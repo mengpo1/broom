@@ -74,6 +74,12 @@ export class AtlasBuilder {
       ctx.translate(x, y);
       item.paint(ctx, item.width, item.height);
       ctx.restore();
+      if (item.meta && item.meta.wrapX) {
+        // tiles repeated along the road: bleed each side edge into the opposite padding
+        const canvas = this.canvases[shelf.layer];
+        ctx.drawImage(canvas, x + item.width - pad, y, pad, item.height, x - pad, y, pad, item.height);
+        ctx.drawImage(canvas, x, y, pad, item.height, x + item.width, y, pad, item.height);
+      }
       const sprite = {
         id: item.id, layer: this.firstLayer + shelf.layer, x, y, w: item.width, h: item.height,
         u0: x / size, v0: y / size, u1: (x + item.width) / size, v1: (y + item.height) / size,

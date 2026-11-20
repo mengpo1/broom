@@ -36,7 +36,7 @@ export async function openGame({ width = 1280, height = 720, hash = '', extraArg
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   page.on('request', (r) => { if (!r.url().startsWith('file://')) requests.push(r.url()); });
   await page.goto(`file://${root}/index.html${hash ? '#' + hash : ''}`);
-  await page.waitForFunction(() => window.virage || document.querySelector('#ui h1'), null, { timeout: 60000 });
+  await page.waitForFunction(() => window.virage || !document.getElementById('notice').hidden, null, { timeout: 60000 });
   const ready = await page.evaluate(() => !!window.virage);
   const close = async () => { await browser.close(); closeDisplay(); };
   return { browser, page, logs, requests, ready, close };

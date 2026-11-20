@@ -8,7 +8,7 @@
 import { TAU, clamp, lerp, saturate, smoothstep, damp } from '../core/math.js';
 import { Random } from '../core/random.js';
 import { AUDIO_TUNING } from './audio-tuning.js';
-import { SmoothParam, createNoiseSource, releaseNodes } from './noise.js';
+import { SmoothParam, createNoiseSource, releaseNodes, setControlRate } from './noise.js';
 
 const E = AUDIO_TUNING.engine;
 const O = AUDIO_TUNING.opponents;
@@ -39,6 +39,13 @@ export function createEngineWave(context, cylinders, seed = 7) {
   return context.createPeriodicWave(real, imag);
 }
 
+/** Square wave with rounded edges (first odd harmonics only): the rev limiter chopper. */
+export function createStutterWave(context) {
+  const real = new Float32Array(8), imag = new Float32Array(8);
+  for (let n = 1; n < 8; n += 2) imag[n] = 1 / n;
+  return context.createPeriodicWave(real, imag);
+}
+
 function makeGain(context, value) {
   const node = context.createGain();
   node.gain.value = value;
@@ -64,7 +71,7 @@ function makeOscillator(context, type, wave, frequency) {
 
 export class PlayerEngineVoice {
   /**
-   * @param res  shared resources: { white, waves: {cylinders: PeriodicWave}, driveCurve, gateCurve }
+   * @param res  shared resources: { white, wander, pops, waves: {cylinders: PeriodicWave}, stutterWave, driveCurve }
    */
   constructor(context, res, destination, cylinders = E.cylinders[0]) {
     this.context = context;
@@ -92,8 +99,8 @@ export class PlayerEngineVoice {
     this.blip.offset.value = 0;
     this.blip.connect(detune);
     this.blip.start();
-    const flutter = run(createNoiseSource(context, res.white, 0.0004, 0.17 * cylinders));
-    const flutterDepth = keep(makeGain(context, E.flutterCents * 2.3));
+    const flutter = run(createNoiseSource(context, res.wander, 0.17 * cylinders));
+    const flutterDepth = keep(makeGain(context, E.flutterCents));
     flutter.connect(flutterDepth); flutterDepth.connect(detune);
 
     // Partials, mixed into the drive gain in front of the distortion.
@@ -102,6 +109,7 @@ export class PlayerEngineVoice {
     const partial = (type, wave, ratio, level) => {
       const osc = run(makeOscillator(context, type, wave, idle * ratio));
       const gain = keep(makeGain(context, level));
+      setControlRate(osc.detune);
       detune.connect(osc.detune);
       osc.connect(gain); gain.connect(drive);
       return { frequency: new SmoothParam(osc.frequency, pitchTau, idle * ratio), gain: new SmoothParam(gain.gain, tau, level) };
@@ -132,7 +140,7 @@ export class PlayerEngineVoice {
     this.bark = new SmoothParam(barkGain.gain, tau, 0);
 
     // Intake roar (direct) and rasp (the same noise fed into the distortion).
-    const air = run(createNoiseSource(context, res.white, 1, 0.31 * cylinders));
+    const air = run(createNoiseSource(context, res.white, 0.31 * cylinders));
     const intake = keep(makeFilter(context, 'bandpass', E.intakeBase, E.intakeQ));
     const intakeGain = keep(makeGain(context, 0));
     const raspGain = keep(makeGain(context, 0));
@@ -142,23 +150,19 @@ export class PlayerEngineVoice {
     this.intake = new SmoothParam(intakeGain.gain, tau, 0);
     this.rasp = new SmoothParam(raspGain.gain, tau, 0);
 
-    // Overrun burble: slow noise gated into sparse pulses, ringing in a low band-pass.
-    const pops = run(createNoiseSource(context, res.white, E.burbleRate, 0.53 * cylinders));
-    const popsBoost = keep(makeGain(context, 2.3));
-    const gate = keep(context.createWaveShaper());
-    gate.curve = res.gateCurve;
+    // Overrun burble: sparse random pulses ringing in a low band-pass.
+    const pops = run(createNoiseSource(context, res.pops, 0.53 * cylinders));
     const popsFilter = keep(makeFilter(context, 'bandpass', E.burbleFrequency, 1.1));
     const popsGain = keep(makeGain(context, 0));
-    pops.connect(popsBoost); popsBoost.connect(gate); gate.connect(popsFilter); popsFilter.connect(popsGain); popsGain.connect(sum);
+    pops.connect(popsFilter); popsFilter.connect(popsGain); popsGain.connect(sum);
     this.burble = new SmoothParam(popsGain.gain, 0.05, 0);
 
-    // Rev limiter: a smoothed square LFO chops the gain and wobbles the pitch.
-    const lfo = run(makeOscillator(context, 'square', null, E.limiterRate));
-    const lfoSmooth = keep(makeFilter(context, 'lowpass', 140, 0.5));
+    // Rev limiter: a rounded square LFO chops the gain and wobbles the pitch.
+    const lfo = run(makeOscillator(context, 'sine', res.stutterWave, E.limiterRate));
     const stutterDepth = keep(makeGain(context, 0));
     const wobble = keep(makeGain(context, 0));
-    lfo.connect(lfoSmooth); lfoSmooth.connect(stutterDepth); stutterDepth.connect(stutter.gain);
-    lfoSmooth.connect(wobble); wobble.connect(detune);
+    lfo.connect(stutterDepth); stutterDepth.connect(stutter.gain);
+    lfo.connect(wobble); wobble.connect(detune);
     this.stutterDepth = new SmoothParam(stutterDepth.gain, 0.012, 0);
     this.wobble = new SmoothParam(wobble.gain, 0.02, 0);
 
@@ -193,7 +197,7 @@ export class PlayerEngineVoice {
     this.sub.frequency.set(crank, time);
     this.wave.gain.set(lerp(E.waveOff, E.waveOn, throttle), time);
     this.saw.gain.set(lerp(E.sawOff, E.sawOn, throttle) * (0.55 + 0.45 * rev), time);
-    this.growl.gain.set(lerp(E.growlOff, E.growlOn, throttle), time);
+    this.growl.gain.set(lerp(E.growlOff, E.growlOn, throttle) * (1 - 0.5 * rev), time);
     this.sub.gain.set(E.subLevel * (1 - 0.6 * rev), time);
 
     this.drive.set(lerp(E.driveOff, E.driveOn, throttle), time);
@@ -269,8 +273,9 @@ export class OpponentEngineVoice {
     this.sources.push(oscWave, oscSaw);
     this.nodes.push(oscWave, oscSaw, waveGain, sawGain, tone, gain, panner);
     this.oscWave = oscWave;
-    this.waveFrequency = new SmoothParam(oscWave.frequency, O.pitchTau, idle * 0.5);
-    this.sawFrequency = new SmoothParam(oscSaw.frequency, O.pitchTau, idle * this.cylinders * 0.5);
+    // One pitch value per render quantum is enough for these voices and halves their cost.
+    this.waveFrequency = new SmoothParam(oscWave.frequency, O.pitchTau, idle * 0.5, true);
+    this.sawFrequency = new SmoothParam(oscSaw.frequency, O.pitchTau, idle * this.cylinders * 0.5, true);
     this.sawGain = new SmoothParam(sawGain.gain, O.gainTau, O.sawLevel);
     this.tone = new SmoothParam(tone.frequency, O.gainTau, O.toneBase, true);
     this.gain = new SmoothParam(gain.gain, O.gainTau, 0);

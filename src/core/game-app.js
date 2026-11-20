@@ -1,72 +1,81 @@
-// Application core: owns the renderer, the current race and the frame loop. Game modes, menus,
-// input devices and audio plug into it; none of them is required for the simulation to run.
+// Application core: owns the renderer, the current race, the views and the frame loop.
+// Simulation runs at a fixed step; presentation reads the simulation and never writes to it.
+// Optional collaborators plug in through small interfaces: input ({ apply(race, app) }),
+// audio ({ update(app, dt), onEvent(e, app) }), ui ({ update(app, dt), drawFront(app, view) }).
 
 import { clamp } from './math.js';
-import { createGpuContext, isSoftwareAdapter } from '../graphics/gpu-context.js';
-import { Renderer, MAX_CARS } from '../graphics/renderer.js';
-import { resolveQuality } from '../graphics/quality.js';
-import { buildWorld } from '../graphics/world-builder.js';
-import { CameraRig, CAMERA_MODE } from '../graphics/cameras.js';
-import { Effects } from '../graphics/particles.js';
-import { buildCarMesh } from '../vehicles/car-mesh.js';
-import { CarVisuals } from '../vehicles/car-visual.js';
+import { DEFAULT_EFFECTS, QUALITY_PRESETS } from './config.js';
+import { createGpuContext, isSoftwareAdapter } from '../rendering/gpu-context.js';
+import { Renderer, MAX_QUADS, MAX_TRACK_SAMPLES } from '../rendering/compositing/renderer.js';
+import { RaceView, CAMERA } from '../rendering/compositing/race-view.js';
+import { QuadBatch } from '../rendering/drawing/quad-batch.js';
+import { buildTrackAttributes } from '../rendering/drawing/track-attributes.js';
+import { SceneBuilder } from '../rendering/drawing/scene-builder.js';
+import { getPalette, shaderColors } from '../art/palettes/palettes.js';
+import { ArtLibrary, CAR_ANGLES } from '../art/art-library.js';
+import { ALL_TEAMS } from '../vehicles/liveries.js';
+import { buildSceneryLayout } from '../tracks/scenery-layout.js';
 import { getCircuit } from '../tracks/track-catalog.js';
 import { buildTrack } from '../tracks/track-builder.js';
 import { Race, RACE_PHASE, SIM_DT } from '../gameplay/race.js';
 import { computeViewRects } from '../multiplayer/split-screen.js';
 
 export class GameApp {
-  constructor(sceneCanvas, hudCanvas) {
-    this.sceneCanvas = sceneCanvas;
-    this.hudCanvas = hudCanvas;
+  constructor(canvas) {
+    this.canvas = canvas;
     this.gpu = null;
     this.renderer = null;
+    this.art = null;             // ArtLibrary: atlases and sprite lookup (set by init)
+    this.scene = null;           // SceneBuilder (set by init)
     this.race = null;
-    this.world = null;
+    this.track = null;
+    this.palette = null;
     this.tracks = new Map();
-    this.visuals = new CarVisuals();
-    this.effects = null;
-    this.rigs = [new CameraRig(), new CameraRig()];
+    this.layouts = new Map();
+    this.layout = null;
+    this.views = [new RaceView(0), new RaceView(1)];
+    this.viewCount = 1;
     this.viewTargets = [0];
     this.splitLayout = 'horizontal';
+    this.effects = { ...DEFAULT_EFFECTS };
+    this.quality = QUALITY_PRESETS.high;
+    this.quads = new QuadBatch(MAX_QUADS);
     this.paused = false;
     this.running = false;
     this.accumulator = 0;
     this.lastTime = 0;
     this.time = 0;
-    this.frameDesc = { time: 0, cameras: [], carCount: 0, particleCount: 0, hideDrivers: [-1, -1] };
     this.listeners = [];
-    this.input = null;     // set by the input layer: { apply(race) }
-    this.audio = null;     // set by the audio layer: { update(app, dt), onEvent(e, app) }
-    this.hud = null;       // set by the UI layer: { draw(app, dt) }
+    this.input = null;
+    this.audio = null;
+    this.ui = null;
     this.forcedSize = null;
-    this.frameHook = null; // benchmark / tests
-    this.stats = { fps: 0, frameMs: 0, simMs: 0, renderMs: 0 };
-    this.worldPose = { tvCameras: [], track: null };
+    this.frameHook = null;
+    this.stats = { fps: 0, frameMs: 0, simMs: 0, buildMs: 0, renderMs: 0 };
+    this.frame = { viewCount: 0, views: [], quads: this.quads, page: { visible: false, alpha: 1, wipe: 1 } };
+    for (const view of this.views) {
+      this.frame.views.push({ rect: view.rect, uniforms: view.uniforms, rows: view.projection.rows, rowCount: 0,
+        sceneStart: 0, sceneCount: 0, frontStart: 0, frontCount: 0, overlay: false, scene: false });
+    }
     this.onFrame = this.onFrame.bind(this);
   }
 
-  async init(qualityId = 'high', qualityOverrides = null, onError = null) {
-    this.gpu = await createGpuContext(this.sceneCanvas, onError);
+  /**
+   * @param options { quality: 'low'|'medium'|'high', onError, artFactory(app) -> ArtLibrary, sceneFactory(app) -> SceneBuilder }
+   */
+  async init(options = {}) {
+    this.gpu = await createGpuContext(this.canvas, options.onError);
     this.softwareAdapter = isSoftwareAdapter(this.gpu.info);
-    this.quality = resolveQuality(qualityId, qualityOverrides);
-    this.renderer = new Renderer(this.gpu, this.quality);
+    this.quality = { ...(QUALITY_PRESETS[options.quality] || QUALITY_PRESETS.high), ...(options.qualityOverrides || {}) };
+    this.renderer = new Renderer(this.gpu, { sampleCount: this.quality.sampleCount, carLayers: CAR_ANGLES * 2 });
     this.renderer.init();
-    this.renderer.setCarMesh(buildCarMesh());
-    this.effects = new Effects(this.renderer, this.quality.particles);
-    this.resize();
-  }
-
-  /** Change quality settings (recreates the renderer's size dependent resources). */
-  setQuality(qualityId, overrides = null) {
-    this.quality = resolveQuality(qualityId, overrides);
-    const world = this.world;
-    this.renderer = new Renderer(this.gpu, this.quality);
-    this.renderer.init();
-    this.renderer.setCarMesh(buildCarMesh());
-    this.effects = new Effects(this.renderer, this.quality.particles);
-    if (world) { this.renderer.setWorld(world); this.effects.reset(world.theme); }
-    this.visuals.reset();
+    this.art = new ArtLibrary(this.renderer);
+    this.art.buildCars();
+    this.art.setLiveries(ALL_TEAMS);
+    if (options.registerArt) options.registerArt(this.art, this);
+    this.art.buildStatic();
+    this.scene = new SceneBuilder(this.art);
+    if (options.attachLayers) options.attachLayers(this.scene, this);
     this.resize(true);
   }
 
@@ -77,29 +86,36 @@ export class GameApp {
   }
 
   on(listener) { this.listeners.push(listener); }
-  emit(type, payload) { for (const l of this.listeners) l(type, payload); }
+  emit(type, payload) { for (let i = 0; i < this.listeners.length; i++) this.listeners[i](type, payload); }
 
   /**
-   * Start a race. config: { circuitId, laps, entries, rules, difficulty, seed, kind, views }
-   * where views lists the car indices to follow (one per screen).
+   * Start a race. config: { circuitId, laps, entries, rules, difficulty, seed, kind, views, cameras }
+   * `views` lists the car indices to follow (one per screen).
    */
   startRace(config) {
     const track = this.getTrack(config.circuitId);
-    if (!this.world || this.world.track !== track) {
-      this.world = buildWorld(track);
-      this.renderer.setWorld(this.world);
-    } else {
-      this.renderer.decalData.fill(0);
-      this.renderer.markDecals(0, this.renderer.decalData.length / 28);
+    let layout = this.layouts.get(track.id);
+    if (!layout) { layout = buildSceneryLayout(track); this.layouts.set(track.id, layout); }
+    this.layout = layout;
+    if (this.track !== track) {
+      this.track = track;
+      this.palette = getPalette(track.theme);
+      this.renderer.setTrackAttributes(buildTrackAttributes(track, MAX_TRACK_SAMPLES));
+      this.art.loadTheme(track, this.palette, layout);
     }
-    this.worldPose.tvCameras = this.world.tvCameras;
-    this.worldPose.track = track;
-    this.effects.reset(this.world.theme);
     this.race = new Race({ ...config, track });
-    if (this.race.cars.length > MAX_CARS) throw new Error(`At most ${MAX_CARS} cars are supported`);
     this.viewTargets = config.views && config.views.length ? config.views.slice(0, 2) : [0];
-    this.visuals.reset();
-    for (const rig of this.rigs) { rig.lastMode = -1; rig.tvIndex = -1; }
+    this.viewCount = this.viewTargets.length;
+    const colors = shaderColors(this.palette);
+    colors.fogDensity = layout.theme.fogDensity;
+    for (let v = 0; v < this.viewCount; v++) {
+      const view = this.views[v];
+      view.carIndex = this.viewTargets[v];
+      view.camera = config.cameras ? config.cameras[v] ?? CAMERA.COCKPIT : CAMERA.COCKPIT;
+      view.configure(track, colors, this.race.rules.flyingStart ? 0 : this.race.cars.length);
+      view.yaw = 0; view.pitch = 0; view.impact = 0; view.flash = 0; view.speedLines = 0;
+    }
+    this.scene.reset(this.race, track, layout);
     this.accumulator = 0;
     this.paused = false;
     this.resize(true);
@@ -112,16 +128,17 @@ export class GameApp {
   setCanvasSize(width, height) { this.forcedSize = { width, height }; this.resize(true); }
 
   resize(force = false) {
-    const canvas = this.sceneCanvas;
+    const canvas = this.canvas;
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     const w = this.forcedSize ? this.forcedSize.width : Math.max(320, Math.round(canvas.clientWidth * ratio));
     const h = this.forcedSize ? this.forcedSize.height : Math.max(200, Math.round(canvas.clientHeight * ratio));
     const changed = canvas.width !== w || canvas.height !== h;
-    if (changed) { canvas.width = w; canvas.height = h; this.hudCanvas.width = w; this.hudCanvas.height = h; }
-    if ((changed || force) && this.renderer) {
-      this.viewRects = computeViewRects(w, h, this.viewTargets.length, this.splitLayout);
-      this.renderer.configureViews(this.viewRects);
-    }
+    if (changed) { canvas.width = w; canvas.height = h; }
+    if (!changed && !force) return;
+    if (this.renderer) this.renderer.resize(w, h);
+    const rects = computeViewRects(w, h, this.viewCount, this.splitLayout);
+    for (let v = 0; v < this.viewCount; v++) this.views[v].setRect(rects[v].x, rects[v].y, rects[v].w, rects[v].h);
+    this.emit('resize', null);
   }
 
   start() {
@@ -140,7 +157,6 @@ export class GameApp {
     this.lastTime = now;
     this.resize();
     const t0 = performance.now();
-    let alpha = 1;
     if (this.race && !this.paused) {
       this.accumulator += dt;
       let steps = 0;
@@ -150,12 +166,10 @@ export class GameApp {
         steps++;
       }
       if (steps === 16) this.accumulator = 0;
-      alpha = this.accumulator / SIM_DT;
     }
     const t1 = performance.now();
-    this.present(this.paused ? 0 : dt, alpha);
-    const t2 = performance.now();
-    this.stats.simMs = t1 - t0; this.stats.renderMs = t2 - t1; this.stats.frameMs = dt * 1000;
+    this.present(dt, this.paused ? 0 : this.accumulator);
+    this.stats.simMs = t1 - t0; this.stats.frameMs = dt * 1000;
     this.stats.fps = this.stats.fps * 0.95 + (dt > 0 ? 1 / dt : 0) * 0.05;
     if (this.frameHook) this.frameHook(dt, this);
   }
@@ -170,42 +184,45 @@ export class GameApp {
   }
 
   dispatch(event) {
-    const race = this.race;
-    if (event.type === 'wall' || event.type === 'contact') {
-      const car = race.cars[event.car];
-      if (event.value > 2.5 && this.effects) {
-        const i = car.segIndex, track = race.track;
-        const side = event.type === 'wall' ? Math.sign(car.d) : 0;
-        this.effects.sparks(car.x + track.nx[i] * side * 0.9, car.y, car.z + track.nz[i] * side * 0.9, Math.cos(car.heading), Math.sin(car.heading), event.value);
-      }
-      this.visuals.addImpact(event.car, clamp(event.value / 18, 0.05, 1));
-      if (event.other >= 0) this.visuals.addImpact(event.other, clamp(event.value / 18, 0.05, 1));
-    } else if (event.type === 'crash') this.visuals.addImpact(event.car, 1);
+    if (this.scene) this.scene.onEvent(event, this);
     if (this.audio) this.audio.onEvent(event, this);
+    if (this.ui) this.ui.onRaceEvent(event, this);
     this.emit(event.type, event);
   }
 
-  /** Update presentation state and draw. */
-  present(dt, alpha) {
-    const race = this.race, renderer = this.renderer;
-    if (!race || !renderer) return;
+  /** Update presentation state and draw. `ahead` = seconds since the last simulation tick. */
+  present(dt, ahead) {
+    const renderer = this.renderer;
+    if (!renderer) return;
+    const t0 = performance.now();
+    const race = this.race, frame = this.frame, quads = this.quads;
+    const simDt = this.paused ? 0 : dt;
     this.time += dt;
-    this.visuals.update(race, alpha, dt, renderer.carInstanceData);
-    const frame = this.frameDesc;
-    frame.time = this.time;
-    frame.carCount = race.cars.length;
-    frame.particleCount = this.effects.update(race, this.visuals, dt);
-    frame.cameras.length = this.viewTargets.length;
-    for (let v = 0; v < this.viewTargets.length; v++) {
-      const index = this.viewTargets[v], rig = this.rigs[v];
-      rig.update(dt, this.visuals.poses[index], race.cars[index], this.worldPose);
-      frame.cameras[v] = rig.camera;
-      frame.hideDrivers[v] = rig.mode === CAMERA_MODE.COCKPIT ? index : -1;
+    quads.reset();
+    if (this.ui) this.ui.update(this, dt);
+    frame.viewCount = race ? this.viewCount : 0;
+    if (race) {
+      if (this.scene) this.scene.update(this, simDt, ahead);
+      for (let v = 0; v < this.viewCount; v++) {
+        const view = this.views[v], fv = frame.views[v];
+        view.update(simDt, race, this.effects, ahead);
+        const car = race.cars[view.carIndex];
+        view.writeUniforms(this.time, car.speed, this.time * 0.0016, this.quality.detail);
+        fv.rowCount = view.projection.height; fv.scene = true;
+        fv.sceneStart = quads.count;
+        if (this.scene) this.scene.buildView(this, view);
+        fv.sceneCount = quads.count - fv.sceneStart;
+        fv.overlay = view.speedLines > 0.004 || view.flash > 0.004;
+        fv.frontStart = quads.count;
+        if (this.scene) this.scene.buildFront(this, view);
+        if (this.ui) this.ui.drawFront(this, view);
+        fv.frontCount = quads.count - fv.frontStart;
+      }
     }
+    const t1 = performance.now();
     renderer.render(frame);
-    this.visuals.endFrame();
     if (this.audio) this.audio.update(this, dt);
-    if (this.hud) this.hud.draw(this, dt);
+    this.stats.buildMs = t1 - t0; this.stats.renderMs = performance.now() - t1;
   }
 
   /**
@@ -214,7 +231,7 @@ export class GameApp {
    */
   async advanceFrame(ticks = 2) {
     if (this.race && !this.paused) for (let i = 0; i < ticks; i++) this.simulate();
-    this.present(ticks * SIM_DT, 1);
+    this.present(ticks * SIM_DT, 0);
     await this.gpu.device.queue.onSubmittedWorkDone();
   }
 

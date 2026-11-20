@@ -11,8 +11,8 @@
 
 import { clamp, saturate } from '../core/math.js';
 import { AUDIO_TUNING } from './audio-tuning.js';
-import { NOISE_WHITE, NOISE_PINK, NOISE_BROWN, SmoothParam, createNoiseBuffer, makeDriveCurve, makeGateCurve, makeLimiterCurve } from './noise.js';
-import { PlayerEngineVoice, OpponentEngineVoice, createEngineWave } from './engine-voice.js';
+import { NOISE_WHITE, NOISE_PINK, NOISE_BROWN, SmoothParam, createNoiseBuffer, createControlBuffer, createPulseBuffer, makeDriveCurve, makeLimiterCurve } from './noise.js';
+import { PlayerEngineVoice, OpponentEngineVoice, createEngineWave, createStutterWave } from './engine-voice.js';
 import { CarNoise } from './car-noise.js';
 import { CrowdAmbience } from './ambience.js';
 import { SfxPlayer } from './sfx.js';
@@ -52,6 +52,9 @@ export class GameAudio {
     this.suspended = false;
     this.scene = 'race';
     this.paused = false;
+    this.stalled = false;        // update() stopped coming (hidden tab, race left without setScene)
+    this.lastUpdate = 0;
+    this.watchdog = 0;
     this.suspendTimer = 0;
     this.detachToken = 0;
     this.raceAttached = false;
@@ -122,6 +125,7 @@ export class GameAudio {
     if (scene === this.scene) return;
     this.scene = scene;
     this.paused = false;
+    this.stalled = false;
     if (this.ready) this.applyScene();
   }
 
@@ -129,6 +133,7 @@ export class GameAudio {
     if (this.disposed) return;
     this.disposed = true;
     if (this.suspendTimer) { clearTimeout(this.suspendTimer); this.suspendTimer = 0; }
+    if (this.watchdog) { clearInterval(this.watchdog); this.watchdog = 0; }
     if (this.ready) {
       this.ready = false;
       for (let v = 0; v < this.slots.length; v++) {
@@ -155,9 +160,13 @@ export class GameAudio {
       white: createNoiseBuffer(context, 2.5, NOISE_WHITE, 11),
       pink: createNoiseBuffer(context, 3.5, NOISE_PINK, 23),
       brown: createNoiseBuffer(context, 3, NOISE_BROWN, 37),
+      wander: createControlBuffer(context, 10, MIX.wanderRate, 41),
+      flutter: createControlBuffer(context, 6, MIX.flutterRate, 43),
+      pops: createPulseBuffer(context, 4, ENGINE.burbleRate, 0.0012, 0.003, 47),
+      grit: createPulseBuffer(context, 3, AUDIO_TUNING.surface.gravelGrit, 0.0005, 0.002, 53),
       waves: {},
+      stutterWave: createStutterWave(context),
       driveCurve: makeDriveCurve(ENGINE.driveAsymmetry),
-      gateCurve: makeGateCurve(ENGINE.burbleThreshold),
     };
     const layouts = ENGINE.cylinders.concat(OPPONENTS.cylinders);
     for (let i = 0; i < layouts.length; i++) {
@@ -188,6 +197,7 @@ export class GameAudio {
     compressor.release.value = MIX.compressorRelease;
     compressor.connect(post);
     this.nodes.push(limiter, compressor);
+    this.compressor = compressor; // compressor.reduction can be shown by a debug overlay
     const mix = gain(1);
     mix.connect(compressor);
     const gate = gain(1);
@@ -214,7 +224,7 @@ export class GameAudio {
     this.uiGain = new SmoothParam(uiBus.gain, tau, 0);
     this.raceEnginesGain = new SmoothParam(this.raceEngines.gain, tau, 0);
     this.raceFxGain = new SmoothParam(this.raceFx.gain, tau, 0);
-    this.crowdGain = new SmoothParam(this.crowdIn.gain, tau * 4, 0);
+    this.crowdGain = new SmoothParam(this.crowdIn.gain, tau, 0);
 
     this.sfx = new SfxPlayer(context, res, this.effectsBus, uiBus);
     this.crowd = new CrowdAmbience(context, res, this.crowdIn);
@@ -223,6 +233,13 @@ export class GameAudio {
     this.ensureSlot(0);
     this.applySettings();
     this.applyScene();
+    // Engines must not drone on when the frames stop (hidden tab...): a slow timer checks update() is alive.
+    if (!this.offline) this.watchdog = setInterval(() => this.checkStall(), 250);
+  }
+
+  checkStall() {
+    if (!this.ready || this.stalled || this.paused || this.scene !== 'race') return;
+    if (this.context.currentTime - this.lastUpdate > MIX.stallTime) { this.stalled = true; this.applyScene(); }
   }
 
   ensureSlot(index) {
@@ -250,7 +267,7 @@ export class GameAudio {
   applyScene() {
     const time = this.context.currentTime;
     const race = this.scene === 'race';
-    const level = race && !this.paused ? 1 : 0;
+    const level = race && !this.paused && !this.stalled ? 1 : 0;
     this.raceEnginesGain.set(level, time);
     this.raceFxGain.set(level, time);
     this.crowdGain.set(race ? level : this.scene === 'results' ? MIX.resultsCrowd : 0, time);
@@ -343,7 +360,8 @@ export class GameAudio {
     if (!race) return;
     const time = this.context.currentTime;
     const paused = !!app.paused;
-    if (paused !== this.paused) { this.paused = paused; this.applyScene(); }
+    this.lastUpdate = time;
+    if (paused !== this.paused || this.stalled) { this.paused = paused; this.stalled = false; this.applyScene(); }
     if (paused) return;
 
     const cars = race.cars, targets = app.viewTargets, slots = this.slots;
@@ -521,6 +539,7 @@ export class GameAudio {
     if (!this.ready || this.suspended || !this.settings.enabled || this.scene !== 'race') return;
     const time = this.context.currentTime, sfx = this.sfx, hear = this.hear;
     const type = event.type, index = event.car;
+    const value = Number.isFinite(event.value) ? event.value : 0;
     switch (type) {
       case 'light':
         sfx.startLight(time);
@@ -533,7 +552,7 @@ export class GameAudio {
         const targets = app.viewTargets;
         let mine = false;
         for (let v = 0; v < 2; v++) {
-          if (this.slots[v] && targets && v < targets.length && targets[v] === index) { this.slots[v].engine.shift(event.value, time); mine = true; }
+          if (this.slots[v] && targets && v < targets.length && targets[v] === index) { this.slots[v].engine.shift(value, time); mine = true; }
         }
         if (!mine) {
           const v = this.voiceOf(index);
@@ -549,21 +568,21 @@ export class GameAudio {
           if (this.locate(event.other, app) > gain) gain = hear.gain;
           else { hear.gain = gain; hear.pan = pan; hear.slot = slot; }
         }
-        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, event.value, type === 'wall', time);
+        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, Math.abs(value), type === 'wall', time);
         break;
       }
       case 'crash':
         if (this.locate(index, app) > 0.02) sfx.crash(hear.pan, hear.gain, time);
         break;
       case 'puncture':
-        if (this.locate(index, app) > 0.02) sfx.puncture(hear.pan, hear.gain, Math.abs(app.race.cars[index].speed), time);
+        if (this.locate(index, app) > 0.02) sfx.puncture(hear.pan, hear.gain, Math.abs(app.race.cars[index].speed) || 0, time);
         break;
       case 'lap':
         if (this.slotOf(index, app) >= 0) sfx.lap(event.other === 1, time);
         break;
       case 'finish':
         if (this.slotOf(index, app) >= 0) { sfx.finish(time); this.crowd.cheer(CROWD.cheerFinish, time); }
-        else if (event.value === 1) this.crowd.cheer(CROWD.cheerOther, time);
+        else if (value === 1) this.crowd.cheer(CROWD.cheerOther, time);
         break;
       case 'overtake':
         if (this.locate(index, app) === 1) { this.crowd.cheer(CROWD.cheerOvertake, time); sfx.whoosh(hear.pan, true, 0.5, time); }

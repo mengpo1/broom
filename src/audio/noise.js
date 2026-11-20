@@ -1,5 +1,6 @@
-// Building blocks shared by every sound generator: seamless noise buffers, looping noise
-// sources, waveshaper curves and a de-zippered AudioParam wrapper.
+// Building blocks shared by every sound generator: seamless noise, control and pulse buffers,
+// looping sources, waveshaper curves and a de-zippered AudioParam wrapper.
+// Every buffer is played at its natural rate: resampled playback is ten times more expensive.
 
 import { Random } from '../core/random.js';
 
@@ -51,12 +52,58 @@ export function createNoiseBuffer(context, seconds, color, seed, rms = 0.25) {
   return buffer;
 }
 
-/** Start a looping source on a noise buffer. `offset` (0..1) decorrelates sources sharing a buffer. */
-export function createNoiseSource(context, buffer, playbackRate = 1, offset = 0) {
+/**
+ * Slow random control signal in -1..1: random points, `pointsPerSecond` of them, joined by
+ * smooth (cosine) interpolation. The last point joins the first one: seamless loop.
+ */
+export function createControlBuffer(context, seconds, pointsPerSecond, seed) {
+  const rate = context.sampleRate;
+  const count = Math.max(2, Math.round(seconds * pointsPerSecond));
+  const length = Math.floor((count / pointsPerSecond) * rate);
+  const buffer = context.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const rng = new Random(seed);
+  const points = new Float32Array(count);
+  for (let i = 0; i < count; i++) points[i] = rng.next() * 2 - 1;
+  for (let i = 0; i < length; i++) {
+    const f = (i / length) * count;
+    const k = Math.floor(f);
+    const t = 0.5 - 0.5 * Math.cos((f - k) * Math.PI);
+    data[i] = points[k % count] + (points[(k + 1) % count] - points[k % count]) * t;
+  }
+  return buffer;
+}
+
+/**
+ * Sparse random pulses (0..1): raised-cosine bumps of random width and height at random times,
+ * `pulsesPerSecond` on average. Band-passed they pop (overrun burble), as a gain they crackle.
+ */
+export function createPulseBuffer(context, seconds, pulsesPerSecond, minWidth, maxWidth, seed) {
+  const rate = context.sampleRate;
+  const length = Math.floor(seconds * rate);
+  const buffer = context.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const rng = new Random(seed);
+  let time = 0;
+  for (;;) {
+    time += -Math.log(1 - rng.next()) / pulsesPerSecond; // Poisson arrivals
+    if (time >= seconds) break;
+    const width = Math.max(2, Math.floor((minWidth + (maxWidth - minWidth) * rng.next()) * rate));
+    const height = 0.35 + 0.65 * rng.next();
+    const start = Math.floor(time * rate);
+    for (let i = 0; i < width; i++) {
+      const index = (start + i) % length; // a pulse cut by the end continues at the start
+      data[index] = Math.min(1, data[index] + height * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / width)));
+    }
+  }
+  return buffer;
+}
+
+/** Start a looping source on a buffer. `offset` (0..1) decorrelates sources sharing a buffer. */
+export function createNoiseSource(context, buffer, offset = 0) {
   const source = context.createBufferSource();
   source.buffer = buffer;
   source.loop = true;
-  source.playbackRate.value = playbackRate;
   source.start(0, (offset % 1) * buffer.duration);
   return source;
 }
@@ -72,16 +119,6 @@ export function makeDriveCurve(asymmetry = 0.2, hardness = 2.2, samples = 2049) 
     peak = Math.max(peak, Math.abs(curve[i]));
   }
   for (let i = 0; i < samples; i++) curve[i] /= peak;
-  return curve;
-}
-
-/** Gate: silent below `threshold`, then rising to 1. Turns slow noise into sparse pulses. */
-export function makeGateCurve(threshold = 0.5, power = 1.5, samples = 1025) {
-  const curve = new Float32Array(samples);
-  for (let i = 0; i < samples; i++) {
-    const x = (i / (samples - 1)) * 2 - 1;
-    curve[i] = x > threshold ? Math.pow((x - threshold) / (1 - threshold), power) : 0;
-  }
   return curve;
 }
 
@@ -102,6 +139,14 @@ export function makeLimiterCurve(knee, ceiling, range, samples = 8193) {
 }
 
 /**
+ * One value per render quantum (3 ms) instead of one per sample: enough for filters and
+ * modulation inputs, and several times cheaper to process.
+ */
+export function setControlRate(param) {
+  try { param.automationRate = 'k-rate'; } catch (error) { /* fixed rate parameter */ }
+}
+
+/**
  * AudioParam driven once per frame without zipper noise: every change is an exponential approach
  * (setTargetAtTime). Unchanged targets are skipped so the automation timeline stays short.
  */
@@ -110,14 +155,14 @@ export class SmoothParam {
     this.param = param;
     this.tau = tau;
     this.target = value;
-    // Filter parameters only need one value per render quantum: much cheaper coefficient updates.
-    if (controlRate) { try { param.automationRate = 'k-rate'; } catch (error) { /* fixed rate parameter */ } }
+    if (controlRate) setControlRate(param);
     param.value = value;
   }
 
   set(value, time) {
+    if (!Number.isFinite(value)) return; // a NaN from the simulation must never reach the audio graph
     const delta = value - this.target;
-    const tolerance = 1e-7 + 1e-5 * (this.target < 0 ? -this.target : this.target);
+    const tolerance = 1e-7 + 4e-4 * (this.target < 0 ? -this.target : this.target); // under 1 cent / 0.004 dB
     if (delta < tolerance && delta > -tolerance) return;
     this.target = value;
     this.param.setTargetAtTime(value, time, this.tau);
@@ -125,6 +170,7 @@ export class SmoothParam {
 
   /** Jump without smoothing (only for silent voices). */
   jump(value, time) {
+    if (!Number.isFinite(value)) return;
     this.target = value;
     this.param.cancelScheduledValues(time);
     this.param.setValueAtTime(value, time);

@@ -1,9 +1,9 @@
 // Renders the lettering specimen (src/art/styles/dev-lettering-specimen.js) to work/renders/.
 //   node work/scripts/lettering-specimen.mjs
-//     -> lettering-specimen.png (main sheet), lettering-specimen-charset.png (160 px charset),
-//        lettering-specimen-styles.png (bold and impact charsets)
+//     -> lettering-specimen.png (main sheet), lettering-specimen-charset-a.png and -charset-b.png
+//        (full charset at 160 px cap height), lettering-specimen-styles.png (bold and impact)
 //   node work/scripts/lettering-specimen.mjs <sheet> <out.png> [x,y,w,h]
-//     -> one sheet (main | charset | styles), optionally cropped to inspect details
+//     -> one sheet (main | charset-a | charset-b | styles), optionally cropped to inspect details
 import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { openStandalone, root } from './lib-browser.mjs';
@@ -14,7 +14,8 @@ const jobs = sheet
   ? [{ sheet, out: out || `work/renders/lettering-specimen-${sheet}.png`, clip }]
   : [
     { sheet: 'main', out: 'work/renders/lettering-specimen.png' },
-    { sheet: 'charset', out: 'work/renders/lettering-specimen-charset.png' },
+    { sheet: 'charset-a', out: 'work/renders/lettering-specimen-charset-a.png' },
+    { sheet: 'charset-b', out: 'work/renders/lettering-specimen-charset-b.png' },
     { sheet: 'styles', out: 'work/renders/lettering-specimen-styles.png' },
   ];
 

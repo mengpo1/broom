@@ -9,7 +9,7 @@ import { SmoothParam, createNoiseSource, releaseNodes } from './noise.js';
 const C = AUDIO_TUNING.crowd;
 
 export class CrowdAmbience {
-  /** @param res shared resources: { white, pink } noise buffers */
+  /** @param res shared resources: { pink, wander } buffers */
   constructor(context, res, destination) {
     this.context = context;
     this.sources = [];
@@ -27,13 +27,13 @@ export class CrowdAmbience {
     };
     const gain = (value) => { const node = keep(context.createGain()); node.gain.value = value; return node; };
 
-    // Two decorrelated voices bands, left and right, each modulated by its own slow noise.
+    // Decorrelated bands of voices, left and right, each modulated by its own slow noise.
     const band = (offset, frequency, q, pan, level) => {
-      const source = run(createNoiseSource(context, res.pink, 1, offset));
+      const source = run(createNoiseSource(context, res.pink, offset));
       const formant = filter('bandpass', frequency, q);
       const amp = gain(level);
-      const texture = run(createNoiseSource(context, res.white, C.textureRate * (1 + offset), offset + 0.31));
-      const depth = gain(level * C.texture * 2.3);
+      const texture = run(createNoiseSource(context, res.wander, offset + 0.31));
+      const depth = gain(level * C.texture);
       const panner = keep(context.createStereoPanner());
       panner.pan.value = pan;
       source.connect(formant); formant.connect(amp); amp.connect(panner);

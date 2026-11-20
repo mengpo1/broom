@@ -4,7 +4,7 @@
 
 import { clamp, lerp, saturate, smoothstep } from '../core/math.js';
 import { AUDIO_TUNING } from './audio-tuning.js';
-import { SmoothParam, createNoiseSource, releaseNodes } from './noise.js';
+import { SmoothParam, createNoiseSource, releaseNodes, setControlRate } from './noise.js';
 
 const W = AUDIO_TUNING.wind;
 const T = AUDIO_TUNING.tyres;
@@ -12,7 +12,6 @@ const S = AUDIO_TUNING.surface;
 const B = AUDIO_TUNING.brake;
 const SURFACE_ASPHALT = 0, SURFACE_KERB = 1, SURFACE_GRASS = 2, SURFACE_GRAVEL = 3, SURFACE_PIT = 4;
 const CAR_RESET = 3;
-const SLOW_NOISE_PEAK = 2.3; // brings the slow control noise (RMS 0.25, uniform) to a -1..1 range
 
 function makeGain(context, value) {
   const node = context.createGain();
@@ -29,7 +28,7 @@ function makeFilter(context, type, frequency, q) {
 }
 
 export class CarNoise {
-  /** @param res shared resources: { white, pink, brown } noise buffers */
+  /** @param res shared resources: { white, pink, brown, wander, flutter, grit } buffers */
   constructor(context, res, destination, seed = 0) {
     this.sources = [];
     this.nodes = [];
@@ -40,17 +39,18 @@ export class CarNoise {
     const panner = keep(context.createStereoPanner());
     panner.connect(destination);
     this.pan = new SmoothParam(panner.pan, 0.08, 0);
-    const white = run(createNoiseSource(context, res.white, 1, phase + 0.4));
-    const pink = run(createNoiseSource(context, res.pink, 1, phase + 0.2));
-    const brown = run(createNoiseSource(context, res.brown, 1, phase));
-    const wander = run(createNoiseSource(context, res.white, W.buffetRate, phase + 0.7)); // slow random control signal
+    const white = run(createNoiseSource(context, res.white, phase + 0.4));
+    const pink = run(createNoiseSource(context, res.pink, phase + 0.2));
+    const brown = run(createNoiseSource(context, res.brown, phase));
+    const gusts = run(createNoiseSource(context, res.flutter, phase + 0.7));  // random control signals
+    const wander = run(createNoiseSource(context, res.wander, phase + 0.3));
 
-    // Wind: band-passed pink noise opening with speed, buffeted by the slow noise (stronger in a slipstream).
+    // Wind: band-passed pink noise opening with speed, buffeted by random gusts (stronger in a slipstream).
     const windFilter = keep(makeFilter(context, 'bandpass', W.lowFrequency, W.q));
     const windGain = keep(makeGain(context, 0));
     const buffet = keep(makeGain(context, 0));
     pink.connect(windFilter); windFilter.connect(windGain); windGain.connect(panner);
-    wander.connect(buffet); buffet.connect(windGain.gain);
+    gusts.connect(buffet); buffet.connect(windGain.gain);
     this.windFrequency = new SmoothParam(windFilter.frequency, W.tau, W.lowFrequency, true);
     this.wind = new SmoothParam(windGain.gain, W.tau, 0);
     this.buffet = new SmoothParam(buffet.gain, W.tau, 0);
@@ -78,7 +78,8 @@ export class CarNoise {
     wobble.frequency.value = T.wobbleRate * (1 + 0.07 * seed);
     wobble.start();
     const wobbleDepth = keep(makeGain(context, T.wobbleCents));
-    const driftDepth = keep(makeGain(context, T.driftCents * SLOW_NOISE_PEAK));
+    const driftDepth = keep(makeGain(context, T.driftCents));
+    setControlRate(squealA.detune); setControlRate(squealB.detune);
     wobble.connect(wobbleDepth); wander.connect(driftDepth);
     wobbleDepth.connect(squealA.detune); wobbleDepth.connect(squealB.detune);
     driftDepth.connect(squealA.detune); driftDepth.connect(squealB.detune);
@@ -111,12 +112,12 @@ export class CarNoise {
     brown.connect(roughFilter); roughFilter.connect(roughGain); roughGain.connect(panner);
     this.rough = new SmoothParam(roughGain.gain, S.tau, 0);
     const gravelBand = keep(makeFilter(context, 'bandpass', S.gravelFrequency, 0.6));
-    const gravelChop = keep(makeGain(context, 0.5));
+    const gravelChop = keep(makeGain(context, 0.3));
     const gravelGain = keep(makeGain(context, 0));
-    const crackle = run(createNoiseSource(context, res.white, S.gravelCrackle, phase + 0.55));
-    const crackleDepth = keep(makeGain(context, 0.5 * SLOW_NOISE_PEAK));
+    const grit = run(createNoiseSource(context, res.grit, phase + 0.55)); // every pulse is a stone
+    const gritDepth = keep(makeGain(context, 1.4));
     white.connect(gravelBand); gravelBand.connect(gravelChop); gravelChop.connect(gravelGain); gravelGain.connect(panner);
-    crackle.connect(crackleDepth); crackleDepth.connect(gravelChop.gain);
+    grit.connect(gritDepth); gritDepth.connect(gravelChop.gain);
     this.gravel = new SmoothParam(gravelGain.gain, S.tau, 0);
 
     // Brake hiss.
@@ -140,7 +141,7 @@ export class CarNoise {
     const wind = W.level * Math.pow(v, W.exponent) * (1 - 0.25 * draft) * level;
     this.wind.set(wind, time);
     this.windFrequency.set(lerp(W.lowFrequency, W.highFrequency, v), time);
-    this.buffet.set(wind * Math.min(0.9, W.buffet * v + W.draftBuffet * draft) * SLOW_NOISE_PEAK, time);
+    this.buffet.set(wind * Math.min(0.9, W.buffet * v + W.draftBuffet * draft), time);
     this.hiss.set(W.hissLevel * Math.pow(v, W.hissExponent) * level, time);
     this.road.set(W.roadLevel * Math.pow(v, 0.8) * (tarmac ? 1 : 0.5) * level, time);
     this.roadFrequency.set(lerp(W.roadLow, W.roadHigh, v), time);

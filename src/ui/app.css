@@ -1,6 +1,4 @@
-html, body { margin: 0; height: 100%; background: #05070a; overflow: hidden; color: #eef1f5;
-  font-family: "Helvetica Neue", "Segoe UI", "DejaVu Sans", Arial, sans-serif; user-select: none; }
-#scene, #hud { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
-#hud { pointer-events: none; }
-#ui { position: fixed; inset: 0; pointer-events: none; }
-#ui > * { pointer-events: auto; }
+html, body { margin: 0; height: 100%; background: #16161f; overflow: hidden; user-select: none; }
+#scene { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+#notice { position: fixed; inset: 20vh 10vw auto; padding: 24px; background: #f4efe2; color: #16161f;
+  font: 20px/1.4 sans-serif; border: 4px solid #16161f; }

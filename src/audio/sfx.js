@@ -47,7 +47,7 @@ export class SfxPlayer {
   }
 
   bus(pan) {
-    const index = clamp(Math.round((pan + 0.8) / 0.4), 0, PANS.length - 1);
+    const index = Number.isFinite(pan) ? clamp(Math.round((pan + 0.8) / 0.4), 0, PANS.length - 1) : 2;
     return this.buses[index];
   }
 
@@ -69,7 +69,7 @@ export class SfxPlayer {
 
   /** Oscillator with a pitch glide f0 -> f1 and a percussive envelope. */
   tone(destination, time, type, f0, f1, attack, decay, level) {
-    if (this.active >= X.maxActive || level <= 0) return;
+    if (this.active >= X.maxActive || !(level > 0)) return;
     const context = this.context;
     const osc = context.createOscillator();
     osc.type = type;
@@ -83,7 +83,7 @@ export class SfxPlayer {
 
   /** Steady tone with short fades. */
   beep(destination, time, type, frequency, duration, level) {
-    if (this.active >= X.maxActive || level <= 0) return;
+    if (this.active >= X.maxActive || !(level > 0)) return;
     const context = this.context;
     const osc = context.createOscillator();
     osc.type = type;
@@ -98,7 +98,7 @@ export class SfxPlayer {
 
   /** Filtered noise burst with a filter sweep f0 -> f1. */
   noise(destination, time, buffer, type, f0, f1, q, attack, decay, level) {
-    if (this.active >= X.maxActive || level <= 0) return;
+    if (this.active >= X.maxActive || !(level > 0)) return;
     const context = this.context;
     const source = context.createBufferSource();
     source.buffer = buffer;
@@ -116,7 +116,7 @@ export class SfxPlayer {
 
   /** Noise chopped by a square LFO (rattle), with a flat envelope. */
   rattle(destination, time, frequency, q, rate, duration, level) {
-    if (this.active >= X.maxActive || level <= 0) return;
+    if (this.active >= X.maxActive || !(level > 0)) return;
     const context = this.context;
     const source = context.createBufferSource();
     source.buffer = this.res.white;
@@ -144,7 +144,7 @@ export class SfxPlayer {
 
   /** Series of soft slaps at a fixed rate, fading out: a flat tyre beating the bodywork. */
   flaps(destination, time, rate, count, level) {
-    if (this.active >= X.maxActive || level <= 0) return;
+    if (this.active >= X.maxActive || !(level > 0)) return;
     const context = this.context;
     const source = context.createBufferSource();
     source.buffer = this.res.pink;
@@ -197,7 +197,7 @@ export class SfxPlayer {
         this.beep(out, time + 0.13, 'sawtooth', 110, 0.16, level * 0.9);
         break;
       case 'panel': // a page of the comic being turned: soft swish plus a papery flick
-        this.noise(this.uiOut, time, this.res.pink, 'bandpass', 420, 2600, 0.8, 0.07, 0.22, level * 1.6);
+        this.noise(this.uiOut, time, this.res.pink, 'bandpass', 420, 2600, 0.8, 0.07, 0.22, level * 4);
         this.noise(this.uiOut, time + 0.05, this.res.white, 'highpass', 3200, 5200, 0.7, 0.02, 0.09, level * 0.5);
         break;
       default:
@@ -216,7 +216,7 @@ export class SfxPlayer {
     this.lastImpact[slot] = time;
     const out = this.bus(pan), white = this.res.white;
     if (speed < X.scrapeSpeed) {
-      this.noise(out, time, white, 'bandpass', 1500, 900, 1.2, 0.004, 0.08, 0.16 * level);
+      this.noise(out, time, white, 'bandpass', 1500, 900, 1.2, 0.004, 0.09, 1.1 * level);
       return;
     }
     const s = saturate(speed / X.impactSpeedFull);
@@ -274,8 +274,8 @@ export class SfxPlayer {
   /** Airy pass-by: rising when gaining a place, falling when losing one. */
   whoosh(pan, rising, level, time) {
     const out = this.bus(pan);
-    if (rising) this.noise(out, time, this.res.pink, 'bandpass', 500, 2400, 1.3, 0.12, 0.26, 0.6 * level);
-    else this.noise(out, time, this.res.pink, 'bandpass', 1900, 380, 1.3, 0.1, 0.3, 0.6 * level);
+    if (rising) this.noise(out, time, this.res.pink, 'bandpass', 500, 2400, 1.3, 0.12, 0.26, 2 * level);
+    else this.noise(out, time, this.res.pink, 'bandpass', 1900, 380, 1.3, 0.1, 0.3, 2 * level);
   }
 
   /** Pit stop: the car drops on its jacks and four wheel guns rattle. */
