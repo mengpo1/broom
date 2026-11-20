@@ -34,8 +34,8 @@ export async function createGpuContext(canvas, onError) {
     features: [...adapter.features],
     limits: {
       maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
+      maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers,
       maxBufferSize: adapter.limits.maxBufferSize,
-      maxColorAttachments: adapter.limits.maxColorAttachments,
     },
   };
 }

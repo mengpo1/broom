@@ -1,0 +1,37 @@
+// Externalised presentation parameters. Nothing here affects the simulation.
+// Angles in radians, distances in metres, times in seconds unless stated otherwise.
+
+export const VIEW_CONFIG = {
+  hfov: 1.5,                 // horizontal field of view of the cockpit camera at rest (about 86 degrees)
+  hfovSpeedGain: 0.16,       // extra field of view at top speed ("perspective stretch")
+  hfovBrakeLoss: 0.05,       // field of view removed under hard braking ("compression")
+  horizonRatio: 0.43,        // horizon height as a fraction of the view height (full-height view)
+  horizonRatioWide: 0.4,     // same for the short views of the horizontal split screen
+  eyeHeight: 0.84,           // driver's eye above the road
+  eyeForward: -0.15,         // eye position along the car, relative to its centre
+  drawDistance: 1300,
+  yawFollow: 0.82,           // share of the car's heading error shown as view rotation
+  pitchFollow: 0.55,         // share of the road grade applied to the horizon
+  chase: { back: 8.5, height: 2.3, side: 0 },
+  front: { ahead: 13, height: 1.25, side: 1.6 },
+  tv: { height: 3.2 },
+};
+
+/** Visual effects, each can be switched off individually (Options menu / saved settings). */
+export const DEFAULT_EFFECTS = {
+  speedLines: true,          // radial pen lines at the edge of the view
+  perspectiveStretch: true,  // field of view breathing with speed / braking
+  cockpitShake: true,        // vibration of the cockpit and view
+  impactFrames: true,        // flash, burst lines and view jolt on contacts
+  onomatopoeia: true,        // lettered sound words on big impacts and at the start
+  dust: true,                // drawn dust and smoke puffs
+  skidMarks: true,           // tyre marks on the asphalt
+  insets: true,              // small caption panels (overtakes, fastest lap...)
+  introPanels: true,         // comic strip shown before a race
+};
+
+export const QUALITY_PRESETS = {
+  low: { sampleCount: 1, detail: 0.6, propDistance: 500, maxProps: 500 },
+  medium: { sampleCount: 1, detail: 1, propDistance: 800, maxProps: 900 },
+  high: { sampleCount: 4, detail: 1, propDistance: 1100, maxProps: 1400 },
+};
