@@ -1,0 +1,6 @@
+html, body { margin: 0; height: 100%; background: #05070a; overflow: hidden; color: #eef1f5;
+  font-family: "Helvetica Neue", "Segoe UI", "DejaVu Sans", Arial, sans-serif; user-select: none; }
+#scene, #hud { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+#hud { pointer-events: none; }
+#ui { position: fixed; inset: 0; pointer-events: none; }
+#ui > * { pointer-events: auto; }
