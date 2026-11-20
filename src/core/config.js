@@ -2,13 +2,13 @@
 // Angles in radians, distances in metres, times in seconds unless stated otherwise.
 
 export const VIEW_CONFIG = {
-  hfov: 1.5,                 // horizontal field of view of the cockpit camera at rest (about 86 degrees)
+  hfov: 1.25,                // horizontal field of view of the cockpit camera at rest (about 72 degrees)
   hfovSpeedGain: 0.16,       // extra field of view at top speed ("perspective stretch")
   hfovBrakeLoss: 0.05,       // field of view removed under hard braking ("compression")
   horizonRatio: 0.43,        // horizon height as a fraction of the view height (full-height view)
   horizonRatioWide: 0.4,     // same for the short views of the horizontal split screen
-  eyeHeight: 0.84,           // driver's eye above the road
-  eyeForward: -0.15,         // eye position along the car, relative to its centre
+  eyeHeight: 0.95,           // driver's eye above the road (same as CAR_DIMENSIONS.eye in the car drawing)
+  eyeForward: -0.35,         // eye position along the car, relative to its centre
   drawDistance: 1300,
   yawFollow: 0.82,           // share of the car's heading error shown as view rotation
   pitchFollow: 0.55,         // share of the road grade applied to the horizon

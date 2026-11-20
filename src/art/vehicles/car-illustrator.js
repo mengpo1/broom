@@ -335,7 +335,7 @@ export function drawCar(ctx, maskCtx, model, cam, options = {}) {
       strokeSeg(s[0], s[1] - w * 0.22, s[3], s[4] - w * 0.22, w * 0.3, tones[2][0], tones[2][1], 'butt');
     } else {
       const line = part.lines[el.index], s = el.seg;
-      const style = line.color === 'tyreMark' ? '#70737f' : INK;
+      const style = line.hex || (line.color === 'tyreMark' ? '#70737f' : INK);
       strokeSeg(s[0], s[1], s[3], s[4], inkBase * 0.4 * (line.weight || 1), style, '#000');
     }
   }

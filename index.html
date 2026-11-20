@@ -65,13 +65,13 @@ __modules["src/core/math.js"] = { TAU, DEG, clamp, saturate, lerp, smoothstep, d
 // Angles in radians, distances in metres, times in seconds unless stated otherwise.
 
 const VIEW_CONFIG = {
-  hfov: 1.5,                 // horizontal field of view of the cockpit camera at rest (about 86 degrees)
+  hfov: 1.25,                // horizontal field of view of the cockpit camera at rest (about 72 degrees)
   hfovSpeedGain: 0.16,       // extra field of view at top speed ("perspective stretch")
   hfovBrakeLoss: 0.05,       // field of view removed under hard braking ("compression")
   horizonRatio: 0.43,        // horizon height as a fraction of the view height (full-height view)
   horizonRatioWide: 0.4,     // same for the short views of the horizontal split screen
-  eyeHeight: 0.84,           // driver's eye above the road
-  eyeForward: -0.15,         // eye position along the car, relative to its centre
+  eyeHeight: 0.95,           // driver's eye above the road (same as CAR_DIMENSIONS.eye in the car drawing)
+  eyeForward: -0.35,         // eye position along the car, relative to its centre
   drawDistance: 1300,
   yawFollow: 0.82,           // share of the car's heading error shown as view rotation
   pitchFollow: 0.55,         // share of the road grade applied to the horizon
@@ -2791,7 +2791,8 @@ const BASE_PALETTE = {
   // vegetation: light / base / shade
   leafLight: '#86bd4c', leaf: '#5d9a3c', leafShade: '#356b33', leafDeep: '#234a2d',
   pineLight: '#4f8f55', pine: '#2f6b47', pineShade: '#1c4737', trunk: '#6b4a35', trunkShade: '#43302a',
-  palmLight: '#8cc152', palm: '#4f9a45', palmShade: '#2c6a3a',
+  palmLight: '#8cc152', palm: '#4f9a45', palmShade: '#2c6a3a', palmTrunkLight: '#c2a783', palmTrunk: '#97795c', palmTrunkShade: '#5f4a42', dateFruit: '#e0902f',
+  cypressLight: '#5f9150', cypress: '#37683f', cypressShade: '#1f4434',
   dryLight: '#c9b36d', dry: '#a58f4f', dryShade: '#75643a',
   // relief (backdrops): far is hazier than near
   farReliefLight: '#b4cbe0', farRelief: '#96b3d1', farReliefShade: '#7c9cc0', snow: '#f4f7fa',
@@ -3225,7 +3226,7 @@ const ROLE = {
 const CAR_DIMENSIONS = {
   frontAxleX: 1.55, rearAxleX: -1.35, frontTrack: 0.9, rearTrack: 0.82,
   frontTyre: { radius: 0.325, width: 0.29 }, rearTyre: { radius: 0.33, width: 0.42 },
-  eye: [-0.12, 0, 0.84],       // driver's eye, used by the cockpit drawing
+  eye: [-0.35, 0, 0.95],       // driver's eye, used by the cockpit drawing
 };
 
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
@@ -3683,29 +3684,78 @@ function buildCarModel(options = {}) {
   parts.push(exhaust);
 
   // ---- wheels (front wheels may be steered about their vertical axis)
-  const addWheel = (name, x, y, tyre, steerAngle) => {
-    const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y));
-    t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
-    const c = Math.cos(steerAngle), s = Math.sin(steerAngle);
-    for (const p of [t, r]) {
-      for (let i = 0; i < p.pos.length; i += 3) {
-        const px = p.pos[i], py = p.pos[i + 1];
-        p.pos[i] = x + px * c - py * s; p.pos[i + 1] = y + px * s + py * c; p.pos[i + 2] += tyre.radius;
-        const nx = p.nor[i], ny = p.nor[i + 1];
-        p.nor[i] = nx * c - ny * s; p.nor[i + 1] = nx * s + ny * c;
-      }
-      for (const l of p.lines) {
-        l.pts = l.pts.map((q) => [x + q[0] * c - q[1] * s, y + q[0] * s + q[1] * c, q[2] + tyre.radius]);
-        l.normal = [l.normal[0] * c - l.normal[1] * s, l.normal[0] * s + l.normal[1] * c, l.normal[2]];
-      }
-      parts.push(p);
-    }
-  };
-  addWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, steer);
-  addWheel('wheel.fr', D.frontAxleX, -D.frontTrack, D.frontTyre, steer);
-  addWheel('wheel.rl', D.rearAxleX, D.rearTrack, D.rearTyre, 0);
-  addWheel('wheel.rr', D.rearAxleX, -D.rearTrack, D.rearTyre, 0);
+  parts.push(...placeWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, steer));
+  parts.push(...placeWheel('wheel.fr', D.frontAxleX, -D.frontTrack, D.frontTyre, steer));
+  parts.push(...placeWheel('wheel.rl', D.rearAxleX, D.rearTrack, D.rearTyre, 0));
+  parts.push(...placeWheel('wheel.rr', D.rearAxleX, -D.rearTrack, D.rearTyre, 0));
 
+  return { parts: parts.map(finishPart), dimensions: D };
+}
+
+
+/** Build a wheel at its place on the car, steered by `steerAngle` about the vertical axis. */
+function placeWheel(name, x, y, tyre, steerAngle, tread = null) {
+  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y));
+  if (tread) addTreadMarks(t, tyre, tread);
+  t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
+  const c = Math.cos(steerAngle), s = Math.sin(steerAngle);
+  for (const p of [t, r]) {
+    for (let i = 0; i < p.pos.length; i += 3) {
+      const px = p.pos[i], py = p.pos[i + 1];
+      p.pos[i] = x + px * c - py * s; p.pos[i + 1] = y + px * s + py * c; p.pos[i + 2] += tyre.radius;
+      const nx = p.nor[i], ny = p.nor[i + 1];
+      p.nor[i] = nx * c - ny * s; p.nor[i + 1] = nx * s + ny * c;
+    }
+    for (const l of p.lines) {
+      l.pts = l.pts.map((q) => [x + q[0] * c - q[1] * s, y + q[0] * s + q[1] * c, q[2] + tyre.radius]);
+      l.normal = [l.normal[0] * c - l.normal[1] * s, l.normal[0] * s + l.normal[1] * c, l.normal[2]];
+    }
+  }
+  return [t, r];
+}
+
+/** Number of rolling marks around a tyre and of drawn phases between two marks. */
+const TREAD_MARKS = 9;
+const TREAD_PHASES = 3;
+
+/**
+ * Pen marks on the tread that make the rolling of a slick tyre visible.
+ * tread: { phase: 0..TREAD_PHASES-1 } for distinct marks, or { blur: true } for the streaks drawn
+ * at speed. Rolling forward moves the marks from the rear of the tyre over the top.
+ */
+function addTreadMarks(part, tyre, tread) {
+  const r = tyre.radius * 1.004;
+  const lanes = [-0.07, 0.02, 0.07, -0.03, 0.05, -0.08, 0, 0.08, -0.05];
+  const arc = (lat, from, to, hex, weight) => {
+    const steps = Math.max(2, Math.ceil(Math.abs(to - from) / 0.07));
+    const pts = [];
+    for (let i = 0; i <= steps; i++) { const t = from + ((to - from) * i) / steps; pts.push([r * Math.cos(t), lat, r * Math.sin(t)]); }
+    const mid = (from + to) / 2;
+    part.lines.push({ pts, normal: [Math.cos(mid), 0, Math.sin(mid)], weight, hex });
+  };
+  const period = (Math.PI * 2) / TREAD_MARKS;
+  if (tread.blur) {
+    for (let lane = 0; lane < 7; lane++) {
+      const lat = -0.085 + lane * 0.028;
+      for (let k = 0; k < 30; k++) {
+        if ((k * 7 + lane * 3) % 5 === 0) continue;       // broken streaks
+        arc(lat, k * 0.2094, (k + 1) * 0.2094, lane % 2 ? '#4a4c58' : '#1c1c26', 1.1);
+      }
+    }
+    return;
+  }
+  for (let i = 0; i < TREAD_MARKS; i++) {
+    const t0 = i * period - (tread.phase / TREAD_PHASES) * period;
+    const len = 0.2 + (i % 3) * 0.05;
+    arc(lanes[i % lanes.length], t0, t0 + len, i % 2 ? '#565866' : '#191a23', 1.6);
+    arc(lanes[(i + 4) % lanes.length], t0 + 0.3, t0 + 0.3 + len * 0.6, i % 2 ? '#191a23' : '#565866', 1.2);
+  }
+}
+
+/** Front-left wheel alone (cockpit drawing): { steer, tread } -> { parts }. */
+function buildFrontWheelModel(options = {}) {
+  const D = CAR_DIMENSIONS;
+  const parts = placeWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, options.steer ?? 0, options.tread || null);
   return { parts: parts.map(finishPart), dimensions: D };
 }
 
@@ -3742,7 +3792,7 @@ function finishPart(p) {
   return { name: p.name, ink: p.ink, bias: p.bias, gloss: p.gloss, outward: p.outward, pos, nor, faces, edges, rods: p.rods, lines: p.lines };
 }
 
-__modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, buildCarModel };
+__modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, buildCarModel, TREAD_MARKS, TREAD_PHASES, buildFrontWheelModel };
 })();
 // ---- src/art/vehicles/car-illustrator.js
 (function () {
@@ -4083,7 +4133,7 @@ function drawCar(ctx, maskCtx, model, cam, options = {}) {
       strokeSeg(s[0], s[1] - w * 0.22, s[3], s[4] - w * 0.22, w * 0.3, tones[2][0], tones[2][1], 'butt');
     } else {
       const line = part.lines[el.index], s = el.seg;
-      const style = line.color === 'tyreMark' ? '#70737f' : INK;
+      const style = line.hex || (line.color === 'tyreMark' ? '#70737f' : INK);
       strokeSeg(s[0], s[1], s[3], s[4], inkBase * 0.4 * (line.weight || 1), style, '#000');
     }
   }
@@ -4189,7 +4239,12 @@ __modules["src/art/environments/scenery-specs.js"] = { SCENERY_SPECS, expandScen
 // Style rules: three flat tones per mass (light / base / shade), contour inked around the whole
 // silhouette (heavier underneath), a few interior pen marks, no gradients.
 
-const { LINE, closedCurve, brushCurve, brushStroke, blobPoints, clipped } = __modules["src/art/styles/ink.js"];
+const { LINE, sampleCurve, brushCurve, brushStroke, clipped, tracePolygon } = __modules["src/art/styles/ink.js"];
+const { shadeHex, mixHex } = __modules["src/art/palettes/palettes.js"];
+
+const TAU = Math.PI * 2;
+
+function jit(rnd, amount) { return (rnd() - 0.5) * 2 * amount; }
 
 /** Flat drop shadow on the ground under an object. */
 function groundShadow(ctx, cx, y, rx, ry) {
@@ -4200,89 +4255,588 @@ function groundShadow(ctx, cx, y, rx, ry) {
 }
 
 /**
- * Foliage mass built from overlapping clumps. clumps: [{x, y, r}]. Draws the inked silhouette,
- * then base and light shapes shifted toward the light, then leaf marks.
+ * Contour of the union of the shapes added by `trace` ("stroke under the fill"): the caller
+ * fills the shapes afterwards, so only the outer half of the stroke remains. A second, shifted
+ * pass makes the line heavier underneath and on the side away from the light.
  */
-function foliageMass(ctx, clumps, colors, k, rnd, options = {}) {
-  const shapes = clumps.map((c) => blobPoints(c.x, c.y, c.r, c.r * (c.squash ?? 0.86), 5 + Math.floor(rnd() * 3), 0.16, rnd));
-  const trace = (g) => { for (const s of shapes) closedCurve(g, s); };
-  // contour first (it shows around the union only), slightly heavier below
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = colors.ink;
-  ctx.lineWidth = LINE.silhouette * 2 * k;
+function inkUnion(ctx, trace, ink, width, k, drop = 1) {
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = width * 1.5 * k;
   ctx.beginPath(); trace(ctx); ctx.stroke();
-  ctx.save(); ctx.translate(k * 0.6, k * 1.5); ctx.beginPath(); trace(ctx); ctx.stroke(); ctx.restore();
-  ctx.fillStyle = colors.shade;
-  ctx.beginPath(); trace(ctx); ctx.fill();
-  clipped(ctx, trace, () => {
-    if (colors.deep) {
-      ctx.fillStyle = colors.deep;
-      for (const c of clumps) {
-        if (rnd() < 0.55) continue;
-        ctx.beginPath(); closedCurve(ctx, blobPoints(c.x + c.r * 0.35, c.y + c.r * 0.45, c.r * 0.42, c.r * 0.3, 4, 0.2, rnd)); ctx.fill();
-      }
-    }
-    ctx.fillStyle = colors.base;
-    for (const c of clumps) { ctx.beginPath(); closedCurve(ctx, blobPoints(c.x - c.r * 0.16, c.y - c.r * 0.2, c.r * 0.84, c.r * 0.7, 6, 0.18, rnd)); ctx.fill(); }
-    ctx.fillStyle = colors.light;
-    for (const c of clumps) {
-      if (c.dark) continue;
-      ctx.beginPath(); closedCurve(ctx, blobPoints(c.x - c.r * 0.3, c.y - c.r * 0.36, c.r * 0.5, c.r * 0.38, 5, 0.22, rnd)); ctx.fill();
-    }
-    // leaf marks: short scalloped pen strokes on the shadow side of each clump
-    const marks = options.marks ?? 3;
-    for (const c of clumps) {
-      for (let m = 0; m < marks; m++) {
-        const a = 0.3 + rnd() * 1.6, rr = c.r * (0.5 + rnd() * 0.4), span = 0.35 + rnd() * 0.3;
-        const pts = [];
-        for (let q = 0; q <= 4; q++) { const t = a + (q / 4 - 0.5) * span; pts.push([c.x + Math.cos(t) * rr, c.y + Math.sin(t) * rr * 0.86]); }
-        brushCurve(ctx, pts, LINE.detail * k * (0.8 + rnd() * 0.5), { color: colors.ink, taper: 0.4, seed: m });
-      }
+  if (drop > 0) { ctx.save(); ctx.translate(k * 0.9 * drop, k * 1.9 * drop); ctx.beginPath(); trace(ctx); ctx.stroke(); ctx.restore(); }
+}
+
+/** Vertices spread around an ellipse with irregular spacing and radius (clockwise on screen). */
+function ringPoints(cx, cy, rx, ry, count, jitter, rnd) {
+  const pts = [], rot = rnd() * TAU;
+  for (let i = 0; i < count; i++) {
+    const a = rot + ((i + jit(rnd, 0.26)) / count) * TAU;
+    const r = 1 + jit(rnd, jitter);
+    pts.push([cx + Math.cos(a) * rx * r, cy + Math.sin(a) * ry * r]);
+  }
+  return pts;
+}
+
+/**
+ * Leafy outline: a chain of convex bumps with crisp cusps between consecutive vertices
+ * (vertices must run clockwise on screen so the bumps point outward). Does not begin/fill.
+ */
+function traceScallops(ctx, pts, bulge = 0.3, dx = 0, dy = 0) {
+  const n = pts.length;
+  ctx.moveTo(pts[0][0] + dx, pts[0][1] + dy);
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % n];
+    const ex = b[0] - a[0], ey = b[1] - a[1];
+    ctx.quadraticCurveTo((a[0] + b[0]) / 2 + ey * bulge * 2 + dx, (a[1] + b[1]) / 2 - ex * bulge * 2 + dy, b[0] + dx, b[1] + dy);
+  }
+  ctx.closePath();
+}
+
+function bumpCount(r, k, density) { return Math.max(6, Math.round((r / k) * 0.13 * density + 2)); }
+
+/**
+ * Geometry of one foliage clump {x, y, r, squash, dark}: scalloped outline, base and light
+ * patches shifted toward the light, and the arcs of a few leaf marks. Pure data (no drawing),
+ * so that tiling strips can draw wrapped copies of the same clump.
+ */
+function buildClump(c, k, rnd, options = {}) {
+  const density = options.density ?? 1, marks = options.marks ?? 2;
+  const ry = c.r * (c.squash ?? 0.86);
+  const clump = {
+    c,
+    outline: ringPoints(c.x, c.y, c.r, ry, bumpCount(c.r, k, density), 0.08, rnd),
+    base: ringPoints(c.x - c.r * 0.17, c.y - ry * 0.24, c.r * 0.84, ry * 0.78, bumpCount(c.r * 0.8, k, density), 0.1, rnd),
+    light: ringPoints(c.x - c.r * 0.3, c.y - ry * 0.42, c.r * 0.52, ry * 0.42, bumpCount(c.r * 0.5, k, density), 0.14, rnd),
+    marks: [],
+  };
+  for (let m = 0; m < marks; m++) {
+    // short scalloped pen strokes hugging the shadow side of the clump
+    const a = 0.15 + rnd() * 1.5, rr = c.r * (0.42 + rnd() * 0.4), span = 0.3 + rnd() * 0.3;
+    const pts = [];
+    for (let q = 0; q <= 4; q++) { const t = a + (q / 4 - 0.5) * span; pts.push([c.x + Math.cos(t) * rr, c.y + Math.sin(t) * rr * 0.86]); }
+    clump.marks.push({ pts, width: LINE.detail * k * (0.8 + rnd() * 0.5), seed: m });
+  }
+  return clump;
+}
+
+/** Paint one built clump (three tones and leaf marks) at a horizontal offset. `tones` = [shade, base, light]. */
+function paintClump(ctx, clump, tones, ink, dx = 0) {
+  const one = (g) => traceScallops(g, clump.outline, 0.3, dx, 0);
+  ctx.beginPath(); one(ctx); ctx.fillStyle = tones[0]; ctx.fill();
+  clipped(ctx, one, () => {
+    ctx.beginPath(); traceScallops(ctx, clump.base, 0.3, dx, 0); ctx.fillStyle = tones[1]; ctx.fill();
+    ctx.beginPath(); traceScallops(ctx, clump.light, 0.32, dx, 0); ctx.fillStyle = tones[2]; ctx.fill();
+    if (ink) {
+      for (const m of clump.marks) brushCurve(ctx, dx ? m.pts.map((p) => [p[0] + dx, p[1]]) : m.pts, m.width, { color: ink, taper: 0.4, seed: m.seed });
     }
   });
 }
 
-function trunk(ctx, x, yBase, yTop, wBase, wTop, P, k, rnd, lean = 0) {
-  const pts = [[x - wBase * 0.7, yBase], [x - wBase * 0.5, yBase - (yBase - yTop) * 0.12], [x - wTop * 0.5 + lean * 0.5, yBase - (yBase - yTop) * 0.6], [x - wTop * 0.45 + lean, yTop],
-    [x + wTop * 0.45 + lean, yTop], [x + wTop * 0.5 + lean * 0.5, yBase - (yBase - yTop) * 0.6], [x + wBase * 0.5, yBase - (yBase - yTop) * 0.12], [x + wBase * 0.75, yBase]];
-  const trace = (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
-  ctx.beginPath(); trace(ctx);
-  ctx.fillStyle = P.trunk; ctx.fill();
-  clipped(ctx, trace, () => { ctx.fillStyle = P.trunkShade; ctx.fillRect(x + lean * 0.5, yTop, wBase, yBase - yTop); });
-  ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.form * k; ctx.lineJoin = 'round';
-  ctx.beginPath(); trace(ctx); ctx.stroke();
-  for (let i = 0; i < 3; i++) {
-    const t = 0.2 + rnd() * 0.6, yy = yBase - (yBase - yTop) * t;
-    brushStroke(ctx, [[x - wTop * 0.2 + lean * t, yy], [x - wTop * 0.1 + lean * t, yy - 14 * k]], LINE.hair * k, { color: P.ink, taper: 0.4 });
+/**
+ * Foliage mass built from overlapping clumps. clumps: [{x, y, r, squash, dark}], painted in the
+ * given order (back to front). Draws the inked silhouette of the union, then every clump in three
+ * tones shifted toward the light (dark clumps use deep / shade / base), then leaf marks.
+ */
+function foliageMass(ctx, clumps, colors, k, rnd, options = {}) {
+  const built = clumps.map((c) => buildClump(c, k, rnd, options));
+  const trace = (g) => { for (const b of built) traceScallops(g, b.outline, 0.3); };
+  inkUnion(ctx, trace, colors.ink, options.inkWidth ?? LINE.silhouette, k);
+  const lit = [colors.shade, colors.base, colors.light], dim = [colors.deep || colors.shade, colors.shade, colors.base];
+  for (const b of built) paintClump(ctx, b, b.c.dark ? dim : lit, colors.ink);
+}
+
+/** Tuft of grass blades (tapered pen strokes fanning out of one point). */
+function grassTuft(ctx, x, y, size, ink, k, rnd, fill) {
+  const blades = 4 + Math.floor(rnd() * 3);
+  for (let i = 0; i < blades; i++) {
+    const a = -Math.PI / 2 + ((i + 0.5) / blades - 0.5) * 1.7 + jit(rnd, 0.12), len = size * (0.6 + rnd() * 0.5);
+    const tip = [x + Math.cos(a) * len, y + Math.sin(a) * len], mid = [x + Math.cos(a) * len * 0.5 + (i - blades / 2) * k * 0.6, y + Math.sin(a) * len * 0.55];
+    if (fill) brushStroke(ctx, [[x + (i - blades / 2) * 1.6 * k, y], mid, tip], LINE.silhouette * k, { color: fill, taperStart: 0, taperEnd: 0.7, swell: 0 });
+    brushStroke(ctx, [[x + (i - blades / 2) * 1.6 * k, y], mid, tip], LINE.detail * k, { color: ink, taperStart: 0.05, taperEnd: 0.6, swell: 0 });
   }
 }
 
+/** Tree trunk: flared foot, shaded right side, a few bark strokes. */
+function trunk(ctx, x, yBase, yTop, wBase, wTop, P, k, rnd, lean = 0) {
+  const H = yBase - yTop;
+  const left = [[x - wBase * 0.95, yBase], [x - wBase * 0.56, yBase - H * 0.1], [x - wTop * 0.52 + lean * 0.45, yBase - H * 0.55], [x - wTop * 0.5 + lean, yTop]];
+  const right = [[x + wTop * 0.5 + lean, yTop], [x + wTop * 0.52 + lean * 0.45, yBase - H * 0.55], [x + wBase * 0.58, yBase - H * 0.1], [x + wBase * 1.05, yBase]];
+  const pts = sampleCurve(left, 5).concat(sampleCurve(right, 5));
+  const trace = (g) => tracePolygon(g, pts);
+  ctx.beginPath(); trace(ctx);
+  ctx.fillStyle = P.trunk; ctx.fill();
+  clipped(ctx, trace, () => {
+    // shaded side with a ragged bark edge
+    const edge = [];
+    for (let i = 0; i <= 8; i++) { const t = i / 8; edge.push([x + lean * t + wTop * 0.06 + (i % 2 ? -1 : 1) * wTop * 0.09 + jit(rnd, wTop * 0.05), yBase - H * t]); }
+    ctx.beginPath(); ctx.moveTo(x + wBase * 2, yBase); for (const p of edge) ctx.lineTo(p[0], p[1]); ctx.lineTo(x + wBase * 2, yTop); ctx.closePath();
+    ctx.fillStyle = P.trunkShade; ctx.fill();
+    // cast shadow of the crown on the top of the trunk
+    ctx.fillRect(x - wBase * 2, yTop - 1, wBase * 4, H * 0.16);
+  });
+  ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.form * k; ctx.lineJoin = 'round';
+  ctx.beginPath(); trace(ctx); ctx.stroke();
+  for (let i = 0; i < 4; i++) {
+    const t = 0.12 + rnd() * 0.55, yy = yBase - H * t, xx = x + lean * t + jit(rnd, wTop * 0.3);
+    brushStroke(ctx, [[xx, yy], [xx + jit(rnd, 1.5 * k), yy - (10 + rnd() * 12) * k]], LINE.hair * k * 1.2, { color: P.ink, taper: 0.45 });
+  }
+}
+
+// ---------------------------------------------------------------------------- broadleaf trees
+
+const BROADLEAF_CROWNS = [
+  // variant 0: broad round oak. [x, y, r, dark] in crown units (x * crownR, y * crownH, r * crownR)
+  [[-0.38, 0.62, 0.34, 1], [0.36, 0.64, 0.36, 1], [0.0, 0.7, 0.3, 1], [-0.74, 0.12, 0.36, 0], [0.74, 0.16, 0.36, 0], [0.46, -0.34, 0.42, 0], [-0.44, -0.38, 0.44, 0], [0.02, 0.06, 0.52, 0], [0.04, -0.66, 0.4, 0]],
+  // variant 1: tall egg-shaped crown (lime, hornbeam)
+  [[-0.3, 0.72, 0.36, 1], [0.34, 0.7, 0.38, 1], [-0.62, 0.3, 0.4, 0], [0.64, 0.3, 0.4, 0], [0.5, -0.16, 0.42, 0], [-0.5, -0.2, 0.44, 0], [0.0, 0.2, 0.5, 0], [0.24, -0.56, 0.38, 0], [-0.2, -0.6, 0.4, 0], [0.02, -0.9, 0.3, 0]],
+  // variant 2: spreading, lopsided crown with a low side bough
+  [[-0.2, 0.62, 0.3, 1], [0.4, 0.5, 0.34, 1], [-0.86, 0.52, 0.27, 0], [0.8, 0.06, 0.34, 0], [-0.52, -0.08, 0.4, 0], [0.4, -0.3, 0.44, 0], [0.1, 0.1, 0.42, 0], [-0.16, -0.62, 0.4, 0], [0.34, -0.74, 0.28, 0]],
+];
+
 function broadleaf(ctx, w, h, P, rnd, variant) {
   const k = w / 352;
-  const cx = w * (0.5 + (rnd() - 0.5) * 0.04);
-  groundShadow(ctx, cx + 10 * k, h - 7 * k, w * 0.33, 7 * k);
-  const crownY = h * (variant === 1 ? 0.36 : 0.39), crownR = w * (variant === 2 ? 0.4 : 0.43), crownH = h * (variant === 1 ? 0.33 : 0.3);
-  trunk(ctx, cx, h - 8 * k, crownY + crownH * 0.35, 30 * k, 17 * k, P, k, rnd, (rnd() - 0.5) * 12 * k);
-  // main boughs showing under the crown
-  for (const side of [-1, 1]) {
-    brushCurve(ctx, [[cx, crownY + crownH * 0.75], [cx + side * crownR * 0.25, crownY + crownH * 0.45], [cx + side * crownR * 0.5, crownY + crownH * 0.2]], 9 * k, { color: P.trunkShade, taper: 0.5, taperStart: 0 });
+  const cx = w * (0.5 + (rnd() - 0.5) * 0.03);
+  groundShadow(ctx, cx + 10 * k, h - 7 * k, w * (variant === 1 ? 0.28 : 0.34), 7 * k);
+  const crownY = h * [0.4, 0.43, 0.39][variant], crownR = w * [0.385, 0.33, 0.37][variant], crownH = h * [0.29, 0.34, 0.27][variant];
+  const lean = jit(rnd, 6 * k) + (variant === 2 ? 8 * k : 0);
+  const forkY = crownY + crownH * (variant === 2 ? 0.62 : 0.5);
+  // main boughs showing under the crown (drawn first: the trunk and the foliage cover their ends)
+  const boughs = variant === 2 ? [[-1, 0.86, 0.5], [1, 0.5, 0.1], [-1, 0.3, -0.1]] : [[-1, 0.5, 0.2], [1, 0.55, 0.25]];
+  for (const [side, reach, rise] of boughs) {
+    const pts = [[cx + lean, forkY + 26 * k], [cx + lean + side * crownR * reach * 0.45, crownY + crownH * (0.52 + rise * 0.5)], [cx + side * crownR * reach, crownY + crownH * rise]];
+    brushCurve(ctx, pts, 15 * k, { color: P.ink, taperStart: 0, taperEnd: 0.6, swell: 0.05 });
+    brushCurve(ctx, pts, 10 * k, { color: P.trunkShade, taperStart: 0, taperEnd: 0.6, swell: 0.05 });
   }
-  const clumps = [{ x: cx, y: crownY, r: crownR * 0.55 }];
-  const count = 7 + variant;
-  for (let i = 0; i < count; i++) {
-    const a = (i / count) * Math.PI * 2 + rnd() * 0.4;
-    const lower = Math.sin(a) > 0.3;
-    clumps.push({ x: cx + Math.cos(a) * crownR * 0.62, y: crownY + Math.sin(a) * crownH * 0.62, r: crownR * (0.34 + rnd() * 0.12), dark: lower && rnd() < 0.6 });
-  }
+  trunk(ctx, cx, h - 8 * k, forkY, 30 * k, 18 * k, P, k, rnd, lean);
+  const clumps = BROADLEAF_CROWNS[variant].map(([x, y, r, dark]) => ({
+    x: cx + (x + jit(rnd, 0.05)) * crownR, y: crownY + (y + jit(rnd, 0.05)) * crownH, r: crownR * r * (0.94 + rnd() * 0.12), dark: !!dark,
+  }));
   foliageMass(ctx, clumps, { ink: P.ink, shade: P.leafShade, base: P.leaf, light: P.leafLight, deep: P.leafDeep }, k, rnd);
+  grassTuft(ctx, cx - 24 * k, h - 6 * k, 13 * k, P.ink, k, rnd);
+  grassTuft(ctx, cx + 30 * k, h - 5 * k, 10 * k, P.ink, k, rnd);
+}
+
+// ------------------------------------------------------------------------------------ conifers
+
+/** Outline of one tier of drooping boughs: apex on the trunk, pointed tips, saw-toothed sagging lower edge. */
+function tierOutline(cx, yTop, yBot, hwL, hwR, teeth, rnd) {
+  const H = yBot - yTop, sag = H * 0.2, depth = H * 0.19, span = hwL + hwR, edgeY = yBot - sag - depth;
+  const pts = sampleCurve([[cx - 1, yTop], [cx - hwL * 0.26, yTop + H * 0.34], [cx - hwL * 0.7, edgeY - H * 0.1], [cx - hwL, edgeY + depth * 0.25]], 4);
+  const firstTooth = pts.length;
+  for (let j = 0; j < teeth; j++) {
+    const u0 = 0.05 + ((j + jit(rnd, 0.1)) / teeth) * 0.9, u = 0.05 + ((j + 0.5 + jit(rnd, 0.12)) / teeth) * 0.9;
+    const d = depth * (0.7 + rnd() * 0.6) * (0.5 + 0.5 * Math.sin(Math.PI * u));
+    pts.push([cx - hwL + Math.max(0.04, u0) * span, edgeY + sag * Math.sin(Math.PI * u0) - d * 0.25]);
+    pts.push([cx - hwL + u * span + (u - 0.5) * d * 1.2, edgeY + sag * Math.sin(Math.PI * u) + d]);
+  }
+  pts.push([cx + hwR - span * 0.04, edgeY - depth * 0.1]);
+  const lastTooth = pts.length;
+  for (const p of sampleCurve([[cx + hwR, edgeY + depth * 0.25], [cx + hwR * 0.7, edgeY - H * 0.1], [cx + hwR * 0.26, yTop + H * 0.34], [cx + 1, yTop]], 4)) pts.push(p);
+  return { pts, firstTooth, lastTooth, cx, yTop, yBot, hw: span / 2 };
+}
+
+const PINE_SHAPES = [
+  // variant 0: full spruce, skirt down to a short bare trunk. widths per tier (fraction of the widest), top first
+  { widths: [0.15, 0.28, 0.41, 0.54, 0.67, 0.8, 0.91, 1], top: 12, bare: 40, maxHw: 96, overlap: 0.7, asym: 0.07, teeth: [2, 3, 4, 5, 5, 6, 7, 7] },
+  // variant 1: old pine, long bare trunk, fewer and uneven tiers that let the trunk show
+  { widths: [0.2, 0.5, 0.84, 0.66, 0.96, 0.7], top: 14, bare: 138, maxHw: 80, overlap: 0.3, asym: 0.2, teeth: [2, 4, 5, 4, 6, 4] },
+];
+
+function pine(ctx, w, h, P, rnd, variant) {
+  const k = w / 224, shape = PINE_SHAPES[variant] || PINE_SHAPES[0];
+  const cx = w * 0.5 + jit(rnd, 3 * k), ground = h - 8 * k;
+  const top = shape.top * k, bottom = ground - shape.bare * k, n = shape.widths.length;
+  groundShadow(ctx, cx + 8 * k, h - 6 * k, shape.maxHw * k * (variant === 1 ? 0.7 : 0.92), 6 * k);
+  const deep = shadeHex(P.pineShade, 0.3, P.ink);
+  // tiers, top first
+  const tiers = [];
+  const spacing = (bottom - top) / (n + 0.25);
+  for (let i = 0; i < n; i++) {
+    const yBot = top + spacing * (i + 1.25) + jit(rnd, spacing * 0.05);
+    const tierH = spacing * (1 + shape.overlap) * (i === 0 ? 0.9 : 1);
+    const hw = shape.maxHw * k * shape.widths[i], skew = jit(rnd, shape.asym) + (variant === 1 ? (i % 2 ? 0.14 : -0.14) : 0);
+    tiers.push(tierOutline(cx + (variant === 1 ? jit(rnd, 4 * k) : 0), Math.max(top, yBot - tierH), yBot, hw * (1 - skew), hw * (1 + skew), shape.teeth[i], rnd));
+  }
+  // trunk (runs up behind the tiers) and leader shoot
+  const trunkTop = tiers[1].yTop, tw = (variant === 1 ? 17 : 15) * k;
+  const trunkPts = [[cx - tw * 0.95, ground], [cx - tw * 0.55, ground - 16 * k], [cx - tw * 0.2, trunkTop], [cx + tw * 0.2, trunkTop], [cx + tw * 0.55, ground - 16 * k], [cx + tw, ground]];
+  const stubs = [];
+  if (variant === 1) {
+    for (let i = 0; i < 4; i++) {
+      const side = i % 2 ? 1 : -1, y = ground - (34 + i * 27 + rnd() * 10) * k, len = (13 + rnd() * 12) * k;
+      stubs.push([[cx + side * tw * 0.3, y], [cx + side * (tw * 0.4 + len * 0.6), y - len * 0.2], [cx + side * (tw * 0.4 + len), y - len * 0.55]]);
+    }
+  }
+  const traceAll = (g) => { tracePolygon(g, trunkPts); for (const t of tiers) tracePolygon(g, t.pts); };
+  inkUnion(ctx, traceAll, P.ink, LINE.silhouette, k);
+  for (const s of stubs) brushCurve(ctx, s, 6.5 * k, { color: P.ink, taperStart: 0, taperEnd: 0.5, swell: 0 });
+  // trunk tones
+  const traceTrunk = (g) => tracePolygon(g, trunkPts);
+  ctx.beginPath(); traceTrunk(ctx); ctx.fillStyle = P.trunk; ctx.fill();
+  clipped(ctx, traceTrunk, () => { ctx.fillStyle = P.trunkShade; ctx.fillRect(cx + tw * 0.08, 0, tw * 2, h); ctx.fillRect(cx - tw * 2, bottom - 2 * k, tw * 4, 16 * k); });
+  for (const s of stubs) brushCurve(ctx, s, 3.4 * k, { color: P.trunkShade, taperStart: 0, taperEnd: 0.5, swell: 0 });
+  for (let i = 0; i < 3; i++) {
+    const yy = ground - (10 + rnd() * (shape.bare - 16)) * k, xx = cx - tw * 0.2 + jit(rnd, tw * 0.12);
+    brushStroke(ctx, [[xx, yy], [xx + jit(rnd, k), yy - (9 + rnd() * 9) * k]], LINE.hair * k * 1.2, { color: P.ink, taper: 0.45 });
+  }
+  // tiers from the lowest to the highest; each one throws a flat shadow on those below
+  for (let i = n - 1; i >= 0; i--) {
+    const t = tiers[i], one = (g) => tracePolygon(g, t.pts);
+    ctx.beginPath(); one(ctx); ctx.fillStyle = P.pineShade; ctx.fill();
+    clipped(ctx, one, () => {
+      const H = t.yBot - t.yTop;
+      ctx.fillStyle = P.pine;
+      ctx.beginPath(); tracePolygon(ctx, t.pts.map((p) => [t.cx + (p[0] - t.cx) * 0.84 - t.hw * 0.13, t.yTop + (p[1] - t.yTop) * 0.87])); ctx.fill();
+      ctx.fillStyle = P.pineLight;
+      ctx.beginPath(); tracePolygon(ctx, t.pts.map((p) => [t.cx + (p[0] - t.cx) * 0.5 - t.hw * 0.36, t.yTop + (p[1] - t.yTop) * 0.66 + H * 0.02])); ctx.fill();
+      // needle sprays: short strokes following the boughs on the shadow side
+      for (let m = 0; m < 2; m++) {
+        const u = 0.52 + rnd() * 0.36, x0 = t.cx + (u - 0.5) * t.hw * 1.5, y0 = t.yTop + H * (0.5 + rnd() * 0.22);
+        brushStroke(ctx, [[x0, y0], [x0 + (u - 0.5) * H * 0.3, y0 + H * 0.12], [x0 + (u - 0.5) * H * 0.56, y0 + H * 0.26]], LINE.detail * k, { color: P.ink, taper: 0.45, seed: m });
+      }
+    });
+    if (i > 0) {
+      const up = tiers[i - 1], drop = (up.yBot - up.yTop) * 0.2;
+      const lower = (g) => { for (let j = i; j < n; j++) tracePolygon(g, tiers[j].pts); tracePolygon(g, trunkPts); };
+      clipped(ctx, lower, () => {
+        ctx.beginPath(); tracePolygon(ctx, up.pts.map((p) => [p[0] + drop * 0.25, p[1] + drop])); ctx.fillStyle = deep; ctx.fill();
+        // pen line under the boughs above, fading out on the lit side
+        const edge = up.pts.slice(up.firstTooth - 1, up.lastTooth + 1);
+        brushStroke(ctx, edge, (s) => LINE.form * k * 2 * (0.25 + 0.75 * s), { color: P.ink, taperStart: 0.4, taperEnd: 0, swell: 0, minRatio: 0.05 });
+      });
+    }
+  }
+  grassTuft(ctx, cx - 16 * k, h - 6 * k, 11 * k, P.ink, k, rnd);
+}
+
+function cypress(ctx, w, h, P, rnd) {
+  const k = w / 128, cx = w * 0.5, ground = h - 8 * k, top = 14 * k, bottom = ground - 20 * k, H = bottom - top, maxHw = 43 * k;
+  groundShadow(ctx, cx + 5 * k, h - 6 * k, 40 * k, 5.5 * k);
+  const profile = sampleCurve([[0, 0.02], [0.08, 0.2], [0.25, 0.52], [0.45, 0.82], [0.66, 1], [0.84, 0.94], [0.95, 0.7], [1, 0.34]], 6);
+  const hwAt = (t) => { const f = Math.min(profile.length - 1.001, Math.max(0, t) * (profile.length - 1)), i = Math.floor(f); return (profile[i][1] + (profile[i + 1][1] - profile[i][1]) * (f - i)) * maxHw; };
+  const sway = (t) => Math.pow(1 - t, 2.2) * 7 * k;                       // the tip leans away from the wind
+  // flame-shaped tufts pointing upward along both flanks
+  const tufts = 11, sides = [[], []];
+  for (let s = 0; s < 2; s++) {
+    for (let j = 0; j <= tufts; j++) {
+      const t = Math.min(1, (j + (s ? 0.45 : 0) + jit(rnd, 0.12)) / tufts);
+      const tn = Math.min(1, t + (0.7 + rnd() * 0.12) / tufts), sign = s ? 1 : -1;
+      sides[s].push({ tip: [cx + sway(t) + sign * hwAt(t) * (1.02 + rnd() * 0.1), top + H * t], notch: [cx + sway(tn) + sign * hwAt(tn) * (0.8 + rnd() * 0.06), top + H * tn] });
+    }
+  }
+  const trace = (g) => {
+    g.moveTo(cx + sway(0), top - 6 * k);
+    for (const f of sides[1]) { g.lineTo(f.tip[0], f.tip[1]); g.quadraticCurveTo(f.tip[0] + 3 * k, (f.tip[1] + f.notch[1]) / 2 + 3 * k, f.notch[0], f.notch[1]); }
+    g.quadraticCurveTo(cx + 6 * k, bottom + 9 * k, cx - 4 * k, bottom + 7 * k);
+    for (let j = sides[0].length - 1; j >= 0; j--) { const f = sides[0][j]; g.lineTo(f.notch[0], f.notch[1]); g.quadraticCurveTo(f.tip[0] - 3 * k, (f.tip[1] + f.notch[1]) / 2 + 3 * k, f.tip[0], f.tip[1]); }
+    g.closePath();
+  };
+  const trunkPts = [[cx - 9 * k, ground], [cx - 5 * k, bottom - 4 * k], [cx + 5 * k, bottom - 4 * k], [cx + 10 * k, ground]];
+  inkUnion(ctx, (g) => { trace(g); tracePolygon(g, trunkPts); }, P.ink, LINE.silhouette, k);
+  ctx.beginPath(); tracePolygon(ctx, trunkPts); ctx.fillStyle = P.trunkShade; ctx.fill();
+  ctx.fillStyle = P.trunk; ctx.fillRect(cx - 6 * k, bottom + 12 * k, 5 * k, ground - bottom - 12 * k);
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = P.cypressShade; ctx.fill();
+  const flame = (x, y, len, wd, color) => {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + wd * 1.1, y - len * 0.3, x + wd * 0.5, y - len);
+    ctx.quadraticCurveTo(x - wd * 0.5, y - len * 0.45, x, y);
+    ctx.fillStyle = color; ctx.fill();
+  };
+  clipped(ctx, trace, () => {
+    const scaled = (sx, shift, lift, color) => {
+      ctx.save(); ctx.translate(cx + shift, top + lift); ctx.scale(sx, 1); ctx.translate(-cx, -top);
+      ctx.beginPath(); trace(ctx); ctx.fillStyle = color; ctx.fill(); ctx.restore();
+    };
+    scaled(0.82, -maxHw * 0.2, -4 * k, P.cypress);
+    scaled(0.42, -maxHw * 0.5, 6 * k, P.cypressLight);
+    // tongues of foliage breaking the tone boundaries
+    for (let i = 0; i < 9; i++) {
+      const t = 0.14 + (i + rnd() * 0.7) / 9 * 0.82, hw = hwAt(t), y = top + H * t, x = cx + sway(t);
+      flame(x + hw * (0.3 + rnd() * 0.25), y, (26 + rnd() * 22) * k, (7 + rnd() * 4) * k, P.cypress);
+      flame(x - hw * (0.1 + rnd() * 0.3), y + 10 * k, (22 + rnd() * 20) * k, (6 + rnd() * 4) * k, i % 2 ? P.cypressShade : P.cypressLight);
+      if (i % 3 === 0) flame(x - hw * 0.62, y + 4 * k, (20 + rnd() * 14) * k, 5 * k, P.cypress);
+    }
+    for (let i = 0; i < 8; i++) {
+      const t = 0.2 + (i + rnd() * 0.6) / 8 * 0.76, hw = hwAt(t), y = top + H * t, x = cx + sway(t) + hw * (rnd() * 0.75 - 0.15), len = (20 + rnd() * 22) * k;
+      brushCurve(ctx, [[x, y], [x + 4 * k, y - len * 0.5], [x + 2 * k, y - len]], LINE.detail * k * (0.8 + rnd() * 0.5), { color: P.ink, taperStart: 0.2, taperEnd: 0.6, seed: i });
+    }
+  });
+  grassTuft(ctx, cx - 13 * k, h - 6 * k, 9 * k, P.ink, k, rnd);
+}
+
+// --------------------------------------------------------------------------------------- palms
+
+/** Polygon of a ribbon of varying width along a polyline: returns { left, right, poly }. */
+function ribbon(pts, widthAt) {
+  const n = pts.length, left = [], right = [];
+  for (let i = 0; i < n; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    let tx = b[0] - a[0], ty = b[1] - a[1];
+    const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+    const hw = widthAt(i / (n - 1), i) * 0.5;
+    left.push([pts[i][0] + ty * hw, pts[i][1] - tx * hw]);
+    right.push([pts[i][0] - ty * hw, pts[i][1] + tx * hw]);
+  }
+  return { left, right, poly: left.concat(right.slice().reverse()) };
+}
+
+/**
+ * Geometry of a feather frond: an arching midrib bent by its own weight, fringed with leaflets
+ * that hang from it (long on the underside, short above). `hang` is the pull of gravity on the
+ * leaflets (0 = stiff herring-bone, 0.7 = limp fringe). Returns { rib, poly, top }.
+ */
+function buildFrond(x0, y0, angle, length, droop, leaf, pairs, hang, rnd) {
+  const sign = Math.cos(angle) >= 0 ? 1 : -1, steps = pairs * 2;
+  const rib = [], sideA = [], sideB = [];
+  let x = x0, y = y0;
+  for (let i = 0; i <= steps; i++) {
+    const s = i / steps, th = angle + sign * droop * Math.pow(s, 1.6);
+    const tx = Math.cos(th), ty = Math.sin(th);
+    rib.push([x, y]);
+    const prof = Math.pow(Math.sin(Math.PI * Math.pow(0.05 + s * 0.95, 0.66)), 0.6);
+    const isTip = i % 2 === 1, reach = isTip ? 0.84 + rnd() * 0.3 : 0.3;
+    for (let q = 0; q < 2; q++) {
+      const nx = q ? -ty : ty, ny = q ? tx : -tx;                        // q = 0: left of the direction of growth
+      const weight = 0.6 + 0.4 * ny;                                      // leaflets under the midrib are longer
+      const sweep = isTip ? 0.62 : 0.15;
+      const lx = nx * 0.6 + tx * sweep, ly = ny * 0.6 + ty * sweep + hang * (isTip ? 1 : 0.4);
+      const l = Math.hypot(lx, ly) || 1, len = leaf * prof * weight * reach;
+      (q ? sideB : sideA).push([x + (lx / l) * len, y + (ly / l) * len]);
+    }
+    x += tx * length / steps; y += ty * length / steps;
+  }
+  // the side that faces the sky carries the light tone
+  const mid = Math.floor(steps / 2), upper = sideA[mid][1] < sideB[mid][1] ? sideA : sideB;
+  return { rib, poly: sideA.concat(sideB.slice().reverse()), top: upper.concat(rib.slice().reverse()) };
+}
+
+// fronds: [angle in degrees (0 = right, -90 = up), droop in radians, relative length, layer]
+// layers: 0 back (shaded), 1 arching sides, 2 front (lit), 3 old hanging fronds, 4 dry skirt
+const PALM_SHAPES = [
+  // variant 0: slender coconut palm, curved trunk leaning to the right, long limp fronds
+  { trunk: [[-46, 0], [-38, -90], [-18, -200], [8, -316]], base: 26, mid: 15, tip: 12, frond: 142, leaf: 46, pairs: 11, hang: 0.62,
+    fronds: [[-98, 0.5, 0.62, 0], [-66, 0.7, 0.7, 0], [-128, 0.7, 0.7, 0], [-152, 1.15, 0.95, 1], [-30, 1.15, 0.95, 1], [-172, 1.45, 0.86, 1], [-8, 1.45, 0.86, 1],
+      [-112, 1.0, 0.82, 2], [-58, 1.05, 0.84, 2], [-86, 0.8, 0.66, 2], [158, 1.2, 0.7, 3], [24, 1.2, 0.68, 3]] },
+  // variant 1: stout date palm, thick scaly trunk, dense round crown of stiff fronds, dry skirt
+  { trunk: [[16, 0], [12, -80], [2, -170], [-8, -258]], base: 35, mid: 27, tip: 34, frond: 130, leaf: 36, pairs: 12, hang: 0.22,
+    fronds: [[146, 0.5, 0.5, 4], [34, 0.5, 0.5, 4], [-90, 0.2, 0.74, 0], [-62, 0.3, 0.8, 0], [-118, 0.3, 0.8, 0], [-36, 0.45, 0.86, 0], [-144, 0.45, 0.86, 0],
+      [-162, 0.75, 0.96, 1], [-18, 0.75, 0.96, 1], [-180, 0.95, 0.9, 1], [0, 0.95, 0.9, 1], [-104, 0.4, 0.84, 2], [-76, 0.4, 0.84, 2], [-132, 0.6, 0.92, 2], [-48, 0.6, 0.92, 2],
+      [164, 0.8, 0.74, 3], [16, 0.8, 0.74, 3]] },
+];
+
+function palm(ctx, w, h, P, rnd, variant) {
+  const k = w / 288, shape = PALM_SHAPES[variant] || PALM_SHAPES[0];
+  const cx = w * 0.5, ground = h - 8 * k;
+  const line = sampleCurve(shape.trunk.map(([x, y]) => [cx + x * k, ground + y * k]), 9);
+  const crown = line[line.length - 1];
+  groundShadow(ctx, line[0][0] + 14 * k, h - 6 * k, 60 * k, 6 * k);
+  const scaly = variant === 1;
+  const widthAt = (t, i) => {
+    const flare = Math.pow(Math.max(0, 1 - t * 7), 2);
+    const body = t < 0.5 ? shape.mid + (shape.base * 0.72 - shape.mid) * Math.pow(1 - t * 2, 1.5) : shape.mid + (shape.tip - shape.mid) * Math.pow((t - 0.5) * 2, scaly ? 3 : 1);
+    return (body + flare * shape.base * 0.5) * k * (scaly ? (i % 2 ? 1.07 : 0.95) : 1);
+  };
+  const trunkShape = ribbon(line, widthAt);
+  const fronds = shape.fronds.map(([deg, droop, len, layer]) => {
+    const f = buildFrond(crown[0] + jit(rnd, 3 * k), crown[1] + jit(rnd, 3 * k), (deg + jit(rnd, 4)) * Math.PI / 180, shape.frond * k * len * (0.95 + rnd() * 0.1),
+      droop * (0.92 + rnd() * 0.16), shape.leaf * k * (layer === 4 ? 0.8 : 1), layer === 4 ? 7 : shape.pairs, layer === 4 ? 0.5 : shape.hang, rnd);
+    f.layer = layer;
+    return f;
+  });
+  const order = [1, 2, 3, 4, 0];                                           // painting rank of each layer (dry skirt first)
+  fronds.sort((a, b) => order[a.layer] - order[b.layer]);
+  const heart = ringPoints(crown[0], crown[1] + 3 * k, (scaly ? 19 : 14) * k, (scaly ? 15 : 12) * k, 7, 0.08, rnd);
+  const traceAll = (g) => { tracePolygon(g, trunkShape.poly); for (const f of fronds) tracePolygon(g, f.poly); traceScallops(g, heart, 0.2); };
+  inkUnion(ctx, traceAll, P.ink, LINE.form * 1.2, k, 0.8);
+  // trunk: three tones and ring scars
+  const traceTrunk = (g) => tracePolygon(g, trunkShape.poly);
+  ctx.beginPath(); traceTrunk(ctx); ctx.fillStyle = P.palmTrunk; ctx.fill();
+  clipped(ctx, traceTrunk, () => {
+    const last = line.length - 1;
+    const band = (from, to, color) => {
+      const a = line.map((p, i) => [p[0] + widthAt(i / last, i) * from, p[1]]), b = line.map((p, i) => [p[0] + widthAt(i / last, i) * to, p[1]]);
+      ctx.beginPath(); tracePolygon(ctx, a.concat(b.reverse())); ctx.fillStyle = color; ctx.fill();
+    };
+    band(0.12, 0.8, P.palmTrunkShade);
+    band(-0.8, -0.2, P.palmTrunkLight);
+    // shadow of the crown on the top of the trunk
+    ctx.fillStyle = P.palmTrunkShade;
+    ctx.beginPath(); ctx.ellipse(crown[0], crown[1] + 4 * k, 44 * k, (scaly ? 40 : 30) * k, 0, 0, TAU); ctx.fill();
+    const rings = scaly ? 14 : 17;
+    for (let r = 1; r < rings; r++) {
+      const t = Math.pow(r / rings, 0.9), f = t * last, i = Math.min(last - 1, Math.floor(f)), u = f - i;
+      const L = trunkShape.left, R = trunkShape.right;
+      const a = [L[i][0] + (L[i + 1][0] - L[i][0]) * u, L[i][1] + (L[i + 1][1] - L[i][1]) * u], b = [R[i][0] + (R[i + 1][0] - R[i][0]) * u, R[i][1] + (R[i + 1][1] - R[i][1]) * u];
+      const up = Math.hypot(b[0] - a[0], b[1] - a[1]) * (scaly ? 0.3 : 0.2);
+      if (scaly) {
+        // chevrons of old leaf bases
+        const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + up];
+        brushStroke(ctx, [a, [(a[0] + m[0]) / 2, (a[1] + m[1]) / 2 - up * 0.2], m, [(b[0] + m[0]) / 2, (b[1] + m[1]) / 2 - up * 0.2], b], LINE.detail * k * 1.1, { color: P.ink, taperStart: 0.35, taperEnd: 0.05, swell: 0 });
+      } else {
+        const start = r % 3 === 0 ? 0 : 0.3 + rnd() * 0.25;
+        const a2 = [a[0] + (b[0] - a[0]) * start, a[1] + (b[1] - a[1]) * start];
+        brushCurve(ctx, [a2, [(a2[0] + b[0]) / 2, (a2[1] + b[1]) / 2 - up], b], LINE.detail * k * (0.9 + rnd() * 0.4), { color: P.ink, taperStart: 0.5, taperEnd: 0.04, swell: 0 });
+      }
+    }
+  });
+  // fronds, back to front: [underside, sky side] tones per layer
+  const tones = [[P.palmShade, P.palm], [P.palm, P.palmLight], [P.palm, P.palmLight], [P.palmShade, P.palm], [P.dryShade, P.dry]];
+  for (const f of fronds) {
+    const [low, high] = tones[f.layer];
+    ctx.lineJoin = 'round'; ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.detail * k * 1.25;
+    ctx.beginPath(); tracePolygon(ctx, f.poly); ctx.stroke();
+    ctx.fillStyle = low; ctx.fill();
+    ctx.beginPath(); tracePolygon(ctx, f.top); ctx.fillStyle = high; ctx.fill();
+    brushStroke(ctx, f.rib, LINE.detail * k * 1.5, { color: f.layer === 4 ? P.ink : shadeHex(low, 0.55, P.ink), taperStart: 0.02, taperEnd: 0.45, swell: 0 });
+  }
+  // heart of the crown and fruit
+  ctx.beginPath(); traceScallops(ctx, heart, 0.2); ctx.fillStyle = P.palmShade; ctx.fill();
+  if (scaly) {
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 4; i++) {
+        const x = crown[0] + side * (16 + i * 5) * k, len = (30 + rnd() * 14) * k;
+        const strand = [[crown[0] + side * 8 * k, crown[1] + 8 * k], [x + side * 5 * k, crown[1] + 10 * k + len * 0.35], [x + side * 2 * k, crown[1] + 10 * k + len]];
+        brushCurve(ctx, strand, 4.4 * k, { color: P.ink, taperStart: 0.1, taperEnd: 0.1, swell: 0 });
+        brushCurve(ctx, strand, 2.4 * k, { color: P.dateFruit, taperStart: 0.1, taperEnd: 0.1, swell: 0 });
+      }
+    }
+  } else {
+    for (const [dx, dy] of [[-9, 13], [5, 16], [13, 8], [-1, 5]]) {
+      const x = crown[0] + dx * k, y = crown[1] + dy * k, r = 7.5 * k;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = P.wood; ctx.fill();
+      ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.detail * k; ctx.stroke();
+      ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.3, r * 0.42, 0, TAU); ctx.fillStyle = P.woodLight; ctx.fill();
+    }
+  }
+  grassTuft(ctx, line[0][0] - 20 * k, h - 6 * k, 12 * k, P.ink, k, rnd);
+  grassTuft(ctx, line[0][0] + 24 * k, h - 5 * k, 9 * k, P.ink, k, rnd);
+}
+
+// ----------------------------------------------------------------------------- bushes and rocks
+
+const BUSH_SHAPES = [
+  // variant 0: dense rounded shrub. [x, y, r, dark] in units of the half width / height
+  [[-0.5, 0.74, 0.3, 1], [0.52, 0.76, 0.3, 1], [0.0, 0.8, 0.34, 1], [-0.62, 0.52, 0.28, 0], [0.6, 0.5, 0.3, 0], [0.26, 0.36, 0.34, 0], [-0.24, 0.38, 0.36, 0], [0.0, 0.56, 0.4, 0]],
+  // variant 1: low spreading shrub, taller on the right, with long shoots
+  [[-0.34, 0.8, 0.26, 1], [0.4, 0.78, 0.3, 1], [-0.7, 0.72, 0.22, 0], [-0.3, 0.62, 0.3, 0], [0.7, 0.62, 0.24, 0], [0.34, 0.44, 0.34, 0], [0.04, 0.66, 0.3, 0]],
+];
+
+function bush(ctx, w, h, P, rnd, variant) {
+  const k = w / 256, cx = w * 0.5, hw = w * 0.5, ground = h - 6 * k;
+  groundShadow(ctx, cx + 6 * k, h - 6 * k, w * (variant ? 0.4 : 0.38), 6 * k);
+  if (variant === 1) {
+    // long shoots standing above the mass, with paired lance-shaped leaves
+    for (const [x, lean, len] of [[0.34, 0.16, 0.6], [0.5, 0.42, 0.46], [0.14, -0.1, 0.5], [-0.3, -0.3, 0.44], [-0.5, -0.56, 0.32]]) {
+      const x0 = cx + x * hw, y0 = h * 0.62, bend = lean * 22 * k, tip = [x0 + lean * 50 * k, y0 - len * h];
+      const at = (t) => [x0 + (tip[0] - x0) * t + bend * 4 * t * (1 - t) * 0.5, y0 + (tip[1] - y0) * t];
+      brushCurve(ctx, [at(0), at(0.5), at(1)], LINE.form * k * 1.5, { color: P.ink, taperStart: 0, taperEnd: 0.55, swell: 0 });
+      for (let i = 0; i < 5; i++) {
+        const t = 0.42 + i * 0.14, [px, py] = at(t), side = i % 2 ? 1 : -1, size = (15 - i * 1.6) * k;
+        const a = -Math.PI / 2 + lean * 0.5 + side * (0.75 + rnd() * 0.3), dx = Math.cos(a), dy = Math.sin(a);
+        ctx.beginPath(); ctx.moveTo(px, py);
+        ctx.quadraticCurveTo(px + dx * size * 0.5 - dy * size * 0.32, py + dy * size * 0.5 + dx * size * 0.32, px + dx * size, py + dy * size);
+        ctx.quadraticCurveTo(px + dx * size * 0.5 + dy * size * 0.32, py + dy * size * 0.5 - dx * size * 0.32, px, py);
+        ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.detail * 1.7 * k; ctx.lineJoin = 'round'; ctx.stroke();
+        ctx.fillStyle = side < 0 ? P.leafLight : P.leaf; ctx.fill();
+      }
+    }
+  }
+  const clumps = BUSH_SHAPES[variant].map(([x, y, r, dark]) => ({ x: cx + (x + jit(rnd, 0.04)) * hw, y: (y + jit(rnd, 0.03)) * h - 4 * k, r: r * hw * (0.95 + rnd() * 0.1), squash: 0.8, dark: !!dark }));
+  clipped(ctx, (g) => g.rect(0, 0, w, ground), () => {
+    foliageMass(ctx, clumps, { ink: P.ink, shade: P.leafShade, base: P.leaf, light: P.leafLight, deep: P.leafDeep }, k, rnd, { inkWidth: LINE.silhouette * 0.9, density: 1.25 });
+  });
+  // ground contact: heavy line under the mass and grass in front
+  const span = variant ? 0.74 : 0.7;
+  brushStroke(ctx, [[cx - hw * span, ground - 2 * k], [cx - hw * 0.2, ground], [cx + hw * 0.3, ground], [cx + hw * span, ground - 2 * k]], LINE.silhouette * k * 1.3, { color: P.ink, taper: 0.22, swell: 0.1 });
+  for (const x of [-0.56, -0.1, 0.36, 0.66]) grassTuft(ctx, cx + (x + jit(rnd, 0.06)) * hw, h - 4 * k, (11 + rnd() * 5) * k, P.ink, k, rnd);
+}
+
+const ROCK_SHAPES = [
+  // variant 0: broad faceted boulder (design space 256 x 168, ground at y = 160)
+  {
+    blocks: [{
+      outline: [[24, 160], [19, 131], [40, 92], [72, 57], [118, 40], [162, 44], [205, 70], [232, 112], [239, 160]],
+      light: [[[40, 92], [72, 57], [118, 40], [162, 44], [205, 70], [158, 93], [110, 84], [66, 105]], [[19, 131], [40, 92], [66, 105], [46, 128]]],
+      shade: [[[158, 93], [205, 70], [232, 112], [239, 160], [172, 160], [180, 124]], [[24, 160], [60, 149], [104, 160]]],
+      edges: [[[40, 92], [66, 105], [110, 84], [158, 93], [205, 70]], [[110, 84], [104, 122], [108, 150]], [[158, 93], [180, 124], [172, 160]], [[66, 105], [46, 128], [36, 150]]],
+      cracks: [[[96, 52], [112, 62], [116, 76]], [[132, 104], [140, 126], [136, 146]], [[212, 96], [206, 118]]],
+      hatch: [[188, 110], [222, 150]],
+    }],
+    pebbles: [[14, 153, 9], [228, 155, 7]],
+  },
+  // variant 1: tall leaning block with a smaller boulder at its foot
+  {
+    blocks: [{
+      outline: [[98, 160], [88, 116], [104, 62], [134, 22], [168, 30], [204, 78], [222, 126], [228, 160]],
+      light: [[[104, 62], [134, 22], [150, 70], [140, 118], [112, 106]], [[134, 22], [168, 30], [176, 56], [150, 70]]],
+      shade: [[[150, 70], [176, 56], [168, 30], [204, 78], [222, 126], [228, 160], [156, 160], [140, 118]]],
+      edges: [[[134, 22], [150, 70], [140, 118], [156, 160]], [[150, 70], [176, 56], [168, 30]], [[104, 62], [112, 106], [140, 118]]],
+      cracks: [[[118, 128], [126, 144], [122, 158]], [[186, 86], [180, 110], [188, 130]], [[98, 96], [110, 100]]],
+      hatch: [[170, 96], [214, 152]],
+    }, {
+      outline: [[28, 160], [26, 134], [46, 112], [84, 107], [110, 128], [116, 160]],
+      light: [[[26, 134], [46, 112], [84, 107], [110, 128], [80, 131], [50, 135]]],
+      shade: [[[80, 131], [110, 128], [116, 160], [88, 160]]],
+      edges: [[[26, 134], [50, 135], [80, 131], [110, 128]], [[80, 131], [88, 160]]],
+      cracks: [[[58, 140], [62, 154]]],
+      hatch: null,
+    }],
+    pebbles: [[238, 154, 8], [12, 156, 6]],
+  },
+];
+
+function rock(ctx, w, h, P, rnd, variant) {
+  const k = w / 256, shape = ROCK_SHAPES[variant] || ROCK_SHAPES[0];
+  const moved = new Map();
+  // every design vertex gets one random offset, so facets that share a vertex stay joined
+  const at = ([x, y]) => {
+    const key = `${x},${y}`;
+    let p = moved.get(key);
+    if (!p) { const fixed = y >= 160; p = [(x + jit(rnd, 5)) * k, h - (168 - y - (fixed ? 0 : jit(rnd, 4))) * k]; moved.set(key, p); }
+    return p;
+  };
+  groundShadow(ctx, w * 0.53, h - 7 * k, w * 0.46, 7 * k);
+  const pebbles = shape.pebbles.map(([x, y, r]) => ringPoints(x * k, h - (168 - y) * k, r * k, r * k * 0.7, 6, 0.16, rnd));
+  const blocks = shape.blocks.map((b) => ({ ...b, outline: b.outline.map(at) }));
+  inkUnion(ctx, (g) => { for (const b of blocks) tracePolygon(g, b.outline); for (const p of pebbles) tracePolygon(g, p); }, P.ink, LINE.silhouette, k);
+  for (const b of blocks) {
+    const trace = (g) => tracePolygon(g, b.outline);
+    ctx.beginPath(); trace(ctx); ctx.lineWidth = LINE.form * 2 * k; ctx.strokeStyle = P.ink; ctx.stroke();
+    ctx.fillStyle = P.rock; ctx.fill();
+    clipped(ctx, trace, () => {
+      ctx.fillStyle = P.rockLight; for (const f of b.light) { ctx.beginPath(); tracePolygon(ctx, f.map(at)); ctx.fill(); }
+      ctx.fillStyle = P.rockShade; for (const f of b.shade) { ctx.beginPath(); tracePolygon(ctx, f.map(at)); ctx.fill(); }
+      if (b.hatch) {
+        const [a, c] = b.hatch;
+        for (let i = 0; i < 6; i++) {
+          const x = (a[0] + (c[0] - a[0]) * (i / 5)) * k, y0 = h - (168 - a[1] - i * 5) * k, len = (16 + rnd() * 16) * k;
+          brushStroke(ctx, [[x, y0], [x - len * 0.2, y0 + len * 0.5], [x - len * 0.4, y0 + len]], LINE.hair * k * 1.3, { color: P.ink, taper: 0.4, swell: 0 });
+        }
+      }
+      for (const e of b.edges) brushStroke(ctx, sampleCurve(e.map(at), 3), LINE.form * k * 0.9, { color: P.ink, taperStart: 0.08, taperEnd: 0.45, swell: 0.25, seed: e[0][0] });
+      for (const c of b.cracks) brushStroke(ctx, sampleCurve(c.map(at), 3), LINE.detail * k * 1.1, { color: P.ink, taperStart: 0.1, taperEnd: 0.6, swell: 0.2, seed: c[0][1] });
+    });
+  }
+  for (const p of pebbles) {
+    ctx.beginPath(); tracePolygon(ctx, p); ctx.fillStyle = P.rock; ctx.fill();
+    clipped(ctx, (g) => tracePolygon(g, p), () => { ctx.fillStyle = P.rockLight; ctx.beginPath(); tracePolygon(ctx, p.map(([x, y]) => [x - 3 * k, y - 4 * k])); ctx.fill(); });
+  }
+  const tuftInk = mixHex(P.ink, P.grassDark, 0.15);
+  for (const x of variant ? [20, 122, 214] : [34, 150, 226]) grassTuft(ctx, (x + jit(rnd, 6)) * k, h - 4 * k, (12 + rnd() * 6) * k, tuftInk, k, rnd, P.grassDark);
 }
 
 /** Painters by family. Missing families fall back to a neutral placeholder (see scenery-painters.js). */
 const VEGETATION_PAINTERS = {
   'tree.broadleaf': broadleaf,
+  'tree.pine': pine,
+  'tree.palm': palm,
+  'tree.cypress': cypress,
+  'bush': bush,
+  'rock': rock,
 };
 
-__modules["src/art/environments/vegetation.js"] = { groundShadow, foliageMass, VEGETATION_PAINTERS };
+__modules["src/art/environments/vegetation.js"] = { groundShadow, inkUnion, ringPoints, traceScallops, buildClump, paintClump, foliageMass, grassTuft, VEGETATION_PAINTERS };
 })();
 // ---- src/art/environments/trackside.js
 (function () {
@@ -4335,6 +4889,26 @@ const TRACKSIDE_PAINTERS = {
 
 __modules["src/art/environments/trackside.js"] = { TRACKSIDE_PAINTERS };
 })();
+// ---- src/art/environments/terrain-strips.js
+(function () {
+// Tall natural strips running along the road (tree line, cliff face). Same contract as the
+// strips of trackside.js: (ctx, w, h, P, rnd, variant), seamless from left edge to right edge.
+
+/** Painters by family. */
+const TERRAIN_STRIP_PAINTERS = {};
+
+__modules["src/art/environments/terrain-strips.js"] = { TERRAIN_STRIP_PAINTERS };
+})();
+// ---- src/art/environments/buildings.js
+(function () {
+// Buildings and large structures: pit building, grandstands, spectator banks, facades and the
+// free-standing buildings of each circuit theme. Painter contract: (ctx, w, h, P, rnd, variant).
+
+/** Painters by family. */
+const BUILDING_PAINTERS = {};
+
+__modules["src/art/environments/buildings.js"] = { BUILDING_PAINTERS };
+})();
 // ---- src/art/environments/scenery-painters.js
 (function () {
 // Registry of scenery painters: logical family -> drawing function. This is the single place
@@ -4343,9 +4917,11 @@ __modules["src/art/environments/trackside.js"] = { TRACKSIDE_PAINTERS };
 
 const { VEGETATION_PAINTERS } = __modules["src/art/environments/vegetation.js"];
 const { TRACKSIDE_PAINTERS } = __modules["src/art/environments/trackside.js"];
+const { TERRAIN_STRIP_PAINTERS } = __modules["src/art/environments/terrain-strips.js"];
+const { BUILDING_PAINTERS } = __modules["src/art/environments/buildings.js"];
 const { LINE } = __modules["src/art/styles/ink.js"];
 
-const PAINTERS = { ...VEGETATION_PAINTERS, ...TRACKSIDE_PAINTERS };
+const PAINTERS = { ...VEGETATION_PAINTERS, ...TRACKSIDE_PAINTERS, ...TERRAIN_STRIP_PAINTERS, ...BUILDING_PAINTERS };
 
 /** Neutral stand-in used when a family has no painter yet: an inked blank panel. */
 function placeholder(ctx, w, h, P) {
@@ -6024,6 +6600,1150 @@ class GameApp {
 
 __modules["src/core/game-app.js"] = { GameApp };
 })();
+// ---- src/art/styles/lettering.js
+(function () {
+// Procedural comic-book hand lettering ("lettrage BD"). Every glyph is a pen skeleton: a few
+// polylines in an em box (cap height = 1, baseline y = 0, y up, x to the right) that is stroked
+// with Canvas 2D paths. No font files, no system fonts, no fillText. Three styles share the same
+// skeleton: 'caption' (monoline round pen), 'bold' (heavier pen, headings and HUD values) and
+// 'impact' (outlined block letters for titles and onomatopoeia).
+// All capitals: lowercase input maps to uppercase, unknown characters fall back to '?'.
+
+// ---- skeleton source -------------------------------------------------------------------------
+// Grid: 100 units = cap height. An entry is 'left right|stroke|stroke...' (side bearings measured
+// from the skeleton bounds) or '=advance|stroke...' (fixed advance, skeleton centred: tabular
+// digits). A stroke is a list of points: 'x,y' is on the curve, 'cx,y' is a quadratic control
+// point (two consecutive controls imply an on-curve midpoint, TrueType style) and a final 'z'
+// closes the stroke. 'ecx,cy,rx,ry[,k]' is a closed round (k = squareness, 0.414 = true ellipse)
+// and 'ox,y' a dot. A leading '~' marks a light stroke (drawn with the thinner accent pen; light
+// strokes come last). Horizontal bars rise slightly to the right, as a right-handed pen does.
+const SOURCE = {
+  A: '5 5|0,0 40,100 82,0|11,29 68,33',
+  B: '13 8|0,0 0,100 26,102 c52,102 52,79 c52,57 27,56 0,54|27,56 32,56 c60,57 60,28 c60,0 30,0 0,0',
+  C: '8 6|76,87 c64,101.5 c24,101.5 c0,74 c0,26 c24,-1.5 c64,-1.5 78,15',
+  D: '13 8|0,0 0,100 24,102 c52,102 c74,78 74,50 c74,23 c50,0 24,0 0,0',
+  E: '13 8|54,103 0,100 0,0 56,3|0,51 46,54',
+  F: '13 5|54,103 0,100 0,0|0,50 44,53',
+  G: '8 10|76,88 c64,101.5 c24,101.5 c0,74 c0,26 c24,-1.5 c56,-1.5 c80,6 80,30 80,47 46,45',
+  H: '13 13|0,0 0,100|70,0 70,100|0,49 70,53',
+  I: '13 13|0,0 0,100',
+  J: '5 12|48,100 48,28 c48,-1.5 24,-1.5 c4,-1.5 0,22',
+  K: '13 5|0,0 0,100|62,100 0,42|19,60 64,0',
+  L: '13 8|0,100 0,0 54,3',
+  M: '12 12|0,0 6,100 47,22 88,100 94,0',
+  N: '13 13|0,0 0,100 70,0 70,100',
+  O: '8 8|e45,50,45,51.5',
+  P: '13 5|0,0 0,100 26,102 c57,102 57,74 c57,47 27,47 0,45',
+  Q: '8 8|e45,50,45,51.5|52,24 c66,6 92,-10',
+  R: '13 6|0,0 0,100 26,102 c56,102 56,76 c56,51 27,50 0,48|28,50 c46,28 63,0',
+  S: '8 8|55,84 c44,101.5 c16,101.5 c2,89 c2,66 c14,56 c46,45 c60,36 c60,13 c45,-1.5 c14,-1.5 0,17',
+  T: '5 5|0,99 74,103|37,101 37,0',
+  U: '12 12|0,100 0,32 c0,12 c15,-1.5 35,-1.5 c55,-1.5 c70,12 70,32 70,100',
+  V: '4 4|0,100 38,0 76,100',
+  W: '4 4|0,100 26,0 55,80 84,0 110,100',
+  X: '6 6|3,100 70,0|68,100 0,0',
+  Y: '4 4|0,100 36,46 72,100|36,46 36,0',
+  Z: '8 8|2,99 66,102 0,0 70,3',
+  0: '=86|e29,50,29,51.5,0.52',
+  1: '=86|8,74 32,100 32,0|10,0 54,1',
+  2: '=86|3,78 c7,101.5 c44,101.5 c56,92 c56,60 0,0 58,2',
+  3: '=86|7,95 c20,101.5 c46,101.5 c54,90 c54,64 c48,53 37,53 c50,53 c58,43 c58,12 c45,-1.5 c10,-1.5 0,13',
+  4: '=86|42,0 42,100 1,32 58,35',
+  5: '=86|52,102 9,100 7,54|7,54 c27,57 c46,66 c58,56 c58,12 c45,-1.5 c10,-1.5 0,14',
+  6: '=86|47,95 c41,101.5 c25,101.5 c0,84 c0,17 c17,-1.5 c41,-1.5 c58,17 c58,43 c41,60.5 c17,60.5 1,40',
+  7: '=86|2,99 58,102 c39,60 24,0|22,50 54,53',
+  8: '=86|c54,90 c43,101.5 c15,101.5 c4,90 c4,66 c13,58 c45,44 c58,36 c58,12 c45,-1.5 c13,-1.5 c0,12 c0,36 c13,44 c45,58 c54,66 z',
+  9: '=86|11,5 c17,-1.5 c33,-1.5 c58,16 c58,83 c41,101.5 c17,101.5 c0,83 c0,57 c17,39.5 c41,39.5 57,60',
+  ' ': '=34',
+  '.': '14 11|o0,3',
+  ',': '12 11|7,6 c7,-8 0,-17',
+  ':': '14 12|o0,12|o0,58',
+  ';': '12 12|o6,58|7,6 c7,-8 0,-17',
+  '!': '12 12|2,100 0,36|o0,3',
+  '?': '8 8|2,80 c7,101.5 c40,101.5 c52,92 c52,62 c26,56 26,34|o26,3',
+  "'": '8 8|4,104 0,78',
+  '"': '8 8|4,104 0,78|22,104 18,78',
+  '-': '8 8|0,42 32,45',
+  '–': '8 8|0,42 56,46',
+  '+': '8 8|0,45 52,48|26,72 26,22',
+  '/': '5 5|0,-6 44,106',
+  '(': '8 4|22,110 c0,84 c0,16 22,-10',
+  ')': '4 8|0,110 c22,84 c22,16 0,-10',
+  '%': '8 8|12,0 68,100|~e15,78,15,19|~e65,22,15,19',
+  '&': '8 4|70,0 24,58 c8,78 c8,101.5 c50,101.5 c54,76 c0,46 c0,-1.5 c44,-1.5 68,48',
+  '#': '7 7|15,0 24,100|46,0 55,100|0,32 68,35|2,65 70,68',
+  '°': '7 7|~e14,85,14,15',
+  '<': '8 8|50,82 0,48 50,14',
+  '>': '8 8|0,82 50,48 0,14',
+  '=': '8 8|0,60 52,63|0,32 52,35',
+  '*': '7 7|21,97 21,53|1,86 41,64|1,64 41,86',
+  _: '2 2|0,-14 60,-14',
+  '×': '8 8|2,72 48,24|2,24 48,72',
+  '«': '8 8|24,70 0,46 24,22|52,70 28,46 52,22',
+  '»': '8 8|0,70 24,46 0,22|28,70 52,46 28,22',
+  'Œ': '8 5|e36,50,36,51.5|118,103 70,100 70,0 120,3|70,51 110,54',
+  'Æ': '4 5|0,0 50,100 100,103|50,100 50,0 102,3|50,51 92,54|17,33 50,35',
+  // the crossbar "I" of comic lettering, used when the letter stands alone (the English pronoun)
+  'I serif': '8 8|16,0 16,100|0,99 32,102|0,0 32,3',
+};
+
+// Accent strokes, x relative to the centre of the base letter. Keys are Unicode combining marks,
+// so accented capitals are composed from their canonical decomposition. As in hand-lettered
+// albums, a capital that carries an accent is drawn a little shorter (ACCENT_SQUASH) so that the
+// accent stays clear of the line above at the usual tight line spacing.
+const ACCENTS = {
+  '\u0301': '-8,106 12,122',
+  '\u0300': '8,106 -12,122',
+  '\u0302': '-17,105 0,121 17,105',
+  '\u0308': 'o-13,113|o13,113',
+  '\u0303': '-19,108 c-10,122 0,113 c10,104 19,118',
+  '\u0327': '1,-1 -2,-9 c11,-9 c11,-26 -8,-23',
+};
+const ACCENTED = 'ÉÈÊËÀÂÄÇÙÛÜÎÏÔÖÁÍÓÚÌÒÑÃÕŸ';
+const ACCENT_ANCHOR = { C: 43 };
+const ACCENT_SQUASH = 0.9;
+
+// Kerning for the worst pairs (grid units), keyed by base letters.
+const KERN_SOURCE = 'AV-11 AW-7 AY-12 AT-10 VA-11 WA-7 YA-12 TA-10 LT-10 LV-10 LY-11 LW-6 PA-7 FA-8 TJ-9 FJ-9 PJ-9'
+  + ' TO-3 OT-3 VO-3 OV-3 YO-4 OY-4 AO-2 OA-2 AC-2 AG-2 AQ-2 DA-2 KO-3 RT-3 RV-3 RY-4 XO-2 OX-2'
+  + ' T.-10 V.-10 Y.-11 P.-10 F.-10 T,-10 V,-10 Y,-11 P,-10 F,-10 L\'-10 A\'-8 \'A-10 L"-10 A"-8 "A-10 T--6 -T-6 7.-6 7,-6';
+
+const UNIT = 0.01;
+const DOT_RADIUS = 2.4;
+const ROUND = 0.46;
+const BOW_MIN = 28, BOW_X = -0.013, BOW_Y = 0.018;
+const BASE_PEN = 0.11;
+const INK = '#16161f';
+
+// pen = stroke width (em), slant = tangent of the lean, stretch = horizontal widening, gap = extra
+// letter space (em), minBearing = least side bearing (em), wobble = share of the hand irregularities,
+// accentPen = pen ratio of the light strokes. The advance of a glyph grows with the pen width.
+const STYLES = {
+  caption: { pen: 0.12, slant: 0.14, stretch: 1, gap: 0.012, minBearing: 0, block: false, wobble: 1, accentPen: 0.88, color: INK, outline: null },
+  bold: { pen: 0.17, slant: 0.14, stretch: 1.05, gap: 0.012, minBearing: 0.06, block: false, wobble: 1, accentPen: 0.8, color: INK, outline: null },
+  impact: { pen: 0.26, slant: 0.12, stretch: 1.14, gap: -0.015, minBearing: 0.12, block: true, wobble: 0.7, accentPen: 0.62, color: '#ffd42a', outline: INK },
+};
+const OUTLINE_WIDTH = 0.045;
+
+function numbers(text) { return text.split(',').map(Number); }
+
+/**
+ * Append a straight segment. Long ones are bowed a little toward the upper left (the arc of a
+ * wrist): the same gentle curve on every stem and bar is what keeps the lettering from looking
+ * ruled, without making it shaky.
+ */
+function bowTo(out, bx, by) {
+  const ax = out[out.length - 2], ay = out[out.length - 1];
+  const dx = bx - ax, dy = by - ay, length = Math.hypot(dx, dy);
+  if (length > BOW_MIN) {
+    const nx = -dy / length, ny = dx / length, sag = (nx * BOW_X + ny * BOW_Y) * length;
+    const steps = Math.ceil(length / 12);
+    for (let s = 1; s < steps; s++) {
+      const t = s / steps, k = 4 * t * (1 - t) * sag;
+      out.push(ax + dx * t + nx * k, ay + dy * t + ny * k);
+    }
+  }
+  out.push(bx, by);
+}
+
+/** Flatten a list of [x, y, onCurve] points (quadratic, implied midpoints) into a flat polyline. */
+function flatten(points, closed) {
+  const seq = [];
+  const count = points.length;
+  for (let i = 0; i < count; i++) {
+    const p = points[i], q = points[(i + 1) % count];
+    seq.push(p);
+    if (!p[2] && !q[2] && (closed || i < count - 1)) seq.push([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, true]);
+  }
+  if (closed) {
+    seq.push(...seq.splice(0, seq.findIndex((p) => p[2])));
+    seq.push(seq[0]);
+  }
+  const out = [seq[0][0], seq[0][1]];
+  for (let i = 1; i < seq.length; i++) {
+    const p = seq[i];
+    if (p[2]) { bowTo(out, p[0], p[1]); continue; }
+    const ax = out[out.length - 2], ay = out[out.length - 1], b = seq[++i];
+    const ux = p[0] - ax, uy = p[1] - ay, vx = b[0] - p[0], vy = b[1] - p[1];
+    const turn = Math.abs(Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy));
+    const steps = Math.max(1, Math.min(Math.ceil(turn / 0.07), Math.ceil((Math.hypot(ux, uy) + Math.hypot(vx, vy)) / 1.2)));
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps, u = 1 - t;
+      out.push(u * u * ax + 2 * u * t * p[0] + t * t * b[0], u * u * ay + 2 * u * t * p[1] + t * t * b[1]);
+    }
+  }
+  return out;
+}
+
+function ring(cx, cy, rx, ry, k) {
+  const corners = [[1, k], [k, 1], [-k, 1], [-1, k], [-1, -k], [-k, -1], [k, -1], [1, -k]];
+  return flatten(corners.map(([a, b]) => [cx + a * rx, cy + b * ry, false]), true);
+}
+
+function expandStroke(source) {
+  const tokens = source.replace('~', '').trim().split(/\s+/);
+  const head = tokens[0];
+  if (head[0] === 'o') { const [x, y] = numbers(head.slice(1)); return ring(x, y, DOT_RADIUS, DOT_RADIUS, 0.414); }
+  if (head[0] === 'e') { const [cx, cy, rx, ry, k] = numbers(head.slice(1)); return ring(cx, cy, rx, ry, k || ROUND); }
+  const closed = tokens[tokens.length - 1] === 'z';
+  if (closed) tokens.pop();
+  return flatten(tokens.map((t) => (t[0] === 'c' ? [...numbers(t.slice(1)), false] : [...numbers(t), true])), closed);
+}
+
+function boundsX(strokes) {
+  let min = Infinity, max = -Infinity;
+  for (const s of strokes) for (let i = 0; i < s.length; i += 2) { min = Math.min(min, s[i]); max = Math.max(max, s[i]); }
+  return min > max ? [0, 0] : [min, max];
+}
+
+function toEm(strokes, shift) {
+  return strokes.map((s) => s.map((v, i) => Math.round((i % 2 ? v : v + shift) * UNIT * 1e4) / 1e4));
+}
+
+/**
+ * Glyph record: w = advance (em), s = polylines (em), a = index of the first light stroke (accents,
+ * small rings), k = kerning letter, l / r = side bearings (em), lift = true when the light strokes
+ * are accents (they move away from the letter as the pen gets heavier).
+ */
+function buildGlyph(char, source) {
+  const parts = source.split('|');
+  const strokes = parts.slice(1).map(expandStroke);
+  const [min, max] = boundsX(strokes);
+  let shift, advance, left = 100, right = 100;
+  if (parts[0][0] === '=') {
+    advance = Number(parts[0].slice(1));
+    shift = (advance - (max - min)) / 2 - min;
+  } else {
+    [left, right] = numbers(parts[0].replace(' ', ','));
+    shift = left - min;
+    advance = left + (max - min) + right;
+  }
+  const light = parts.findIndex((part) => part[0] === '~');
+  return { w: advance * UNIT, s: toEm(strokes, shift), a: light < 0 ? strokes.length : light - 1, k: char, l: left * UNIT, r: right * UNIT };
+}
+
+function buildAccented(char, glyphs) {
+  const [base, mark] = char.normalize('NFD');
+  const glyph = glyphs[base];
+  const [min, max] = boundsX(glyph.s);
+  const anchor = ACCENT_ANCHOR[base] === undefined ? (min + max) / 2 / UNIT : min / UNIT + ACCENT_ANCHOR[base];
+  // a wide accent on the narrow I needs a little more room
+  const pad = base === 'I' && mark !== '\u0301' && mark !== '\u0300' ? 0.05 : 0;
+  const squash = mark === '\u0327' ? 1 : ACCENT_SQUASH;
+  const s = glyph.s.map((stroke) => stroke.map((v, i) => Math.round((i % 2 ? v * squash : v + pad) * 1e4) / 1e4));
+  return { w: glyph.w + 2 * pad, s: s.concat(toEm(ACCENTS[mark].split('|').map(expandStroke), anchor + pad / UNIT)), a: glyph.s.length, k: base, l: glyph.l + pad, r: glyph.r + pad, lift: true };
+}
+
+function buildGlyphs() {
+  const glyphs = Object.create(null);
+  for (const char of Object.keys(SOURCE)) glyphs[char] = buildGlyph(char, SOURCE[char]);
+  for (const char of ACCENTED) glyphs[char] = buildAccented(char, glyphs);
+  glyphs['Œ'].k = 'O';
+  glyphs['I serif'].k = 'I';
+  return glyphs;
+}
+
+/**
+ * Expanded glyph table: char -> { w: advance in em, s: [[x0, y0, x1, y1, ...], ...] } (cap height 1,
+ * baseline 0, y up; a polyline whose last point repeats the first is closed). 'I serif' is the
+ * crossbar I. Advances are those of the reference pen: use glyphAdvance for a given style.
+ */
+const GLYPHS = buildGlyphs();
+
+/** Every supported character (uppercase forms). */
+const LETTERING_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,:;!?\'"-–+/()%&#°<>=*_×ÉÈÊËÀÂÄÇÙÛÜÎÏÔÖŒÆÁÍÓÚÌÒÑÃÕŸ«»';
+
+const KERN = {};
+for (const pair of KERN_SOURCE.split(' ')) KERN[pair.slice(0, 2)] = Number(pair.slice(2)) * UNIT;
+
+const ALIASES = { '’': "'", '‘': "'", '`': "'", '´': "'", '“': '"', '”': '"', '„': '"', '—': '–', '−': '-', '\u2011': '-', '·': '.', '\u00a0': ' ', '\u202f': ' ', '\u2009': ' ', '\t': ' ', '\n': ' ', '[': '(', ']': ')', '\\': '/', 'º': '°' };
+
+function normalize(text) {
+  return Array.from(String(text).toUpperCase().replace(/…/g, '...'), (c) => ALIASES[c] || c);
+}
+
+function isAlphanumeric(c) { return c !== undefined && /[A-Z0-9À-ÖØ-ÞŒŸ]/.test(c); }
+
+function styleOf(options) { return STYLES[options && options.style] || STYLES.caption; }
+
+/** Position the glyphs of one line. Returns { glyphs, xs, extra, width } in em. */
+function layout(text, style, options) {
+  const chars = normalize(text);
+  const extra = style.pen * (options.weight || 1) - BASE_PEN + style.gap;
+  const tracking = options.tracking || 0;
+  const glyphs = [], xs = [];
+  let pen = 0, previous = null;
+  for (let i = 0; i < chars.length; i++) {
+    let glyph = GLYPHS[chars[i]] || GLYPHS['?'];
+    if (chars[i] === 'I' && options.crossbarI !== false && !isAlphanumeric(chars[i - 1]) && !isAlphanumeric(chars[i + 1])) glyph = GLYPHS['I serif'];
+    if (previous) pen += (KERN[previous.k + glyph.k] || 0) * style.stretch + tracking;
+    // heavy pens need a minimum of air around open-sided letters (T, F, L...)
+    pen += Math.max(0, style.minBearing - glyph.l);
+    glyphs.push(glyph);
+    xs.push(pen);
+    pen += glyph.w * style.stretch + extra + Math.max(0, style.minBearing - glyph.r);
+    previous = glyph;
+  }
+  return { glyphs, xs, extra, width: pen };
+}
+
+/** Deterministic noise in [-1, 1) from a character code, its position, a seed and a channel. */
+function noise(code, index, seed, channel) {
+  let h = Math.imul(code + 1, 374761393) ^ Math.imul(index + 1, 668265263) ^ Math.imul(seed + 7, 1274126177) ^ Math.imul(channel, 2246822519);
+  h = Math.imul(h ^ (h >>> 15), 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 3266489917);
+  return ((h ^ (h >>> 16)) >>> 0) / 2147483648 - 1;
+}
+
+// ---- block letters ('impact') ------------------------------------------------------------------
+// The thick pen uses mitred joins and flat ends. Canvas has no clipped mitre, so sharp corners
+// (A, M, N, V, W...) are split in two close vertices, which cuts the spike flat at pen distance,
+// and stroke ends are squared off by hand: free ends are extended by half the pen width, ends
+// that butt against another stroke (the bar of an A, the arm of a K) are left flush.
+const blockCache = new Map();
+
+function segmentDistance(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+  return [Math.hypot(px - ax - t * dx, py - ay - t * dy), t];
+}
+
+function arcLengths(pts) {
+  const lengths = [0];
+  for (let i = 2; i < pts.length; i += 2) lengths.push(lengths[lengths.length - 1] + Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]));
+  return lengths;
+}
+
+function isClosed(pts) { const n = pts.length; return n > 4 && pts[0] === pts[n - 2] && pts[1] === pts[n - 1]; }
+
+/**
+ * Extension factor of one stroke end: 0 = flush (it butts against another stroke), 1 = squared
+ * free end, 0.4 = free end of a curve, ~0 = free but not extended (it faces the dot of "!" or "?").
+ * Where two ends meet in a corner, the end of the earlier stroke is squared and covers the other.
+ */
+function endFactor(strokes, lengths, index, atEnd, baseCount) {
+  const pts = strokes[index], own = lengths[index], total = own[own.length - 1];
+  const n = pts.length / 2;
+  const px = atEnd ? pts[2 * n - 2] : pts[0], py = atEnd ? pts[2 * n - 1] : pts[1];
+  let best = Infinity, nearEnd = false, nearest = -1;
+  for (let j = 0; j < strokes.length; j++) {
+    const other = strokes[j], len = lengths[j], length = len[len.length - 1], closed = isClosed(other);
+    for (let k = 0; k + 1 < len.length; k++) {
+      if (j === index && (atEnd ? total - len[k + 1] : len[k]) < 0.2) continue;
+      const [d, t] = segmentDistance(px, py, other[2 * k], other[2 * k + 1], other[2 * k + 2], other[2 * k + 3]);
+      if (closed && length < 0.3 && d < 0.42 && j < baseCount && index < baseCount) return 1e-6;
+      if (d >= best) continue;
+      const at = len[k] + t * (len[k + 1] - len[k]);
+      best = d;
+      nearest = j;
+      nearEnd = !closed && (at < 0.05 || length - at < 0.05);
+    }
+  }
+  if (best < 0.075) return nearEnd && nearest >= index ? 1 : 0;
+  // curved end: the direction turns noticeably within the first 0.15 em
+  const step = atEnd ? -1 : 1;
+  let i = atEnd ? n - 1 : 0;
+  const d0 = Math.atan2(pts[2 * (i + step) + 1] - pts[2 * i + 1], pts[2 * (i + step)] - pts[2 * i]);
+  let turned = 0;
+  while (i + step >= 0 && i + step < n && Math.abs(own[i + step] - own[atEnd ? n - 1 : 0]) < 0.15) {
+    const d1 = Math.atan2(pts[2 * (i + step) + 1] - pts[2 * i + 1], pts[2 * (i + step)] - pts[2 * i]);
+    turned = Math.max(turned, Math.abs(Math.atan2(Math.sin(d1 - d0), Math.cos(d1 - d0))));
+    i += step;
+  }
+  return turned > 0.35 ? 0.4 : 1;
+}
+
+function splitSharpCorners(pts) {
+  const closed = isClosed(pts);
+  const count = pts.length / 2 - (closed ? 1 : 0);
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const x = pts[2 * i], y = pts[2 * i + 1];
+    const p = closed ? (i + count - 1) % count : i - 1, q = closed ? (i + 1) % count : i + 1;
+    if (p < 0 || q >= count) { out.push(x, y); continue; }
+    let ux = x - pts[2 * p], uy = y - pts[2 * p + 1], vx = pts[2 * q] - x, vy = pts[2 * q + 1] - y;
+    const ul = Math.hypot(ux, uy) || 1, vl = Math.hypot(vx, vy) || 1;
+    ux /= ul; uy /= ul; vx /= vl; vy /= vl;
+    if (ux * vx + uy * vy > -0.375) { out.push(x, y); continue; }
+    // across the corner: perpendicular to the bisector, oriented along the direction of travel
+    let tx = -(vy - uy), ty = vx - ux;
+    const tl = Math.hypot(tx, ty) || 1;
+    tx /= tl; ty /= tl;
+    if (tx * (ux + vx) + ty * (uy + vy) < 0) { tx = -tx; ty = -ty; }
+    // (kept shorter than the neighbouring segments, or the cut would kink a tightly curved stroke)
+    const half = Math.min(0.012, 0.3 * ul, 0.3 * vl);
+    out.push(x - tx * half, y - ty * half, x + tx * half, y + ty * half);
+  }
+  if (closed) out.push(out[0], out[1]);
+  return out;
+}
+
+function blockGlyph(glyph) {
+  let block = blockCache.get(glyph);
+  if (!block) {
+    const lengths = glyph.s.map(arcLengths);
+    block = {
+      s: glyph.s.map(splitSharpCorners),
+      e: glyph.s.map((pts, i) => (isClosed(pts) ? [0, 0] : [endFactor(glyph.s, lengths, i, false, glyph.a), endFactor(glyph.s, lengths, i, true, glyph.a)])),
+    };
+    blockCache.set(glyph, block);
+  }
+  return block;
+}
+
+// ---- drawing -------------------------------------------------------------------------------------
+let scratch = new Float64Array(512);
+
+/**
+ * Add one polyline to the current path. m = [a, b, c, d, e, f] maps em to pixels
+ * (px = a x + c y + e, py = b x + d y + f); `lift` moves the stroke vertically in em (accents);
+ * ext0 / ext1 extend the two ends in pixels (squared block-letter ends).
+ */
+function tracePolyline(ctx, pts, m, lift, ext0, ext1) {
+  const n = pts.length;
+  if (scratch.length < n) scratch = new Float64Array(n * 2);
+  for (let i = 0; i < n; i += 2) {
+    const x = pts[i], y = pts[i + 1] + lift;
+    scratch[i] = m[0] * x + m[2] * y + m[4];
+    scratch[i + 1] = m[1] * x + m[3] * y + m[5];
+  }
+  const closed = isClosed(pts);
+  if (ext0 > 0 && n >= 4) {
+    const dx = scratch[0] - scratch[2], dy = scratch[1] - scratch[3], l = Math.hypot(dx, dy) || 1;
+    scratch[0] += dx / l * ext0; scratch[1] += dy / l * ext0;
+  }
+  if (ext1 > 0 && n >= 4) {
+    const dx = scratch[n - 2] - scratch[n - 4], dy = scratch[n - 1] - scratch[n - 3], l = Math.hypot(dx, dy) || 1;
+    scratch[n - 2] += dx / l * ext1; scratch[n - 1] += dy / l * ext1;
+  }
+  ctx.moveTo(scratch[0], scratch[1]);
+  const last = closed ? n - 2 : n;
+  for (let i = 2; i < last; i += 2) ctx.lineTo(scratch[i], scratch[i + 1]);
+  if (closed) ctx.closePath();
+}
+
+/** Width in pixels of one line of text. options: { style, tracking, weight, crossbarI }. */
+function measureText(text, size, options) {
+  const o = options || {};
+  return layout(text, styleOf(o), o).width * size;
+}
+
+/**
+ * Draw one line of text with its baseline at y; `size` is the cap height in pixels. Returns the width.
+ * options: { style: 'caption' | 'bold' | 'impact', color, outline: null | color, outlineWidth (px),
+ *   align: 'left' | 'center' | 'right', tracking (em), slant (radians), weight (pen multiplier),
+ *   shadow: null | { dx, dy, color } (px), seed, bounce (0..1 per-letter size / baseline / rotation
+ *   variation for onomatopoeia), jitter (hand irregularity multiplier, default 1; 0 = none),
+ *   crossbarI (default true: an "I" standing alone gets the crossbar form) }.
+ * 'impact' defaults to a yellow fill with an ink outline (pass outline: null for none). The hand
+ * irregularities depend only on the characters, their position and the seed: never on the frame.
+ */
+function drawText(ctx, text, x, y, size, options) {
+  const o = options || {}, style = styleOf(o);
+  const run = layout(text, style, o);
+  const width = run.width * size;
+  const count = run.glyphs.length;
+  if (!ctx || !count) return width;
+  const left = x - (o.align === 'center' ? width / 2 : o.align === 'right' ? width : 0);
+  const pen = style.pen * (o.weight || 1) * size;
+  const slant = Math.tan(o.slant === undefined ? style.slant : o.slant);
+  const seed = o.seed | 0, bounce = o.bounce || 0;
+  const wobble = (o.jitter === undefined ? 1 : o.jitter) * style.wobble;
+  const outline = o.outline === undefined ? style.outline : o.outline;
+  const outlineWidth = outline ? (o.outlineWidth === undefined ? OUTLINE_WIDTH * size : o.outlineWidth) : 0;
+  const accentPen = pen * style.accentPen;
+  const accentLift = ((pen + accentPen) / 2 + outlineWidth) / size - BASE_PEN;
+
+  // one em-to-pixel matrix per glyph: stretch, slant about mid height, hand irregularities, bounce
+  // (the pen only follows the bounce, so that plain text is stroked as a single path per pass)
+  const mats = [], scales = [];
+  for (let i = 0; i < count; i++) {
+    const glyph = run.glyphs[i], code = glyph.k.charCodeAt(0) + glyph.s.length;
+    const grow = 1 + bounce * 0.17 * noise(code, i, seed, 3), scale = grow * (1 + wobble * 0.02 * noise(code, i, seed, 6));
+    const angle = wobble * 0.0175 * noise(code, i, seed, 1) + bounce * 0.1 * noise(code, i, seed, 4);
+    const rise = wobble * 0.01 * noise(code, i, seed, 2) + bounce * 0.085 * ((i % 2 ? -0.6 : 0.6) + 0.5 * noise(code, i, seed, 5));
+    const cos = Math.cos(angle), sin = Math.sin(angle), s = size * scale;
+    const a = s * cos * style.stretch, b = -s * sin * style.stretch;
+    const c = s * (cos * slant - sin), d = -s * (sin * slant + cos);
+    const cx = left + (run.xs[i] + (glyph.w * style.stretch + run.extra) / 2) * size, cy = y - (0.5 + rise) * size;
+    mats.push([a, b, c, d, cx - a * glyph.w / 2 - c * 0.5, cy - b * glyph.w / 2 - d * 0.5]);
+    scales.push(grow);
+  }
+
+  const passes = [];
+  if (o.shadow) passes.push([o.shadow.color || INK, outlineWidth, o.shadow.dx === undefined ? 0.05 * size : o.shadow.dx, o.shadow.dy === undefined ? 0.05 * size : o.shadow.dy]);
+  if (outlineWidth > 0) passes.push([outline, outlineWidth, 0, 0]);
+  passes.push([o.color || style.color, 0, 0, 0]);
+
+  ctx.save();
+  ctx.lineCap = style.block ? 'butt' : 'round';
+  ctx.lineJoin = style.block ? 'miter' : 'round';
+  ctx.miterLimit = 2;
+  for (const [color, grow, dx, dy] of passes) {
+    ctx.strokeStyle = color;
+    // accents are drawn with a lighter pen, in a second batch
+    for (let part = 0; part < 2; part++) {
+      let current = -1;
+      for (let i = 0; i < count; i++) {
+        const glyph = run.glyphs[i];
+        const from = part ? glyph.a : 0, to = part ? glyph.s.length : glyph.a;
+        if (from >= to) continue;
+        const lineWidth = (part ? accentPen : pen) * scales[i] + 2 * grow;
+        if (lineWidth !== current) {
+          if (current >= 0) ctx.stroke();
+          ctx.beginPath();
+          ctx.lineWidth = current = lineWidth;
+        }
+        const m = mats[i];
+        m[4] += dx; m[5] += dy;
+        const block = style.block ? blockGlyph(glyph) : null;
+        for (let k = from; k < to; k++) {
+          const lift = part && glyph.lift ? (glyph.s[k][1] > 0.5 ? accentLift : -accentLift) : 0;
+          if (block) {
+            const half = (lineWidth - 2 * grow) / 2, e = block.e[k];
+            tracePolyline(ctx, block.s[k], m, lift, e[0] && e[0] * half + grow, e[1] && e[1] * half + grow);
+          } else tracePolyline(ctx, glyph.s[k], m, lift, 0, 0);
+        }
+        m[4] -= dx; m[5] -= dy;
+      }
+      if (current >= 0) ctx.stroke();
+    }
+  }
+  ctx.restore();
+  return width;
+}
+
+/** Break a text into lines no wider than maxWidth (spaces and explicit \n). */
+function wrapLines(text, maxWidth, size, options) {
+  const lines = [];
+  for (const paragraph of String(text).split('\n')) {
+    // French punctuation: never start a line with "!", "?", ":", ";" or "»", nor end one with "«"
+    const words = paragraph.split(' ').filter(Boolean).reduce((list, word) => {
+      const glue = list.length && (/^[!?:;»]+$/.test(word) || list[list.length - 1].endsWith('«'));
+      if (glue) list[list.length - 1] += ' ' + word; else list.push(word);
+      return list;
+    }, []);
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? line + ' ' + word : word;
+      if (line && measureText(candidate, size, options) > maxWidth) { lines.push(line); line = word; } else line = candidate;
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
+/**
+ * Draw word-wrapped text in a box whose top-left corner is (x, y): the cap line of the first row
+ * sits at y (accents rise about 0.3 em above it). `align` positions the rows inside [x, x + maxWidth].
+ * options: those of drawText plus lineHeight (em, default 1.35). A null ctx only measures.
+ * Returns { width, height, lines }.
+ */
+function drawTextBox(ctx, text, x, y, maxWidth, size, options) {
+  const o = options || {};
+  const lineHeight = (o.lineHeight || 1.35) * size;
+  const lines = wrapLines(text, maxWidth, size, o);
+  const anchor = x + (o.align === 'center' ? maxWidth / 2 : o.align === 'right' ? maxWidth : 0);
+  let width = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const row = Object.assign({}, o, { seed: (o.seed | 0) + i * 131 });
+    width = Math.max(width, drawText(ctx, lines[i], anchor, y + size + i * lineHeight, size, row));
+  }
+  return { width, height: size + (lines.length - 1) * lineHeight, lines };
+}
+
+function glyphOf(ch) {
+  const char = normalize(ch)[0];
+  return GLYPHS[ch] || GLYPHS[char] || GLYPHS['?'];
+}
+
+/** Expanded skeleton polylines of one character, in em (cap height 1, baseline 0, y up). Do not mutate. */
+function glyphOutline(ch) { return glyphOf(ch).s; }
+
+/** Advance width of one character in em for a style (default 'caption'). */
+function glyphAdvance(ch, style) {
+  const st = STYLES[style] || STYLES.caption, glyph = glyphOf(ch);
+  return glyph.w * st.stretch + st.pen - BASE_PEN + st.gap + Math.max(0, st.minBearing - glyph.l) + Math.max(0, st.minBearing - glyph.r);
+}
+
+__modules["src/art/styles/lettering.js"] = { GLYPHS, LETTERING_CHARSET, measureText, drawText, drawTextBox, glyphOutline, glyphAdvance };
+})();
+// ---- src/art/cockpits/cockpit-art.js
+(function () {
+// Cockpit drawings. What the driver sees of the car is drawn by the same illustrator as the
+// opponents' cars, from the driver's eye and with the game's focal length, so wheels, nose and
+// wings sit in a consistent perspective with the road. The picture is split into animable
+// layers: front wing (far), front wheel (per steering angle, with rolling marks), bodywork with
+// suspension and mirror (near), instrument dial and needle, steering wheel with the hands.
+// Symmetric layers are drawn once for the left half and mirrored by the compositor.
+//
+// All positions are in "reference pixels": the view of a 2560 px wide screen at the rest field
+// of view, relative to the point (screen centre, horizon line).
+
+const { VIEW_CONFIG } = __modules["src/core/config.js"];
+const { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES } = __modules["src/art/vehicles/car-model.js"];
+const { drawCar } = __modules["src/art/vehicles/car-illustrator.js"];
+const { LINE, brushStroke, brushCurve, closedCurve } = __modules["src/art/styles/ink.js"];
+const { drawText } = __modules["src/art/styles/lettering.js"];
+const { shadeHex, lightHex, mixHex } = __modules["src/art/palettes/palettes.js"];
+
+const COCKPIT_REF_WIDTH = 2560;
+const COCKPIT_REF_FOCAL = (COCKPIT_REF_WIDTH / 2) / Math.tan(VIEW_CONFIG.hfov / 2);
+const STEER_FRAMES = 5;                 // drawn steering angles of a front wheel, from full right to full left
+const MAX_DRAWN_STEER = 0.26;           // radians at the first / last frame
+const WHEEL_VARIANTS = TREAD_PHASES + 1; // rolling phases, then the streaked "at speed" drawing
+const DIAL = { x: 0, y: 700, r: 92, minAngle: -2.2, maxAngle: 2.2, maxRpm: 14000 };
+const STEERING = { x: 0, y: 872, size: 800, squash: 0.9 };
+const MIRROR = { x: -1010, y: 188, w: 300, h: 138 };   // left mirror (centre and size); the right one is its reflection
+const INK = '#16161f';
+const COCKPIT_INK = 4.2;
+const BOTTOM_LIMIT = 900;                      // nothing is needed further below the horizon than this
+
+function cropOf(bounds, minX, maxX, pad) {
+  const x0 = Math.max(minX, Math.floor(bounds.minX - pad)), x1 = Math.min(maxX, Math.ceil(bounds.maxX + pad));
+  const y0 = Math.floor(bounds.minY - pad), y1 = Math.min(BOTTOM_LIMIT, Math.ceil(bounds.maxY + pad));
+  return { x: x0, y: y0, w: Math.max(8, x1 - x0), h: Math.max(8, y1 - y0) };
+}
+
+/** Hood of the instrument binnacle (symmetric, drawn in the bodywork layer). */
+function paintBinnacle(ctx, ox, oy) {
+  const r = DIAL.r, cy = DIAL.y;
+  const p = (x, y) => [ox + x * r, oy + cy + y * r];
+  const outline = [p(-2.1, 2.9), p(-1.95, 0.2), p(-1.4, -0.95), p(-0.55, -1.32), p(0.55, -1.32), p(1.4, -0.95), p(1.95, 0.2), p(2.1, 2.9)];
+  ctx.beginPath(); closedCurve(ctx, outline, 0.6);
+  ctx.fillStyle = '#262833'; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = '#3a3d4b';
+  ctx.beginPath(); closedCurve(ctx, [p(-1.4, -0.78), p(-0.55, -1.16), p(0.55, -1.16), p(1.4, -0.78), p(0.9, -0.9), p(0, -1.02), p(-0.9, -0.9)], 0.6); ctx.fill();
+  ctx.fillStyle = '#16171f';
+  ctx.beginPath(); ctx.ellipse(ox, oy + cy + 6, r * 1.34, r * 1.24, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); closedCurve(ctx, outline, 0.6);
+  ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.lineJoin = 'round'; ctx.stroke();
+  for (const [x, y] of [[-1.72, 0.6], [-1.58, -0.3], [-1.08, -0.95]]) {   // rivets
+    ctx.fillStyle = '#565866'; ctx.beginPath(); ctx.arc(...p(x, y), 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.4; ctx.stroke();
+  }
+}
+
+/** Left rear-view mirror on its stalk: housing in the body colour, glass with a drawn reflection. */
+function paintMirror(ctx, ox, oy, colors) {
+  const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hw = MIRROR.w / 2, hh = MIRROR.h / 2;
+  // stalk running down to the cockpit side, out of the picture
+  const stalk = [[cx - 14, cy + hh - 6], [cx - 46, cy + 380], [cx - 64, BOTTOM_LIMIT - oy + oy]];
+  brushStroke(ctx, [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]], 30, { color: INK, taper: 0, swell: 0 });
+  brushStroke(ctx, [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]], 21, { color: '#30323d', taper: 0, swell: 0 });
+  brushStroke(ctx, [[cx - 11, cy + hh], [cx - 45, cy + 380], [cx - 57, cy + 760]], 5, { color: '#555866', taper: 0, swell: 0 });
+  void stalk;
+  const housing = [[cx - hw, cy - hh * 0.72], [cx - hw * 0.86, cy - hh], [cx + hw * 0.9, cy - hh], [cx + hw, cy - hh * 0.6], [cx + hw * 0.94, cy + hh * 0.86], [cx + hw * 0.8, cy + hh], [cx - hw * 0.88, cy + hh], [cx - hw, cy + hh * 0.7]];
+  const trace = (pts) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); };
+  trace(housing); ctx.fillStyle = shadeHex(colors[0], 0.16); ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = colors[0]; ctx.fillRect(cx - hw, cy - hh, MIRROR.w, hh * 0.5);
+  ctx.fillStyle = shadeHex(colors[0], 0.46); ctx.fillRect(cx - hw, cy + hh * 0.62, MIRROR.w, hh);
+  ctx.restore();
+  trace(housing); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 1.15; ctx.lineJoin = 'round'; ctx.stroke();
+  // glass
+  const g = 16;
+  const glass = [[cx - hw + g, cy - hh + g + 6], [cx - hw + g + 10, cy - hh + g], [cx + hw - g - 6, cy - hh + g], [cx + hw - g, cy - hh + g + 12], [cx + hw - g - 4, cy + hh - g], [cx - hw + g + 6, cy + hh - g]];
+  trace(glass); ctx.fillStyle = '#9fc9e6'; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = '#d2ecf7'; ctx.fillRect(cx - hw, cy - hh, MIRROR.w, hh * 0.75);
+  ctx.fillStyle = '#6f9a5c'; ctx.fillRect(cx - hw, cy - 2, MIRROR.w, hh);                        // verge
+  ctx.fillStyle = '#6c6e77';                                                                      // road running away behind
+  ctx.beginPath(); ctx.moveTo(cx + hw * 0.1, cy - 2); ctx.lineTo(cx + hw * 0.34, cy - 2); ctx.lineTo(cx + hw, cy + hh * 0.75); ctx.lineTo(cx + hw, cy + hh); ctx.lineTo(cx - hw * 0.55, cy + hh); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#f1efe6';
+  ctx.beginPath(); ctx.moveTo(cx + hw * 0.1, cy - 2); ctx.lineTo(cx + hw * 0.13, cy - 2); ctx.lineTo(cx - hw * 0.44, cy + hh); ctx.lineTo(cx - hw * 0.55, cy + hh); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';                                                       // glare
+  ctx.beginPath(); ctx.moveTo(cx - hw * 0.5, cy - hh); ctx.lineTo(cx - hw * 0.28, cy - hh); ctx.lineTo(cx - hw * 0.62, cy + hh); ctx.lineTo(cx - hw * 0.84, cy + hh); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  trace(glass); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 0.7; ctx.stroke();
+}
+
+/** Rev counter face (not mirrored: it carries numerals). */
+function paintDial(ctx, size) {
+  const c = size / 2, r = DIAL.r;
+  ctx.fillStyle = '#16171f'; ctx.beginPath(); ctx.arc(c, c, r + 12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f4efe2'; ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.fill();
+  // shade crescent at the bottom left, as inked dials are drawn (built as a polygon: part of
+  // the face outside a second circle shifted toward the light)
+  const sx = c + 10, sy = c - 14, cres = [], inner = [];
+  for (let i = 0; i <= 180; i++) {
+    const a = (i / 180) * Math.PI * 2;
+    const px = c + Math.cos(a) * r, py = c + Math.sin(a) * r;
+    if (Math.hypot(px - sx, py - sy) > r) cres.push([px, py]);
+    const qx = sx + Math.cos(a) * r, qy = sy + Math.sin(a) * r;
+    if (Math.hypot(qx - c, qy - c) < r) inner.push([qx, qy]);
+  }
+  // both runs are contiguous arcs; order the inner one so that the outline closes
+  const first = inner.findIndex((q, i) => i > 0 && Math.hypot(q[0] - inner[i - 1][0], q[1] - inner[i - 1][1]) > 12);
+  const run = first > 0 ? inner.slice(first).concat(inner.slice(0, first)) : inner;
+  const endC = cres[cres.length - 1];
+  if (Math.hypot(run[0][0] - endC[0], run[0][1] - endC[1]) > Math.hypot(run[run.length - 1][0] - endC[0], run[run.length - 1][1] - endC[1])) run.reverse();
+  ctx.fillStyle = '#d7cfbc';
+  ctx.beginPath(); ctx.moveTo(cres[0][0], cres[0][1]);
+  for (const q of cres) ctx.lineTo(q[0], q[1]);
+  for (const q of run) ctx.lineTo(q[0], q[1]);
+  ctx.closePath(); ctx.fill();
+  const angleOf = (rpm) => DIAL.minAngle + ((DIAL.maxAngle - DIAL.minAngle) * rpm) / DIAL.maxRpm - Math.PI / 2;
+  // red zone
+  ctx.strokeStyle = '#d5302a'; ctx.lineWidth = 10; ctx.lineCap = 'butt';
+  ctx.beginPath(); ctx.arc(c, c, r - 10, angleOf(12500), angleOf(14000)); ctx.stroke();
+  for (let k = 0; k <= 28; k++) {
+    const a = angleOf(k * 500), major = k % 2 === 0;
+    const r0 = r - (major ? 21 : 13), r1 = r - 5;
+    brushStroke(ctx, [[c + Math.cos(a) * r0, c + Math.sin(a) * r0], [c + Math.cos(a) * r1, c + Math.sin(a) * r1]], major ? 4.2 : 2.2, { color: INK, taper: 0.1, swell: 0 });
+  }
+  for (let k = 0; k <= 14; k += 2) {
+    const a = angleOf(k * 1000);
+    drawText(ctx, String(k), c + Math.cos(a) * (r - 40), c + Math.sin(a) * (r - 40) + 7, 15, { style: 'bold', color: INK, align: 'center', jitter: 0 });
+  }
+  drawText(ctx, 'RPM', c, c - 22, 9, { style: 'bold', color: '#6b6d78', align: 'center', jitter: 0 });
+  drawText(ctx, 'x1000', c, c - 10, 7, { style: 'bold', color: '#6b6d78', align: 'center', jitter: 0 });
+  // gear window
+  ctx.fillStyle = '#1b1c26'; ctx.fillRect(c - 21, c + 26, 42, 44);
+  ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(c - 21, c + 26, 42, 44);
+  ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = '#565866'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(c, c, r + 9, Math.PI * 1.05, Math.PI * 1.75); ctx.stroke();
+}
+
+function paintNeedle(ctx, w, h) {
+  // points up; pivot at (w/2, h - w/2)
+  const cx = w / 2, py = h - w / 2;
+  ctx.beginPath(); ctx.moveTo(cx - 5, py); ctx.lineTo(cx - 1.5, 6); ctx.lineTo(cx + 1.5, 6); ctx.lineTo(cx + 5, py); ctx.closePath();
+  ctx.fillStyle = '#d5302a'; ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.fillStyle = '#22232e'; ctx.beginPath(); ctx.arc(cx, py, w / 2 - 2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#565866'; ctx.beginPath(); ctx.arc(cx - 2, py - 2, 3, 0, Math.PI * 2); ctx.fill();
+}
+
+/** One gloved hand gripping the rim at angle `a` (canvas angle), with cuff and sleeve. */
+function paintHand(ctx, c, rimMid, a, S, glove, suit) {
+  const ux = Math.cos(a), uy = Math.sin(a);
+  let tx = -uy, ty = ux;
+  if (ty > 0) { tx = -tx; ty = -ty; }                       // tangent pointing up the rim
+  const hx = c + ux * (rimMid + S * 0.012), hy = c + uy * (rimMid + S * 0.012);
+  const P = (along, out) => [hx + tx * along + ux * out, hy + ty * along + uy * out];
+  const gloveShade = shadeHex(glove, 0.4), gloveLight = lightHex(glove, 0.3);
+  // sleeve from the wrist to beyond the lower corner of the drawing
+  const side = ux < 0 ? -1 : 1;
+  const wrist = P(-S * 0.085, S * 0.03);
+  const elbow = [c + side * S * 0.62, c + S * 0.78];
+  const nx = -(elbow[1] - wrist[1]), ny = elbow[0] - wrist[0];
+  const nl = Math.hypot(nx, ny) || 1;
+  const wx = (nx / nl) * S * 0.06, wy = (ny / nl) * S * 0.06;
+  const sleeve = [[wrist[0] - wx * 0.9, wrist[1] - wy * 0.9], [wrist[0] + wx * 0.9, wrist[1] + wy * 0.9], [elbow[0] + wx * 1.8, elbow[1] + wy * 1.8], [elbow[0] - wx * 1.8, elbow[1] - wy * 1.8]];
+  ctx.beginPath(); ctx.moveTo(sleeve[0][0], sleeve[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(sleeve[i][0], sleeve[i][1]); ctx.closePath();
+  ctx.fillStyle = suit; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = shadeHex(suit, 0.3);
+  ctx.beginPath(); ctx.moveTo(sleeve[1][0], sleeve[1][1]); ctx.lineTo(sleeve[2][0], sleeve[2][1]);
+  ctx.lineTo(elbow[0] + wx * 0.5, elbow[1] + wy * 0.5); ctx.lineTo(wrist[0] + wx * 0.25, wrist[1] + wy * 0.25); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(sleeve[0][0], sleeve[0][1]); ctx.lineTo(sleeve[3][0], sleeve[3][1]); ctx.moveTo(sleeve[1][0], sleeve[1][1]); ctx.lineTo(sleeve[2][0], sleeve[2][1]); ctx.stroke();
+  for (let i = 1; i <= 3; i++) {   // cloth folds
+    const t = i / 4.5;
+    const fx = wrist[0] + (elbow[0] - wrist[0]) * t, fy = wrist[1] + (elbow[1] - wrist[1]) * t;
+    brushCurve(ctx, [[fx - wx * (0.7 + t), fy - wy * (0.7 + t)], [fx - wx * 0.1 + (elbow[0] - wrist[0]) * 0.03, fy - wy * 0.1 + (elbow[1] - wrist[1]) * 0.03], [fx + wx * 0.5, fy + wy * 0.5]], 2.6, { color: INK, taper: 0.45 });
+  }
+  // cuff
+  const cuff = [P(-S * 0.1, -S * 0.035), P(-S * 0.1, S * 0.085), P(-S * 0.062, S * 0.092), P(-S * 0.062, -S * 0.04)];
+  ctx.beginPath(); ctx.moveTo(cuff[0][0], cuff[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(cuff[i][0], cuff[i][1]); ctx.closePath();
+  ctx.fillStyle = '#f1efe6'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.stroke();
+  // back of the hand and fingers wrapped over the rim
+  const back = [P(-S * 0.07, -S * 0.045), P(-S * 0.075, S * 0.05), P(-S * 0.03, S * 0.092), P(S * 0.04, S * 0.098), P(S * 0.085, S * 0.07), P(S * 0.092, S * 0.02), P(S * 0.075, -S * 0.04), P(S * 0.0, -S * 0.055)];
+  ctx.beginPath(); closedCurve(ctx, back, 0.7);
+  ctx.fillStyle = glove; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = gloveShade;
+  ctx.beginPath(); closedCurve(ctx, [P(-S * 0.08, S * 0.0), P(-S * 0.02, -S * 0.02), P(S * 0.1, -S * 0.01), P(S * 0.1, -S * 0.08), P(-S * 0.09, -S * 0.08)], 0.6); ctx.fill();
+  ctx.fillStyle = gloveLight;
+  for (let f = 0; f < 4; f++) { const al = -S * 0.035 + f * S * 0.032; ctx.beginPath(); ctx.ellipse(...P(al, S * 0.07), S * 0.012, S * 0.016, a, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+  ctx.beginPath(); closedCurve(ctx, back, 0.7); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.stroke();
+  for (let f = 1; f < 4; f++) {   // finger separations
+    const al = -S * 0.05 + f * S * 0.033;
+    brushCurve(ctx, [P(al, S * 0.094), P(al - S * 0.004, S * 0.055), P(al + S * 0.002, S * 0.012)], 3, { color: INK, taperStart: 0.05, taperEnd: 0.6 });
+  }
+  brushCurve(ctx, [P(-S * 0.055, S * 0.045), P(-S * 0.01, S * 0.038), P(S * 0.06, S * 0.045)], 2.2, { color: INK, taper: 0.4 });   // knuckle seam
+  // thumb lying along the inside of the rim
+  const thumb = [P(-S * 0.02, -S * 0.03), P(S * 0.05, -S * 0.052), P(S * 0.105, -S * 0.05), P(S * 0.118, -S * 0.03), P(S * 0.1, -S * 0.012), P(S * 0.04, -S * 0.008)];
+  ctx.beginPath(); closedCurve(ctx, thumb, 0.7); ctx.fillStyle = glove; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3.4; ctx.stroke();
+  brushStroke(ctx, [P(S * 0.085, -S * 0.044), P(S * 0.1, -S * 0.024)], 2, { color: INK, taper: 0.3 });
+}
+
+function paintSteeringWheel(ctx, S, glove, suit, accent) {
+  const c = S / 2, R = S * 0.452, rimW = S * 0.074, rimMid = R - rimW / 2;
+  // spokes (behind the rim)
+  const spoke = (a, w0, w1) => {
+    const ux = Math.cos(a), uy = Math.sin(a), tx = -uy, ty = ux;
+    const r0 = S * 0.1, r1 = R - rimW * 0.7;
+    const pts = [[c + ux * r0 + tx * w0, c + uy * r0 + ty * w0], [c + ux * r1 + tx * w1, c + uy * r1 + ty * w1], [c + ux * r1 - tx * w1, c + uy * r1 - ty * w1], [c + ux * r0 - tx * w0, c + uy * r0 - ty * w0]];
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath();
+    ctx.fillStyle = '#a3acb8'; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = '#dfe5ea'; ctx.fillRect(0, 0, S, c - 4);
+    ctx.fillStyle = '#66717f'; ctx.fillRect(0, c + 18, S, S);
+    ctx.restore();
+    ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.lineJoin = 'round'; ctx.stroke();
+    for (const t of [0.42, 0.62, 0.8]) {
+      const rr = r0 + (r1 - r0) * t, hw = (w0 + (w1 - w0) * t) * 0.42;
+      ctx.fillStyle = '#22232e'; ctx.beginPath(); ctx.ellipse(c + ux * rr, c + uy * rr, hw, hw, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
+    }
+  };
+  spoke(Math.PI, S * 0.05, S * 0.036); spoke(0, S * 0.05, S * 0.036); spoke(Math.PI / 2, S * 0.046, S * 0.034);
+  // rim
+  ctx.beginPath(); ctx.arc(c, c, R, 0, Math.PI * 2); ctx.arc(c, c, R - rimW, 0, Math.PI * 2, true);
+  ctx.fillStyle = '#2d2e38'; ctx.fill('evenodd');
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#4c4e5b'; ctx.lineWidth = rimW * 0.3; ctx.beginPath(); ctx.arc(c, c, R - rimW * 0.3, Math.PI * 1.08, Math.PI * 1.62); ctx.stroke();
+  ctx.strokeStyle = '#17171f'; ctx.lineWidth = rimW * 0.34; ctx.beginPath(); ctx.arc(c, c, R - rimW * 0.72, Math.PI * 0.05, Math.PI * 0.6); ctx.stroke();
+  ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 1.3; ctx.beginPath(); ctx.arc(c, c, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = COCKPIT_INK * 0.8; ctx.beginPath(); ctx.arc(c, c, R - rimW, 0, Math.PI * 2); ctx.stroke();
+  for (let k = 0; k < 44; k++) {   // stitching on the inner edge
+    const a = (k / 44) * Math.PI * 2, r0 = R - rimW + 5, r1 = R - rimW + 15;
+    brushStroke(ctx, [[c + Math.cos(a) * r0, c + Math.sin(a) * r0], [c + Math.cos(a + 0.03) * r1, c + Math.sin(a + 0.03) * r1]], 1.6, { color: '#6b6d78', taper: 0.3, swell: 0 });
+  }
+  // top marker
+  ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(c, c - rimMid, 0, 0, 0); ctx.fillRect(c - 9, c - R + 4, 18, rimW - 8);
+  ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.strokeRect(c - 9, c - R + 4, 18, rimW - 8);
+  // hub
+  ctx.fillStyle = '#30323d'; ctx.beginPath(); ctx.arc(c, c, S * 0.112, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#454856'; ctx.beginPath(); ctx.arc(c - 6, c - 8, S * 0.09, Math.PI, Math.PI * 1.9); ctx.arc(c + 4, c + 2, S * 0.1, Math.PI * 1.9, Math.PI, true); ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.beginPath(); ctx.arc(c, c, S * 0.112, 0, Math.PI * 2); ctx.stroke();
+  drawText(ctx, 'V', c, c + S * 0.03, S * 0.07, { style: 'impact', color: accent, outline: INK, outlineWidth: 3, align: 'center', jitter: 0 });
+  for (const [bx, col] of [[-S * 0.185, '#d5302a'], [S * 0.185, '#2f9a5a']]) {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(c + bx, c - S * 0.012, S * 0.017, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke();
+  }
+  paintHand(ctx, c, rimMid, Math.PI * 1.16, S, glove, suit);
+  paintHand(ctx, c, rimMid, -Math.PI * 0.16, S, glove, suit);
+}
+
+/**
+ * Register the cockpit drawings in the static atlas.
+ * @param art     ArtLibrary
+ * @param players [{ colors: [body, flanks, wings] hex, glove: hex, suit: hex }] one entry per local player
+ * @returns layout used by the compositor (see compositing/cockpit-layer.js)
+ */
+function defineCockpitArt(art, players) {
+  const eye = CAR_DIMENSIONS.eye, focal = COCKPIT_REF_FOCAL;
+  const half = COCKPIT_REF_WIDTH / 2;
+  const model = buildCarModel({ detail: 1 });
+  const camera = (crop) => ({ eye, focal, cx: -crop.x, cy: -crop.y });
+  const probe = { eye, focal, cx: 0, cy: 0 };
+  const nearParts = (name) => name === 'tub' || name === 'suspension.left' || name === 'exhaust';
+  const farParts = (name) => name === 'frontwing.main' || name === 'frontwing.flap.left' || name === 'frontwing.endplate.left' || name === 'frontwing.pylons';
+  const layout = { near: [], far: [], wheels: [], steering: [], dial: null, needle: null };
+
+  const nearBounds = drawCar(null, null, model, probe, { measure: true, include: nearParts });
+  nearBounds.minY = Math.min(nearBounds.minY, MIRROR.y - MIRROR.h / 2 - 6); nearBounds.maxY = BOTTOM_LIMIT;
+  nearBounds.minX = Math.min(nearBounds.minX, MIRROR.x - MIRROR.w / 2 - 6);
+  const nearCrop = cropOf(nearBounds, -half - 4, 4, 8);
+  const farCrop = cropOf(drawCar(null, null, model, probe, { measure: true, include: farParts }), -half - 4, 4, 8);
+  players.forEach((player, p) => {
+    const livery = { colors: player.colors };
+    art.defineStatic(`cockpit.near.${p}`, nearCrop.w, nearCrop.h, (ctx) => {
+      drawCar(ctx, null, model, camera(nearCrop), { livery, ink: COCKPIT_INK, shadow: false, include: nearParts });
+      paintMirror(ctx, -nearCrop.x, -nearCrop.y, player.colors);
+      paintBinnacle(ctx, -nearCrop.x, -nearCrop.y);
+    }, { ox: nearCrop.x, oy: nearCrop.y });
+    art.defineStatic(`cockpit.far.${p}`, farCrop.w, farCrop.h, (ctx) => {
+      drawCar(ctx, null, model, camera(farCrop), { livery, ink: COCKPIT_INK * 0.8, shadow: false, include: farParts });
+    }, { ox: farCrop.x, oy: farCrop.y });
+    art.defineStatic(`cockpit.steering.${p}`, STEERING.size, STEERING.size, (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2]));
+    layout.near.push(`cockpit.near.${p}`); layout.far.push(`cockpit.far.${p}`); layout.steering.push(`cockpit.steering.${p}`);
+  });
+
+  // front-left wheel: steering frames x rolling variants, all sharing one crop so frames register
+  const steerOf = (k) => ((k - (STEER_FRAMES - 1) / 2) / ((STEER_FRAMES - 1) / 2)) * MAX_DRAWN_STEER;
+  const union = { minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 };
+  const wheelModels = [];
+  for (let k = 0; k < STEER_FRAMES; k++) {
+    const row = [];
+    for (let v = 0; v < WHEEL_VARIANTS; v++) {
+      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : { blur: true } });
+      row.push(wm);
+      if (v === 0) {
+        const b = drawCar(null, null, wm, probe, { measure: true });
+        union.minX = Math.min(union.minX, b.minX); union.maxX = Math.max(union.maxX, b.maxX);
+        union.minY = Math.min(union.minY, b.minY); union.maxY = Math.max(union.maxY, b.maxY);
+      }
+    }
+    wheelModels.push(row);
+  }
+  const wheelCrop = cropOf(union, -half - 200, 0, 8);
+  for (let k = 0; k < STEER_FRAMES; k++) {
+    const row = [];
+    for (let v = 0; v < WHEEL_VARIANTS; v++) {
+      const id = `cockpit.wheel.${k}.${v}`;
+      const wm = wheelModels[k][v];
+      art.defineStatic(id, wheelCrop.w, wheelCrop.h, (ctx) => {
+        drawCar(ctx, null, wm, camera(wheelCrop), { livery: { colors: ['#000', '#000', '#000'] }, ink: COCKPIT_INK, shadow: false });
+      }, { ox: wheelCrop.x, oy: wheelCrop.y });
+      row.push(id);
+    }
+    layout.wheels.push(row);
+  }
+  const dialSize = (DIAL.r + 16) * 2;
+  art.defineStatic('cockpit.dial', dialSize, dialSize, (ctx, w) => paintDial(ctx, w));
+  art.defineStatic('cockpit.needle', 22, DIAL.r - 6, paintNeedle);
+  layout.dial = 'cockpit.dial'; layout.needle = 'cockpit.needle';
+  return layout;
+}
+
+/** Dev helper: colours of a player's overalls and gloves from the team livery. */
+function playerCockpitColors(colors) {
+  return { colors, glove: mixHex(colors[2], '#d5302a', 0.0), suit: lightHex(colors[0], 0.1) };
+}
+
+__modules["src/art/cockpits/cockpit-art.js"] = { COCKPIT_REF_WIDTH, COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, WHEEL_VARIANTS, DIAL, STEERING, MIRROR, defineCockpitArt, playerCockpitColors };
+})();
+// ---- src/rendering/compositing/cockpit-layer.js
+(function () {
+// Cockpit compositor: places the cockpit drawings (art/cockpits/cockpit-art.js) in a view and
+// animates them — steering wheel and hands, steered front wheels with rolling marks, rev needle,
+// gear digit, vibration. Pure presentation: reads the car state only.
+
+const { VIEW_CONFIG } = __modules["src/core/config.js"];
+const { clamp, mod } = __modules["src/core/math.js"];
+const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
+const { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING } = __modules["src/art/cockpits/cockpit-art.js"];
+const { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES } = __modules["src/art/vehicles/car-model.js"];
+const { BASE_CAR_SPEC } = __modules["src/vehicles/car-spec.js"];
+const { QUAD_MODE } = __modules["src/rendering/drawing/quad-batch.js"];
+
+const BLUR_SPEED = 17;       // m/s above which the tyre is drawn with speed streaks
+
+/**
+ * Which drawing of the front wheel to show: rolling phase 0..TREAD_PHASES-1 synchronised with the
+ * distance travelled, or TREAD_PHASES (streaks) at speed.
+ */
+function wheelVariant(odometer, speed) {
+  if (Math.abs(speed) > BLUR_SPEED) return TREAD_PHASES;
+  const angle = odometer / CAR_DIMENSIONS.frontTyre.radius;
+  const period = (Math.PI * 2) / TREAD_MARKS;
+  return Math.floor((mod(angle, period) / period) * TREAD_PHASES) % TREAD_PHASES;
+}
+
+/** Steering frame (0 = full right ... STEER_FRAMES-1 = full left) of the LEFT wheel for a steering value in -1..1 (+ = right). */
+function steerFrame(steer, lock) {
+  const angle = clamp(-steer * lock, -MAX_DRAWN_STEER, MAX_DRAWN_STEER);
+  const mid = (STEER_FRAMES - 1) / 2;
+  return Math.round(mid + (angle / MAX_DRAWN_STEER) * mid);
+}
+
+class CockpitLayer {
+  constructor(art, layout, text) {
+    this.text = text;
+    this.near = layout.near.map((id) => art.sprite(id));
+    this.far = layout.far.map((id) => art.sprite(id));
+    this.steering = layout.steering.map((id) => art.sprite(id));
+    this.wheels = layout.wheels.map((row) => row.map((id) => art.sprite(id)));
+    this.dial = art.sprite(layout.dial);
+    this.needle = art.sprite(layout.needle);
+    this.needleAngle = [0, 0];
+    this.wheelAngle = [0, 0];
+  }
+
+  /** True when the dash dial is visible in this view (otherwise the HUD shows a rev bar). */
+  dialVisible(view) {
+    const k = view.baseFocal / COCKPIT_REF_FOCAL;
+    const ratio = view.wide ? VIEW_CONFIG.horizonRatioWide : VIEW_CONFIG.horizonRatio;
+    return view.camera === CAMERA.COCKPIT && view.rect.h * ratio + (DIAL.y + DIAL.r * 0.6) * k < view.rect.h;
+  }
+
+  half(quads, sp, ox, oy, k) {
+    const w = sp.w * k, h = sp.h * k, y = oy + sp.oy * k;
+    quads.sprite(sp, ox + sp.ox * k, y, w, h, 1, 1, 1, 1, 0, false);
+    quads.sprite(sp, ox - (sp.ox + sp.w) * k, y, w, h, 1, 1, 1, 1, 0, true);
+  }
+
+  buildFront(app, view) {
+    if (view.camera !== CAMERA.COCKPIT) return;
+    const quads = app.quads, r = view.rect;
+    const car = app.race.cars[view.carIndex];
+    const p = clamp(car.playerIndex, 0, this.near.length - 1);
+    const k = view.baseFocal / COCKPIT_REF_FOCAL;
+    const ratio = view.wide ? VIEW_CONFIG.horizonRatioWide : VIEW_CONFIG.horizonRatio;
+    const ox = r.w * 0.5 + view.shakeX, oy = r.h * ratio + view.shakeY + Math.max(0, view.dive) * 6 * k;
+    this.half(quads, this.far[p], ox, oy, k);
+
+    // front wheels: steering frame and rolling variant
+    const lock = BASE_CAR_SPEC.steerLock * (0.45 + 0.55 / (1 + Math.abs(car.speed) / 28));
+    const frame = steerFrame(car.steer, lock);
+    const variant = wheelVariant(car.odometer, car.speed);
+    const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
+    const jolt = view.shakeAmp * 0.5 * k;
+    const wy = oy + left.oy * k + Math.sin(view.time * 61) * jolt;
+    quads.sprite(left, ox + left.ox * k, wy, left.w * k, left.h * k, 1, 1, 1, 1, 0, false);
+    quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k - Math.sin(view.time * 53) * jolt, right.w * k, right.h * k, 1, 1, 1, 1, 0, true);
+
+    this.half(quads, this.near[p], ox, oy, k);
+
+    if (this.dialVisible(view)) {
+      const dx = ox + DIAL.x * k, dy = oy + DIAL.y * k;
+      const ds = this.dial.w * k;
+      quads.sprite(this.dial, dx - ds / 2, dy - ds / 2, ds, ds, 1, 1, 1, 1, 0, false);
+      const rpm = clamp(car.rpm, 0, DIAL.maxRpm);
+      const target = DIAL.minAngle + ((DIAL.maxAngle - DIAL.minAngle) * rpm) / DIAL.maxRpm;
+      const vi = view.index;
+      this.needleAngle[vi] += (target - this.needleAngle[vi]) * 0.45;
+      const flutter = car.limiter ? Math.sin(view.time * 90) * 0.05 : 0;
+      quads.rotated(this.needle, dx, dy, this.needle.w * k, this.needle.h * k, this.needleAngle[vi] + flutter, 0.5, 1 - 11 / this.needle.h, 1, 1, 1, 1);
+      // gear digit in the dial window
+      const buf = this.text.scratch.clear();
+      if (car.reverse) buf.char(82); else buf.int(car.gear);
+      this.text.drawBuffer(quads, 'b', buf, dx, dy + 63 * k, 30 * k, 1, 0.82, 0.2, 1, 0.5);
+    }
+
+    // steering wheel with the hands, rotated then flattened (the wheel is tilted toward the driver)
+    const sp = this.steering[p];
+    const angle = car.steer * 0.95;
+    const s = STEERING.size * k * 0.5;
+    const cx = ox + STEERING.x * k + view.shakeX * 0.4, cy = oy + STEERING.y * k + view.shakeY * 0.6;
+    const c = Math.cos(angle) * s, sn = Math.sin(angle) * s, q = STEERING.squash;
+    quads.quad(
+      cx - c + sn, cy + (-sn - c) * q, 1, cx + c + sn, cy + (sn - c) * q, 1,
+      cx - c - sn, cy + (-sn + c) * q, 1, cx + c - sn, cy + (sn + c) * q, 1,
+      sp.u0, sp.v0, sp.u1, sp.v1, sp.layer, QUAD_MODE.SPRITE, 1, 1, 1, 1, 0);
+  }
+}
+
+__modules["src/rendering/compositing/cockpit-layer.js"] = { wheelVariant, steerFrame, CockpitLayer };
+})();
+// ---- src/ui/text-painter.js
+(function () {
+// HUD text drawn with baked glyph sprites of the comic lettering (art/styles/lettering.js).
+// Two baked sets: 'b' bold white glyphs (tinted at draw time, used on paper cartouches) and
+// 'o' outlined white glyphs with an ink contour (readable directly over the scene).
+// Drawing allocates nothing; numbers are formatted into a reusable character buffer.
+
+const { LETTERING_CHARSET, drawText, glyphAdvance } = __modules["src/art/styles/lettering.js"];
+
+const BAKE = { b: { cap: 44, style: 'bold', chars: LETTERING_CHARSET }, o: { cap: 88, style: 'bold', chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,:!?\'-+/%°ÉÈÊÀÇÔ' } };
+const INK = '#16161f';
+
+/** Reusable character buffer for numbers and times. */
+class TextBuffer {
+  constructor(capacity = 48) { this.codes = new Uint16Array(capacity); this.length = 0; }
+  clear() { this.length = 0; return this; }
+  char(code) { if (this.length < this.codes.length) this.codes[this.length++] = code; return this; }
+  text(str) { for (let i = 0; i < str.length; i++) this.char(str.charCodeAt(i)); return this; }
+  /** Non-negative integer, left padded with zeros to `digits`. */
+  int(value, digits = 1) {
+    let v = Math.max(0, Math.floor(value));
+    let count = 1;
+    for (let p = 10; p <= v; p *= 10) count++;
+    if (count < digits) count = digits;
+    const start = this.length;
+    for (let i = count - 1; i >= 0; i--) {
+      if (start + i < this.codes.length) this.codes[start + i] = 48 + (v % 10);
+      v = Math.floor(v / 10);
+    }
+    this.length = Math.min(this.codes.length, start + count);
+    return this;
+  }
+  /** Lap time as M:SS.mmm (or -:--.--- when there is none). */
+  time(seconds) {
+    if (!(seconds > 0)) return this.text('-:--.---');
+    const ms = Math.round(seconds * 1000);
+    this.int(Math.floor(ms / 60000)).char(58).int(Math.floor(ms / 1000) % 60, 2).char(46).int(ms % 1000, 3);
+    return this;
+  }
+}
+
+class TextPainter {
+  constructor() {
+    this.sets = { b: this.makeSet(BAKE.b), o: this.makeSet(BAKE.o) };
+    this.scratch = new TextBuffer(96);
+  }
+
+  makeSet(bake) {
+    return { cap: bake.cap, style: bake.style, chars: bake.chars, sprites: new Array(0x180).fill(null), advance: new Float32Array(0x180), padX: Math.ceil(bake.cap * 0.22), baseline: Math.ceil(bake.cap * 1.34), height: Math.ceil(bake.cap * 1.78) };
+  }
+
+  /** Register glyph drawings in the static atlas. */
+  define(art) {
+    for (const key of Object.keys(this.sets)) {
+      const set = this.sets[key];
+      for (const ch of set.chars) {
+        if (ch === ' ') continue;
+        const adv = glyphAdvance(ch, set.style) * set.cap;
+        const w = Math.ceil(adv) + set.padX * 2;
+        art.defineStatic(`glyph.${key}.${ch.charCodeAt(0)}`, w, set.height, (ctx) => {
+          const options = key === 'o'
+            ? { style: 'bold', color: '#ffffff', outline: INK, outlineWidth: set.cap * 0.2, jitter: 0, slant: 0.14 }
+            : { style: 'bold', color: '#ffffff', jitter: 0 };
+          drawText(ctx, ch, set.padX, set.baseline, set.cap, options);
+        });
+      }
+    }
+  }
+
+  /** Look the sprites up once the atlas is built. */
+  resolve(art) {
+    for (const key of Object.keys(this.sets)) {
+      const set = this.sets[key];
+      const space = glyphAdvance(' ', set.style);
+      for (let code = 0; code < 0x180; code++) set.advance[code] = space;
+      for (const ch of set.chars) {
+        const code = ch.charCodeAt(0);
+        set.advance[code] = glyphAdvance(ch, set.style);
+        if (ch !== ' ') set.sprites[code] = art.sprite(`glyph.${key}.${code}`);
+      }
+      // lowercase maps to capitals, unknown characters to '?'
+      for (let code = 97; code <= 122; code++) { set.sprites[code] = set.sprites[code - 32]; set.advance[code] = set.advance[code - 32]; }
+      for (const [lower, upper] of [['é', 'É'], ['è', 'È'], ['ê', 'Ê'], ['à', 'À'], ['ç', 'Ç'], ['ô', 'Ô'], ['ù', 'Ù'], ['î', 'Î'], ['â', 'Â'], ['û', 'Û'], ['ë', 'Ë'], ['ï', 'Ï']]) {
+        const lc = lower.charCodeAt(0), uc = upper.charCodeAt(0);
+        set.sprites[lc] = set.sprites[uc]; set.advance[lc] = set.advance[uc];
+      }
+    }
+  }
+
+  /** Width in pixels of a string at cap height `size`. */
+  measure(setKey, text, size) {
+    const set = this.sets[setKey];
+    let w = 0;
+    for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); w += set.advance[c < 0x180 ? c : 63]; }
+    return w * size;
+  }
+
+  measureBuffer(setKey, buffer, size) {
+    const set = this.sets[setKey];
+    let w = 0;
+    for (let i = 0; i < buffer.length; i++) w += set.advance[buffer.codes[i]];
+    return w * size;
+  }
+
+  /** Draw a string with its baseline at y. align: 0 left, 0.5 centre, 1 right. */
+  draw(quads, setKey, text, x, y, size, r, g, b, a, align = 0) {
+    const buffer = this.scratch.clear().text(text);
+    return this.drawBuffer(quads, setKey, buffer, x, y, size, r, g, b, a, align);
+  }
+
+  drawBuffer(quads, setKey, buffer, x, y, size, r, g, b, a, align = 0) {
+    const set = this.sets[setKey];
+    const k = size / set.cap;
+    let pen = x;
+    if (align > 0) pen -= this.measureBuffer(setKey, buffer, size) * align;
+    const top = y - set.baseline * k, h = set.height * k;
+    for (let i = 0; i < buffer.length; i++) {
+      let code = buffer.codes[i];
+      if (code >= 0x180) code = 63;
+      const sp = set.sprites[code];
+      if (sp) quads.sprite(sp, pen - set.padX * k, top, sp.w * k, h, r, g, b, a, 0, false);
+      pen += set.advance[code] * size;
+    }
+    return pen;
+  }
+}
+
+__modules["src/ui/text-painter.js"] = { TextBuffer, TextPainter };
+})();
 // ---- src/main.js
 (function () {
 // Entry point: boots the application and exposes a small automation API used by tests,
@@ -6034,6 +7754,12 @@ const { GpuUnavailableError } = __modules["src/rendering/gpu-context.js"];
 const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
 const { DRIVERS, PLAYER_DRIVERS } = __modules["src/vehicles/liveries.js"];
 const { RULE_PRESETS } = __modules["src/gameplay/rules.js"];
+const { PLAYER_TEAMS } = __modules["src/vehicles/liveries.js"];
+const { liveryColors } = __modules["src/art/art-library.js"];
+const { rgbToHex } = __modules["src/art/palettes/palettes.js"];
+const { defineCockpitArt } = __modules["src/art/cockpits/cockpit-art.js"];
+const { CockpitLayer } = __modules["src/rendering/compositing/cockpit-layer.js"];
+const { TextPainter } = __modules["src/ui/text-painter.js"];
 
 function parseParams() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -6048,7 +7774,24 @@ async function boot() {
   const app = new GameApp(canvas);
   const notice = document.getElementById('notice');
   try {
-    await app.init({ quality: params.quality || 'high' });
+    const text = new TextPainter();
+    let cockpitLayout = null;
+    await app.init({
+      quality: params.quality || 'high',
+      registerArt: (art) => {
+        const players = PLAYER_TEAMS.map((team) => {
+          const colors = liveryColors(team).map((c) => rgbToHex(c[0], c[1], c[2]));
+          return { colors, glove: colors[2], suit: '#f1efe6' };
+        });
+        cockpitLayout = defineCockpitArt(art, players);
+        text.define(art);
+      },
+      attachLayers: (scene, appRef) => {
+        text.resolve(appRef.art);
+        appRef.text = text;
+        scene.cockpit = new CockpitLayer(appRef.art, cockpitLayout, text);
+      },
+    });
   } catch (error) {
     const message = error instanceof GpuUnavailableError ? error.message : `Initialisation failed: ${error.message}`;
     notice.hidden = false;

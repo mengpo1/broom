@@ -4,3 +4,4 @@ work/renders/sequence/
 work/logs/*.log
 work/logs/standalone-*.html
 *.tmp
+work/renders/atlas/

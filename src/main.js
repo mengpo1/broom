@@ -6,6 +6,12 @@ import { GpuUnavailableError } from './rendering/gpu-context.js';
 import { CAMERA } from './rendering/compositing/race-view.js';
 import { DRIVERS, PLAYER_DRIVERS } from './vehicles/liveries.js';
 import { RULE_PRESETS } from './gameplay/rules.js';
+import { PLAYER_TEAMS } from './vehicles/liveries.js';
+import { liveryColors } from './art/art-library.js';
+import { rgbToHex } from './art/palettes/palettes.js';
+import { defineCockpitArt } from './art/cockpits/cockpit-art.js';
+import { CockpitLayer } from './rendering/compositing/cockpit-layer.js';
+import { TextPainter } from './ui/text-painter.js';
 
 function parseParams() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -20,7 +26,24 @@ async function boot() {
   const app = new GameApp(canvas);
   const notice = document.getElementById('notice');
   try {
-    await app.init({ quality: params.quality || 'high' });
+    const text = new TextPainter();
+    let cockpitLayout = null;
+    await app.init({
+      quality: params.quality || 'high',
+      registerArt: (art) => {
+        const players = PLAYER_TEAMS.map((team) => {
+          const colors = liveryColors(team).map((c) => rgbToHex(c[0], c[1], c[2]));
+          return { colors, glove: colors[2], suit: '#f1efe6' };
+        });
+        cockpitLayout = defineCockpitArt(art, players);
+        text.define(art);
+      },
+      attachLayers: (scene, appRef) => {
+        text.resolve(appRef.art);
+        appRef.text = text;
+        scene.cockpit = new CockpitLayer(appRef.art, cockpitLayout, text);
+      },
+    });
   } catch (error) {
     const message = error instanceof GpuUnavailableError ? error.message : `Initialisation failed: ${error.message}`;
     notice.hidden = false;

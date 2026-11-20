@@ -19,12 +19,13 @@ export const BASE_PALETTE = {
   // vegetation: light / base / shade
   leafLight: '#86bd4c', leaf: '#5d9a3c', leafShade: '#356b33', leafDeep: '#234a2d',
   pineLight: '#4f8f55', pine: '#2f6b47', pineShade: '#1c4737', trunk: '#6b4a35', trunkShade: '#43302a',
-  palmLight: '#8cc152', palm: '#4f9a45', palmShade: '#2c6a3a',
+  palmLight: '#8cc152', palm: '#4f9a45', palmShade: '#2c6a3a', palmTrunkLight: '#c2a783', palmTrunk: '#97795c', palmTrunkShade: '#5f4a42', dateFruit: '#e0902f',
+  cypressLight: '#5f9150', cypress: '#37683f', cypressShade: '#1f4434',
   dryLight: '#c9b36d', dry: '#a58f4f', dryShade: '#75643a',
   // relief (backdrops): far is hazier than near
   farReliefLight: '#b4cbe0', farRelief: '#96b3d1', farReliefShade: '#7c9cc0', snow: '#f4f7fa',
   nearReliefLight: '#7fae6b', nearRelief: '#5c9058', nearReliefShade: '#3f7350',
-  rockLight: '#c9b7a3', rock: '#a08a78', rockShade: '#6f5d57',
+  rockLight: '#c9b7a3', rock: '#a08a78', rockShade: '#6f5d57', rockDeep: '#4a3d45',
   // structures
   concreteLight: '#dcdad2', concrete: '#b7b6b0', concreteShade: '#85868a',
   metalLight: '#d6dde4', metal: '#a3aebb', metalShade: '#66717f',
@@ -78,7 +79,7 @@ const OVERRIDES = {
     grassA: '#d9b877', grassB: '#cfac6b', grassDark: '#a98850', mown: '#e2c486', gravelA: '#e8d2a0', gravelB: '#c9b07b',
     beyondA: '#cfa965', beyondB: '#c09a59', farGround: '#d8b77e',
     farReliefLight: '#e0c6a8', farRelief: '#cfa98a', farReliefShade: '#b58b73', nearReliefLight: '#dba86a', nearRelief: '#c2874f', nearReliefShade: '#96603e',
-    rockLight: '#dfb07a', rock: '#c08a56', rockShade: '#8f5f40', leafLight: '#a9b356', leaf: '#7f9145', leafShade: '#566b38',
+    rockLight: '#dfb07a', rock: '#c08a56', rockShade: '#8f5f40', rockDeep: '#5f3d38', leafLight: '#a9b356', leaf: '#7f9145', leafShade: '#566b38',
     dust: '#e6cf9e', dustShade: '#c3a873',
   },
   canyon: {
@@ -87,7 +88,7 @@ const OVERRIDES = {
     grassA: '#cf9a62', grassB: '#c48d57', grassDark: '#9c6a42', mown: '#d9a870', gravelA: '#e3c08c', gravelB: '#c49d68',
     beyondA: '#c08552', beyondB: '#b17746', farGround: '#cf9c6c',
     farReliefLight: '#e2b79a', farRelief: '#cf9478', farReliefShade: '#b0745f', nearReliefLight: '#dd935a', nearRelief: '#bf6f41', nearReliefShade: '#8d4b33',
-    rockLight: '#e39a5e', rock: '#c47442', rockShade: '#8e4c32', leafLight: '#a3ad55', leaf: '#7b8a44', leafShade: '#536338',
+    rockLight: '#e39a5e', rock: '#c47442', rockShade: '#8e4c32', rockDeep: '#5c2f30', leafLight: '#a3ad55', leaf: '#7b8a44', leafShade: '#536338',
     dust: '#e3bf90', dustShade: '#bd9566',
   },
   plains: {

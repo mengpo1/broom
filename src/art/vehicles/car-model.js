@@ -16,7 +16,7 @@ export const ROLE = {
 export const CAR_DIMENSIONS = {
   frontAxleX: 1.55, rearAxleX: -1.35, frontTrack: 0.9, rearTrack: 0.82,
   frontTyre: { radius: 0.325, width: 0.29 }, rearTyre: { radius: 0.33, width: 0.42 },
-  eye: [-0.12, 0, 0.84],       // driver's eye, used by the cockpit drawing
+  eye: [-0.35, 0, 0.95],       // driver's eye, used by the cockpit drawing
 };
 
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
@@ -474,29 +474,78 @@ export function buildCarModel(options = {}) {
   parts.push(exhaust);
 
   // ---- wheels (front wheels may be steered about their vertical axis)
-  const addWheel = (name, x, y, tyre, steerAngle) => {
-    const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y));
-    t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
-    const c = Math.cos(steerAngle), s = Math.sin(steerAngle);
-    for (const p of [t, r]) {
-      for (let i = 0; i < p.pos.length; i += 3) {
-        const px = p.pos[i], py = p.pos[i + 1];
-        p.pos[i] = x + px * c - py * s; p.pos[i + 1] = y + px * s + py * c; p.pos[i + 2] += tyre.radius;
-        const nx = p.nor[i], ny = p.nor[i + 1];
-        p.nor[i] = nx * c - ny * s; p.nor[i + 1] = nx * s + ny * c;
-      }
-      for (const l of p.lines) {
-        l.pts = l.pts.map((q) => [x + q[0] * c - q[1] * s, y + q[0] * s + q[1] * c, q[2] + tyre.radius]);
-        l.normal = [l.normal[0] * c - l.normal[1] * s, l.normal[0] * s + l.normal[1] * c, l.normal[2]];
-      }
-      parts.push(p);
-    }
-  };
-  addWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, steer);
-  addWheel('wheel.fr', D.frontAxleX, -D.frontTrack, D.frontTyre, steer);
-  addWheel('wheel.rl', D.rearAxleX, D.rearTrack, D.rearTyre, 0);
-  addWheel('wheel.rr', D.rearAxleX, -D.rearTrack, D.rearTyre, 0);
+  parts.push(...placeWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, steer));
+  parts.push(...placeWheel('wheel.fr', D.frontAxleX, -D.frontTrack, D.frontTyre, steer));
+  parts.push(...placeWheel('wheel.rl', D.rearAxleX, D.rearTrack, D.rearTyre, 0));
+  parts.push(...placeWheel('wheel.rr', D.rearAxleX, -D.rearTrack, D.rearTyre, 0));
 
+  return { parts: parts.map(finishPart), dimensions: D };
+}
+
+
+/** Build a wheel at its place on the car, steered by `steerAngle` about the vertical axis. */
+function placeWheel(name, x, y, tyre, steerAngle, tread = null) {
+  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y));
+  if (tread) addTreadMarks(t, tyre, tread);
+  t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
+  const c = Math.cos(steerAngle), s = Math.sin(steerAngle);
+  for (const p of [t, r]) {
+    for (let i = 0; i < p.pos.length; i += 3) {
+      const px = p.pos[i], py = p.pos[i + 1];
+      p.pos[i] = x + px * c - py * s; p.pos[i + 1] = y + px * s + py * c; p.pos[i + 2] += tyre.radius;
+      const nx = p.nor[i], ny = p.nor[i + 1];
+      p.nor[i] = nx * c - ny * s; p.nor[i + 1] = nx * s + ny * c;
+    }
+    for (const l of p.lines) {
+      l.pts = l.pts.map((q) => [x + q[0] * c - q[1] * s, y + q[0] * s + q[1] * c, q[2] + tyre.radius]);
+      l.normal = [l.normal[0] * c - l.normal[1] * s, l.normal[0] * s + l.normal[1] * c, l.normal[2]];
+    }
+  }
+  return [t, r];
+}
+
+/** Number of rolling marks around a tyre and of drawn phases between two marks. */
+export const TREAD_MARKS = 9;
+export const TREAD_PHASES = 3;
+
+/**
+ * Pen marks on the tread that make the rolling of a slick tyre visible.
+ * tread: { phase: 0..TREAD_PHASES-1 } for distinct marks, or { blur: true } for the streaks drawn
+ * at speed. Rolling forward moves the marks from the rear of the tyre over the top.
+ */
+function addTreadMarks(part, tyre, tread) {
+  const r = tyre.radius * 1.004;
+  const lanes = [-0.07, 0.02, 0.07, -0.03, 0.05, -0.08, 0, 0.08, -0.05];
+  const arc = (lat, from, to, hex, weight) => {
+    const steps = Math.max(2, Math.ceil(Math.abs(to - from) / 0.07));
+    const pts = [];
+    for (let i = 0; i <= steps; i++) { const t = from + ((to - from) * i) / steps; pts.push([r * Math.cos(t), lat, r * Math.sin(t)]); }
+    const mid = (from + to) / 2;
+    part.lines.push({ pts, normal: [Math.cos(mid), 0, Math.sin(mid)], weight, hex });
+  };
+  const period = (Math.PI * 2) / TREAD_MARKS;
+  if (tread.blur) {
+    for (let lane = 0; lane < 7; lane++) {
+      const lat = -0.085 + lane * 0.028;
+      for (let k = 0; k < 30; k++) {
+        if ((k * 7 + lane * 3) % 5 === 0) continue;       // broken streaks
+        arc(lat, k * 0.2094, (k + 1) * 0.2094, lane % 2 ? '#4a4c58' : '#1c1c26', 1.1);
+      }
+    }
+    return;
+  }
+  for (let i = 0; i < TREAD_MARKS; i++) {
+    const t0 = i * period - (tread.phase / TREAD_PHASES) * period;
+    const len = 0.2 + (i % 3) * 0.05;
+    arc(lanes[i % lanes.length], t0, t0 + len, i % 2 ? '#565866' : '#191a23', 1.6);
+    arc(lanes[(i + 4) % lanes.length], t0 + 0.3, t0 + 0.3 + len * 0.6, i % 2 ? '#191a23' : '#565866', 1.2);
+  }
+}
+
+/** Front-left wheel alone (cockpit drawing): { steer, tread } -> { parts }. */
+export function buildFrontWheelModel(options = {}) {
+  const D = CAR_DIMENSIONS;
+  const parts = placeWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, options.steer ?? 0, options.tread || null);
   return { parts: parts.map(finishPart), dimensions: D };
 }
 
