@@ -1,0 +1,14 @@
+{
+  "name": "virage-gp",
+  "version": "1.0.0",
+  "description": "Virage GP - original arcade open-wheel racing game, raw WebGPU, fully procedural, single-file build",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node work/scripts/build.mjs",
+    "test": "node --test tests/unit tests/integration tests/gameplay",
+    "test:browser": "node work/scripts/browser-smoke.mjs",
+    "capture": "node work/scripts/capture-stills.mjs",
+    "benchmark": "node work/scripts/run-benchmark.mjs"
+  }
+}

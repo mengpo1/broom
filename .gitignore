@@ -1,0 +1,5 @@
+node_modules/
+work/renders/frames/
+work/renders/sequence/
+work/logs/*.log
+*.tmp
