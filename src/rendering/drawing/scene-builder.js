@@ -70,7 +70,11 @@ export class SceneBuilder {
       // buildings along the road are volumes: the end of a run shows a gable of this depth (m)
       strip.gable = /grandstand/.test(strip.id) ? 7 : /pitbuilding|facade/.test(strip.id) ? 10 : /crowdbank/.test(strip.id) ? 5 : 0;
       strip.gableWindows = /pitbuilding|facade/.test(strip.id);
+      strip.edgeTrees = /forest/.test(strip.id);          // a tree mass ends on the outline of its last trees, not on a straight cut
     }
+    // the tree drawn at both ends of a tree mass: the first kind of tree this circuit plants
+    this.edgeTree = null;
+    for (const prop of layout.props) if (prop.id.startsWith('tree.')) { this.edgeTree = this.art.sprite(prop.id); break; }
     this.gableWall = hexToRgb(palette.concrete); this.gableTop = hexToRgb(palette.metalShade); this.gableGlass = hexToRgb(palette.glassShade); this.inkColor = hexToRgb(palette.ink);
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
@@ -126,6 +130,7 @@ export class SceneBuilder {
   }
 
   buildView(app, view) {
+    this.viewSerial = (this.viewSerial || 0) + 1;
     const p = view.projection, quads = app.quads, layout = this.layout, track = this.track;
     const cars = app.race.cars, n = track.n;
     const W = view.rect.w, H = view.rect.h;
@@ -161,13 +166,32 @@ export class SceneBuilder {
           let step = lodStep < strip.tile ? lodStep : strip.tile;
           if (step > 1 && (sample % step !== 0 || k === 0)) { if (sample % step !== 0) continue; step = 1; }
           if (strip.gable > 0 && k > 0 && sample === (dir > 0 ? strip.from : (strip.from + strip.count - 1) % track.n)) this.emitGable(quads, p, track, strip, k, sample);
-          this.emitStrip(quads, p, track, strip, k, Math.min(k + step, nodeCount - 1), sample, W, H);
+          const kEnd = Math.min(k + step, nodeCount - 1);
+          this.emitStrip(quads, p, track, strip, k, kEnd, sample, W, H);
+          if (strip.edgeTrees && this.edgeTree) {
+            // (far away the strip is drawn in pieces of several samples: the ends fall inside a piece)
+            const rel = mod(sample - strip.from, track.n), toLast = strip.count - 1 - rel;
+            if (rel < step) this.emitEdgeTree(quads, p, track, strip, dir > 0 ? k : kEnd);
+            if (toLast >= 0 && toLast < step) this.emitEdgeTree(quads, p, track, strip, dir > 0 ? Math.min(k + toLast + 1, nodeCount - 1) : k);
+          }
         }
       }
       if (to > from) this.emitProps(quads, p, layout, from, to, list.length, dir, W, propReach, detail);
       for (let i = segHead[k]; i >= 0; i = carNext[i]) this.emitCar(quads, p, cars[i], i, yawAngle, W);
       if (this.effects) this.effects.buildSegment(app, view, k, zNear, zFar);
     }
+  }
+
+  /** Tree standing on the end of a tree-mass strip, hiding its straight edge behind an irregular outline. */
+  emitEdgeTree(quads, p, track, strip, node) {
+    if (node < 1) return;
+    const side = strip.side, sampleAt = p.nodeSample[node];
+    const d = side * (strip.absolute ? strip.offset : (side > 0 ? track.barrierR : track.barrierL)[sampleAt] + strip.offset);
+    projectNode(p, node, d, strip.base, pt);
+    const sp = this.edgeTree, h = strip.height * 1.1 * pt.scale, w = h * (sp.w / sp.h) * 1.15;
+    if (h < 6 || h > sp.h * 2.4) return;
+    quads.sprite(sp, pt.x - w * 0.5, pt.y - h, w, h, 1, 1, 1, 1, pt.z, false);
+    quads.sprite(sp, pt.x - w * 0.5 - side * w * 0.42, pt.y - h * 0.86, w * 0.86, h * 0.86, 1, 1, 1, 1, pt.z, true);   // a second, smaller one steps the edge down
   }
 
   /** End wall of a building strip, facing the camera at the start of its run: a plain inked gable. */
@@ -241,6 +265,13 @@ export class SceneBuilder {
     const du = sp.u1 - sp.u0;
     quads.quad(xN, yNt, zN, xF, yFt, zF, xN, yNb, zN, xF, yFb, zF,
       sp.u0 + du * uNear, sp.v0, sp.u0 + du * uFar, sp.v1, sp.layer, QUAD_MODE.SPRITE, 1, 1, 1, 1, zN);   // hidden by crests nearer than its near end (testing the middle would nibble its foot)
+    if (strip.edgeTrees && this.edgeTree) {
+      // where the road bends, a tree mass turns away from the eye and its outline would be a
+      // straight vertical line (the edge of a flat drawing): a tree stands on that fold
+      const facing = (xF - xN) * -side > 0;
+      if (strip.foldView === this.viewSerial && strip.foldNode === kFar && strip.foldFacing !== facing) this.emitEdgeTree(quads, p, track, strip, kFar);
+      strip.foldView = this.viewSerial; strip.foldNode = kNear; strip.foldFacing = facing;
+    }
   }
 
   emitProps(quads, p, layout, from, to, slot, dir, W, reachLimit, detail) {

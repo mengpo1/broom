@@ -31,7 +31,7 @@ export const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
     let len = 0.2 + 0.3 * hs2.y + 0.25 * intensity;
     let along = (r - start) / len;
     let taper = clamp(along * 1.5, 0.0, 1.0) * clamp((1.0 - along) * 2.5, 0.0, 1.0);
-    let halfW = (0.05 + 0.17 * hs2.y) * taper;
+    let halfW = (0.035 + 0.075 * hs2.y) * taper;       // thin pen strokes, never a beam
     let aw = cells * 0.16 / max(r * h, 1.0);         // one pixel in cell units
     let line = (1.0 - aastep(halfW, abs(f), aw)) * step(0.0, along) * step(along, 1.0);
     let life = smoothstep(0.0, 0.12, phase) * (1.0 - smoothstep(0.82, 1.0, phase));
@@ -40,7 +40,7 @@ export const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
     let alpha = line * present * periphery * life * clamp(intensity * 1.6, 0.0, 1.0);
     let lightLine = hs2.x > 0.38;
     let rgb = select(view.colors[C_SPEED_DARK].rgb, view.colors[C_SPEED_LIGHT].rgb, lightLine);
-    let al = alpha * select(0.5, 0.82, lightLine);
+    let al = alpha * select(0.85, 1.0, lightLine);      // drawn lines, not a veil over what they cross
     outC = vec4f(rgb * al, al);
   }
   if (flash > 0.004) {

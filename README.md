@@ -37,7 +37,7 @@ en écran partagé (haut/bas ou gauche/droite). 18 circuits originaux, 16 advers
 ## Contenu du dépôt
 
 ```
-index.html            le jeu autonome (construit depuis src/), 979 692 octets
+index.html            le jeu autonome (construit depuis src/), 982 054 octets
 race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s
 src/                  sources (voir docs/architecture/overview.md)
 tests/                tests automatisés (Node et navigateur)

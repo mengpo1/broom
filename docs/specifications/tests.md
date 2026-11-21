@@ -8,7 +8,7 @@ l'image, pas la vitesse.
 
 ## 0. Dernière exécution complète
 
-Sur le build final (`index.html`, 979 692 octets), le 21 novembre 2026 :
+Sur le build final (`index.html`, 982 054 octets), le 21 novembre 2026 :
 
 | Suite | Commande | Résultat |
 |---|---|---|

@@ -72,7 +72,7 @@ par le rasteriseur logiciel SwiftShader).
 ## 4. Revue artistique : objectif non atteint
 
 La demande était d'itérer jusqu'à ce qu'aucun défaut ne dépasse le niveau « mineur ». **Ce
-n'est pas le cas.** Trois critiques indépendants successifs (voir
+n'est pas le cas.** Quatre critiques indépendants successifs (voir
 `docs/art-direction/independent-review.md`) ont relevé :
 
 | Itération | Graves | Moyens | Mineurs |
@@ -80,13 +80,13 @@ n'est pas le cas.** Trois critiques indépendants successifs (voir
 | 1 | 5 | 15 | 9 |
 | 2 | 2 | 15 | 7 |
 | 3 | 2 | 16 | 10 |
+| 4 | 1 | 9 | 13 |
 
 Les défauts graves de chaque itération ont été corrigés avant la suivante, mais chaque
-nouveau critique, qui ne connaît pas les rapports précédents, en a trouvé d'autres — dont deux
-fois des effets de bord de mes propres corrections. Les corrections apportées après le
-troisième rapport (mur au contact, page de circuit, poignets, lettrage, ordre des objets,
-onomatopées) ont été vérifiées par moi sur captures, **pas par un quatrième critique**, sauf
-mention contraire dans le document de revue.
+nouveau critique, qui ne connaît pas les rapports précédents, en a trouvé d'autres — dont trois
+fois des effets de bord de mes propres corrections. Le défaut grave du quatrième rapport
+(lisière de forêt coupée à la verticale) a été corrigé ensuite et vérifié par moi sur capture,
+**sans nouvelle contre-expertise** ; huit de ses neuf défauts moyens ne sont pas traités.
 
 Défauts connus qui subsistent, par ordre d'importance :
 

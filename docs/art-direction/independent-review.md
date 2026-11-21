@@ -136,20 +136,32 @@ la coupe du mur de pneus vient de la règle « ne pas dessiner une barrière tro
 | 18 | Moyen | Forêt et grillage terminés par une verticale | **Non traité** |
 | 19–28 | Mineur | Panneaux au texte inversé, cartouche de vitesse, reflets simplifiés, raccord rail/pneus, zone claire de l'asphalte, rectangle pâle en écran partagé, stries des tubes, apparition de l'onomatopée, spectateurs sans visage, sapin répété | Apparition de l'onomatopée traitée (n° 14) ; le reste non traité |
 
-## Itération 4 (état final)
+## Itération 4
 
-Captures : `work/renders/final/` (copies JPEG des captures 2560×1440 de l'état final ; les PNG
-d'origine, `work/renders/review-4/`, ne sont pas versionnés à cause de leur poids).
+Captures : `work/renders/review-4/` (après les corrections de l'itération 3 ; copies JPEG
+versionnées dans `work/renders/final/`).
+Rapport : `work/reviews/review-4.md` — **1 grave, 9 moyens, 13 mineurs**.
+Notes : dessin 3,5 ; précision mécanique 3,5 ; encrage 3 ; colorisation 4 ; perspective 4 ;
+cohérence 3 ; lisibilité 4 ; vitesse 3 ; animation 3,5 ; continuité des formes 3 ;
+scintillement 4 ; déformations 4 ; arrière-plans 4.
 
-Les corrections qui ont suivi le troisième rapport ont été contrôlées par le développeur sur
-ces captures : le mur de pneus est continu jusqu'au bord de l'image lors d'une collision, le
-bandeau d'horizon de la page de circuit couvre toute la case, les avant-bras ne sont plus
-coupés, les onomatopées de moteur varient.
+Ce quatrième critique ne relève plus les deux défauts graves de l'itération 3 (mur de pneus au
+contact, bandeau d'horizon du menu). Son exécution a été interrompue deux fois par la limite
+d'utilisation du service puis reprise ; le rapport est complet.
 
-Un quatrième critique indépendant a été lancé sur ces captures. **Il n'a pas pu rendre son
-rapport** : son exécution a été interrompue deux fois par la limite d'utilisation du service
-(voir l'état en fin de document). Il n'existe donc **aucun jugement indépendant de l'état
-final** au moment où ce document est écrit.
+| N° | Gravité | Défaut relevé | Suite donnée |
+|---|---|---|---|
+| 1 | Grave | Massif forestier tranché par une verticale parfaite | Corrigé après ce rapport : un arbre est dessiné aux extrémités des bandes de forêt **et** là où la bande se replie derrière elle-même dans un virage (c'était le cas relevé). Vérifié par le développeur sur une capture du même endroit, **pas par un critique** |
+| 2 | Moyen | Rai translucide (trait de vitesse) passant sur deux voitures | Traits de vitesse amincis et opaques. Ils passent toujours devant les voitures |
+| 3 | Moyen | Changement d'angle d'un adversaire en une seule image | Non traité (25 dessins par demi-tour, soit un pas de 7,5°) |
+| 4 | Moyen | Adversaires proches mous et empâtés à côté d'un cockpit net | Non traité (dessins stockés en images, agrandis de près) |
+| 5 | Moyen | Pilotes sans bras, mains ni volant en vue extérieure et au menu | Non traité |
+| 6 | Moyen | Avant-bras du pilote en planche rigide | Non traité |
+| 7 | Moyen | Onomatopées typographiées, non intégrées à l'image | Non traité |
+| 8 | Moyen | Figurants en pictogrammes, sans visage, clonés | Non traité |
+| 9 | Moyen | Trace sombre ondulante au milieu de la piste (bande de gomme) | Non traité |
+| 10 | Moyen | Vitesse peu traduite hors de la chaussée | Non traité |
+| 11–23 | Mineur | Gravier en semis de pois, raccord mer/relief, fin de grillage, rectangle pâle en écran partagé, voitures des rétroviseurs en écran partagé, cartouche de vitesse, répétitions de la ligne des stands, jantes en disques, moyeu et compte-tours, tremblement d'un pixel du cockpit, lettrages des menus, bas des murs de pneus, voiture noire en masse | Non traités |
 
 ## Bilan
 
@@ -158,16 +170,19 @@ final** au moment où ce document est écrit.
 | 1 | 5 | 15 | 9 | précision mécanique 2 ; cohérence, continuité, déformations 2,5 |
 | 2 | 2 | 15 | 7 | vitesse 2,5 ; continuité 2,5 |
 | 3 | 2 | 16 | 10 | précision mécanique 2,5 ; continuité 2,5 |
+| 4 | 1 | 9 | 13 | encrage, cohérence, vitesse, continuité 3 |
 
-- **L'objectif fixé (plus aucun défaut au-dessus de « mineur ») n'est pas atteint.**
-- Les défauts graves relevés à chaque itération ont été corrigés, mais chaque critique neuf en
-  a trouvé d'autres ; deux des quatre derniers venaient de corrections précédentes. Le nombre
-  de défauts moyens ne baisse pas : les critiques, qui ne se connaissent pas, déplacent leur
-  attention vers ce qui reste le plus faible.
-- Ce que les trois critiques jugent solide, de façon constante : les arrière-plans et les
-  palettes par circuit (4 à 4,5), la lisibilité (4), l'interface en cartouches, le cockpit et
-  son animation, la stabilité de l'image d'une image à l'autre.
-- Ce qui revient dans les trois rapports et n'est pas résolu : les voitures concurrentes vues
+- **L'objectif fixé (plus aucun défaut au-dessus de « mineur ») n'est pas atteint** : le dernier
+  rapport compte encore un défaut grave (corrigé ensuite, sans nouvelle contre-expertise) et
+  neuf défauts moyens, dont huit ne sont pas traités.
+- La tendance est à l'amélioration (5 → 1 grave, 15 → 9 moyens, aucune note sous 3 au dernier
+  rapport), mais chaque critique neuf, qui ne connaît pas les rapports précédents, a trouvé des
+  défauts que les autres n'avaient pas relevés ; trois défauts graves sur dix étaient des effets
+  de bord de corrections précédentes.
+- Ce que les quatre critiques jugent solide, de façon constante : les arrière-plans et les
+  palettes par circuit (4), la lisibilité (4), l'interface en cartouches, le cockpit et son
+  animation, la stabilité de l'image d'une image à l'autre.
+- Ce qui revient dans tous les rapports et n'est pas résolu : les voitures concurrentes vues
   de près (dessins agrandis, sans numéro ni marquage), l'écart de netteté entre le cockpit et
-  le reste, la vitesse peu lisible sur image fixe, les répétitions et coupes nettes des décors
-  en bandes, les bords de piste lointains crénelés.
+  le reste, la vitesse peu lisible sur image fixe, les pilotes sans bras en vue extérieure,
+  les répétitions des décors en bandes.
