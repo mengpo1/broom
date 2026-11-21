@@ -13,6 +13,7 @@ const info = await page.evaluate(async (opt) => {
   if (opt.effects) Object.assign(app.effects, opt.effects);
   const warm = opt.simSeconds ?? 8;
   for (let i = 0; i < warm * 120; i++) app.simulate();
+  app.present(warm > 3 ? 3 : 0.01, 0);   // let presentation timers (messages, pops) catch up with the fast-forward
   if (opt.eval) new Function('app', 'race', opt.eval)(app, race);
   const t = performance.now();
   const frames = opt.frames ?? 4;

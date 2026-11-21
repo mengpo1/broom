@@ -110,7 +110,7 @@ export function inkTubes(ctx, P, groups, line = LINE.detail, cap = 'round') {
   ctx.restore();
 }
 
-function lerp2(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+export function lerp2(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
 
 /**
  * Members of a lattice panel between chord a (a0 -> a1) and chord b (b0 -> b1), as polylines:
@@ -839,7 +839,7 @@ function hoarding(ctx, w, h, P, rnd, variant) {
 
 // ---- trackside furniture (props) ----------------------------------------------------------------
 
-function roundRectPath(g, x, y, w, h, r) {
+export function roundRectPath(g, x, y, w, h, r) {
   g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
   g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
 }

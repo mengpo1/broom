@@ -333,7 +333,7 @@ export class PagePainter {
       for (let i = 0; i < 9; i++) ctx.fillRect(m + i * W * 0.12, m + off + top * 0.5, W * 0.06, top);
       this.trackMap(model.track, W * 0.4, m + off + 20 * S, W * 0.56, top - m - 70 * S);
       drawText(ctx, model.track.name, m + 50 * S, m + off + 150 * S, 110 * S, { style: 'impact', color: '#ffd42a', outline: INK, outlineWidth: 13 * S, shadow: { dx: 8 * S, dy: 9 * S, color: INK }, seed: 3 });
-      if (model.round) drawText(ctx, model.round, m + 56 * S, m + off + 220 * S, 40 * S, { style: 'bold', color: INK });
+      if (model.round) drawText(ctx, model.round, m + 56 * S, m + off + 236 * S, 40 * S, { style: 'bold', color: INK });
       this.endPanel(p);
       this.caption(model.captions[0], m + 50 * S, top - 150 * S + off, W * 0.34, 28 * S);
       ctx.globalAlpha = 1;

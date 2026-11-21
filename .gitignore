@@ -5,3 +5,4 @@ work/logs/*.log
 work/logs/standalone-*.html
 *.tmp
 work/renders/atlas/
+work/renders/tests/

@@ -6,9 +6,13 @@
 // painted back to front; whatever crosses a vertical edge is drawn again one period away, so the
 // picture wraps. Far relief: two or three flat hazy tones, no ink. Near relief: more saturated,
 // light pen contours, trees and buildings. One pixel is about 1/1960 radian in both directions.
+//
+// Large objects are assembled on a work surface and then stamped on the panorama: their inner
+// tones are confined to the silhouette with 'source-atop' and the contour is slipped underneath
+// with 'destination-over' (no clipping paths: on big canvases they leave hairlines).
 
 import { BACKDROP_TAN_TOP, BACKDROP_TAN_BOTTOM } from './backdrop-rules.js';
-import { seeded, sampleCurve, brushStroke, tracePolygon, clipped } from '../styles/ink.js';
+import { seeded, sampleCurve, brushStroke, tracePolygon } from '../styles/ink.js';
 import { mixHex, hexToRgb } from '../palettes/palettes.js';
 
 const TAU = Math.PI * 2;
@@ -36,10 +40,32 @@ function scatter(rnd, w, count, jitter, place) {
   for (let i = 0; i < count; i++) place((((i + phase + jit(rnd, jitter)) / count) % 1) * w, seeded(newSeed(rnd)), i);
 }
 
-/** Paint an object (deterministic `paint(r)`) with its wrap-around copies. */
+let surface = null;
+
+/**
+ * Paint one object (deterministic `paint(r, e)`, e = env whose ctx is the work surface) and stamp
+ * it on the panorama with its wrap-around copies. [minX, maxX] must contain the whole object.
+ */
 function stamp(env, minX, maxX, seed, paint) {
-  wrapped(env.ctx, env.w, minX, maxX, () => paint(seeded(seed)));
+  const { ctx, w, h } = env, pad = 6, x0 = Math.floor(minX) - pad, width = Math.min(w, Math.ceil(maxX - minX) + 2 * pad);
+  if (!surface || surface.width !== w || surface.height !== h) {
+    if (typeof OffscreenCanvas !== 'undefined') surface = new OffscreenCanvas(w, h);
+    else { surface = document.createElement('canvas'); surface.width = w; surface.height = h; }
+  }
+  const g = surface.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  g.clearRect(0, 0, w, h);
+  g.translate(-x0, 0);
+  paint(seeded(seed), { ...env, ctx: g });
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
+  for (const dx of [0, -w, w]) {
+    if (x0 + width + dx < 0 || x0 + dx > w) continue;
+    ctx.drawImage(surface, 0, 0, width, h, x0 + dx, 0, width, h);
+  }
 }
+
+/** Draw only on what the work surface already holds (inner tones of a silhouette). */
+function inside(ctx, draw) { ctx.globalCompositeOperation = 'source-atop'; draw(); ctx.globalCompositeOperation = 'source-over'; }
 
 function tones(light, base, shade, ink = null) { return { light, base, shade, ink }; }
 
@@ -59,12 +85,14 @@ function groundHaze(env, height, alpha) {
   ctx.restore();
 }
 
-/** Thin contour of the shape about to be filled (stroke under the fill), heavier below / right. */
+/** Thin contour slipped under a shape already painted on the work surface, heavier below / right. */
 function contour(ctx, trace, ink, width) {
   if (!ink) return;
+  ctx.globalCompositeOperation = 'destination-over';
   ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = ink; ctx.lineWidth = width * 2;
   ctx.beginPath(); trace(ctx); ctx.stroke();
   ctx.save(); ctx.translate(width * 0.5, width * 0.5); ctx.beginPath(); trace(ctx); ctx.stroke(); ctx.restore();
+  ctx.globalCompositeOperation = 'source-over';
 }
 
 /** Line broken by random midpoint displacement (rock edges). Returns points from a to b. */
@@ -115,15 +143,17 @@ function paintHill(env, o, rnd) {
   pts.push([o.x + o.halfW, o.base]); tips.push(0.5);
   const trace = (g) => { g.moveTo(pts[0][0], h + 4); g.lineTo(pts[0][0], pts[0][1]); traceCrest(g, pts, o.edge, tips); g.lineTo(o.x + o.halfW, h + 4); g.closePath(); };
   const t = o.tones;
-  contour(ctx, trace, t.ink, o.contour || 1.3);
   ctx.beginPath(); trace(ctx); ctx.fillStyle = t.shade; ctx.fill();
-  clipped(ctx, trace, () => {
+  inside(ctx, () => {
     const copy = (dx, dy, color) => { ctx.save(); ctx.translate(dx, dy); ctx.beginPath(); trace(ctx); ctx.fillStyle = color; ctx.fill(); ctx.restore(); };
     copy(-o.halfW * 0.1 - grain * 0.4, o.height * 0.02, t.base);
-    copy(-o.halfW * 0.2 - grain * 0.6, o.height * 0.07 + grain * 0.2, t.light);
-    copy(-o.halfW * 0.36 - grain * 0.6, o.height * (0.34 + rnd() * 0.14) + grain * 0.5, t.base);
-    if (o.detail) o.detail(yAt, rnd);
+    if (!o.plain) {
+      copy(-o.halfW * 0.2 - grain * 0.6, o.height * 0.07 + grain * 0.2, t.light);
+      copy(-o.halfW * 0.36 - grain * 0.6, o.height * (0.34 + rnd() * 0.14) + grain * 0.5, t.base);
+    }
+    if (o.detail) o.detail(yAt, rnd, ctx);
   });
+  contour(ctx, trace, t.ink, o.contour || 1.3);
   return yAt;
 }
 
@@ -135,7 +165,8 @@ function paintPeak(env, o, rnd) {
   const { ctx, h } = env;
   const top = [o.x, o.base - o.height], footL = [o.x - o.left, o.base], footR = [o.x + o.right, o.base];
   const rough = o.rough ?? 0.1;
-  const edgeL = jagged(footL, top, 4, rough, rnd, -0.07 - rnd() * 0.06), edgeR = jagged(top, footR, 4, rough, rnd, -0.07 - rnd() * 0.06);
+  const sag = () => (rnd() < 0.3 ? -0.05 - rnd() * 0.05 : 0.03 + rnd() * 0.09);          // hollow flanks, sometimes a bulging shoulder
+  const edgeL = jagged(footL, top, 4, rough, rnd, sag()), edgeR = jagged(top, footR, 4, rough, rnd, sag());
   const trace = (g) => { g.moveTo(footL[0], h + 4); for (const p of edgeL) g.lineTo(p[0], p[1]); for (const p of edgeR) g.lineTo(p[0], p[1]); g.lineTo(footR[0], h + 4); g.closePath(); };
   // ridge running down from the summit toward the viewer: the boundary between light and shade
   const ridgeEnd = o.x + o.right * (0.08 + rnd() * 0.22), ridge = [top], steps = 7;
@@ -150,30 +181,45 @@ function paintPeak(env, o, rnd) {
     const s = 0.2 + rnd() * 0.45, a = [lerp(top[0], footL[0], s * 0.8) + o.left * 0.1, lerp(top[1], o.base, s)], len = o.height * (0.2 + rnd() * 0.22), wd = o.left * (0.05 + rnd() * 0.06);
     spurs.push([a, [a[0] - len * 0.25 + wd, a[1] + len * 0.6], [a[0] - len * 0.5 + wd * 1.6, a[1] + len], [a[0] - len * 0.62, a[1] + len * 1.05], [a[0] - len * 0.3, a[1] + len * 0.5]]);
   }
-  contour(ctx, trace, o.tones.ink, 1.2);
   ctx.beginPath(); trace(ctx); ctx.fillStyle = o.tones.light; ctx.fill();
-  clipped(ctx, trace, () => {
+  inside(ctx, () => {
     ctx.fillStyle = o.tones.base;
     ctx.beginPath(); shadeTrace(ctx); ctx.fill();
     for (const s of spurs) { ctx.beginPath(); tracePolygon(ctx, s); ctx.fill(); }
-    if (o.snowLine > 0) {
-      // snow above a ragged line; tongues of snow reach lower in the gullies
-      const ySnow = o.base - o.snowLine, teeth = [[footL[0] - 4, top[1] - 40], [footL[0] - 4, ySnow]];
-      for (let x = footL[0]; x < footR[0]; ) { const step = (o.left + o.right) * (0.03 + rnd() * 0.05); teeth.push([x + step * 0.5, ySnow + step * (0.5 + rnd() * 1.6)], [x + step, ySnow - step * (0.2 + rnd() * 0.9)]); x += step; }
-      teeth.push([footR[0] + 4, ySnow], [footR[0] + 4, top[1] - 40]);
-      clipped(ctx, (g) => tracePolygon(g, teeth), () => {
-        ctx.fillStyle = o.snow; ctx.fillRect(footL[0] - 4, top[1] - 40, o.left + o.right + 8, o.height + 40);
-        ctx.fillStyle = o.snowShade;
-        ctx.beginPath(); shadeTrace(ctx); ctx.fill();
-        for (const s of spurs) { ctx.beginPath(); tracePolygon(ctx, s); ctx.fill(); }
-        // rock showing through the snow
-        for (let i = 0; i < 4; i++) {
-          const s = 0.25 + rnd() * 0.6, side = rnd() < 0.5 ? -1 : 1, x = top[0] + side * (side < 0 ? o.left : o.right) * s * (0.2 + rnd() * 0.5), y = lerp(top[1], ySnow, s), d = o.height * (0.025 + rnd() * 0.03);
-          ctx.beginPath(); tracePolygon(ctx, [[x, y], [x + d * 0.9, y + d * 2.2], [x - d * 0.7, y + d * 1.6]]); ctx.fillStyle = side < 0 ? o.tones.light : o.tones.base; ctx.fill();
-        }
-      });
+    if (!(o.snowLine > 0 && o.snowLine < o.height * 0.9)) return;
+    // snow cap: the outline of the summit above a ragged line, tongues of snow reaching lower in the gullies
+    const ySnow = o.base - o.snowLine, cap = [], tongues = [];
+    const crossing = (edge, i) => { const p = edge[i], q = edge[i + 1], f = (ySnow - p[1]) / ((q[1] - p[1]) || 1); return [lerp(p[0], q[0], f), ySnow]; };
+    let iL = 0; while (iL < edgeL.length - 2 && edgeL[iL + 1][1] > ySnow) iL++;
+    let iR = edgeR.length - 1; while (iR > 1 && edgeR[iR - 1][1] > ySnow) iR--;
+    const cl = crossing(edgeL, iL), cr = crossing(edgeR, iR - 1);
+    const span = cr[0] - cl[0], teeth = Math.max(3, Math.round(span / ((34 + rnd() * 22) * env.u)));
+    for (let i = 1; i < teeth; i++) {
+      const f = i / teeth, fade = Math.sin(Math.PI * f), step = span / teeth;
+      tongues.push([lerp(cr[0], cl[0], f - 0.5 / teeth), ySnow + step * (0.25 + rnd() * 0.75) * fade], [lerp(cr[0], cl[0], f) + jit(rnd, step * 0.2), ySnow - step * (0.1 + rnd() * 0.45) * fade]);
+    }
+    tongues.push([lerp(cr[0], cl[0], 1 - 0.5 / teeth), ySnow + (span / teeth) * 0.25]);
+    cap.push(cl); for (let i = iL + 1; i < edgeL.length; i++) cap.push(edgeL[i]); for (let i = 1; i < iR; i++) cap.push(edgeR[i]); cap.push(cr);
+    ctx.beginPath(); tracePolygon(ctx, cap.concat(tongues)); ctx.fillStyle = o.snow; ctx.fill();
+    // snow in the shade: the part of the cap that lies right of the ridge
+    const shaded = [top];
+    let ridgeX = top[0];
+    for (let j = 1; j < ridge.length; j++) {
+      if (ridge[j][1] < ySnow) { shaded.push(ridge[j]); ridgeX = ridge[j][0]; continue; }
+      const p = ridge[j - 1], q = ridge[j], f = (ySnow - p[1]) / ((q[1] - p[1]) || 1); ridgeX = lerp(p[0], q[0], f); shaded.push([ridgeX, ySnow]); break;
+    }
+    for (let i = tongues.length - 1; i >= 0; i--) if (tongues[i][0] > ridgeX) shaded.push(tongues[i]);
+    shaded.push(cr); for (let i = iR - 1; i >= 1; i--) shaded.push([edgeR[i][0] + 2, edgeR[i][1] - 1]);
+    ctx.beginPath(); tracePolygon(ctx, shaded); ctx.fillStyle = o.snowShade; ctx.fill();
+    for (const s of spurs) if (s[3][1] < ySnow - 4) { ctx.beginPath(); tracePolygon(ctx, s); ctx.fill(); }
+    // rock showing through the snow
+    for (let i = 0; i < 3; i++) {
+      const s = 0.3 + rnd() * 0.5, side = rnd() < 0.5 ? -1 : 1, y = lerp(top[1], ySnow, s), half = (side < 0 ? o.left : o.right) * ((y - top[1]) / o.height) * 0.7;
+      const x = top[0] + side * half * (0.2 + rnd() * 0.6), d = o.height * (0.02 + rnd() * 0.025);
+      ctx.beginPath(); tracePolygon(ctx, [[x, y], [x + d * 0.9, y + d * 2.2], [x - d * 0.7, y + d * 1.6]]); ctx.fillStyle = side < 0 ? o.tones.light : o.tones.base; ctx.fill();
     }
   });
+  contour(ctx, trace, o.tones.ink, 1.2);
 }
 
 /**
@@ -194,9 +240,8 @@ function paintMesa(env, o, rnd) {
   const outline = left.concat(summit, right);
   const trace = (g) => { g.moveTo(outline[0][0], h + 4); for (const p of outline) g.lineTo(p[0], p[1]); g.lineTo(outline[outline.length - 1][0], h + 4); g.closePath(); };
   const t = o.tones, width = xr - xl;
-  contour(ctx, trace, t.ink, 1.3);
   ctx.beginPath(); trace(ctx); ctx.fillStyle = t.base; ctx.fill();
-  clipped(ctx, trace, () => {
+  inside(ctx, () => {
     // sunlit cliff: everything above the ragged top of the scree cones
     const cones = [[xl - batter - step - 6, yCliff]], count = Math.max(2, Math.round(width / (o.height * 0.3)));
     for (let i = 0; i < count; i++) { const x0 = lerp(xl - batter, xr + batter, i / count), x1 = lerp(xl - batter, xr + batter, (i + 1) / count); cones.push([lerp(x0, x1, 0.5 + jit(rnd, 0.2)), yCliff - o.height * o.cap * (0.06 + rnd() * 0.16)], [x1, yCliff + jit(rnd, o.height * 0.02)]); }
@@ -215,9 +260,9 @@ function paintMesa(env, o, rnd) {
     if (o.detail) {
       // fluting of the cliff and gullies in the scree
       const pen = t.ink || t.shade;
-      for (let i = 0; i < Math.round(width / (9 * u)); i++) {
+      for (let i = 0; i < Math.round(width / (13 * u)); i++) {
         const x = lerp(xl, xr - turn, rnd()), ya = lerp(yTop, yCliff, rnd() * 0.5), len = (yCliff - yTop) * (0.2 + rnd() * 0.5);
-        brushStroke(ctx, [[x, ya], [x + jit(rnd, 1.5 * u), ya + len * 0.5], [x + jit(rnd, 2 * u), ya + len]], (1 + rnd() * 0.8) * u, { color: i % 3 ? t.base : pen, taper: 0.4, swell: 0.1 });
+        brushStroke(ctx, [[x, ya], [x + jit(rnd, 1.5 * u), ya + len * 0.5], [x + jit(rnd, 2 * u), ya + len]], (1.2 + rnd() * 1.2) * u, { color: i % 5 ? t.base : pen, taper: 0.4, swell: 0.1 });
       }
       for (let i = 0; i < Math.round((width + apronL) / (26 * u)); i++) {
         const x = lerp(xl - apronL * 0.5, xr - turn, rnd()), ya = yCliff + (o.base - yCliff) * 0.1, len = (o.base - yCliff) * (0.4 + rnd() * 0.5), lean = (x - o.x) / (width + apronL) * len * 0.9;
@@ -225,6 +270,7 @@ function paintMesa(env, o, rnd) {
       }
     }
   });
+  contour(ctx, trace, t.ink, 1.3);
 }
 
 /**
@@ -241,9 +287,8 @@ function paintDune(env, o, rnd) {
   const sway = (rnd() < 0.5 ? -1 : 1) * o.halfW * (0.12 + rnd() * 0.14);
   const crest = sampleCurve([[crestX, top], [crestX - sway * 0.5, o.base - o.height * 0.66], [crestX + sway * 0.6, o.base - o.height * 0.3], [crestX + sway * 0.2 - o.halfW * 0.1, o.base + 8 * u]], 6);
   const t = o.tones;
-  contour(ctx, trace, t.ink, 1.2);
   ctx.beginPath(); trace(ctx); ctx.fillStyle = t.light; ctx.fill();
-  clipped(ctx, trace, () => {
+  inside(ctx, () => {
     // lower windward apron in the middle tone
     const apron = sampleCurve([[crestX - L - 10, o.base - o.height * 0.1], [crestX - L * 0.5, o.base - o.height * (0.2 + rnd() * 0.12)], [crestX - L * 0.2, o.base - o.height * (0.42 + rnd() * 0.1)], [crestX + sway * 0.4, o.base - o.height * 0.36], [crestX + R, o.base - o.height * 0.3]], 6);
     ctx.beginPath(); ctx.moveTo(crestX - L - 10, h + 4); for (const p of apron) ctx.lineTo(p[0], p[1]); ctx.lineTo(crestX + R, h + 4); ctx.closePath(); ctx.fillStyle = t.base; ctx.fill();
@@ -258,6 +303,7 @@ function paintDune(env, o, rnd) {
       if (t.ink) brushStroke(ctx, crest, 1.8 * u, { color: t.ink, taperStart: 0.05, taperEnd: 0.5, swell: 0.2 });
     }
   });
+  contour(ctx, trace, t.ink, 1.2);
 }
 
 // --------------------------------------------------------------------- small drawn structures
@@ -295,7 +341,8 @@ function paintTree(ctx, x, y, size, flat, dark, light, ink, rnd) {
   ctx.fillStyle = ink || dark; ctx.fillRect(x - size * 0.05, cy, size * 0.1, y - cy);
   if (ink) { ctx.beginPath(); trace(ctx); ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke(); }
   ctx.beginPath(); trace(ctx); ctx.fillStyle = dark; ctx.fill();
-  clipped(ctx, trace, () => { ctx.save(); ctx.translate(-rx * 0.3, -ry * 0.4); ctx.beginPath(); trace(ctx); ctx.fillStyle = light; ctx.fill(); ctx.restore(); });
+  // lit side: the same crown, smaller, pulled toward the light
+  ctx.save(); ctx.translate(x - rx * 0.2, cy - ry * 0.24); ctx.scale(0.66, 0.62); ctx.translate(-x, -cy); ctx.beginPath(); trace(ctx); ctx.fillStyle = light; ctx.fill(); ctx.restore();
 }
 
 /** Small palm silhouette: bent trunk and a star of drooping fronds. */
@@ -371,68 +418,65 @@ function paintChimney(ctx, x, y, ht, wd, c, plume, u, rnd) {
   }
   if (c.ink) { ctx.beginPath(); tracePolygon(ctx, shaft); ctx.strokeStyle = c.ink; ctx.lineWidth = 2.4 * u; ctx.lineJoin = 'miter'; ctx.stroke(); }
   ctx.beginPath(); tracePolygon(ctx, shaft); ctx.fillStyle = c.light; ctx.fill();
-  clipped(ctx, (g) => tracePolygon(g, shaft), () => {
-    ctx.fillStyle = c.base; ctx.fillRect(x + wd * 0.06, top, wd, ht);
-    ctx.fillStyle = c.band; ctx.fillRect(x - wd, top + ht * 0.06, wd * 2, ht * 0.07); ctx.fillRect(x - wd, top + ht * 0.2, wd * 2, ht * 0.07);
-  });
+  const half = (f) => wd * (0.32 + 0.18 * f);                               // half width at a fraction f of the height below the top
+  ctx.beginPath(); tracePolygon(ctx, [[x + wd * 0.06, y], [x + wd * 0.06, top], [x + half(0), top], [x + half(1), y]]); ctx.fillStyle = c.base; ctx.fill();
+  ctx.fillStyle = c.band;
+  for (const f of [0.06, 0.2]) { ctx.beginPath(); tracePolygon(ctx, [[x - half(f), top + ht * f], [x + half(f), top + ht * f], [x + half(f + 0.07), top + ht * (f + 0.07)], [x - half(f + 0.07), top + ht * (f + 0.07)]]); ctx.fill(); }
 }
 
 // ------------------------------------------------------------------------------------- clouds
 
 /**
- * Cumulus: a heap of billows on a flat base. o: { x, y (base), width, height, c: { light, shade,
- * deep, line }, shadow (0..1 share of shade), deepBase }.
+ * Cumulus: a heap of round billows on a flat base. o: { x, y (base), width, height, c: { light,
+ * shade, deep, line }, shadow (0..1 share of shade), deepBase }. Every billow is a circle cut at
+ * the base line; the big ones carry a crescent of shade, the underside is a scalloped flat tone.
  */
 function paintCumulus(env, o, rnd) {
-  const { ctx, u } = env;
-  const count = Math.max(4, Math.round(o.width / (o.height * 0.42))), puffs = [];
-  const lean = jit(rnd, 0.18);
-  for (let i = 0; i < count; i++) {
-    const t = (i + 0.5) / count, dome = Math.pow(Math.sin(Math.PI * (0.06 + 0.88 * t)), 0.9);
-    const lift = dome * (0.35 + rnd() * 0.65), r = o.height * (0.2 + 0.22 * dome) * (0.85 + rnd() * 0.3);
-    puffs.push({ x: o.x + (t - 0.5 + lean * lift) * o.width * 0.86 + jit(rnd, r * 0.3), y: o.y - r * 0.5 - (o.height - r * 1.4) * lift, r, lift });
+  const { ctx, u } = env, W = o.width, H = o.height, base = o.y, puffs = [];
+  const summit = 0.34 + rnd() * 0.32, bigs = Math.max(2, Math.round(W / (H * 0.8)));
+  const dome = (t) => Math.pow(Math.max(0, 1 - Math.abs(t - summit) / Math.max(summit, 1 - summit)), 0.75);
+  for (let i = 0; i < bigs; i++) {
+    const t = (i + 0.5 + jit(rnd, 0.22)) / bigs, d = dome(t), r = H * (0.22 + 0.17 * d) * (0.9 + rnd() * 0.22), topY = base - H * (0.44 + 0.56 * d * (0.82 + rnd() * 0.18));
+    puffs.push({ x: o.x + (t - 0.5) * W * 0.7, y: topY + r, r, rank: topY, crescent: true });
   }
-  // a row of smaller billows along the base hides the feet of the big ones
-  for (let i = 0; i < count; i++) { const t = (i + rnd()) / count, r = o.height * (0.16 + rnd() * 0.1); puffs.push({ x: o.x + (t - 0.5) * o.width * 0.94, y: o.y - r * 0.5, r, lift: -1 }); }
-  puffs.sort((a, b) => b.lift - a.lift);
-  for (const p of puffs) {
-    p.ring = [];
-    const bumps = Math.max(6, Math.round(p.r / (7 * u)) + 3), rot = rnd() * TAU;
-    for (let i = 0; i < bumps; i++) { const a = rot + ((i + jit(rnd, 0.22)) / bumps) * TAU, rr = p.r * (0.94 + rnd() * 0.12); p.ring.push([p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr * 0.92]); }
+  for (let i = 0, n = bigs * 2 + 1; i < n; i++) {
+    const t = (i + rnd()) / n, r = H * (0.13 + rnd() * 0.1), topY = base - H * (0.26 + 0.52 * dome(t) * rnd());
+    puffs.push({ x: o.x + (t - 0.5) * W * 0.9, y: topY + r, r, rank: topY + H, crescent: rnd() < 0.45 });
   }
-  const ringPath = (g, ring, dx = 0, dy = 0, s = 1, cx = 0, cy = 0) => {
-    const q = (p) => [cx + (p[0] - cx) * s + dx, cy + (p[1] - cy) * s + dy];
-    const first = q(ring[0]); g.moveTo(first[0], first[1]);
-    for (let i = 0; i < ring.length; i++) { const a = q(ring[i]), b = q(ring[(i + 1) % ring.length]); g.quadraticCurveTo((a[0] + b[0]) / 2 + (b[1] - a[1]) * 0.42, (a[1] + b[1]) / 2 - (b[0] - a[0]) * 0.42, b[0], b[1]); }
-    g.closePath();
+  for (let i = 0, n = Math.max(3, Math.round(W / (H * 0.34))); i < n; i++) {
+    const r = H * (0.13 + rnd() * 0.09), t = (i + 0.2 + rnd() * 0.6) / n;
+    puffs.push({ x: o.x - W / 2 + r * 0.7 + (W - r * 1.4) * t, y: base - r * (0.25 + rnd() * 0.5), r, rank: base + i, crescent: false });
+  }
+  puffs.sort((a, b) => a.rank - b.rank);
+  const puffPath = (g, p, dx = 0, dy = 0) => {
+    const cx = p.x + dx, cy = p.y + dy;
+    if (cy + p.r <= base) { g.moveTo(cx + p.r, cy); g.arc(cx, cy, p.r, 0, TAU); return; }
+    const a0 = Math.asin(Math.max(-1, Math.min(1, (base - cy) / p.r)));
+    g.moveTo(cx - Math.cos(a0) * p.r, base); g.arc(cx, cy, p.r, Math.PI - a0, TAU + a0); g.closePath();
   };
-  const all = (g) => { for (const p of puffs) ringPath(g, p.ring); };
-  const half = o.width * 0.56;
-  ctx.save();
-  ctx.beginPath(); ctx.rect(o.x - half - o.height, o.y - o.height * 1.6, 2 * half + 2 * o.height, o.height * 1.6); ctx.clip();
+  const slab = (g) => { g.moveTo(o.x - W * 0.38, base); g.ellipse(o.x + (summit - 0.5) * W * 0.3, base, W * 0.38, H * 0.5, 0, Math.PI, TAU); g.closePath(); };
+  const all = (g) => { slab(g); for (const p of puffs) puffPath(g, p); };
+  ctx.beginPath(); slab(ctx); ctx.fillStyle = o.c.light; ctx.fill();
+  const shift = 0.07 + o.shadow * 0.13;
+  for (const p of puffs) {
+    ctx.beginPath(); puffPath(ctx, p); ctx.fillStyle = p.crescent ? o.c.shade : o.c.light; ctx.fill();
+    if (p.crescent) inside(ctx, () => { ctx.beginPath(); puffPath(ctx, p, -p.r * shift * 0.8, -p.r * shift); ctx.fillStyle = o.c.light; ctx.fill(); });
+  }
+  // underside: flat tone with a scalloped upper edge, darker strip along the base of heavy clouds
+  inside(ctx, () => {
+    const band = (depth, color, bumps) => {
+      ctx.beginPath(); ctx.moveTo(o.x - W * 0.6, base + 2); ctx.lineTo(o.x - W * 0.6, base - H * depth * 0.5);
+      for (let i = 0; i < bumps; i++) { const x0 = o.x - W * 0.6 + (W * 1.2 * i) / bumps, x1 = o.x - W * 0.6 + (W * 1.2 * (i + 1)) / bumps, d = H * depth * (0.6 + rnd() * 0.8); ctx.quadraticCurveTo((x0 + x1) / 2, base - d * 1.5, x1, base - H * depth * (0.3 + rnd() * 0.3)); }
+      ctx.lineTo(o.x + W * 0.6, base + 2); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    };
+    band(0.16 + o.shadow * 0.26, o.c.shade, Math.max(3, Math.round(W / (H * 0.5))));
+    if (o.deepBase) band(0.07 + o.shadow * 0.1, o.c.deep, Math.max(3, Math.round(W / (H * 0.7))));
+  });
+  // thin soft outline in a darker cloud tone, slipped under the fills
+  ctx.globalCompositeOperation = 'destination-over';
   ctx.lineJoin = 'round'; ctx.strokeStyle = o.c.line; ctx.lineWidth = 3 * u;
   ctx.beginPath(); all(ctx); ctx.stroke();
-  for (const p of puffs) {
-    const one = (g) => ringPath(g, p.ring);
-    ctx.beginPath(); one(ctx); ctx.fillStyle = o.c.shade; ctx.fill();
-    clipped(ctx, one, () => {
-      // lit top of the billow: the same shape pushed toward the light
-      const k = o.shadow * (p.lift < 0 ? 1.5 : 1);
-      ctx.beginPath(); ringPath(ctx, p.ring, -p.r * 0.1 * k, -p.r * (0.14 + 0.4 * k), 1 - 0.1 * k, p.x, p.y); ctx.fillStyle = o.c.light; ctx.fill();
-    });
-  }
-  // flat underside
-  clipped(ctx, all, () => {
-    const under = [[o.x - half - 20, o.y + 4]];
-    for (let i = 0; i <= 8; i++) under.push([o.x - half + (2 * half * i) / 8, o.y - o.height * (0.07 + o.shadow * 0.16) * (i % 2 ? 1.5 : 0.7) * (0.7 + rnd() * 0.6)]);
-    under.push([o.x + half + 20, o.y + 4]);
-    ctx.beginPath(); ctx.moveTo(under[0][0], under[0][1]);
-    for (let i = 1; i < under.length - 1; i++) ctx.quadraticCurveTo(under[i][0], under[i][1], (under[i][0] + under[i + 1][0]) / 2, (under[i][1] + under[i + 1][1]) / 2);
-    ctx.lineTo(under[under.length - 1][0], under[under.length - 1][1]); ctx.closePath();
-    ctx.fillStyle = o.deepBase ? o.c.deep : o.c.shade; ctx.fill();
-  });
-  ctx.restore();
-  brushStroke(ctx, [[o.x - half * 0.9, o.y], [o.x, o.y + 0.5 * u], [o.x + half * 0.9, o.y]], 2.4 * u, { color: o.c.line, taper: 0.3, swell: 0.2 });
+  ctx.globalCompositeOperation = 'source-over';
 }
 
 /** Stratus: a long flat streak, lit on top, shaded underneath, tapering at both ends. */
@@ -446,9 +490,9 @@ function paintStratus(env, o, rnd) {
   }
   const outline = sampleCurve(upper, 5).concat(sampleCurve(lower, 5).reverse());
   const trace = (g) => tracePolygon(g, outline);
-  if (o.c.line) { ctx.beginPath(); trace(ctx); ctx.strokeStyle = o.c.line; ctx.lineWidth = 2.4 * env.u; ctx.lineJoin = 'round'; ctx.stroke(); }
   ctx.beginPath(); trace(ctx); ctx.fillStyle = o.c.shade; ctx.fill();
-  clipped(ctx, trace, () => { ctx.save(); ctx.translate(-o.width * 0.02, -o.height * (0.3 + 0.3 * (1 - o.shadow))); ctx.beginPath(); trace(ctx); ctx.fillStyle = o.c.light; ctx.fill(); ctx.restore(); });
+  inside(ctx, () => { ctx.beginPath(); tracePolygon(ctx, outline.map(([x, y]) => [x - o.width * 0.02, y - o.height * (0.3 + 0.3 * (1 - o.shadow))])); ctx.fillStyle = o.c.light; ctx.fill(); });
+  contour(ctx, trace, o.c.line, 1.2 * env.u);
 }
 
 /** How overcast a palette is (0 clear blue sky .. 1 grey sky), read from the saturation of its zenith. */
@@ -474,13 +518,13 @@ function paintClouds(env) {
   // high streaks first, then heaps from the horizon upward (the nearest, highest clouds last)
   scatter(rnd, w, Math.round(style.stratus * (1 + grey * 1.6)), 0.4, (x, r) => {
     const level = r(), y = lerp(y0 - 90 * u, 70 * u, level), width = (260 + r() * 420) * u * (0.6 + level * 0.6);
-    items.push({ order: level * 0.2, x, half: width / 2, seed: newSeed(r), paint: (rr) => paintStratus(env, { x, y, width, height: (9 + rr() * 9) * u * (0.6 + level * 0.7), c: colors(1 - level, grey > 0.5 && rr() < 0.6), shadow: 0.4 + grey * 0.4 }, rr) });
+    items.push({ order: level * 0.2, x, half: width / 2, seed: newSeed(r), paint: (rr, e) => paintStratus(e, { x, y, width, height: (9 + rr() * 9) * u * (0.6 + level * 0.7), c: colors(1 - level, grey > 0.5 && rr() < 0.6), shadow: 0.4 + grey * 0.4 }, rr) });
   });
   scatter(rnd, w, Math.round(style.cumulus * (1 + grey * 1.3)), 0.42, (x, r) => {
     const level = Math.pow(r(), 1.25 - grey * 0.4), y = lerp(y0 - 70 * u, 190 * u, level), scale = style.size * (0.5 + level * 0.9) * (0.8 + r() * 0.5) * (1 + grey * 0.25);
-    const width = (190 + r() * 230) * u * scale, height = Math.min(y - 14 * u, (70 + r() * 60) * u * scale * (0.6 + level * 0.4));
+    const height = Math.min(y - 14 * u, (70 + r() * 60) * u * scale * (0.6 + level * 0.4)), width = Math.min((190 + r() * 230) * u * scale, height * (2.6 + r() * 1.6));
     const dark = grey > 0.3 && r() < grey * 0.75;
-    items.push({ order: 1 + level, x, half: width * 0.56 + height, seed: newSeed(r), paint: (rr) => paintCumulus(env, { x, y, width, height, c: colors(1 - level, dark), shadow: 0.34 + grey * 0.5 + (dark ? 0.2 : 0), deepBase: dark || grey > 0.6 }, rr) });
+    items.push({ order: 1 + level, x, half: width * 0.62 + height * 0.3, seed: newSeed(r), paint: (rr, e) => paintCumulus(e, { x, y, width, height, c: colors(1 - level, dark), shadow: 0.34 + grey * 0.5 + (dark ? 0.2 : 0), deepBase: dark || grey > 0.6 }, rr) });
   });
   items.sort((a, b) => a.order - b.order);
   for (const it of items) stamp(env, it.x - it.half, it.x + it.half, it.seed, it.paint);
@@ -496,15 +540,15 @@ function row(env, count, jitter, make) {
   const list = [];
   scatter(env.rnd, env.w, count, jitter, (x, r, i) => { const o = make(x, r, i); if (o) list.push({ o, seed: newSeed(r) }); });
   list.sort((a, b) => (b.o.rank ?? b.o.height) - (a.o.rank ?? a.o.height));
-  for (const { o, seed } of list) stamp(env, o.x - o.reach, o.x + o.reach, seed, (r) => o.paint(o, r));
+  for (const { o, seed } of list) stamp(env, o.x - o.reach, o.x + o.reach, seed, (r, e) => o.paint(o, r, e));
 }
 
 function farHills(env) {
   const { u, y0, P } = env;
   const back = farTones(P, 0.42), mid = farTones(P, 0.16), front = tones(P.farRelief, mixHex(P.farRelief, P.farReliefShade, 0.55), P.farReliefShade);
-  row(env, 6, 0.3, (x, r) => ({ x, halfW: (520 + r() * 420) * u, height: (120 + r() * 110) * u, base: y0, tones: back, edge: 'smooth', get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
-  row(env, 8, 0.3, (x, r) => ({ x, halfW: (380 + r() * 360) * u, height: (70 + r() * 80) * u, base: y0, tones: mid, edge: 'scallop', grain: 9 * u, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
-  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 320) * u, height: (36 + r() * 52) * u, base: y0, tones: front, edge: 'scallop', grain: 12 * u, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 6, 0.3, (x, r) => ({ x, halfW: (520 + r() * 420) * u, height: (120 + r() * 110) * u, base: y0, tones: tones(back.light, back.light, back.base), plain: true, edge: 'smooth', get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  row(env, 8, 0.3, (x, r) => ({ x, halfW: (380 + r() * 360) * u, height: (70 + r() * 80) * u, base: y0, tones: mid, edge: 'scallop', grain: 9 * u, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 320) * u, height: (36 + r() * 52) * u, base: y0, tones: front, edge: 'scallop', grain: 12 * u, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   groundHaze(env, 120, 0.5);
 }
 
@@ -515,13 +559,13 @@ function farMountains(env) {
   // main range: high snowy summits
   row(env, 11, 0.32, (x, r) => {
     const height = (190 + Math.pow(r(), 1.3) * 190) * u;
-    return { x, height, left: height * (1.0 + r() * 0.7), right: height * (0.9 + r() * 0.7), base: y0, tones: backRock, snow: P.snow, snowShade, snowLine: (150 + r() * 40) * u, detail: 2, get reach() { return Math.max(this.left, this.right); }, paint: (o, rr) => paintPeak(env, o, rr) };
+    return { x, height, left: height * (1.0 + r() * 0.7), right: height * (0.9 + r() * 0.7), base: y0, tones: backRock, snow: P.snow, snowShade, snowLine: (150 + r() * 40) * u, detail: 2, get reach() { return Math.max(this.left, this.right) * 1.25; }, paint: (o, rr, e) => paintPeak(e, o, rr) };
   });
   // lower spurs in front of it, darker, with little snow
   const frontRock = tones(P.farRelief, P.farReliefShade, P.farReliefShade);
   row(env, 12, 0.35, (x, r) => {
     const height = (80 + r() * 100) * u;
-    return { x, height, left: height * (1.5 + r() * 1.0), right: height * (1.4 + r() * 1.0), base: y0, tones: frontRock, snow: mixHex(P.snow, P.farReliefLight, 0.25), snowShade, snowLine: height > 158 * u ? 150 * u : 0, rough: 0.08, detail: 1, get reach() { return Math.max(this.left, this.right); }, paint: (o, rr) => paintPeak(env, o, rr) };
+    return { x, height, left: height * (1.5 + r() * 1.0), right: height * (1.4 + r() * 1.0), base: y0, tones: frontRock, snow: mixHex(P.snow, P.farReliefLight, 0.25), snowShade, snowLine: height > 158 * u ? 150 * u : 0, rough: 0.08, detail: 1, get reach() { return Math.max(this.left, this.right) * 1.25; }, paint: (o, rr, e) => paintPeak(e, o, rr) };
   });
   groundHaze(env, 150, 0.55);
 }
@@ -529,28 +573,28 @@ function farMountains(env) {
 function farSea(env) {
   const { ctx, w, h, u, y0, P, rnd } = env;
   // the sea rises a little above the true horizon so that it shows over the far end of the land
-  const seaTop = y0 - 44 * u, far = mixHex(P.waterB, P.haze, 0.55), mid = mixHex(P.waterB, P.haze, 0.2);
+  const seaTop = y0 - 58 * u, far = mixHex(P.waterB, P.haze, 0.5), mid = mixHex(P.waterB, P.haze, 0.15);
   // headlands and islands standing on the sea horizon
   const land = farTones(P, 0.3), nearer = farTones(P, 0.05);
-  row(env, 5, 0.4, (x, r) => ({ x, halfW: (300 + r() * 520) * u, height: (40 + r() * 90) * u, base: seaTop + 2 * u, tones: land, edge: 'smooth', power: 0.6 + r() * 0.3, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 5, 0.4, (x, r) => ({ x, halfW: (300 + r() * 520) * u, height: (40 + r() * 90) * u, base: seaTop + 2 * u, tones: land, edge: 'smooth', power: 0.6 + r() * 0.3, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   ctx.fillStyle = far; ctx.fillRect(0, seaTop, w, h - seaTop);
-  ctx.fillStyle = mid; ctx.fillRect(0, seaTop + 13 * u, w, h - seaTop);
-  ctx.fillStyle = P.waterB; ctx.fillRect(0, seaTop + 27 * u, w, h - seaTop);
-  ctx.fillStyle = P.waterA; ctx.fillRect(0, seaTop + 40 * u, w, h - seaTop);
+  ctx.fillStyle = mid; ctx.fillRect(0, seaTop + 12 * u, w, h - seaTop);
+  ctx.fillStyle = P.waterB; ctx.fillRect(0, seaTop + 26 * u, w, h - seaTop);
+  ctx.fillStyle = mixHex(P.waterB, P.waterA, 0.6); ctx.fillRect(0, seaTop + 41 * u, w, h - seaTop);
   // ragged joins between the bands of water, glitter toward the horizon
   const streak = (y, color, count, len) => scatter(rnd, w, count, 0.5, (x, r) => { const l = len * (0.4 + r()) * u, yy = y + jit(r, 2.5 * u); wrapped(ctx, w, x - l, x + l, () => brushStroke(ctx, [[x - l / 2, yy], [x, yy + 0.4 * u], [x + l / 2, yy]], (1.6 + r() * 1.6) * u, { color, taper: 0.45, swell: 0 })); });
-  streak(seaTop + 13 * u, far, 26, 150); streak(seaTop + 27 * u, mid, 22, 190); streak(seaTop + 40 * u, P.waterB, 18, 240);
-  streak(seaTop + 6 * u, mixHex(P.cloudLight, far, 0.35), 16, 120); streak(seaTop + 21 * u, mixHex(P.cloudLight, mid, 0.5), 10, 90);
+  streak(seaTop + 12 * u, far, 26, 150); streak(seaTop + 26 * u, mid, 22, 190); streak(seaTop + 41 * u, P.waterB, 18, 240);
+  streak(seaTop + 6 * u, mixHex(P.cloudLight, far, 0.35), 16, 120); streak(seaTop + 20 * u, mixHex(P.cloudLight, mid, 0.5), 10, 90); streak(seaTop + 34 * u, mixHex(P.cloudLight, P.waterB, 0.55), 8, 70);
   // a nearer island with a lighthouse, sails
-  row(env, 2, 0.3, (x, r) => ({ x, halfW: (150 + r() * 160) * u, height: (26 + r() * 30) * u, base: seaTop + 9 * u, tones: nearer, edge: 'smooth', power: 0.7, get reach() { return this.halfW + 20 * u; }, paint: (o, rr) => {
-    const yAt = paintHill(env, o, rr), lx = o.x + o.halfW * jit(rr, 0.3), ly = yAt(lx) + 2 * u;
+  row(env, 2, 0.3, (x, r) => ({ x, halfW: (150 + r() * 160) * u, height: (26 + r() * 30) * u, base: seaTop + 11 * u, tones: nearer, edge: 'smooth', power: 0.7, get reach() { return this.halfW + 20 * u; }, paint: (o, rr, e) => {
+    const ctx = e.ctx, yAt = paintHill(e, o, rr), lx = o.x + o.halfW * jit(rr, 0.3), ly = yAt(lx) + 2 * u;
     ctx.fillStyle = mixHex(P.cloudLight, P.haze, 0.3); ctx.fillRect(lx - 1.6 * u, ly - 15 * u, 3.2 * u, 15 * u);
     ctx.fillStyle = nearer.shade; ctx.fillRect(lx - 2.4 * u, ly - 18 * u, 4.8 * u, 3.4 * u);
     brushStroke(ctx, [[o.x - o.halfW * 0.9, o.base + 1.5 * u], [o.x, o.base + 2 * u], [o.x + o.halfW * 0.9, o.base + 1.5 * u]], 2 * u, { color: mixHex(P.cloudLight, far, 0.3), taper: 0.3, swell: 0.3 });
   } }));
   const sail = mixHex(P.cloudLight, P.haze, 0.15), sailShade = mixHex(P.cloudShade, P.haze, 0.2), hull = mixHex(P.farReliefShade, P.waterA, 0.4);
   scatter(rnd, w, 9, 0.45, (x, r) => {
-    const depth = r(), size = (9 + depth * 17) * u, y = seaTop + (4 + depth * 30) * u, seed = newSeed(r);
+    const depth = r(), size = (9 + depth * 19) * u, y = seaTop + (4 + depth * 40) * u, seed = newSeed(r);
     wrapped(ctx, w, x - size, x + size, () => paintSail(ctx, x, y, size, sail, sailShade, hull, seeded(seed)));
   });
   // a freighter on the horizon
@@ -564,9 +608,9 @@ function farDunes(env) {
   const { u, y0, P } = env;
   const back = farTones(P, 0.4), mid = farTones(P, 0.12);
   // a distant plateau, then two ranks of sand ridges
-  row(env, 4, 0.3, (x, r) => ({ x, top: (160 + r() * 300) * u, height: (60 + r() * 50) * u, cap: 0.3, apron: (150 + r() * 120) * u, base: y0, tones: back, strata: [[0.5, 0.12]], get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr) => paintMesa(env, o, rr) }));
-  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 380) * u, height: (50 + r() * 80) * u, base: y0, tones: mid, get reach() { return this.halfW; }, paint: (o, rr) => paintDune(env, o, rr) }));
-  row(env, 10, 0.3, (x, r) => ({ x, halfW: (260 + r() * 300) * u, height: (26 + r() * 44) * u, base: y0, tones: tones(P.farReliefLight, P.farRelief, P.farReliefShade), get reach() { return this.halfW; }, paint: (o, rr) => paintDune(env, o, rr) }));
+  row(env, 4, 0.3, (x, r) => ({ x, top: (160 + r() * 300) * u, height: (60 + r() * 50) * u, cap: 0.3, apron: (150 + r() * 120) * u, base: y0, tones: back, strata: [[0.5, 0.12]], get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr, e) => paintMesa(e, o, rr) }));
+  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 380) * u, height: (50 + r() * 80) * u, base: y0, tones: mid, get reach() { return this.halfW; }, paint: (o, rr, e) => paintDune(e, o, rr) }));
+  row(env, 10, 0.3, (x, r) => ({ x, halfW: (260 + r() * 300) * u, height: (26 + r() * 44) * u, base: y0, tones: tones(P.farReliefLight, P.farRelief, P.farReliefShade), get reach() { return this.halfW; }, paint: (o, rr, e) => paintDune(e, o, rr) }));
   groundHaze(env, 100, 0.45);
 }
 
@@ -574,10 +618,10 @@ function farMesas(env) {
   const { u, y0, P } = env;
   const back = farTones(P, 0.42), mid = farTones(P, 0.08);
   const strataBack = [[0.3, 0.07]], strataMid = [[0.22, 0.06], [0.52, 0.1], [0.8, 0.04]];
-  row(env, 5, 0.35, (x, r) => { const height = (120 + r() * 90) * u; return { x, top: (120 + r() * r() * 520) * u, height, cap: 0.5 + r() * 0.15, apron: height * (0.7 + r() * 0.4), base: y0, tones: back, strata: strataBack, get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr) => paintMesa(env, o, rr) }; });
+  row(env, 5, 0.35, (x, r) => { const height = (120 + r() * 90) * u; return { x, top: (120 + r() * r() * 520) * u, height, cap: 0.5 + r() * 0.15, apron: height * (0.7 + r() * 0.4), base: y0, tones: back, strata: strataBack, get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr, e) => paintMesa(e, o, rr) }; });
   row(env, 7, 0.35, (x, r, i) => {
     const spire = i % 3 === 1, height = (spire ? 110 + r() * 80 : 70 + r() * 80) * u;
-    return { x, top: (spire ? 12 + r() * 22 : 70 + r() * r() * 330) * u, height, cap: spire ? 0.66 : 0.48 + r() * 0.14, apron: height * (0.6 + r() * 0.4), base: y0, tones: mid, strata: strataMid, get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr) => paintMesa(env, o, rr) };
+    return { x, top: (spire ? 12 + r() * 22 : 70 + r() * r() * 330) * u, height, cap: spire ? 0.66 : 0.48 + r() * 0.14, apron: height * (0.6 + r() * 0.4), base: y0, tones: mid, strata: strataMid, get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr, e) => paintMesa(e, o, rr) };
   });
   groundHaze(env, 110, 0.45);
 }
@@ -585,7 +629,7 @@ function farMesas(env) {
 function farCity(env) {
   const { ctx, w, h, u, y0, P, rnd } = env;
   // low hills behind the town, then two ranks of towers lost in the haze
-  row(env, 5, 0.3, (x, r) => ({ x, halfW: (500 + r() * 500) * u, height: (30 + r() * 46) * u, base: y0, tones: farTones(P, 0.5), edge: 'smooth', get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 5, 0.3, (x, r) => ({ x, halfW: (500 + r() * 500) * u, height: (30 + r() * 46) * u, base: y0, tones: farTones(P, 0.5), edge: 'smooth', get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   const ranks = [{ c: farTones(P, 0.42), count: 60, height: 54, width: 20 }, { c: farTones(P, 0.12), count: 54, height: 78, width: 26 }];
   for (const rank of ranks) {
     // towers cluster into a few districts
@@ -605,9 +649,9 @@ function farCity(env) {
 function farFlat(env) {
   const { ctx, w, h, u, y0, P, rnd } = env;
   // very low swells on the horizon, a distant line of woods, a few landmarks
-  row(env, 5, 0.3, (x, r) => ({ x, halfW: (600 + r() * 600) * u, height: (16 + r() * 22) * u, base: y0, tones: farTones(P, 0.45), edge: 'smooth', power: 0.7, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 5, 0.3, (x, r) => ({ x, halfW: (600 + r() * 600) * u, height: (16 + r() * 22) * u, base: y0, tones: farTones(P, 0.45), edge: 'smooth', power: 0.7, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   const wood = farTones(P, 0.1);
-  row(env, 12, 0.4, (x, r) => ({ x, halfW: (140 + r() * 260) * u, height: (9 + r() * 12) * u, base: y0, tones: wood, edge: 'scallop', grain: 8 * u, power: 0.35, skew: 0, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 12, 0.4, (x, r) => ({ x, halfW: (140 + r() * 260) * u, height: (9 + r() * 12) * u, base: y0, tones: wood, edge: 'scallop', grain: 8 * u, power: 0.35, skew: 0, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   // water towers, a church, pylons of a power line marching across the plain
   scatter(rnd, w, 4, 0.4, (x, r, i) => {
     const c = wood.shade, s = (16 + r() * 8) * u;
@@ -645,10 +689,10 @@ function nearHills(env) {
   const back = nearTones(P, 0.34), front = nearTones(P, 0.08);
   const field = [mixHex(P.mown, P.haze, 0.3), mixHex(P.gravelA, P.nearReliefLight, 0.45), mixHex(P.nearReliefLight, P.haze, 0.25)];
   const built = builtColors(P, 0.25, front.ink);
-  row(env, 7, 0.3, (x, r) => ({ x, halfW: (420 + r() * 380) * u, height: (70 + r() * 70) * u, base: y0, tones: back, edge: 'scallop', grain: 11 * u, contour: 1, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 7, 0.3, (x, r) => ({ x, halfW: (420 + r() * 380) * u, height: (70 + r() * 70) * u, base: y0, tones: back, edge: 'scallop', grain: 11 * u, contour: 1, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   row(env, 8, 0.3, (x, r, i) => ({
     x, halfW: (330 + r() * 330) * u, height: (30 + r() * 52) * u, base: y0 + 6 * u, tones: front, edge: 'scallop', grain: 17 * u, contour: 1.5, get reach() { return this.halfW; },
-    paint: (o, rr) => paintHill(env, { ...o, detail: (yAt, r2) => {
+    paint: (o, rr, e) => paintHill(e, { ...o, detail: (yAt, r2, ctx) => {
       // clearings: fields that follow the roundness of the hill, edged with hedges
       const cells = 2 + Math.floor(r2() * 3);
       for (let c = 0; c < cells; c++) {
@@ -680,16 +724,16 @@ function nearMountains(env) {
   const meadow = mixHex(P.mown, P.haze, 0.22), built = builtColors(P, 0.2, front.ink);
   const rock = hazed(tones(P.rockLight, P.rock, P.rockShade, front.ink), P.haze, 0.3);
   // steep wooded spurs: firs on the crests, alpine meadows and chalets lower down
-  row(env, 7, 0.3, (x, r) => ({ x, halfW: (330 + r() * 330) * u, height: (110 + r() * 80) * u, base: y0, tones: back, edge: 'fir', grain: 7 * u, power: 1.2 + r() * 0.5, contour: 1, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 7, 0.3, (x, r) => ({ x, halfW: (330 + r() * 330) * u, height: (110 + r() * 80) * u, base: y0, tones: back, edge: 'fir', grain: 7 * u, power: 1.2 + r() * 0.5, contour: 1, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   row(env, 8, 0.3, (x, r, i) => ({
     x, halfW: (300 + r() * 300) * u, height: (44 + r() * 70) * u, base: y0 + 6 * u, tones: front, edge: 'fir', grain: 11 * u, power: 1.1 + r() * 0.5, contour: 1.5, get reach() { return this.halfW; },
-    paint: (o, rr) => paintHill(env, { ...o, detail: (yAt, r2) => {
-      // a meadow below the tree line, edged by a ragged row of firs
-      const t0 = -0.5 + r2() * 0.5, t1 = t0 + 0.3 + r2() * 0.3, upper = [], lower = [];
-      for (let q = 0; q <= 8; q++) { const xx = o.x + lerp(t0, t1, q / 8) * o.halfW, yy = yAt(xx); upper.push([xx, yy + (o.base - yy) * (0.42 + 0.1 * Math.sin(q * 1.3))]); lower.push([xx, o.base + 6 * u]); }
-      ctx.beginPath(); tracePolygon(ctx, upper.concat(lower.reverse())); ctx.fillStyle = meadow; ctx.fill();
+    paint: (o, rr, e) => paintHill(e, { ...o, detail: (yAt, r2, ctx) => {
+      // a meadow below the tree line: a rounded clearing edged by a ragged row of firs
+      const t0 = -0.55 + r2() * 0.5, t1 = t0 + 0.34 + r2() * 0.3, upper = [], lower = [];
+      for (let q = 0; q <= 8; q++) { const xx = o.x + lerp(t0, t1, q / 8) * o.halfW, yy = yAt(xx), rise = Math.pow(Math.sin(Math.PI * q / 8), 0.6); upper.push([xx, lerp(o.base + 8 * u, yy + (o.base - yy) * (0.4 + 0.08 * Math.sin(q * 1.3)), rise)]); lower.push([xx, o.base + 8 * u]); }
+      ctx.beginPath(); tracePolygon(ctx, sampleCurve(upper, 4).concat(lower.reverse())); ctx.fillStyle = meadow; ctx.fill();
       ctx.beginPath();
-      for (let q = 0; q < 26; q++) { const f = q / 25, a = upper[Math.min(7, Math.floor(f * 8))], b = upper[Math.min(8, Math.floor(f * 8) + 1)], g = f * 8 - Math.floor(f * 8), xx = lerp(a[0], b[0], g), yy = lerp(a[1], b[1], g) + 3 * u, s = (7 + r2() * 6) * u; ctx.moveTo(xx - s * 0.4, yy); ctx.lineTo(xx, yy - s * 1.5); ctx.lineTo(xx + s * 0.4, yy); }
+      for (let q = 0; q < 30; q++) { const f = q / 29, a = upper[Math.min(7, Math.floor(f * 8))], b = upper[Math.min(8, Math.floor(f * 8) + 1)], g = f * 8 - Math.floor(f * 8), xx = lerp(a[0], b[0], g), yy = lerp(a[1], b[1], g) + 3 * u, s = (7 + r2() * 6) * u; ctx.moveTo(xx - s * 0.4, yy); ctx.lineTo(xx, yy - s * 1.5); ctx.lineTo(xx + s * 0.4, yy); }
       ctx.fillStyle = front.shade; ctx.fill();
       if (i % 2 === 0) for (let b = 0; b < 3; b++) { const xx = o.x + lerp(t0, t1, 0.25 + b * 0.25) * o.halfW; paintHouse(ctx, xx, upper[4][1] + (16 + r2() * 14) * u, (15 + r2() * 6) * u, (7 + r2() * 3) * u, built, false, r2); }
       if (i % 3 === 1) {
@@ -714,10 +758,10 @@ function nearSea(env) {
     const hills = [];
     for (let i = 0; i < 4; i++) hills.push({ x: cape.centre + ((i + 0.5) / 4 - 0.5) * 2 * cape.span * 0.8 + jit(rnd, 40 * u), halfW: (230 + rnd() * 200) * u, height: (60 + rnd() * 70) * u * (1 - Math.abs(i - 1.5) * 0.22), seed: newSeed(rnd), far: true });
     for (let i = 0; i < 4; i++) hills.push({ x: cape.centre + ((i + 0.5) / 4 - 0.5) * 2 * cape.span + jit(rnd, 50 * u), halfW: (200 + rnd() * 170) * u, height: (36 + rnd() * 54) * u * (1 - Math.abs(i - 1.5) * 0.2), seed: newSeed(rnd), far: false, index: i });
-    for (const hill of hills) {
+    const drawHill = (hill) => {
       const o = { x: hill.x, halfW: hill.halfW, height: hill.height, base: y0 + 4 * u, tones: hill.far ? back : front, edge: 'scallop', grain: (hill.far ? 10 : 15) * u, contour: hill.far ? 1 : 1.5, power: 0.8 + (hill.seed % 5) * 0.08 };
-      stamp(env, o.x - o.halfW - 30 * u, o.x + o.halfW + 30 * u, hill.seed, (r) => {
-        const yAt = paintHill(env, hill.far ? o : { ...o, detail: (y2, r2) => {
+      stamp(env, o.x - o.halfW - 30 * u, o.x + o.halfW + 30 * u, hill.seed, (r, e) => {
+        const ctx = e.ctx, yAt = paintHill(e, hill.far ? o : { ...o, detail: (y2, r2) => {
           // terraces drawn as pale lines across the slope
           for (let i = 0; i < 3; i++) { const t0 = -0.5 + r2() * 0.6, v = 0.45 + i * 0.16, line = []; for (let q = 0; q <= 5; q++) { const xx = o.x + (t0 + q * 0.07) * o.halfW, yy = y2(xx); line.push([xx, yy + (o.base - yy) * v]); } brushStroke(ctx, line, 2 * u, { color: front.light, taper: 0.3, swell: 0.2 }); }
         } }, r);
@@ -730,25 +774,39 @@ function nearSea(env) {
           else paintTree(ctx, xx, ground, (20 + r() * 9) * u, true, pines[0], pines[1], front.ink, r);
         }
       });
-    }
-    // rocky point where the cape falls into the sea, with a line of surf
+    };
+    for (const hill of hills) if (hill.far) drawHill(hill);
+    // headland sloping down to a rocky point, with a line of surf at its foot
     for (const side of [-1, 1]) {
-      const x = cape.centre + side * cape.span * 1.12, s = (40 + rnd() * 26) * u, base = y0 - 8 * u;
-      const cliff = [[x - s, base + 30 * u], [x - s * 0.9, base - s * 0.2], [x - s * 0.3, base - s * (0.5 + rnd() * 0.2)], [x + s * 0.2, base - s * 0.42], [x + s * 0.8, base - s * 0.12], [x + s, base + 30 * u]];
-      wrapped(ctx, w, x - s * 1.6, x + s * 1.6, () => {
-        ctx.beginPath(); tracePolygon(ctx, cliff); ctx.strokeStyle = front.ink; ctx.lineWidth = 2.4 * u; ctx.lineJoin = 'round'; ctx.stroke(); ctx.fillStyle = rock.light; ctx.fill();
-        ctx.beginPath(); tracePolygon(ctx, [cliff[2], cliff[3], cliff[4], cliff[5], [x + s * 0.1, base + 30 * u], [x - s * 0.05, base - s * 0.1]]); ctx.fillStyle = rock.shade; ctx.fill();
-        ctx.beginPath(); tracePolygon(ctx, [cliff[1], cliff[2], [x - s * 0.05, base - s * 0.1], [x - s * 0.5, base]]); ctx.fillStyle = rock.base; ctx.fill();
-        brushStroke(ctx, [[x - s * 1.4, base + 5 * u], [x, base + 6.5 * u], [x + s * 1.4, base + 5 * u]], 3 * u, { color: P.cloudLight, taper: 0.3, swell: 0.4 });
+      const tip = cape.centre + side * cape.span * (1.2 + rnd() * 0.1), s = (40 + rnd() * 20) * u, base = y0 - 5 * u, len = cape.span * (0.5 + rnd() * 0.15), inland = tip - side * len, seed = newSeed(rnd);
+      stamp(env, Math.min(tip, inland) - 50 * u, Math.max(tip, inland) + 50 * u, seed, (r, e) => {
+        const g = e.ctx, lit = side < 0;
+        const crest = sampleCurve([[inland, base], [inland + side * len * 0.2, base - s * 0.9], [tip - side * len * 0.55, base - s * 1.0], [tip - side * len * 0.22, base - s * 0.7], [tip - side * s * 0.3, base - s * 0.5]], 5);
+        const shape = (c) => { c.moveTo(inland, e.h + 4); for (const p of crest) c.lineTo(p[0], p[1]); c.lineTo(tip - side * s * 0.08, base - s * 0.3); c.lineTo(tip, base + 2 * u); c.lineTo(tip, e.h + 4); c.closePath(); };
+        g.beginPath(); shape(g); g.fillStyle = front.base; g.fill();
+        inside(g, () => {
+          g.save(); g.translate(-len * 0.08, s * 0.2); g.beginPath(); shape(g); g.fillStyle = front.light; g.fill(); g.restore();
+          // cliff: bare rock below a ragged line that climbs toward the point
+          const edge = [], n = 9;
+          for (let i = 0; i <= n; i++) { const f = i / n; edge.push([lerp(tip - side * len * 0.6, tip - side * s * 0.2, f), base - s * (0.02 + 0.42 * Math.pow(f, 1.3)) - (i % 2 ? s * 0.07 : 0) * (0.5 + r())]); }
+          g.beginPath(); g.moveTo(edge[0][0], e.h + 4); for (const p of edge) g.lineTo(p[0], p[1]); g.lineTo(tip + side * 6 * u, base - s * 0.5); g.lineTo(tip + side * 6 * u, e.h + 4); g.closePath(); g.fillStyle = lit ? rock.light : rock.base; g.fill();
+          for (let i = 1; i < n; i += 2) {
+            const a = edge[i], b = edge[i + 1], wd = (b[0] - a[0]);
+            g.beginPath(); tracePolygon(g, [a, b, [b[0] - wd * 0.2, base + 6 * u], [a[0] + wd * 0.3, base + 6 * u]]); g.fillStyle = lit ? rock.base : rock.shade; g.fill();
+          }
+        });
+        contour(g, shape, front.ink, 1.4 * u);
+        brushStroke(g, [[inland + side * len * 0.3, base + 4 * u], [tip - side * s, base + 5.5 * u], [tip + side * s * 0.5, base + 4 * u]], 3 * u, { color: P.cloudLight, taper: 0.3, swell: 0.4 });
       });
     }
+    for (const hill of hills) if (!hill.far) drawHill(hill);
   }
 }
 
 function nearDunes(env) {
   const { ctx, w, u, y0, P, rnd } = env;
   const back = nearTones(P, 0.3), front = nearTones(P, 0.04);
-  row(env, 7, 0.3, (x, r) => ({ x, halfW: (300 + r() * 330) * u, height: (50 + r() * 70) * u, base: y0, tones: back, detail: false, get reach() { return this.halfW; }, paint: (o, rr) => paintDune(env, o, rr) }));
+  row(env, 7, 0.3, (x, r) => ({ x, halfW: (300 + r() * 330) * u, height: (50 + r() * 70) * u, base: y0, tones: back, detail: false, get reach() { return this.halfW; }, paint: (o, rr, e) => paintDune(e, o, rr) }));
   // an oasis in a hollow between the two ranks of dunes
   const palmDark = mixHex(P.palmShade, P.haze, 0.12), palmLight = mixHex(P.palm, P.haze, 0.12), built = builtColors(P, 0.15, front.ink);
   scatter(rnd, w, 3, 0.3, (x, r) => {
@@ -759,7 +817,7 @@ function nearDunes(env) {
       for (let i = 0; i < 9; i++) paintPalm(ctx, x + jit(r2, span), y0 - r2() * 8 * u, (26 + r2() * 20) * u, palmDark, palmLight, front.ink, r2);
     });
   });
-  row(env, 7, 0.3, (x, r) => ({ x, halfW: (320 + r() * 360) * u, height: (22 + r() * 46) * u, base: y0 + 8 * u, tones: front, detail: true, get reach() { return this.halfW; }, paint: (o, rr) => paintDune(env, o, rr) }));
+  row(env, 7, 0.3, (x, r) => ({ x, halfW: (320 + r() * 360) * u, height: (22 + r() * 46) * u, base: y0 + 8 * u, tones: front, detail: true, get reach() { return this.halfW; }, paint: (o, rr, e) => paintDune(e, o, rr) }));
   groundHaze(env, 30, 0.25);
 }
 
@@ -768,14 +826,14 @@ function nearMesas(env) {
   const back = nearTones(P, 0.3), front = nearTones(P, 0.04);
   const strata = [[0.16, 0.07], [0.4, 0.03], [0.58, 0.12], [0.86, 0.04]];
   // the nearer buttes leave wide gaps: the far mesas show between them
-  row(env, 4, 0.3, (x, r) => { const height = (90 + r() * 60) * u; return { x, top: (90 + r() * 260) * u, height, cap: 0.5 + r() * 0.12, apron: height * (0.8 + r() * 0.4), base: y0, tones: back, strata, detail: true, get reach() { return this.top + this.apron * 1.7; }, paint: (o, rr) => paintMesa(env, o, rr) }; });
+  row(env, 4, 0.3, (x, r) => { const height = (90 + r() * 60) * u; return { x, top: (90 + r() * 260) * u, height, cap: 0.5 + r() * 0.12, apron: height * (0.8 + r() * 0.4), base: y0, tones: back, strata, detail: true, get reach() { return this.top + this.apron * 1.7; }, paint: (o, rr, e) => paintMesa(e, o, rr) }; });
   row(env, 3, 0.25, (x, r, i) => {
     const spire = i === 1, height = (spire ? 150 + r() * 40 : 110 + r() * 60) * u;
-    return { x, top: (spire ? 20 + r() * 20 : 140 + r() * 240) * u, height, cap: spire ? 0.62 : 0.5 + r() * 0.1, apron: height * (0.7 + r() * 0.3), base: y0 + 6 * u, tones: front, strata, detail: true, get reach() { return this.top + this.apron * 1.7; }, paint: (o, rr) => paintMesa(env, o, rr) };
+    return { x, top: (spire ? 20 + r() * 20 : 140 + r() * 240) * u, height, cap: spire ? 0.62 : 0.5 + r() * 0.1, apron: height * (0.7 + r() * 0.3), base: y0 + 6 * u, tones: front, strata, detail: true, get reach() { return this.top + this.apron * 1.7; }, paint: (o, rr, e) => paintMesa(e, o, rr) };
   });
   // low swells of the desert floor dotted with scrub
   const floor = tones(mixHex(front.light, P.haze, 0.15), mixHex(front.base, P.haze, 0.1), front.shade, front.ink);
-  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 300) * u, height: (8 + r() * 16) * u, base: y0 + 6 * u, tones: floor, edge: 'smooth', power: 0.7, contour: 1, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 300) * u, height: (8 + r() * 16) * u, base: y0 + 6 * u, tones: floor, edge: 'smooth', power: 0.7, contour: 1, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   const scrub = mixHex(P.dryShade, P.haze, 0.15), scrubLight = mixHex(P.dry, P.haze, 0.15);
   scatter(rnd, w, 46, 0.5, (x, r) => { const s = (7 + r() * 9) * u, y = y0 - r() * 9 * u, seed = newSeed(r); wrapped(ctx, w, x - s, x + s, () => paintTree(ctx, x, y + s * 0.3, s, true, scrub, scrubLight, null, seeded(seed))); });
   groundHaze(env, 30, 0.25);
@@ -784,12 +842,14 @@ function nearMesas(env) {
 function nearCity(env) {
   const { ctx, w, h, u, y0, P, rnd } = env;
   const concrete = (amount, ink) => ({ light: mixHex(P.concreteLight, P.haze, amount), base: mixHex(P.concrete, P.haze, amount), shade: mixHex(P.concreteShade, P.haze, amount), ink });
-  const brick = (amount, ink) => ({ light: mixHex(P.wallLight, P.haze, amount), base: mixHex(P.wall, P.haze, amount), shade: mixHex(P.wallShade, P.haze, amount), ink });
+  const plaster = (amount, ink) => ({ light: mixHex(P.wallLight, P.haze, amount), base: mixHex(P.wall, P.haze, amount), shade: mixHex(P.wallShade, P.haze, amount), ink });
+  const brick = (amount, ink) => ({ light: mixHex(mixHex(P.roof, P.wall, 0.45), P.haze, amount), base: mixHex(mixHex(P.roof, P.wallShade, 0.3), P.haze, amount), shade: mixHex(P.roofShade, P.haze, amount), ink });
+  const front = (i, amount) => { const c = [concrete, brick, plaster, concrete, brick][i % 5](amount, ink); return i % 5 === 0 ? { ...c, light: c.base, base: c.shade, shade: mixHex(P.concreteShade, P.ink, 0.25) } : c; };
   const ink = mixHex(P.ink, P.concreteShade, 0.4), steel = mixHex(P.metalShade, P.haze, 0.2);
   const plume = { light: mixHex(P.smoke, P.haze, 0.2), shade: mixHex(P.smokeShade, P.haze, 0.2) };
   // back rank: big housing blocks and office slabs
   scatter(rnd, w, 30, 0.5, (x, r, i) => {
-    const slab = r() < 0.4, ht = (slab ? 44 + r() * 30 : 70 + r() * 80) * u, wd = (slab ? 90 + r() * 80 : 36 + r() * 34) * u, seed = newSeed(r), c = i % 3 ? concrete(0.34, null) : brick(0.34, null);
+    const slab = r() < 0.4, ht = (slab ? 44 + r() * 30 : 70 + r() * 80) * u, wd = (slab ? 90 + r() * 80 : 36 + r() * 34) * u, seed = newSeed(r), c = [concrete, plaster, concrete, brick][i % 4](0.36, null);
     wrapped(ctx, w, x - wd, x + wd, () => paintBlock(ctx, x, y0, wd, ht, { ...c, windows: 8 }, ['flat', 'plant', 'step', 'flat'][seed % 4], u, seeded(seed)));
   });
   // chimneys and cranes stand between the two ranks
@@ -802,7 +862,7 @@ function nearCity(env) {
   scatter(rnd, w, 26, 0.5, (x, r, i) => {
     const seed = newSeed(r), kind = r();
     if (kind < 0.12) {
-      const rad = (26 + r() * 14) * u, c = concrete(0.14, ink);
+      const rad = (26 + r() * 14) * u, c = concrete(0.1, ink);
       wrapped(ctx, w, x - rad * 1.2, x + rad * 1.2, () => {
         ctx.strokeStyle = ink; ctx.lineWidth = 2.4 * u; ctx.strokeRect(x - rad, y0 - rad * 1.3, rad * 2, rad * 1.3 + 4);
         ctx.fillStyle = c.light; ctx.fillRect(x - rad, y0 - rad * 1.3, rad * 2, rad * 1.3 + 4);
@@ -812,12 +872,12 @@ function nearCity(env) {
       });
       return;
     }
-    const shed = kind < 0.4, ht = (shed ? 16 + r() * 12 : 30 + r() * 44) * u, wd = (shed ? 80 + r() * 90 : 40 + r() * 50) * u, c = i % 2 ? concrete(0.12, ink) : brick(0.12, ink);
+    const shed = kind < 0.4, ht = (shed ? 16 + r() * 12 : 30 + r() * 44) * u, wd = (shed ? 80 + r() * 90 : 40 + r() * 50) * u, c = front(i, 0.08);
     wrapped(ctx, w, x - wd, x + wd, () => paintBlock(ctx, x, y0, wd, ht, { ...c, windows: shed ? 0 : 7 }, shed ? (seed % 2 ? 'slant' : 'flat') : ['flat', 'plant', 'flat', 'step'][seed % 4], u, seeded(seed)));
   });
   // trees of the avenues and parks at the foot of the buildings
   const green = nearTones(P, 0.1);
-  row(env, 16, 0.45, (x, r) => ({ x, halfW: (70 + r() * 150) * u, height: (11 + r() * 13) * u, base: y0 + 4 * u, tones: green, edge: 'scallop', grain: 11 * u, power: 0.4, skew: 0, contour: 1.2, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 16, 0.45, (x, r) => ({ x, halfW: (70 + r() * 150) * u, height: (11 + r() * 13) * u, base: y0 + 4 * u, tones: green, edge: 'scallop', grain: 11 * u, power: 0.4, skew: 0, contour: 1.2, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   ctx.fillStyle = green.shade; ctx.fillRect(0, y0 + 2 * u, w, h - y0);
   groundHaze(env, 26, 0.25);
 }
@@ -833,19 +893,21 @@ function nearFlat(env) {
     const half = (120 + r() * 160) * u, top = y0 - (5 + r() * 7) * u, lean = jit(r, 30 * u), color = crops[i % 4];
     wrapped(ctx, w, x - half - 40 * u, x + half + 40 * u, () => { ctx.beginPath(); tracePolygon(ctx, [[x - half, y0 + 6 * u], [x - half * 0.8 + lean, top], [x + half * 0.8 + lean, top + jit(seeded(i + 1), 2 * u)], [x + half, y0 + 6 * u]]); ctx.fillStyle = color; ctx.fill(); });
   });
-  row(env, 14, 0.45, (x, r) => ({ x, halfW: (90 + r() * 220) * u, height: (12 + r() * 14) * u, base: y0, tones: back, edge: 'scallop', grain: 10 * u, power: 0.4, skew: 0, contour: 1, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 14, 0.45, (x, r) => ({ x, halfW: (90 + r() * 220) * u, height: (12 + r() * 14) * u, base: y0, tones: back, edge: 'scallop', grain: 10 * u, power: 0.4, skew: 0, contour: 1, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   // the airfield: hangars, control tower, radar, wind sock; farms and rows of poplars elsewhere
   const field = rnd() * w;
   for (let i = 0; i < 4; i++) {
     const x = field + (i - 1.5) * 150 * u + jit(rnd, 20 * u), wd = (110 + rnd() * 40) * u, ht = (30 + rnd() * 10) * u;
-    wrapped(ctx, w, x - wd, x + wd, () => {
-      const arch = (g) => { g.moveTo(x - wd / 2, y0 + 4); g.lineTo(x - wd / 2, y0 - ht * 0.45); g.quadraticCurveTo(x, y0 - ht * 1.5, x + wd / 2, y0 - ht * 0.45); g.lineTo(x + wd / 2, y0 + 4); g.closePath(); };
-      ctx.beginPath(); arch(ctx); ctx.strokeStyle = ink; ctx.lineWidth = 2.6 * u; ctx.lineJoin = 'round'; ctx.stroke(); ctx.fillStyle = metal.base; ctx.fill();
-      clipped(ctx, arch, () => {
-        ctx.save(); ctx.translate(-wd * 0.12, ht * 0.16); ctx.beginPath(); arch(ctx); ctx.fillStyle = metal.light; ctx.fill(); ctx.restore();
-        ctx.fillStyle = metal.shade; ctx.fillRect(x - wd * 0.34, y0 - ht * 0.56, wd * 0.68, ht);
-        ctx.fillStyle = ink; for (let d = 1; d < 4; d++) ctx.fillRect(x - wd * 0.34 + (wd * 0.68 * d) / 4, y0 - ht * 0.56, 1.2 * u, ht);
+    stamp(env, x - wd * 0.6, x + wd * 0.6, i + 1, (r, e) => {
+      const g = e.ctx;
+      const arch = (c) => { c.moveTo(x - wd / 2, y0 + 4); c.lineTo(x - wd / 2, y0 - ht * 0.45); c.quadraticCurveTo(x, y0 - ht * 1.5, x + wd / 2, y0 - ht * 0.45); c.lineTo(x + wd / 2, y0 + 4); c.closePath(); };
+      g.beginPath(); arch(g); g.fillStyle = metal.base; g.fill();
+      inside(g, () => {
+        g.save(); g.translate(-wd * 0.12, ht * 0.16); g.beginPath(); arch(g); g.fillStyle = metal.light; g.fill(); g.restore();
+        g.fillStyle = metal.shade; g.fillRect(x - wd * 0.34, y0 - ht * 0.56, wd * 0.68, ht);
+        g.fillStyle = ink; for (let d = 1; d < 4; d++) g.fillRect(x - wd * 0.34 + (wd * 0.68 * d) / 4, y0 - ht * 0.56, 1.2 * u, ht);
       });
+      contour(g, arch, ink, 1.3 * u);
     });
   }
   const tx = field + 330 * u, th = 78 * u;
@@ -885,7 +947,7 @@ function nearFlat(env) {
     });
   });
   // hedge line closing the foreground
-  row(env, 12, 0.45, (x, r) => ({ x, halfW: (120 + r() * 240) * u, height: (6 + r() * 8) * u, base: y0 + 4 * u, tones: front, edge: 'scallop', grain: 12 * u, power: 0.35, skew: 0, contour: 1.2, get reach() { return this.halfW; }, paint: (o, rr) => paintHill(env, o, rr) }));
+  row(env, 12, 0.45, (x, r) => ({ x, halfW: (120 + r() * 240) * u, height: (6 + r() * 8) * u, base: y0 + 4 * u, tones: front, edge: 'scallop', grain: 12 * u, power: 0.35, skew: 0, contour: 1.2, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   ctx.fillStyle = front.base; ctx.fillRect(0, y0 + 3 * u, w, h - y0);
   groundHaze(env, 22, 0.25);
 }

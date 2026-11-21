@@ -304,7 +304,7 @@ export class GameFlow {
     const winner = result.classification[0];
     const rows = result.classification.map((row) => ({
       pos: row.position, name: row.driver.name, teamIndex: row.driver.team, human: row.isHuman, retired: row.retired,
-      time: row.retired ? t('results.dnf') : row.position === 1 || !row.finished ? formatTime(row.time) : row.lapsDown > 0 ? t('results.lapsDown', { n: row.lapsDown }) : `+${row.gap.toFixed(3)}`,
+      time: row.retired ? t('results.dnf') : row.position === 1 ? formatTime(row.time) : row.lapsDown > 0 ? t('results.lapsDown', { n: row.lapsDown }) : `+${row.gap.toFixed(3)}`,
       best: formatTime(row.bestLap), points: row.points,
     }));
     let sub = `${race.track.name} - ${t(result.position === 1 ? 'results.caption.win' : 'results.caption.other')}`;

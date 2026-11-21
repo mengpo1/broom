@@ -9,7 +9,7 @@ import { QUAD_MODE } from '../drawing/quad-batch.js';
 import { CAR_STATE } from '../../physics/car-physics.js';
 import { SURFACE } from '../../tracks/track-builder.js';
 import { closedCurve, blobPoints, brushStroke, seeded } from '../../art/styles/ink.js';
-import { drawText } from '../../art/styles/lettering.js';
+import { drawText, measureText } from '../../art/styles/lettering.js';
 import { hexToRgb } from '../../art/palettes/palettes.js';
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8;
@@ -73,7 +73,9 @@ export function defineEffectsArt(art) {
   }, { wrapY: true });
   WORDS.forEach((word, i) => {
     art.defineStatic(`fx.word.${i}`, 720, 250, (ctx, w, h) => {
-      drawText(ctx, word, w / 2, h * 0.72, 118, { style: 'impact', color: WORD_COLORS[i], outline: '#16161f', outlineWidth: 14, align: 'center', bounce: 0.14, seed: 3 + i, shadow: { dx: 9, dy: 10, color: '#16161f' } });
+      const options = { style: 'impact', color: WORD_COLORS[i], outline: '#16161f', outlineWidth: 12, align: 'center', bounce: 0.12, seed: 3 + i, shadow: { dx: 8, dy: 9, color: '#16161f' } };
+      const size = Math.min(112, (112 * (w - 90)) / measureText(word, 112, options));
+      drawText(ctx, word, w / 2, h * 0.5 + size * 0.42, size, options);
     });
   });
 }
@@ -278,7 +280,7 @@ export class EffectsLayer {
         quads.rotated(this.burst, cx, cy, s, s, p.angle * 2, 0.5, 0.5, 1, 1, 1, alpha * (1 - t * 0.5));
       } else {
         const sp = this.words[p.word];
-        quads.rotated(sp, cx, cy, sp.w * scale * 1.5, sp.h * scale * 1.5, p.angle - 0.08, 0.5, 0.5, 1, 1, 1, alpha);
+        quads.rotated(sp, cx, cy, sp.w * scale, sp.h * scale, p.angle - 0.08, 0.5, 0.5, 1, 1, 1, alpha);
       }
     }
   }

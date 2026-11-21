@@ -19,6 +19,20 @@ const MAX_CARS = 32;
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
+/**
+ * Which drawing of a car to show for an angle between its nose and the line of sight
+ * (radians, 0 = seen from behind, positive = nose pointing to the right). Drawings cover 0..180
+ * degrees; the other side uses the same drawing mirrored. Returns the drawing index, or
+ * -(index + 1) when it must be mirrored.
+ */
+export function carViewFrame(alpha, count) {
+  const step = Math.PI / (count - 1);
+  const mirrored = alpha < 0;
+  let index = Math.round(Math.abs(alpha) / step);
+  if (index > count - 1) index = count - 1;
+  return mirrored && index > 0 && index < count - 1 ? -(index + 1) : index;
+}
+
 export class SceneBuilder {
   constructor(art) {
     this.art = art;
@@ -216,11 +230,9 @@ export class SceneBuilder {
     // angle between the car's nose and the line of sight (0 = seen from behind, + = nose to the right)
     const lateral = (pt.x - p.cx) / p.focal;
     let alpha = wrapAngle(pt.theta - yawAngle + car.headingError + (p.dir < 0 ? Math.PI : 0) - Math.atan(lateral));
-    const flip = alpha < 0;
-    if (flip) alpha = -alpha;
-    let a = Math.round(alpha / this.carAngleStep);
-    if (a >= this.art.cars.length) a = this.art.cars.length - 1;
-    const cs = this.art.cars[a];
+    const frame = carViewFrame(alpha, this.art.cars.length);
+    const flip = frame < 0;
+    const cs = this.art.cars[flip ? -frame - 1 : frame];
     const k = pt.scale / cs.ppm;
     const w = cs.w * k, h = cs.h * k;
     const left = pt.x - (flip ? cs.w - cs.ax : cs.ax) * k, top = pt.y - cs.ay * k;

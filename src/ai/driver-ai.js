@@ -23,7 +23,7 @@ export function createAiController(skill, seed) {
     mistakeKind: MISTAKE.NONE, mistakeLeft: 0, mistakeSign: 1,
     mistakeTimer: 10 + rng.range(0, 40),
     startDelay: skill.reaction * rng.range(0.7, 1.3),
-    pitDecisionLap: -1,
+    pitDecisionLap: -1, holdBrake: false,
   };
 }
 
@@ -153,6 +153,7 @@ export function updateAiController(ai, car, race, dt) {
         if (dist < 34 && dist > -3) {
           dTarget = lerp(laneD, pit.side * pit.boxD, smoothstep(34, 12, dist - look * 0.5));
           vTarget = Math.min(vTarget, Math.sqrt(2 * 5 * Math.max(0, dist - 0.4)) + 0.5);
+          if (dist < 1.6) ai.holdBrake = true;        // on the marks: stop completely so the crew can work
         } else if (dist <= -3) car.wantsPit = false;
       }
       ai.offset = dTarget - lineD;
@@ -183,6 +184,7 @@ export function updateAiController(ai, car, race, dt) {
     car.inThrottle = err > -1 ? 0.2 : 0;
     car.inBrake = clamp((-err - 0.5) * 0.3, 0, 1);
   }
+  if (ai.holdBrake) { car.inThrottle = 0; car.inBrake = 1; ai.holdBrake = false; }
   if (ai.mistakeKind === MISTAKE.LIFT) car.inThrottle *= 0.2;
   if (race.time < ai.startDelay && !car.autoDrive) { car.inThrottle = 0; car.inBrake = 0; }
   if (car.params.profile.boost) {

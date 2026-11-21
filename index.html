@@ -2804,7 +2804,7 @@ function createAiController(skill, seed) {
     mistakeKind: MISTAKE.NONE, mistakeLeft: 0, mistakeSign: 1,
     mistakeTimer: 10 + rng.range(0, 40),
     startDelay: skill.reaction * rng.range(0.7, 1.3),
-    pitDecisionLap: -1,
+    pitDecisionLap: -1, holdBrake: false,
   };
 }
 
@@ -2934,6 +2934,7 @@ function updateAiController(ai, car, race, dt) {
         if (dist < 34 && dist > -3) {
           dTarget = lerp(laneD, pit.side * pit.boxD, smoothstep(34, 12, dist - look * 0.5));
           vTarget = Math.min(vTarget, Math.sqrt(2 * 5 * Math.max(0, dist - 0.4)) + 0.5);
+          if (dist < 1.6) ai.holdBrake = true;        // on the marks: stop completely so the crew can work
         } else if (dist <= -3) car.wantsPit = false;
       }
       ai.offset = dTarget - lineD;
@@ -2964,6 +2965,7 @@ function updateAiController(ai, car, race, dt) {
     car.inThrottle = err > -1 ? 0.2 : 0;
     car.inBrake = clamp((-err - 0.5) * 0.3, 0, 1);
   }
+  if (ai.holdBrake) { car.inThrottle = 0; car.inBrake = 1; ai.holdBrake = false; }
   if (ai.mistakeKind === MISTAKE.LIFT) car.inThrottle *= 0.2;
   if (race.time < ai.startDelay && !car.autoDrive) { car.inThrottle = 0; car.inBrake = 0; }
   if (car.params.profile.boost) {
@@ -5244,7 +5246,7 @@ function armPose(name) { return ARM_POSES[name] || ARM_POSES.down; }
  * A row of spectators shown as busts (shoulders and head, a few raised arms), inked as a group.
  * `u` is the head height in pixels, `yBase` the line where the busts are cut by whatever stands
  * in front. o: { density, stagger, arms (chance of a raised arm), tint (colour -> colour),
- * wrap (tile width: figures crossing an edge are repeated), line, flags (chance) }.
+ * wrap (tile width: figures crossing an edge are repeated), line, skip (x -> true where nobody sits) }.
  */
 function crowdRow(ctx, P, rnd, x0, x1, yBase, u, o = {}) {
   const lw = o.line ?? Math.max(0.9, u * 0.1), tint = o.tint || ((c) => c);
@@ -5253,7 +5255,7 @@ function crowdRow(ctx, P, rnd, x0, x1, yBase, u, o = {}) {
   for (let i = 0; i < count; i++) {
     const look = randomLook(P, rnd), keep = rnd() < (o.density ?? 0.94), arm = rnd(), side = rnd() < 0.5 ? -1 : 1;
     const person = { x: x0 + (i + 0.5 + (o.stagger || 0)) * step + (rnd() - 0.5) * u * 0.3, y: yBase, s: u * (0.93 + rnd() * 0.14), look, arms: arm < (o.arms ?? 0.1) ? (arm < (o.arms ?? 0.1) * 0.4 ? 2 : 1) : 0, side, lift: rnd() < 0.12 ? u * 0.35 : 0 };
-    if (!keep) continue;
+    if (!keep || (o.skip && o.skip(person.x))) continue;
     people.push(person);
     if (o.wrap) for (const dx of [-o.wrap, o.wrap]) if (person.x + dx > x0 - u * 2 && person.x + dx < x1 + u * 2) people.push({ ...person, x: person.x + dx });
   }
@@ -6173,13 +6175,17 @@ function startGantry(ctx, w, h, P) {
   ctx.stroke();
   inkGroup(ctx, P, [{ r: [bx, by, bw, bh], fill: red.base }], LINE.silhouette * k);
   fillPoly(ctx, [[bx + bw * 0.52, by + bh], [bx + bw, by + bh * 0.2], [bx + bw, by + bh]], red.shade);
-  fillRect(ctx, bx + cw, by + 9 * k, bw - cw * 2, 3.5 * k, P.paint); fillRect(ctx, bx + cw, by + bh - 12.5 * k, bw - cw * 2, 3.5 * k, P.paint);
   checker(ctx, bx, by, cw, bh, 2, 4, P.ink, P.paint); checker(ctx, bx + bw - cw, by, cw, bh, 2, 4, P.ink, P.paint);
   inkLine(ctx, bx + cw, by, bx + cw, by + bh, LINE.detail * k, P.ink); inkLine(ctx, bx + bw - cw, by, bx + bw - cw, by + bh, LINE.detail * k, P.ink);
-  const titleSize = 62 * k, title = 'VIRAGE GP', titleW = measureText(title, titleSize, { style: 'impact' });
-  drawText(ctx, title, cx, by + bh / 2 + titleSize / 2, titleSize, { style: 'impact', align: 'center', shadow: { dx: 3 * k, dy: 3.5 * k, color: P.ink }, seed: 2 });
-  const sideW = (bw - cw * 2 - titleW) / 2 - 44 * k;
-  for (const s of [-1, 1]) label(ctx, 'GRAND PRIX', cx + s * (titleW / 2 + 22 * k + sideW / 2 + 6 * k), by + bh / 2, sideW, 36 * k, { weight: 1.2, color: P.paint, slant: 0.12, seed: 9 });
+  // speed flashes on both sides of the title
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const x = cx + s * (bw / 2 - cw - 30 * k - i * 32 * k), lean = s * 22 * k, wd = s * (18 - i * 4) * k;
+      fillPoly(ctx, [[x - lean, by + 22 * k], [x - lean - wd, by + 22 * k], [x - wd, by + bh - 22 * k], [x, by + bh - 22 * k]], i === 1 ? P.paintYellow : P.paint);
+    }
+  }
+  drawText(ctx, 'GRAND PRIX', cx, by + 35 * k, 23 * k, { style: 'bold', weight: 1.25, color: P.paint, align: 'center', tracking: 0.16, slant: 0.1, seed: 9 });
+  drawText(ctx, 'VIRAGE GP', cx, by + bh - 15 * k, 50 * k, { style: 'impact', align: 'center', shadow: { dx: 3 * k, dy: 3.5 * k, color: P.ink }, seed: 2 });
   // light panel: five round lamp housings, unlit (dark red glass)
   const py = 119 * k, ph = 46 * k, pw = 222 * k, glassR = GANTRY_LIGHTS[0].fr * w;
   inkTubes(ctx, P, [{ paths: [[[cx - 78 * k, beamBot + 4 * k], [cx - 78 * k, py + 4 * k]], [[cx + 78 * k, beamBot + 4 * k], [cx + 78 * k, py + 4 * k]]], width: 6 * k, fill: P.metal, light: P.metalLight }], LINE.form * k, 'butt');
@@ -6221,46 +6227,60 @@ function bridge(ctx, w, h, P, rnd, variant) {
     const tintCache = new Map();
     const tint = (c) => { if (!tintCache.has(c)) tintCache.set(c, mixHex(c, P.ink, 0.3)); return tintCache.get(c); };
     crowdRow(ctx, P, rnd, cIn + 14 * k, w - cIn - 14 * k, parapet + 2 * k, 11.5 * k, { density: 0.72, arms: 0.14, tint, line: LINE.detail * k * 0.9 });
-    // stair towers: three flights between the columns, landings, handrails
+    // near side of the truss (the banner hangs in front of its lower half)
+    const front = latticeMembers([cIn, top], [w - cIn, top], [cIn, deckY - 1 * k], [w - cIn, deckY - 1 * k], 12, 'zig');
+    inkTubes(ctx, P, [
+      { paths: front.braces, width: 4.6 * k, fill: steel.base },
+      { paths: front.struts, width: 5.4 * k, fill: steel.base, light: steel.light },
+    ], LINE.form * k * 0.9, 'butt');
+    // stair towers: three stepped flights between the columns, landings, handrails
     for (const right of [false, true]) {
-      const X = sideX(w, right), levels = [ground - 2 * k, 336 * k, 246 * k, deckY + 4 * k], xa = 44 * k, xb = 162 * k;
-      const flights = [], rails = [], balusters = [], steps = [];
+      const X = sideX(w, right), levels = [ground - 3 * k, 336 * k, 246 * k, deckY + 2 * k], xa = 52 * k, xb = 154 * k, depth = 13 * k;
+      const rails = [], balusters = [], landings = [];
+      const flights = [];
       for (let f = 0; f < 3; f++) {
-        const from = [X(f % 2 ? xb : xa), levels[f]], to = [X(f % 2 ? xa : xb), levels[f + 1]];
-        flights.push([from, to]);
-        rails.push([[from[0], from[1] - 44 * k], [to[0], to[1] - 44 * k]]);
-        for (const t of [0, 0.5, 1]) { const p = lerp2(from, to, t); balusters.push([p, [p[0], p[1] - 44 * k]]); }
-        for (let i = 1; i < 10; i++) { const p = lerp2(from, to, i / 10); steps.push([[p[0], p[1] - 1 * k], [p[0], p[1] - 7 * k]]); }
+        const from = [X(f % 2 ? xb : xa), levels[f]], to = [X(f % 2 ? xa : xb), levels[f + 1]], n = 10, pts = [from];
+        for (let i = 0; i < n; i++) { const q = lerp2(from, to, (i + 1) / n); pts.push([pts[pts.length - 1][0], q[1]], q); }
+        const tread = pts.slice();
+        pts.push([to[0], to[1] + depth], [from[0] + (to[0] - from[0]) * (f ? 0 : 0.13), Math.min(ground, from[1] + depth)]);
+        flights.push({ pts, tread });
+        rails.push([[from[0], from[1] - 46 * k], [to[0], to[1] - 46 * k]]);
+        for (const t of [0, 0.5, 1]) { const q = lerp2(from, to, t); balusters.push([[q[0], q[1] - 2 * k], [q[0], q[1] - 46 * k]]); }
+        // landing at the top of the flight, reaching the column on that side
+        const cx2 = X(f % 2 ? cOut : cIn);
+        landings.push([Math.min(to[0], cx2), to[1], Math.abs(cx2 - to[0]), 6 * k]);
+        rails.push([[to[0], to[1] - 46 * k], [cx2, to[1] - 46 * k]]);
       }
+      inkTubes(ctx, P, [{ paths: balusters, width: 2 * k, fill: steel.shade }, { paths: rails, width: 3 * k, fill: steel.base, light: steel.light }], LINE.detail * k, 'butt');
+      inkGroup(ctx, P, [...flights.map((f) => ({ p: f.pts, fill: steel.base })), ...landings.map((r) => ({ r, fill: steel.base }))], LINE.form * k * 0.9);
+      for (const f of flights) {
+        clipped(ctx, (g) => tracePolygon(g, f.pts), () => {
+          const a = f.tread[0], z = f.tread[f.tread.length - 1];
+          fillPoly(ctx, [[a[0], a[1] + depth * 0.45], [z[0], z[1] + depth * 0.45], [z[0], z[1] + depth + 2 * k], [a[0], a[1] + depth + 2 * k]], steel.shade);
+        });
+        for (let i = 1; i + 1 < f.tread.length; i += 2) fillRect(ctx, Math.min(f.tread[i][0], f.tread[i + 1][0]), f.tread[i][1], Math.abs(f.tread[i + 1][0] - f.tread[i][0]), 1.8 * k, steel.light);
+      }
+      for (const r of landings) fillRect(ctx, r[0], r[1], r[2], 2 * k, steel.light);
       inkTubes(ctx, P, [
-        { paths: [[[X(cOut), levels[1]], [X(cIn), levels[1]]], [[X(cOut), levels[2]], [X(cIn), levels[2]]], [[X(cOut), top], [X(cIn), top]]], width: 5 * k, fill: steel.shade },
-        { paths: steps, width: 1.6 * k, fill: steel.shade },
-        { paths: balusters, width: 2 * k, fill: steel.base },
-        { paths: rails, width: 3 * k, fill: steel.base, light: steel.light },
-        { paths: flights, width: 7 * k, fill: steel.base, light: steel.light, shade: steel.shade },
-        { paths: [[[X(cOut), ground - 3 * k], [X(cOut), top - 4 * k]], [[X(cIn), ground - 3 * k], [X(cIn), top - 4 * k]]], width: 9 * k, fill: steel.base, light: steel.light, shade: steel.shade },
+        { paths: [[[X(cOut), top], [X(cIn), top]]], width: 6 * k, fill: steel.base, light: steel.light },
+        { paths: [[[X(cOut), ground - 3 * k], [X(cOut), top - 3 * k]], [[X(cIn), ground - 3 * k], [X(cIn), top - 3 * k]]], width: 9 * k, fill: steel.base, light: steel.light, shade: steel.shade },
       ], LINE.form * k * 0.9, 'butt');
       for (const x of [cOut, cIn]) { inkGroup(ctx, P, [{ r: [X(x) - 15 * k, ground - 7 * k, 30 * k, 7 * k], fill: P.concrete }], LINE.detail * k); fillRect(ctx, X(x) - 15 * k, ground - 7 * k, 30 * k, 2.4 * k, P.concreteLight); }
     }
-    // deck girder, parapet with the sponsor banner
+    // deck girder, parapet with the sponsor banner, top chord
     inkGroup(ctx, P, [{ r: [cOut - 6 * k, deckY, w - 2 * cOut + 12 * k, girder], fill: P.metal }, { r: [cIn, parapet, w - 2 * cIn, deckY - parapet], fill: P.metalLight }], LINE.silhouette * k);
     fillRect(ctx, cOut - 6 * k, deckY, w - 2 * cOut + 12 * k, 3.4 * k, P.metalLight);
     fillRect(ctx, cOut - 6 * k, deckY + girder - 5 * k, w - 2 * cOut + 12 * k, 5 * k, P.metalShade);
     for (let x = cIn + 45 * k; x < w - cIn; x += 45 * k) fillEllipse(ctx, x, deckY + 6.5 * k, 1.6 * k, 1.6 * k, P.ink);
     const panels = ['keltor', 'virage', 'keltor'], pw = (w - 2 * cIn) / 3;
     panels.forEach((id, i) => {
-      sponsorPanel(ctx, P, id, cIn + i * pw, parapet, pw, deckY - parapet, { size: 0.5 });
+      sponsorPanel(ctx, P, id, cIn + i * pw, parapet, pw, deckY - parapet, { size: 0.52 });
       if (i) inkLine(ctx, cIn + i * pw, parapet, cIn + i * pw, deckY, LINE.detail * k, P.ink);
     });
     fillRect(ctx, cIn, parapet, w - 2 * cIn, 3 * k, 'rgba(255,248,230,0.35)');
+    fillRect(ctx, cIn, deckY - 8 * k, w - 2 * cIn, 8 * k, inkAlpha(P, 0.18));
     inkLine(ctx, cIn, deckY, w - cIn, deckY, LINE.form * k, P.ink);
-    // near side of the truss over everything
-    const front = latticeMembers([cIn, top], [w - cIn, top], [cIn, deckY - 1 * k], [w - cIn, deckY - 1 * k], 12, 'zig');
-    inkTubes(ctx, P, [
-      { paths: front.braces, width: 4.6 * k, fill: steel.base },
-      { paths: front.struts, width: 5.4 * k, fill: steel.base, light: steel.light },
-      { paths: [front.chords[0]], width: 9 * k, fill: steel.base, light: steel.light, shade: steel.shade },
-    ], LINE.form * k * 0.9, 'butt');
+    inkTubes(ctx, P, [{ paths: [front.chords[0]], width: 9 * k, fill: steel.base, light: steel.light, shade: steel.shade }], LINE.form * k * 0.9, 'butt');
     return;
   }
   // ---- advertising arch
@@ -6347,7 +6367,7 @@ const TRACKSIDE_PAINTERS = {
   'crowd.group': crowdGroup,
 };
 
-__modules["src/art/environments/trackside.js"] = { inkAlpha, paintTones, fillRect, fillPoly, fillTrace, traceEllipse, fillEllipse, inkLine, contour, inkGroup, inkTubes, latticeMembers, drawLattice, label, checker, diamondMesh, clipTile, wrapped, superEllipse, randomLook, drawFigure, armPose, crowdRow, emblem, SPONSORS, sponsorPanel, GANTRY_LIGHTS, TRACKSIDE_PAINTERS };
+__modules["src/art/environments/trackside.js"] = { inkAlpha, paintTones, fillRect, fillPoly, fillTrace, traceEllipse, fillEllipse, inkLine, contour, inkGroup, inkTubes, lerp2, latticeMembers, drawLattice, label, checker, diamondMesh, clipTile, wrapped, superEllipse, randomLook, drawFigure, armPose, crowdRow, emblem, SPONSORS, sponsorPanel, roundRectPath, GANTRY_LIGHTS, TRACKSIDE_PAINTERS };
 })();
 // ---- src/rendering/drawing/scene-builder.js
 (function () {
@@ -6371,6 +6391,20 @@ const DEFAULT_GANTRY_LIGHTS = [0.42, 0.46, 0.5, 0.54, 0.58].map((fx) => ({ fx, f
 const MAX_CARS = 32;
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
+
+/**
+ * Which drawing of a car to show for an angle between its nose and the line of sight
+ * (radians, 0 = seen from behind, positive = nose pointing to the right). Drawings cover 0..180
+ * degrees; the other side uses the same drawing mirrored. Returns the drawing index, or
+ * -(index + 1) when it must be mirrored.
+ */
+function carViewFrame(alpha, count) {
+  const step = Math.PI / (count - 1);
+  const mirrored = alpha < 0;
+  let index = Math.round(Math.abs(alpha) / step);
+  if (index > count - 1) index = count - 1;
+  return mirrored && index > 0 && index < count - 1 ? -(index + 1) : index;
+}
 
 class SceneBuilder {
   constructor(art) {
@@ -6569,11 +6603,9 @@ class SceneBuilder {
     // angle between the car's nose and the line of sight (0 = seen from behind, + = nose to the right)
     const lateral = (pt.x - p.cx) / p.focal;
     let alpha = wrapAngle(pt.theta - yawAngle + car.headingError + (p.dir < 0 ? Math.PI : 0) - Math.atan(lateral));
-    const flip = alpha < 0;
-    if (flip) alpha = -alpha;
-    let a = Math.round(alpha / this.carAngleStep);
-    if (a >= this.art.cars.length) a = this.art.cars.length - 1;
-    const cs = this.art.cars[a];
+    const frame = carViewFrame(alpha, this.art.cars.length);
+    const flip = frame < 0;
+    const cs = this.art.cars[flip ? -frame - 1 : frame];
     const k = pt.scale / cs.ppm;
     const w = cs.w * k, h = cs.h * k;
     const left = pt.x - (flip ? cs.w - cs.ax : cs.ax) * k, top = pt.y - cs.ay * k;
@@ -6591,7 +6623,7 @@ class SceneBuilder {
   }
 }
 
-__modules["src/rendering/drawing/scene-builder.js"] = { SceneBuilder };
+__modules["src/rendering/drawing/scene-builder.js"] = { carViewFrame, SceneBuilder };
 })();
 // ---- src/art/vehicles/car-model.js
 (function () {
@@ -7931,9 +7963,623 @@ __modules["src/art/environments/terrain-strips.js"] = { TERRAIN_STRIP_PAINTERS }
 (function () {
 // Buildings and large structures: pit building, grandstands, spectator banks, facades and the
 // free-standing buildings of each circuit theme. Painter contract: (ctx, w, h, P, rnd, variant).
+// Strips tile seamlessly from the left edge to the right edge; props stand on the bottom edge.
+// Everything is drawn at real scale (pixels per metre derived from the spec): a door is 2.1 m,
+// a storey about 3 m, a person 1.75 m. Light comes from the upper left.
+
+const { LINE, closedCurve, brushStroke, brushCurve, tracePolygon, clipped, blobPoints } = __modules["src/art/styles/ink.js"];
+const { mixHex, shadeHex, lightHex } = __modules["src/art/palettes/palettes.js"];
+const { groundShadow } = __modules["src/art/environments/vegetation.js"];
+const { inkAlpha, paintTones, fillRect, fillPoly, fillTrace, traceEllipse, fillEllipse, inkLine, contour, inkGroup, inkTubes, latticeMembers, drawLattice, label, checker, clipTile, wrapped, drawFigure, randomLook, armPose, crowdRow, sponsorPanel, emblem, roundRectPath, lerp2 } = __modules["src/art/environments/trackside.js"];
+
+const TAU = Math.PI * 2;
+
+// ---- architectural kit --------------------------------------------------------------------------
+
+/** Ruled parallel lines over a rectangle (cladding ribs, planks, slats, courses). */
+function ribs(ctx, x, y, w, h, pitch, color, width, vertical = true) {
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'butt';
+  ctx.beginPath();
+  if (vertical) for (let p = x + pitch; p < x + w - 0.5; p += pitch) { ctx.moveTo(p, y); ctx.lineTo(p, y + h); }
+  else for (let p = y + pitch; p < y + h - 0.5; p += pitch) { ctx.moveTo(x, p); ctx.lineTo(x + w, p); }
+  ctx.stroke();
+}
+
+/**
+ * Batch of rectangular windows: ink reveal, glass in three values (shadow of the reveal, base,
+ * sky reflection), optional glazing bars, sills and drawn blinds. cells: [[x, y, w, h], ...].
+ * o: { line, glass, shade, light, bars: [cols, rows], frame, sill, blinds (chance), rnd }.
+ */
+function windows(ctx, P, cells, o = {}) {
+  const lw = o.line ?? LINE.detail;
+  const each = (fn) => { ctx.beginPath(); for (const c of cells) fn(c); };
+  each((c) => ctx.rect(c[0] - lw, c[1] - lw, c[2] + lw * 2, c[3] + lw * 2.4)); ctx.fillStyle = P.ink; ctx.fill();
+  each((c) => ctx.rect(c[0], c[1], c[2], c[3])); ctx.fillStyle = o.glass || P.glass; ctx.fill();
+  each((c) => { ctx.moveTo(c[0] + c[2], c[1] + c[3] * 0.4); ctx.lineTo(c[0] + c[2], c[1] + c[3]); ctx.lineTo(c[0] + c[2] * 0.35, c[1] + c[3]); ctx.closePath(); }); ctx.fillStyle = o.light || P.glassLight; ctx.fill();
+  each((c) => { ctx.rect(c[0], c[1], c[2], c[3] * 0.26); ctx.rect(c[0], c[1], c[2] * 0.16, c[3]); }); ctx.fillStyle = o.shade || P.glassShade; ctx.fill();
+  if (o.blinds && o.rnd) {
+    each((c) => { if (o.rnd() < o.blinds) ctx.rect(c[0], c[1], c[2], c[3] * (0.3 + o.rnd() * 0.45)); }); ctx.fillStyle = o.blindColor || P.wallLight; ctx.fill();
+  }
+  if (o.bars) {
+    each((c) => {
+      for (let i = 1; i < o.bars[0]; i++) { ctx.moveTo(c[0] + (c[2] * i) / o.bars[0], c[1]); ctx.lineTo(c[0] + (c[2] * i) / o.bars[0], c[1] + c[3]); }
+      for (let j = 1; j < o.bars[1]; j++) { ctx.moveTo(c[0], c[1] + (c[3] * j) / o.bars[1]); ctx.lineTo(c[0] + c[2], c[1] + (c[3] * j) / o.bars[1]); }
+    });
+    ctx.strokeStyle = o.frame || P.paint; ctx.lineWidth = Math.max(1, lw * 0.9); ctx.lineCap = 'butt'; ctx.stroke();
+  }
+  if (o.sill) {
+    each((c) => ctx.rect(c[0] - lw * 2.5, c[1] + c[3] + lw, c[2] + lw * 5, lw * 2.6)); ctx.fillStyle = o.sill; ctx.fill();
+    each((c) => ctx.rect(c[0] - lw * 2.5, c[1] + c[3] + lw * 3.6, c[2] + lw * 5, lw * 0.9)); ctx.fillStyle = P.ink; ctx.fill();
+  }
+}
+
+/** Open louvred shutters on both sides of a window cell. */
+function shutterPair(ctx, P, c, color, lw = LINE.detail) {
+  const sw = c[2] * 0.5, shade = shadeHex(color, 0.3);
+  for (const x of [c[0] - sw - lw, c[0] + c[2] + lw]) {
+    fillRect(ctx, x - lw, c[1] - lw, sw + lw * 2, c[3] + lw * 2.4, P.ink);
+    fillRect(ctx, x, c[1], sw, c[3], color);
+    fillRect(ctx, x + sw * 0.62, c[1], sw * 0.38, c[3], shade);
+    ribs(ctx, x, c[1], sw, c[3], Math.max(3, c[3] / 9), shade, Math.max(0.8, lw * 0.6), false);
+  }
+}
+
+/** Roller shutter: slats from the lintel down to (1 - open) of the opening. The caller paints the interior first. */
+function rollerDoor(ctx, P, x, y, w, h, open, k) {
+  const sh = h * (1 - open);
+  if (sh < 2) return;
+  fillRect(ctx, x, y, w, sh, P.metal);
+  ribs(ctx, x, y, w, sh, 9 * k, P.metalShade, 1.3 * k, false);
+  fillRect(ctx, x, y, w * 0.34, sh, 'rgba(255,248,230,0.22)');
+  fillRect(ctx, x, y, w, Math.min(sh, 9 * k), inkAlpha(P, 0.34));
+  fillRect(ctx, x, y + sh - 8 * k, w, 8 * k, P.metalShade);
+  inkLine(ctx, x, y + sh - 8 * k, x + w, y + sh - 8 * k, LINE.hair * k, P.ink);
+  inkLine(ctx, x, y + sh, x + w, y + sh, LINE.form * k, P.ink);
+}
+
+/** Person sitting on the ground facing the viewer, knees up. H is the standing height; (x, y) the seat. */
+function drawSitter(ctx, P, x, y, H, look, lw) {
+  const u = H, shY = y - 0.36 * u, hy = y - 0.475 * u, rx = 0.053 * u, ry = 0.068 * u, kneeY = y - 0.25 * u;
+  const torso = [[x - 0.034 * u, shY - 0.02 * u], [x + 0.034 * u, shY - 0.02 * u], [x + 0.118 * u, shY + 0.014 * u], [x + 0.105 * u, y], [x - 0.105 * u, y], [x - 0.118 * u, shY + 0.014 * u]];
+  const shin = (s) => (g) => roundRectPath(g, x + s * 0.075 * u - 0.036 * u, kneeY, 0.072 * u, y - kneeY + 0.02 * u, 0.03 * u);
+  const shoe = (s) => [[x + s * 0.075 * u - 0.05 * u, y + 0.045 * u], [x + s * 0.075 * u - 0.04 * u, y + 0.005 * u], [x + s * 0.075 * u + 0.04 * u, y + 0.005 * u], [x + s * 0.075 * u + 0.05 * u, y + 0.045 * u]];
+  const hairPath = (g) => { g.moveTo(x - rx * 1.08, hy); g.ellipse(x, hy, rx * 1.08, ry * 1.06, 0, Math.PI, TAU); g.quadraticCurveTo(x, hy - ry * (look.hat === 'cap' ? 0.1 : 0.5), x - rx * 1.08, hy); g.closePath(); };
+  const shirtShade = shadeHex(look.shirt, 0.3), skinShade = shadeHex(look.skin, 0.26);
+  contour(ctx, (g) => { tracePolygon(g, torso); traceEllipse(g, x, hy, rx, ry); hairPath(g); g.rect(x - 0.026 * u, shY - 0.05 * u, 0.052 * u, 0.05 * u); }, P.ink, lw, 1, 'round');
+  fillPoly(ctx, torso, look.shirt);
+  fillPoly(ctx, [[x + 0.045 * u, shY - 0.02 * u], [x + 0.13 * u, shY], [x + 0.11 * u, y], [x + 0.05 * u, y]], shirtShade);
+  fillRect(ctx, x - 0.026 * u, shY - 0.05 * u, 0.052 * u, 0.05 * u, skinShade);
+  fillEllipse(ctx, x, hy, rx, ry, look.skin);
+  clipped(ctx, (g) => traceEllipse(g, x, hy, rx, ry), () => fillEllipse(ctx, x + rx * 0.95, hy + ry * 0.15, rx * 0.62, ry * 1.2, skinShade));
+  fillTrace(ctx, hairPath, look.hat === 'cap' || look.hat === 'sunhat' ? look.hatColor : look.hair);
+  // arms resting on the knees, then the shins in front
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const s of [-1, 1]) {
+    const j = [x + s * 0.105 * u, shY + 0.04 * u], e = [x + s * 0.15 * u, shY + 0.15 * u], hd = [x + s * 0.085 * u, kneeY + 0.01 * u];
+    ctx.strokeStyle = P.ink; ctx.lineWidth = 0.052 * u + lw * 2; ctx.beginPath(); ctx.moveTo(j[0], j[1]); ctx.lineTo(e[0], e[1]); ctx.lineTo(hd[0], hd[1]); ctx.stroke();
+    ctx.strokeStyle = look.sleeves === 'long' ? (s > 0 ? shirtShade : look.shirt) : s > 0 ? skinShade : look.skin; ctx.lineWidth = 0.052 * u; ctx.beginPath(); ctx.moveTo(j[0], j[1]); ctx.lineTo(e[0], e[1]); ctx.lineTo(hd[0], hd[1]); ctx.stroke();
+    ctx.strokeStyle = s > 0 ? shirtShade : look.shirt; ctx.beginPath(); ctx.moveTo(j[0], j[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
+  }
+  contour(ctx, (g) => { for (const s of [-1, 1]) { shin(s)(g); tracePolygon(g, shoe(s)); } }, P.ink, lw, 1, 'round');
+  fillTrace(ctx, shin(-1), look.trousers); fillTrace(ctx, shin(1), shadeHex(look.trousers, 0.3));
+  fillPoly(ctx, shoe(-1), P.ink); fillPoly(ctx, shoe(1), P.ink);
+}
+
+/** Garden parasol planted at (x, y): pole and a scalloped canopy of radius r in two colours. */
+function parasol(ctx, P, x, y, r, height, colorA, colorB, k) {
+  const cy = y - height, lean = r * 0.08;
+  inkTubes(ctx, P, [{ paths: [[[x, y], [x + lean, cy - r * 0.2]]], width: 2.4 * k, fill: P.metalLight }], LINE.detail * k);
+  const cx = x + lean, top = cy - r * 0.62;
+  const dome = (g) => { g.moveTo(cx - r, cy); g.quadraticCurveTo(cx - r * 0.6, top, cx, top - r * 0.06); g.quadraticCurveTo(cx + r * 0.6, top, cx + r, cy); for (let i = 3; i >= 0; i--) g.quadraticCurveTo(cx - r + (i + 0.5) * r * 0.5, cy - r * 0.14, cx - r + i * r * 0.5, cy); g.closePath(); };
+  contour(ctx, dome, P.ink, LINE.form * k, 1, 'round');
+  fillTrace(ctx, dome, colorA);
+  clipped(ctx, dome, () => {
+    fillPoly(ctx, [[cx - r * 0.5, cy + 2], [cx - r * 0.2, top - r * 0.1], [cx + r * 0.05, top - r * 0.1], [cx, cy + 2]], colorB);
+    fillPoly(ctx, [[cx + r * 0.5, cy + 2], [cx + r * 0.32, top], [cx + r * 0.6, top + r * 0.2], [cx + r * 1.05, cy + 2]], colorB);
+    fillPoly(ctx, [[cx + r * 0.12, cy + 2], [cx + r * 0.1, top - r * 0.2], [cx + r * 1.1, top], [cx + r * 1.1, cy + 2]], inkAlpha(P, 0.2));
+    for (const f of [-0.5, 0, 0.5]) brushStroke(ctx, [[cx + f * r * 0.1, top], [cx + f * r * 0.7, top + r * 0.3], [cx + f * r, cy - r * 0.08]], LINE.hair * k * 1.2, { color: P.ink, taper: 0.1 });
+  });
+  fillEllipse(ctx, cx, top - r * 0.08, 2.2 * k, 2.2 * k, P.ink);
+}
+
+/** Small two-colour pennant on a stick from (x, y) up to (x + dx, y - len). */
+function pennant(ctx, P, x, y, dx, len, cw, ch, colorA, colorB, k) {
+  const tx = x + dx, ty = y - len;
+  inkTubes(ctx, P, [{ paths: [[[x, y], [tx, ty]]], width: 1.8 * k, fill: P.woodLight }], LINE.hair * k * 1.3);
+  const cloth = [[tx, ty], [tx + cw * 0.5, ty + ch * 0.16], [tx + cw, ty + ch * 0.04], [tx + cw * 0.96, ty + ch * 0.9], [tx + cw * 0.5, ty + ch], [tx + dx * -0.2, ty + ch * 0.86]];
+  const path = (g) => closedCurve(g, cloth, 0.3);
+  contour(ctx, path, P.ink, LINE.detail * k, 1, 'round');
+  fillTrace(ctx, path, colorA);
+  clipped(ctx, path, () => { fillPoly(ctx, [[tx - 4 * k, ty + ch * 1.2], [tx + cw * 1.1, ty - ch * 0.1], [tx + cw * 1.1, ty + ch * 1.2]], colorB); fillRect(ctx, tx + cw * 0.38, ty - 4 * k, cw * 0.2, ch * 1.4, inkAlpha(P, 0.24)); });
+}
+
+// ---- strips -------------------------------------------------------------------------------------
+
+/** Main grandstand: banner wall, ten rows of spectators, steel columns every 10 m, cantilever roof. */
+function grandstand(ctx, w, h, P, rnd) {
+  const k = w / 1024;
+  ctx.save(); clipTile(ctx, w, h);
+  const fasciaTop = 10 * k, fasciaBot = 44 * k, wallTop = 132 * k, railY = 428 * k, bannerBot = 488 * k;
+  const columns = [w * 0.25, w * 0.75], aisles = [0, w * 0.5], aisleHalf = 29 * k;
+  const inAisle = (x) => aisles.some((a) => { const d = (((x - a) % w) + w) % w; return Math.min(d, w - d) < aisleHalf + 9 * k; });
+  const rows = [];
+  let base = railY;
+  for (let r = 9; r >= 0; r--) { const u = 13.4 * k * (0.72 + (0.28 * r) / 9); rows[r] = { u, base, top: base - u * 1.62 }; base -= u * 1.62; }
+  const tierTop = rows[0].top;
+  // roof underside: lit near the front edge, deep shade toward the back wall, rafters and purlins
+  const soffit = shadeHex(P.metal, 0.3), soffitDeep = shadeHex(P.metalShade, 0.36);
+  fillRect(ctx, 0, fasciaBot - 2 * k, w, wallTop - fasciaBot + 2 * k, soffit);
+  fillRect(ctx, 0, 92 * k, w, wallTop - 92 * k, soffitDeep);
+  for (const y of [62 * k, 78 * k, 108 * k, 120 * k]) inkLine(ctx, 0, y, w, y, LINE.hair * k, P.inkSoft);
+  inkLine(ctx, 0, 92 * k, w, 92 * k, LINE.detail * k, P.ink);
+  for (let i = 0; i < 16; i++) inkLine(ctx, (i + 0.5) * (w / 16), fasciaBot, (i + 0.5) * (w / 16), wallTop, LINE.hair * k * 1.2, P.inkSoft);
+  // back wall with the glazed boxes, in the shade of the roof
+  fillRect(ctx, 0, wallTop, w, tierTop - wallTop + 20 * k, P.concreteShade);
+  fillRect(ctx, 0, wallTop, w, 12 * k, shadeHex(P.concreteShade, 0.3));
+  const boxes = [];
+  for (let i = 0; i < 16; i++) boxes.push([i * (w / 16) + 5 * k, wallTop + 22 * k, w / 16 - 10 * k, 44 * k]);
+  windows(ctx, P, boxes, { line: LINE.detail * k, glass: P.glassShade, shade: shadeHex(P.glassShade, 0.4), light: P.glass, blinds: 0.25, rnd, blindColor: P.concrete });
+  inkLine(ctx, 0, wallTop, w, wallTop, LINE.form * k, P.ink);
+  inkLine(ctx, 0, wallTop + 78 * k, w, wallTop + 78 * k, LINE.detail * k, P.ink);
+  // seats: plastic shells in three values, visible wherever nobody sits
+  const seat = mixHex(P.banners[2], P.concrete, 0.3), seatShade = shadeHex(seat, 0.42), seatLight = lightHex(seat, 0.35);
+  for (let r = 0; r < 10; r++) {
+    const { u, base: by, top } = rows[r], count = Math.max(1, Math.round(w / (u * 2.12))), step = w / count, off = r % 2 ? 0.5 : 0;
+    fillRect(ctx, 0, top - 1, w, by - top + 2, seatShade);
+    ctx.fillStyle = seat; ctx.beginPath();
+    for (let i = -1; i <= count; i++) { const x = (i + 0.5 + off) * step; roundRectPath(ctx, x - u * 0.82, by - u * 1.12, u * 1.64, u * 1.2, u * 0.3); }
+    ctx.fill();
+    ctx.fillStyle = seatLight; ctx.beginPath();
+    for (let i = -1; i <= count; i++) { const x = (i + 0.5 + off) * step; ctx.rect(x - u * 0.6, by - u * 1.08, u * 1.2, u * 0.18); }
+    ctx.fill();
+    inkLine(ctx, 0, top, w, top, LINE.hair * k, P.ink);
+  }
+  // stair aisles
+  for (const a of [0, w * 0.5, w]) {
+    fillRect(ctx, a - aisleHalf, tierTop, aisleHalf * 2, railY - tierTop, P.concrete);
+    for (let r = 0; r < 10; r++) {
+      fillRect(ctx, a - aisleHalf, rows[r].top, aisleHalf * 2, rows[r].u * 0.6, P.concreteLight);
+      inkLine(ctx, a - aisleHalf, rows[r].top + rows[r].u * 0.6, a + aisleHalf, rows[r].top + rows[r].u * 0.6, LINE.hair * k, P.ink);
+    }
+    fillRect(ctx, a + aisleHalf - 7 * k, tierTop, 7 * k, railY - tierTop, inkAlpha(P, 0.22));
+    inkLine(ctx, a - aisleHalf, tierTop, a - aisleHalf, railY, LINE.detail * k, P.ink); inkLine(ctx, a + aisleHalf, tierTop, a + aisleHalf, railY, LINE.detail * k, P.ink);
+    inkTubes(ctx, P, [{ paths: [[[a, rows[1].base], [a, railY - 4 * k]], [[a - 5 * k, rows[1].base], [a + 5 * k, rows[1].base]], [[a - 5 * k, rows[5].base], [a + 5 * k, rows[5].base]]], width: 2.6 * k, fill: P.metalLight }], LINE.detail * k);
+  }
+  // the crowd, back rows first; the three top rows sit in the shadow of the roof
+  for (let r = 0; r < 10; r++) {
+    const { u, base: by } = rows[r];
+    crowdRow(ctx, P, rnd, 0, w, by, u, { density: 0.9, stagger: r % 2 ? 0.5 : 0, arms: 0.1, wrap: w, skip: inAisle, line: Math.max(0.9, LINE.detail * k * (0.8 + r * 0.03)) });
+    if (r === 2) fillRect(ctx, 0, wallTop, w, rows[2].base - wallTop - rows[3].u * 0.2, inkAlpha(P, 0.3));
+  }
+  // a few supporters' pennants (kept away from the tile edges)
+  for (let i = 0; i < 6; i++) {
+    const r = 3 + Math.floor(rnd() * 6), x = w * (0.08 + 0.14 * i + rnd() * 0.07);
+    if (inAisle(x) || columns.some((c) => Math.abs(c - x) < 40 * k)) continue;
+    pennant(ctx, P, x, rows[r].base - rows[r].u * 1.9, (rnd() - 0.3) * 10 * k, 40 * k, 30 * k, 21 * k, P.banners[Math.floor(rnd() * 7)], P.banners[Math.floor(rnd() * 7)], k);
+  }
+  // front rail, banner wall of the sponsors, concrete base
+  const ids = ['montevo', 'freinor', 'virage', 'solgane'];
+  ids.forEach((id, i) => {
+    sponsorPanel(ctx, P, id, (i * w) / 4, railY, w / 4, bannerBot - railY, { size: 0.5 });
+    inkLine(ctx, (i * w) / 4, railY, (i * w) / 4, bannerBot, LINE.detail * k, P.ink);
+  });
+  fillRect(ctx, 0, railY, w, 4 * k, inkAlpha(P, 0.22));
+  fillRect(ctx, 0, bannerBot, w, h - bannerBot, P.concrete);
+  fillRect(ctx, 0, bannerBot, w, 7 * k, P.concreteLight);
+  fillRect(ctx, 0, bannerBot + 7 * k, w, 5 * k, P.concreteShade);
+  fillRect(ctx, 0, h - 18 * k, w, 18 * k, P.concreteShade);
+  for (let i = 0; i < 8; i++) {
+    const x = (i + 0.5) * (w / 8);
+    inkLine(ctx, i * (w / 8), bannerBot + 12 * k, i * (w / 8), h, LINE.hair * k, P.inkSoft);
+    fillRect(ctx, x - 20 * k, bannerBot + 30 * k, 40 * k, 12 * k, P.ink);
+    ribs(ctx, x - 20 * k, bannerBot + 30 * k, 40 * k, 12 * k, 5 * k, P.concreteShade, 1.2 * k, true);
+  }
+  wrapped(ctx, w, rnd, (r) => {
+    for (let i = 0; i < 9; i++) { const x = r() * w, y = bannerBot + (14 + r() * 40) * k; brushStroke(ctx, [[x, y], [x + 0.6 * k, y + (8 + r() * 18) * k]], (1.2 + r() * 1.4) * k, { color: P.concreteShade, taperStart: 0, taperEnd: 0.7 }); }
+  });
+  inkLine(ctx, 0, bannerBot, w, bannerBot, LINE.form * k, P.ink);
+  inkLine(ctx, 0, h - 18 * k, w, h - 18 * k, LINE.hair * k, P.inkSoft);
+  inkTubes(ctx, P, [{ paths: [[[-4, railY - 3 * k], [w + 4, railY - 3 * k]]], width: 5 * k, fill: P.metal, light: P.metalLight }], LINE.form * k * 0.9, 'butt');
+  fillRect(ctx, 0, h - 5 * k, w, 5 * k, inkAlpha(P, 0.4));
+  // steel columns with haunches under the roof
+  for (const cx of columns) {
+    fillPoly(ctx, [[cx + 7 * k, fasciaBot + 4 * k], [cx + 20 * k, fasciaBot + 4 * k], [cx + 20 * k, wallTop + 40 * k], [cx + 7 * k, wallTop + 70 * k]], inkAlpha(P, 0.2));
+    inkGroup(ctx, P, [{ p: [[cx - 44 * k, fasciaBot - 2 * k], [cx + 44 * k, fasciaBot - 2 * k], [cx + 7 * k, fasciaBot + 52 * k], [cx - 7 * k, fasciaBot + 52 * k]], fill: P.metalShade }, { r: [cx - 7 * k, fasciaBot, 14 * k, railY - fasciaBot + 2 * k], fill: P.metal }, { r: [cx - 13 * k, railY - 4 * k, 26 * k, 9 * k], fill: P.metalShade }], LINE.form * k);
+    fillRect(ctx, cx - 7 * k, fasciaBot + 50 * k, 4 * k, railY - fasciaBot - 54 * k, P.metalLight);
+    fillRect(ctx, cx + 3 * k, fasciaBot + 50 * k, 4 * k, railY - fasciaBot - 54 * k, P.metalShade);
+    fillPoly(ctx, [[cx - 44 * k, fasciaBot - 2 * k], [cx - 7 * k, fasciaBot - 2 * k], [cx - 7 * k, fasciaBot + 52 * k]], P.metal);
+    for (let y = fasciaBot + 90 * k; y < railY - 20 * k; y += 96 * k) { fillEllipse(ctx, cx, y, 1.8 * k, 1.8 * k, P.ink); fillEllipse(ctx, cx, y + 9 * k, 1.8 * k, 1.8 * k, P.ink); }
+  }
+  // floodlights under the front edge, then the roof fascia over everything
+  for (let i = 0; i < 8; i++) {
+    const x = (i + 0.5) * (w / 8);
+    if (columns.some((c) => Math.abs(c - x) < 50 * k)) continue;
+    inkGroup(ctx, P, [{ r: [x - 11 * k, fasciaBot, 22 * k, 10 * k], fill: P.glassLight }], LINE.detail * k);
+    fillRect(ctx, x - 11 * k, fasciaBot, 22 * k, 3 * k, P.metalShade);
+  }
+  fillRect(ctx, 0, fasciaTop - LINE.form * k, w, fasciaBot - fasciaTop + LINE.form * k + LINE.silhouette * k, P.ink);
+  fillRect(ctx, 0, fasciaTop, w, fasciaBot - fasciaTop, P.paint);
+  fillRect(ctx, 0, fasciaTop, w, 4 * k, P.metalLight);
+  fillRect(ctx, 0, fasciaBot - 12 * k, w, 7 * k, P.kerbA);
+  fillRect(ctx, 0, fasciaBot - 5 * k, w, 5 * k, shadeHex(P.paint, 0.3));
+  inkLine(ctx, 0, fasciaBot - 12 * k, w, fasciaBot - 12 * k, LINE.hair * k, P.ink); inkLine(ctx, 0, fasciaBot - 5 * k, w, fasciaBot - 5 * k, LINE.hair * k, P.ink);
+  for (const cx of [w * 0.5]) label(ctx, 'TRIBUNE ' + 'ABCD'[Math.floor(rnd() * 4)], cx, fasciaTop + 11.5 * k, 300 * k, 13 * k, { weight: 1.2, color: P.ink, tracking: 0.12, slant: 0.08 });
+  ctx.restore();
+}
+
+/** Pit building: one garage per tile, glazed hospitality floor with balcony, roof edge with flags. */
+function pitBuilding(ctx, w, h, P, rnd) {
+  const k = w / 768;
+  ctx.save(); clipTile(ctx, w, h);
+  const roofTop = 62 * k, roofBot = 86 * k, floorY = 262 * k, slabBot = 276 * k, fasciaBot = 332 * k, pier = 106 * k;
+  const doorX = pier, doorW = w - 2 * pier, doorTop = 350 * k, doorH = h - doorTop, team = paintTones(P.banners[2]);
+  const dim = (c, t = 0.5) => mixHex(c, P.ink, t);
+  // ---- first floor: curtain wall behind the balcony
+  fillRect(ctx, 0, roofBot, w, floorY - roofBot, P.glass);
+  fillRect(ctx, 0, roofBot, w, 30 * k, P.glassShade);
+  fillRect(ctx, 0, floorY - 40 * k, w, 40 * k, shadeHex(P.glass, 0.2));
+  for (let i = 0; i < 8; i++) {
+    const x = i * 96 * k, f = (i * 37) % 5;
+    // sky reflections, different in each pane; ceiling lights of the lounge
+    fillPoly(ctx, [[x + (14 + f * 6) * k, floorY], [x + (58 + f * 6) * k, roofBot + 30 * k], [x + (78 + f * 5) * k, roofBot + 30 * k], [x + (34 + f * 6) * k, floorY]], P.glassLight);
+    if (f % 2) fillPoly(ctx, [[x + 4 * k, floorY - 60 * k], [x + 30 * k, roofBot + 30 * k], [x + 38 * k, roofBot + 30 * k], [x + 4 * k, floorY - 40 * k]], P.glassLight);
+    fillRect(ctx, x + 22 * k, roofBot + 12 * k, 20 * k, 4 * k, P.glassLight); fillRect(ctx, x + 58 * k, roofBot + 12 * k, 20 * k, 4 * k, P.glassLight);
+  }
+  inkLine(ctx, 0, roofBot + 30 * k, w, roofBot + 30 * k, LINE.hair * k, P.ink);
+  for (let i = 0; i <= 8; i++) { fillRect(ctx, i * 96 * k - 3.5 * k, roofBot, 7 * k, floorY - roofBot, P.ink); fillRect(ctx, i * 96 * k - 2 * k, roofBot, 2.4 * k, floorY - roofBot, P.metalLight); }
+  fillRect(ctx, 0, roofBot + 74 * k, w, 3 * k, P.ink);
+  // guests on the balcony
+  const guests = [[136, 0], [236, 1], [286, 0], [442, 2], [520, 0], [628, 1]];
+  for (const [gx, kind] of guests) {
+    const look = randomLook(P, rnd);
+    if (kind === 1) { look.shirt = team.base; look.hat = 'cap'; look.hatColor = team.base; }
+    if (kind === 2) { look.shirt = P.paint; look.sleeves = 'long'; }
+    const pose = rnd();
+    drawFigure(ctx, P, gx * k + (rnd() - 0.5) * 16 * k, floorY, (102 + rnd() * 9) * k, { ...look, arms: pose < 0.55 ? { l: armPose('rail'), r: armPose('rail') } : pose < 0.8 ? { l: armPose('down'), r: armPose('hip') } : { l: armPose('wave'), r: armPose('rail') }, lean: (rnd() - 0.5) * 0.03, line: LINE.detail * k * 1.2 });
+  }
+  // balcony rail: posts, handrail, two cables
+  const railTop = floorY - 67 * k, posts = [];
+  for (let i = 0; i < 8; i++) posts.push([[(i + 0.5) * 96 * k, floorY], [(i + 0.5) * 96 * k, railTop]]);
+  inkTubes(ctx, P, [{ paths: [[[-4, floorY - 22 * k], [w + 4, floorY - 22 * k]], [[-4, floorY - 44 * k], [w + 4, floorY - 44 * k]]], width: 1.4 * k, fill: P.metalLight }, { paths: posts, width: 3.6 * k, fill: P.metal, light: P.metalLight }, { paths: [[[-4, railTop], [w + 4, railTop]]], width: 5 * k, fill: P.metal, light: P.metalLight }], LINE.detail * k, 'butt');
+  // ---- roof edge and what stands on it
+  const flagAt = [150, 384, 618];
+  flagAt.forEach((fx, i) => {
+    const x = fx * k, c = P.banners[[0, 1, 4][i]];
+    inkTubes(ctx, P, [{ paths: [[[x, roofTop], [x, 12 * k]]], width: 2.4 * k, fill: P.metalLight }], LINE.detail * k);
+    const cloth = [[x + 1 * k, 14 * k], [x + 18 * k, 18 * k], [x + 38 * k, 14 * k], [x + 37 * k, 34 * k], [x + 18 * k, 38 * k], [x + 1 * k, 35 * k]];
+    const path = (g) => closedCurve(g, cloth, 0.3);
+    contour(ctx, path, P.ink, LINE.detail * k * 1.2, 1, 'round');
+    fillTrace(ctx, path, c);
+    clipped(ctx, path, () => { fillRect(ctx, x, 23 * k, 40 * k, 7 * k, P.banners[i === 1 ? 7 : 3]); fillRect(ctx, x + 14 * k, 8 * k, 9 * k, 36 * k, inkAlpha(P, 0.25)); });
+  });
+  // air-conditioning unit, antenna mast with a dish
+  inkGroup(ctx, P, [{ r: [236 * k, roofTop - 30 * k, 66 * k, 30 * k], fill: P.metalLight }], LINE.form * k);
+  fillRect(ctx, 280 * k, roofTop - 30 * k, 22 * k, 30 * k, P.metal);
+  ribs(ctx, 240 * k, roofTop - 24 * k, 36 * k, 20 * k, 5 * k, P.metalShade, 1.2 * k, false);
+  inkTubes(ctx, P, [{ paths: [[[520 * k, roofTop], [520 * k, 12 * k]], [[508 * k, 26 * k], [532 * k, 26 * k]], [[512 * k, 36 * k], [528 * k, 36 * k]]], width: 2 * k, fill: P.metal }], LINE.detail * k);
+  inkGroup(ctx, P, [{ trace: (g) => traceEllipse(g, 538 * k, 48 * k, 9 * k, 11 * k), fill: P.concreteLight }], LINE.detail * k, 1, 'round');
+  fillEllipse(ctx, 540 * k, 50 * k, 5 * k, 7 * k, P.concrete);
+  inkGroup(ctx, P, [{ r: [-4, roofTop, w + 8, roofBot - roofTop], fill: P.concreteLight }], LINE.silhouette * k);
+  fillRect(ctx, 0, roofTop + 9 * k, w, 6 * k, team.base);
+  fillRect(ctx, 0, roofBot - 6 * k, w, 6 * k, P.concrete);
+  inkLine(ctx, 0, roofTop + 9 * k, w, roofTop + 9 * k, LINE.hair * k, P.ink); inkLine(ctx, 0, roofTop + 15 * k, w, roofTop + 15 * k, LINE.hair * k, P.ink);
+  fillRect(ctx, 0, roofBot + LINE.silhouette * k * 0.8, w, 12 * k, inkAlpha(P, 0.38));
+  // ---- balcony slab and team fascia
+  inkGroup(ctx, P, [{ r: [-4, floorY, w + 8, slabBot - floorY], fill: P.concreteLight }, { r: [-4, slabBot, w + 8, fasciaBot - slabBot], fill: team.base }], LINE.form * k);
+  fillRect(ctx, 0, slabBot - 4 * k, w, 4 * k, P.concrete);
+  inkLine(ctx, 0, slabBot, w, slabBot, LINE.detail * k, P.ink);
+  fillRect(ctx, 0, slabBot + LINE.detail * k * 0.5, w, 7 * k, team.shade);
+  fillRect(ctx, 0, fasciaBot - 12 * k, w, 5 * k, P.paintYellow);
+  fillRect(ctx, 0, fasciaBot - 7 * k, w, 7 * k, team.shade);
+  emblem(ctx, 'gear', w * 0.5 - 150 * k, slabBot + 25 * k, 14 * k, P.paintYellow, team.base);
+  label(ctx, 'KELTOR RACING', w * 0.5 + 16 * k, slabBot + 25 * k, 280 * k, 22 * k, { weight: 1.25, color: P.paint, slant: 0.12, seed: 4 });
+  // ---- ground floor: garage interior, seen under the half-open shutter
+  const floorLine = h - 30 * k;
+  fillRect(ctx, doorX, doorTop, doorW, doorH, P.ink);
+  fillRect(ctx, doorX, doorTop + doorH * 0.5, doorW, doorH * 0.5 - 30 * k, dim(P.concreteShade, 0.62));
+  fillRect(ctx, doorX, floorLine, doorW, 30 * k, dim(P.pitAsphalt, 0.5));
+  fillPoly(ctx, [[doorX, h], [doorX + 60 * k, floorLine + 8 * k], [doorX + doorW - 150 * k, floorLine + 8 * k], [doorX + doorW - 60 * k, h]], dim(P.pitAsphalt, 0.18));
+  inkLine(ctx, doorX, floorLine, doorX + doorW, floorLine, LINE.hair * k, P.ink);
+  // work bench, screen, a front wing on its trestles, tool trolley, tyres in their blankets
+  const bx = doorX + doorW * 0.5;
+  fillRect(ctx, bx - 150 * k, floorLine - 52 * k, 300 * k, 6 * k, dim(P.metal, 0.5));
+  fillRect(ctx, bx - 144 * k, floorLine - 46 * k, 5 * k, 46 * k, dim(P.metal, 0.6)); fillRect(ctx, bx + 139 * k, floorLine - 46 * k, 5 * k, 46 * k, dim(P.metal, 0.6));
+  fillRect(ctx, bx + 40 * k, floorLine - 96 * k, 58 * k, 36 * k, dim(P.glassLight, 0.25)); fillRect(ctx, bx + 44 * k, floorLine - 78 * k, 50 * k, 3 * k, dim(P.glass, 0.2)); fillRect(ctx, bx + 44 * k, floorLine - 70 * k, 34 * k, 3 * k, dim(P.glass, 0.2));
+  const wing = dim(P.banners[2], 0.3);
+  fillPoly(ctx, [[bx - 130 * k, floorLine - 26 * k], [bx - 10 * k, floorLine - 30 * k], [bx - 10 * k, floorLine - 20 * k], [bx - 130 * k, floorLine - 14 * k]], wing);
+  fillRect(ctx, bx - 136 * k, floorLine - 44 * k, 8 * k, 34 * k, dim(P.paint, 0.3)); fillRect(ctx, bx - 14 * k, floorLine - 44 * k, 8 * k, 30 * k, dim(P.paint, 0.4));
+  fillRect(ctx, bx - 112 * k, floorLine - 14 * k, 4 * k, 22 * k, dim(P.metal, 0.4)); fillRect(ctx, bx - 40 * k, floorLine - 18 * k, 4 * k, 26 * k, dim(P.metal, 0.4));
+  const tx = doorX + 72 * k, trolley = dim(P.banners[0], 0.3);
+  fillRect(ctx, tx - 2 * k, h - 78 * k, 62 * k, 64 * k, P.ink);
+  fillRect(ctx, tx, h - 76 * k, 58 * k, 60 * k, trolley);
+  fillRect(ctx, tx + 38 * k, h - 76 * k, 20 * k, 60 * k, dim(P.banners[0], 0.55));
+  fillRect(ctx, tx - 3 * k, h - 80 * k, 64 * k, 6 * k, dim(P.metalLight, 0.25));
+  for (let i = 0; i < 4; i++) { inkLine(ctx, tx, h - 62 * k + i * 12 * k, tx + 58 * k, h - 62 * k + i * 12 * k, LINE.hair * k, P.ink); fillRect(ctx, tx + 20 * k, h - 69 * k + i * 12 * k, 18 * k, 2.6 * k, dim(P.metalLight, 0.2)); }
+  fillEllipse(ctx, tx + 8 * k, h - 9 * k, 6 * k, 6 * k, P.ink); fillEllipse(ctx, tx + 50 * k, h - 9 * k, 6 * k, 6 * k, P.ink);
+  const sx = doorX + doorW - 92 * k;
+  for (let i = 0; i < 3; i++) {
+    const y = h - 12 * k - (i + 1) * 23 * k;
+    fillTrace(ctx, (g) => roundRectPath(g, sx - 2 * k, y - 2 * k, 68 * k, 25 * k, 8 * k), P.ink);
+    fillTrace(ctx, (g) => roundRectPath(g, sx, y, 64 * k, 21 * k, 7 * k), i === 2 ? dim(P.tyreLight, 0.15) : dim(P.banners[0], 0.35));
+    fillRect(ctx, sx + 8 * k, y + 3 * k, 30 * k, 3.4 * k, i === 2 ? dim(P.metalLight, 0.45) : dim(P.banners[5], 0.2));
+  }
+  fillRect(ctx, sx - 6 * k, h - 13 * k, 76 * k, 5 * k, dim(P.metal, 0.4));
+  rollerDoor(ctx, P, doorX, doorTop, doorW, doorH, 0.52, k);
+  // door guides and piers
+  for (const x of [doorX, doorX + doorW]) {
+    fillRect(ctx, x - 6 * k, doorTop, 12 * k, doorH, P.ink);
+    fillRect(ctx, x - 4.4 * k, doorTop, 8.8 * k, doorH, P.metalShade); fillRect(ctx, x - 4.4 * k, doorTop, 3 * k, doorH, P.metal);
+  }
+  fillRect(ctx, 0, fasciaBot, w, doorTop - fasciaBot, P.concrete);
+  fillRect(ctx, 0, fasciaBot + LINE.form * k * 0.5, w, 8 * k, inkAlpha(P, 0.34));
+  inkLine(ctx, doorX, doorTop, doorX + doorW, doorTop, LINE.form * k, P.ink);
+  for (const dx of [0, w]) {
+    fillRect(ctx, dx - pier + 6 * k, fasciaBot, 2 * pier - 12 * k, h - fasciaBot, P.concreteLight);
+    fillRect(ctx, dx - pier + 6 * k, fasciaBot, 2 * pier - 12 * k, 9 * k, inkAlpha(P, 0.3));
+    fillRect(ctx, dx + pier - 44 * k, fasciaBot, 38 * k, h - fasciaBot, P.concrete);
+    fillRect(ctx, dx - pier + 6 * k, h - 16 * k, 2 * pier - 12 * k, 16 * k, P.concreteShade);
+    inkLine(ctx, dx - pier + 6 * k, h - 16 * k, dx + pier - 6 * k, h - 16 * k, LINE.hair * k, P.ink);
+    // numbered bay sign, service door, extinguisher, conduit
+    const number = String(4 + Math.floor(rnd() * 20)).padStart(2, '0');
+    inkGroup(ctx, P, [{ r: [dx - 38 * k, fasciaBot + 22 * k, 76 * k, 46 * k], fill: P.paint }], LINE.form * k);
+    fillRect(ctx, dx - 38 * k, fasciaBot + 22 * k, 76 * k, 11 * k, team.base);
+    fillPoly(ctx, [[dx + 38 * k, fasciaBot + 44 * k], [dx + 38 * k, fasciaBot + 68 * k], [dx + 6 * k, fasciaBot + 68 * k]], shadeHex(P.paint, 0.14));
+    label(ctx, dx ? numberCache.value : (numberCache.value = number), dx, fasciaBot + 51 * k, 60 * k, 24 * k, { weight: 1.25, color: P.ink, slant: 0.06, seed: 1 });
+    label(ctx, 'BOX', dx, fasciaBot + 27.5 * k, 60 * k, 6.5 * k, { color: P.paint, tracking: 0.2 });
+    const ddx = dx - 27 * k, ddy = h - 129 * k;
+    inkGroup(ctx, P, [{ r: [ddx, ddy, 55 * k, 129 * k], fill: P.metal }], LINE.form * k);
+    fillRect(ctx, ddx, ddy, 55 * k, 6 * k, P.metalLight);
+    fillRect(ctx, ddx + 38 * k, ddy + 6 * k, 17 * k, 123 * k, P.metalShade);
+    fillRect(ctx, ddx + 9 * k, ddy + 16 * k, 22 * k, 30 * k, P.ink); fillRect(ctx, ddx + 11 * k, ddy + 18 * k, 18 * k, 26 * k, P.glassShade); fillPoly(ctx, [[ddx + 29 * k, ddy + 28 * k], [ddx + 29 * k, ddy + 44 * k], [ddx + 17 * k, ddy + 44 * k]], P.glass);
+    fillRect(ctx, ddx + 42 * k, ddy + 66 * k, 5 * k, 12 * k, P.ink);
+    const red = paintTones(P.banners[0]);
+    inkGroup(ctx, P, [{ trace: (g) => roundRectPath(g, dx + 56 * k, h - 78 * k, 14 * k, 34 * k, 4 * k), fill: red.base }, { r: [dx + 60 * k, h - 84 * k, 6 * k, 7 * k], fill: P.ink }], LINE.detail * k, 1, 'round');
+    fillRect(ctx, dx + 57 * k, h - 76 * k, 4 * k, 30 * k, red.light); fillRect(ctx, dx + 56 * k, h - 66 * k, 14 * k, 7 * k, P.paint);
+    inkTubes(ctx, P, [{ paths: [[[dx - 62 * k, fasciaBot + 2 * k], [dx - 62 * k, h - 60 * k]]], width: 3 * k, fill: P.metal }], LINE.detail * k, 'butt');
+    inkGroup(ctx, P, [{ r: [dx - 72 * k, h - 76 * k, 20 * k, 26 * k], fill: P.metalLight }], LINE.detail * k);
+    fillRect(ctx, dx - 60 * k, h - 76 * k, 8 * k, 26 * k, P.metal);
+  }
+  inkLine(ctx, 0, fasciaBot, w, fasciaBot, LINE.form * k, P.ink);
+  fillRect(ctx, 0, h - 4 * k, w, 4 * k, inkAlpha(P, 0.4));
+  ctx.restore();
+}
+const numberCache = { value: '' };
+
+/** Grass bank with spectators sitting and standing, parasols, pennants; a wire fence at its foot. */
+function crowdBank(ctx, w, h, P, rnd) {
+  const k = w / 1024;
+  ctx.save(); clipTile(ctx, w, h);
+  const crestAt = (x) => (120 + 7 * Math.sin((x / w) * TAU + 1) + 4 * Math.sin((x / w) * TAU * 3 + 2.2)) * k;
+  const body = [];
+  for (let x = -16 * k; x <= w + 16 * k; x += 16 * k) body.push([x, crestAt(x)]);
+  body.push([w + 16 * k, h + 8], [-16 * k, h + 8]);
+  contour(ctx, (g) => tracePolygon(g, body), P.ink, LINE.form * k, 0, 'round');
+  fillPoly(ctx, body, P.grassA);
+  clipped(ctx, (g) => tracePolygon(g, body), () => {
+    // lit shoulder of the bank, broad darker bands, deep green at the foot
+    const strip = (dy0, dy1, phase, color) => { const pts = []; for (let x = -16 * k; x <= w + 16 * k; x += 16 * k) pts.push([x, crestAt(x) + (dy0 + 3 * Math.sin((x / w) * TAU * 4 + phase)) * k]); for (let x = w + 16 * k; x >= -16 * k; x -= 16 * k) pts.push([x, crestAt(x) + (dy1 + 5 * Math.sin((x / w) * TAU * 5 + phase * 2)) * k]); fillPoly(ctx, pts, color); };
+    strip(-4, 9, 0.4, P.mown); strip(34, 52, 1.7, P.grassB); strip(72, 110, 2.9, P.grassDark);
+    wrapped(ctx, w, rnd, (r) => {
+      for (let i = 0; i < 40; i++) {
+        const x = r() * w, y = crestAt(x) + (6 + r() * 84) * k, s = (3 + r() * 4) * k;
+        brushStroke(ctx, [[x, y], [x - s * 0.3, y - s]], LINE.hair * k * 1.3, { color: P.ink, taperStart: 0, taperEnd: 0.6 });
+        brushStroke(ctx, [[x + s * 0.5, y], [x + s * 0.7, y - s * 0.8]], LINE.hair * k * 1.3, { color: P.ink, taperStart: 0, taperEnd: 0.6 });
+      }
+    });
+  });
+  // tall pennants planted on the crest (clear of the edges)
+  for (const [fx, a, b] of [[0.21, 0, 3], [0.64, 2, 1], [0.86, 5, 7]]) pennant(ctx, P, w * fx, crestAt(w * fx) + 4 * k, 3 * k, 106 * k, 44 * k, 28 * k, P.banners[a], P.banners[b], k);
+  wrapped(ctx, w, rnd, (r) => {
+    const lookOf = () => randomLook(P, r);
+    const shade = (x, y, rx) => fillEllipse(ctx, x + 5 * k, y + 1 * k, rx, 4 * k, inkAlpha(P, 0.28));
+    // crest: people standing against the sky
+    for (let i = 0; i < 15; i++) {
+      const x = (i + 0.2 + r() * 0.6) * (w / 15), pose = r(), look = lookOf(), H = (74 + r() * 12) * k;
+      if (r() < 0.22) continue;
+      drawFigure(ctx, P, x, crestAt(x) + 5 * k, H, { ...look, arms: pose < 0.2 ? { l: armPose('up'), r: armPose('up') } : pose < 0.4 ? { l: armPose('down'), r: armPose('wave') } : pose < 0.65 ? { l: armPose('hip'), r: armPose('hip') } : undefined, lean: (r() - 0.5) * 0.03, stance: 0.02 + r() * 0.03, line: LINE.detail * k * 1.05 });
+    }
+    // parasols with their owners, half-way up
+    for (const [fx, a, b] of [[0.12, 0, 3], [0.47, 1, 2], [0.76, 3, 4]]) {
+      const x = w * fx + (r() - 0.5) * 30 * k, y = crestAt(x) + 46 * k;
+      shade(x, y, 46 * k);
+      drawSitter(ctx, P, x - 22 * k, y - 2 * k, 84 * k, lookOf(), LINE.detail * k);
+      drawSitter(ctx, P, x + 26 * k, y + 2 * k, 82 * k, lookOf(), LINE.detail * k);
+      parasol(ctx, P, x, y + 4 * k, 44 * k, 78 * k, P.banners[a], P.banners[b], k);
+    }
+    // rows of people sitting on the slope, a few standing among them
+    for (const [dy, n] of [[40, 13], [74, 12]]) {
+      for (let i = 0; i < n; i++) {
+        const x = (i + 0.25 + r() * 0.5) * (w / n), y = crestAt(x) + (dy + r() * 10) * k, look = lookOf(), what = r();
+        if ([0.12, 0.47, 0.76].some((f) => Math.abs((((x - w * f) % w) + w) % w) < 70 * k && dy < 60)) continue;
+        if (what < 0.12) continue;
+        shade(x, y, 20 * k);
+        if (what < 0.3) drawFigure(ctx, P, x, y, (80 + r() * 10) * k, { ...look, arms: r() < 0.4 ? { l: armPose('wave'), r: armPose('down') } : { l: armPose('hip'), r: armPose('down') }, stance: 0.03, line: LINE.detail * k * 1.1 });
+        else drawSitter(ctx, P, x, y, (84 + r() * 8) * k, look, LINE.detail * k * 1.05);
+        if (what > 0.9) {
+          // cool box next to them
+          inkGroup(ctx, P, [{ r: [x + 20 * k, y - 12 * k, 22 * k, 14 * k], fill: P.banners[2] }, { r: [x + 19 * k, y - 16 * k, 24 * k, 5 * k], fill: P.paint }], LINE.detail * k);
+        }
+      }
+    }
+  });
+  // wire fence at the foot of the bank
+  const posts = [];
+  for (let i = 0; i < 8; i++) posts.push([[(i + 0.5) * (w / 8), h], [(i + 0.5) * (w / 8), h - 30 * k]]);
+  inkTubes(ctx, P, [{ paths: [[[-4, h - 12 * k], [w + 4, h - 12 * k]], [[-4, h - 25 * k], [w + 4, h - 25 * k]]], width: 1.3 * k, fill: P.metalLight }, { paths: posts, width: 5 * k, fill: P.wood, light: P.woodLight, shade: P.woodShade }], LINE.detail * k, 'butt');
+  fillRect(ctx, 0, h - 3 * k, w, 3 * k, inkAlpha(P, 0.35));
+  ctx.restore();
+}
+
+/** Dockside street front: brick warehouse, sheet-metal shed, narrow town house with a café. */
+function facade(ctx, w, h, P, rnd) {
+  const k = w / 768, m = 38.4 * k;
+  ctx.save(); clipTile(ctx, w, h);
+  const lw = LINE.detail * k;
+  // ---- brick warehouse, four storeys
+  const ax = 100 * k, aw = 300 * k, aTop = h - 13.2 * m, brick = { light: P.brickLight, base: P.brick, shade: P.brickShade };
+  inkGroup(ctx, P, [{ r: [ax, aTop, aw, h - aTop], fill: brick.base }], LINE.silhouette * k);
+  fillRect(ctx, ax, aTop, 16 * k, h - aTop, brick.light); fillRect(ctx, ax + aw - 16 * k, aTop, 16 * k, h - aTop, brick.shade);
+  for (let i = 0; i < 70; i++) {
+    const x = ax + 18 * k + rnd() * (aw - 56 * k), y = aTop + 30 * k + rnd() * (h - aTop - 40 * k), len = (10 + rnd() * 22) * k;
+    if (rnd() < 0.3) fillRect(ctx, x, y, 9 * k, 4 * k, rnd() < 0.5 ? brick.light : brick.shade);
+    else inkLine(ctx, x, y, x + len, y, LINE.hair * k, brick.shade);
+  }
+  // cornice and parapet
+  fillRect(ctx, ax, aTop + 16 * k, aw, 12 * k, brick.light);
+  fillRect(ctx, ax, aTop + 28 * k, aw, 9 * k, inkAlpha(P, 0.34));
+  inkLine(ctx, ax, aTop + 16 * k, ax + aw, aTop + 16 * k, lw, P.ink); inkLine(ctx, ax, aTop + 28 * k, ax + aw, aTop + 28 * k, LINE.form * k, P.ink);
+  for (let x = ax + 12 * k; x < ax + aw - 8 * k; x += 14 * k) fillRect(ctx, x, aTop + 28 * k, 6 * k, 5 * k, brick.base);
+  const floorH = 3.05 * m, groundH = 4.05 * m, cells = [];
+  for (let f = 0; f < 3; f++) for (let c = 0; c < 3; c++) if (!(f === 0 && c === 1)) cells.push([ax + aw * (1 / 6 + c / 3) - 29 * k, aTop + 54 * k + f * floorH, 58 * k, 74 * k]);
+  // segmental brick arches over the openings
+  for (const c of cells) { fillTrace(ctx, (g) => { g.moveTo(c[0] - 5 * k, c[1] + 4 * k); g.quadraticCurveTo(c[0] + c[2] / 2, c[1] - 16 * k, c[0] + c[2] + 5 * k, c[1] + 4 * k); g.lineTo(c[0] + c[2] + 5 * k, c[1] - 6 * k); g.quadraticCurveTo(c[0] + c[2] / 2, c[1] - 26 * k, c[0] - 5 * k, c[1] - 6 * k); g.closePath(); }, brick.light); }
+  windows(ctx, P, cells, { line: lw, bars: [3, 4], frame: P.wallLight, sill: P.concreteLight, glass: P.glassShade, shade: shadeHex(P.glassShade, 0.35), light: P.glass });
+  for (const c of cells) brushStroke(ctx, [[c[0] + c[2] * 0.3, c[1] + c[3] + 6 * k], [c[0] + c[2] * 0.32, c[1] + c[3] + (16 + rnd() * 16) * k]], 1.6 * k, { color: brick.shade, taperStart: 0, taperEnd: 0.7 });
+  // loading door of the top floor with its hoist beam
+  const ldx = ax + aw / 2 - 31 * k, ldy = aTop + 46 * k;
+  inkGroup(ctx, P, [{ r: [ldx, ldy, 62 * k, 86 * k], fill: P.wood }], lw);
+  fillRect(ctx, ldx + 31 * k, ldy, 31 * k, 86 * k, P.woodShade); ribs(ctx, ldx, ldy, 62 * k, 86 * k, 10.3 * k, P.ink, LINE.hair * k, true);
+  fillRect(ctx, ldx, ldy, 62 * k, 8 * k, inkAlpha(P, 0.35));
+  inkGroup(ctx, P, [{ r: [ax + aw / 2 - 6 * k, aTop + 30 * k, 12 * k, 12 * k], fill: P.metalShade }], lw);
+  brushStroke(ctx, [[ax + aw / 2, aTop + 42 * k], [ax + aw / 2 + 1 * k, aTop + 64 * k]], 1.6 * k, { color: P.ink, taper: 0.05 });
+  ctx.strokeStyle = P.ink; ctx.lineWidth = 2 * k; ctx.beginPath(); ctx.arc(ax + aw / 2 + 1 * k, aTop + 69 * k, 5 * k, -Math.PI * 0.5, Math.PI * 0.9); ctx.stroke();
+  // painted sign band
+  const signY = h - groundH - 6 * k;
+  fillRect(ctx, ax + 16 * k, signY, aw - 32 * k, 30 * k, P.wallLight);
+  fillRect(ctx, ax + 16 * k, signY + 24 * k, aw - 32 * k, 6 * k, P.wall);
+  inkLine(ctx, ax + 16 * k, signY, ax + aw - 16 * k, signY, lw, P.ink); inkLine(ctx, ax + 16 * k, signY + 30 * k, ax + aw - 16 * k, signY + 30 * k, lw, P.ink);
+  label(ctx, 'ENTREPÔTS MARLOC', ax + aw / 2, signY + 14 * k, aw - 60 * k, 15 * k, { weight: 1.2, color: P.brickShade, tracking: 0.08, seed: 6 });
+  // ground floor: roller door, entrance, barred window
+  const rdx = ax + 28 * k, rdw = 128 * k, rdy = h - 3.4 * m;
+  fillRect(ctx, rdx - 5 * k, rdy - 5 * k, rdw + 10 * k, h - rdy + 5 * k, P.ink);
+  fillRect(ctx, rdx, rdy, rdw, h - rdy, P.ink);
+  rollerDoor(ctx, P, rdx, rdy, rdw, h - rdy, 0, k * 1.1);
+  fillRect(ctx, rdx - 5 * k, rdy - 16 * k, rdw + 10 * k, 12 * k, P.concreteLight); inkLine(ctx, rdx - 5 * k, rdy - 16 * k, rdx + rdw + 5 * k, rdy - 16 * k, lw, P.ink);
+  const pdx = ax + 186 * k, pdy = h - 2.1 * m;
+  inkGroup(ctx, P, [{ r: [pdx, pdy - 22 * k, 36 * k, 2.1 * m + 22 * k], fill: P.shutterShade }], lw);
+  fillRect(ctx, pdx + 4 * k, pdy - 18 * k, 28 * k, 14 * k, P.glassShade); fillPoly(ctx, [[pdx + 32 * k, pdy - 14 * k], [pdx + 32 * k, pdy - 4 * k], [pdx + 16 * k, pdy - 4 * k]], P.glass);
+  fillRect(ctx, pdx, pdy, 36 * k, 2.1 * m, P.shutter); fillRect(ctx, pdx + 24 * k, pdy, 12 * k, 2.1 * m, P.shutterShade);
+  inkLine(ctx, pdx, pdy, pdx + 36 * k, pdy, lw, P.ink); fillRect(ctx, pdx + 5 * k, pdy + 36 * k, 4 * k, 8 * k, P.ink);
+  ctx.strokeStyle = P.ink; ctx.lineWidth = lw; ctx.strokeRect(pdx + 7 * k, pdy + 8 * k, 14 * k, 22 * k); ctx.strokeRect(pdx + 7 * k, pdy + 50 * k, 14 * k, 22 * k);
+  windows(ctx, P, [[ax + 240 * k, h - 2.3 * m, 36 * k, 40 * k]], { line: lw, bars: [4, 1], frame: P.ink, sill: P.concreteLight, glass: P.glassShade, light: P.glass, shade: shadeHex(P.glassShade, 0.4) });
+  inkGroup(ctx, P, [{ p: [[pdx + 8 * k, pdy - 40 * k], [pdx + 28 * k, pdy - 40 * k], [pdx + 34 * k, pdy - 30 * k], [pdx + 2 * k, pdy - 30 * k]], fill: P.metalShade }], lw);
+  fillRect(ctx, pdx + 10 * k, pdy - 30 * k, 16 * k, 4 * k, P.paintYellow);
+  inkTubes(ctx, P, [{ paths: [[[ax + aw - 24 * k, aTop + 30 * k], [ax + aw - 24 * k, h - 4 * k]]], width: 5 * k, fill: P.metalShade, light: P.metal }], lw, 'butt');
+  for (let y = aTop + 90 * k; y < h - 20 * k; y += 110 * k) fillRect(ctx, ax + aw - 29 * k, y, 10 * k, 3 * k, P.ink);
+  fillRect(ctx, ax, h - 14 * k, aw, 14 * k, brick.shade); inkLine(ctx, ax, h - 14 * k, ax + aw, h - 14 * k, LINE.hair * k, P.ink);
+  // ---- sheet-metal shed
+  const bx = 400 * k, bw = 268 * k, eaves = h - 8.3 * m, ridge = eaves - 36 * k, clad = paintTones(mixHex(P.shutter, P.concreteLight, 0.45), 0.3, 0.3);
+  const gable = [[bx, h], [bx, eaves], [bx + bw / 2, ridge], [bx + bw, eaves], [bx + bw, h]];
+  inkGroup(ctx, P, [{ p: gable, fill: clad.base }], LINE.silhouette * k);
+  clipped(ctx, (g) => tracePolygon(g, gable), () => {
+    fillRect(ctx, bx + bw - 30 * k, ridge, 30 * k, h - ridge, clad.shade);
+    fillRect(ctx, bx, ridge, 24 * k, h - ridge, clad.light);
+    ribs(ctx, bx, ridge, bw, h - ridge, 10 * k, clad.shade, LINE.hair * k * 1.3, true);
+    // flashing along the verges, its shadow below
+    ctx.lineJoin = 'miter'; ctx.strokeStyle = inkAlpha(P, 0.3); ctx.lineWidth = 30 * k; ctx.beginPath(); ctx.moveTo(bx, eaves); ctx.lineTo(bx + bw / 2, ridge); ctx.lineTo(bx + bw, eaves); ctx.stroke();
+    ctx.strokeStyle = P.metalLight; ctx.lineWidth = 16 * k; ctx.beginPath(); ctx.moveTo(bx, eaves); ctx.lineTo(bx + bw / 2, ridge); ctx.lineTo(bx + bw, eaves); ctx.stroke();
+    fillRect(ctx, bx, h - 22 * k, bw, 22 * k, P.concrete); fillRect(ctx, bx, h - 22 * k, bw, 5 * k, P.concreteLight);
+  });
+  inkLine(ctx, bx, h - 22 * k, bx + bw, h - 22 * k, lw, P.ink);
+  windows(ctx, P, [0, 1, 2, 3].map((i) => [bx + 44 * k + i * 48 * k, eaves + 22 * k, 38 * k, 24 * k]), { line: lw, bars: [2, 1], frame: P.metalLight, glass: P.glassShade, light: P.glass, shade: shadeHex(P.glassShade, 0.35) });
+  label(ctx, 'QUAI 4', bx + bw / 2, eaves + 86 * k, bw - 70 * k, 40 * k, { weight: 1.3, color: P.paint, slant: 0, seed: 8, jitter: 0.8 });
+  // sliding door, half open on the dark interior
+  const sdx = bx + 44 * k, sdw = 156 * k, sdy = h - 4.4 * m, leaf = sdw / 2;
+  fillRect(ctx, sdx - 4 * k, sdy - 4 * k, sdw + 8 * k, h - sdy + 4 * k, P.ink);
+  fillRect(ctx, sdx + leaf, h - 30 * k, leaf, 30 * k, mixHex(P.pitAsphalt, P.ink, 0.55));
+  fillRect(ctx, sdx + leaf + 14 * k, h - 64 * k, 40 * k, 40 * k, mixHex(P.wood, P.ink, 0.45)); fillRect(ctx, sdx + leaf + 18 * k, h - 100 * k, 34 * k, 34 * k, mixHex(P.woodLight, P.ink, 0.5));
+  inkLine(ctx, sdx + leaf + 14 * k, h - 44 * k, sdx + leaf + 54 * k, h - 44 * k, LINE.hair * k, P.ink);
+  const door = paintTones(mixHex(P.shutterShade, P.concrete, 0.25));
+  for (const [x, wd] of [[sdx, leaf], [sdx + leaf * 0.34, leaf]]) {
+    inkGroup(ctx, P, [{ r: [x, sdy, wd, h - sdy - 2 * k], fill: door.base }], lw);
+    fillRect(ctx, x + wd * 0.7, sdy, wd * 0.3, h - sdy - 2 * k, door.shade);
+    ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.hair * k * 1.3; ctx.strokeRect(x + 6 * k, sdy + 6 * k, wd - 12 * k, (h - sdy) * 0.45); ctx.strokeRect(x + 6 * k, sdy + (h - sdy) * 0.5, wd - 12 * k, (h - sdy) * 0.45);
+    ctx.beginPath(); ctx.moveTo(x + 6 * k, sdy + (h - sdy) * 0.95); ctx.lineTo(x + wd - 6 * k, sdy + (h - sdy) * 0.5); ctx.stroke();
+  }
+  inkGroup(ctx, P, [{ r: [sdx - 60 * k + leaf * 0.34, sdy - 12 * k, sdw + 60 * k, 9 * k], fill: P.metal }], lw);
+  fillRect(ctx, sdx - 60 * k + leaf * 0.34, sdy - 12 * k, sdw + 60 * k, 3 * k, P.metalLight);
+  fillRect(ctx, sdx, sdy - 3 * k + lw, sdw, 8 * k, inkAlpha(P, 0.3));
+  // lamp, pipe run, bollards
+  inkTubes(ctx, P, [{ paths: [[[bx + bw - 34 * k, eaves + 60 * k], [bx + bw - 34 * k, h - 24 * k]], [[bx + bw - 34 * k, eaves + 60 * k], [bx + bw - 6 * k, eaves + 60 * k]]], width: 5 * k, fill: P.metalShade, light: P.metal }], lw, 'butt');
+  inkGroup(ctx, P, [{ r: [bx + bw - 46 * k, h - 110 * k, 24 * k, 34 * k], fill: P.metalLight }], lw); fillRect(ctx, bx + bw - 32 * k, h - 110 * k, 10 * k, 34 * k, P.metal);
+  inkTubes(ctx, P, [{ paths: [[[sdx + sdw * 0.6, sdy - 44 * k], [sdx + sdw * 0.6, sdy - 30 * k]]], width: 2.4 * k, fill: P.metalShade }], lw, 'butt');
+  inkGroup(ctx, P, [{ p: [[sdx + sdw * 0.6 - 12 * k, sdy - 20 * k], [sdx + sdw * 0.6 - 6 * k, sdy - 30 * k], [sdx + sdw * 0.6 + 6 * k, sdy - 30 * k], [sdx + sdw * 0.6 + 12 * k, sdy - 20 * k]], fill: P.metalShade }], lw);
+  fillRect(ctx, sdx + sdw * 0.6 - 7 * k, sdy - 20 * k, 14 * k, 4 * k, P.paintYellow);
+  for (const x of [bx + 22 * k, bx + bw - 70 * k]) {
+    inkGroup(ctx, P, [{ trace: (g) => roundRectPath(g, x - 6 * k, h - 40 * k, 12 * k, 40 * k, 5 * k), fill: P.paintYellow }], lw, 1, 'round');
+    fillRect(ctx, x - 6 * k, h - 30 * k, 12 * k, 7 * k, P.ink); fillRect(ctx, x - 6 * k, h - 15 * k, 12 * k, 7 * k, P.ink);
+  }
+  // ---- narrow town house (spans the tile edge)
+  for (const dx of [0, w]) {
+    const cx0 = dx - 100 * k, cw = 200 * k, cTop = h - 13.5 * m, wall = { light: P.wallLight, base: P.wall, shade: P.wallShade };
+    const mansard = [[cx0 + 3 * k, cTop], [cx0 + 16 * k, cTop - 34 * k], [cx0 + cw - 16 * k, cTop - 34 * k], [cx0 + cw - 3 * k, cTop]];
+    // chimney stack
+    inkGroup(ctx, P, [{ r: [cx0 + cw - 62 * k, cTop - 46 * k, 34 * k, 30 * k], fill: P.brick }, { r: [cx0 + cw - 58 * k, cTop - 54 * k, 8 * k, 9 * k], fill: P.roof }, { r: [cx0 + cw - 42 * k, cTop - 54 * k, 8 * k, 9 * k], fill: P.roof }], LINE.form * k);
+    fillRect(ctx, cx0 + cw - 40 * k, cTop - 46 * k, 12 * k, 30 * k, P.brickShade); fillRect(ctx, cx0 + cw - 64 * k, cTop - 46 * k, 38 * k, 5 * k, P.brickLight);
+    inkGroup(ctx, P, [{ p: mansard, fill: P.metal }, { r: [cx0, cTop, cw, h - cTop], fill: wall.light }], LINE.silhouette * k);
+    clipped(ctx, (g) => tracePolygon(g, mansard), () => {
+      fillRect(ctx, cx0, cTop - 34 * k, 70 * k, 34 * k, P.metalLight); fillRect(ctx, cx0 + cw - 50 * k, cTop - 34 * k, 50 * k, 34 * k, P.metalShade);
+      ribs(ctx, cx0, cTop - 34 * k, cw, 34 * k, 18 * k, P.inkSoft, LINE.hair * k, true);
+    });
+    // dormers
+    for (const f of [0.28, 0.72]) {
+      const x = cx0 + cw * f;
+      inkGroup(ctx, P, [{ p: [[x - 16 * k, cTop - 4 * k], [x - 16 * k, cTop - 24 * k], [x, cTop - 32 * k], [x + 16 * k, cTop - 24 * k], [x + 16 * k, cTop - 4 * k]], fill: wall.light }], lw);
+      windows(ctx, P, [[x - 9 * k, cTop - 22 * k, 18 * k, 16 * k]], { line: LINE.hair * k * 1.3, bars: [2, 1], glass: P.glassShade, light: P.glass, shade: shadeHex(P.glassShade, 0.4) });
+    }
+    // cornice, string courses, shaded return on the right
+    fillRect(ctx, cx0 + cw - 22 * k, cTop, 22 * k, h - cTop, wall.base);
+    fillRect(ctx, cx0, cTop, cw, 10 * k, P.paint); fillRect(ctx, cx0, cTop + 10 * k, cw, 8 * k, inkAlpha(P, 0.3));
+    inkLine(ctx, cx0, cTop + 10 * k, cx0 + cw, cTop + 10 * k, LINE.form * k, P.ink); inkLine(ctx, cx0 - 3 * k, cTop, cx0 + cw + 3 * k, cTop, LINE.form * k, P.ink);
+    const fh = 2.85 * m, shop = h - 3.5 * m, cellsC = [];
+    for (let f = 0; f < 4; f++) {
+      const y = cTop + 34 * k + f * (shop - cTop - 26 * k) / 4;
+      for (const fx of [0.27, 0.73]) cellsC.push([cx0 + cw * fx - 17 * k, y, 34 * k, (f === 3 ? 72 : 60) * k]);
+      if (f) inkLine(ctx, cx0, y - 14 * k, cx0 + cw, y - 14 * k, LINE.hair * k, P.wallShade);
+    }
+    for (const c of cellsC) shutterPair(ctx, P, c, P.shutter, lw);
+    windows(ctx, P, cellsC, { line: lw, bars: [2, 3], frame: P.paint, sill: P.concreteLight, blinds: 0.3, rnd, blindColor: P.paint });
+    // first-floor balcony with its iron rail
+    const by = cellsC[6][1] + 72 * k;
+    inkGroup(ctx, P, [{ r: [cx0 + 14 * k, by, cw - 28 * k, 7 * k], fill: P.concreteLight }], lw);
+    fillRect(ctx, cx0 + 14 * k, by + 7 * k + lw, cw - 28 * k, 6 * k, inkAlpha(P, 0.3));
+    ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.hair * k * 1.4; ctx.beginPath();
+    for (let x = cx0 + 18 * k; x <= cx0 + cw - 18 * k; x += 7.5 * k) { ctx.moveTo(x, by); ctx.lineTo(x, by - 30 * k); }
+    ctx.stroke();
+    inkLine(ctx, cx0 + 14 * k, by - 30 * k, cx0 + cw - 14 * k, by - 30 * k, LINE.form * k, P.ink); inkLine(ctx, cx0 + 14 * k, by - 8 * k, cx0 + cw - 14 * k, by - 8 * k, LINE.hair * k * 1.3, P.ink);
+    // café front: sign band, awning, glazed front and door
+    const dark = P.shutterShade;
+    fillRect(ctx, cx0, shop, cw, h - shop, dark);
+    inkLine(ctx, cx0, shop, cx0 + cw, shop, LINE.form * k, P.ink);
+    label(ctx, 'CAFÉ DU PORT', cx0 + cw / 2, shop + 13 * k, cw - 30 * k, 12 * k, { weight: 1.15, color: P.paintYellow, tracking: 0.06, seed: 12 });
+    const glassY = shop + 60 * k;
+    windows(ctx, P, [[cx0 + 14 * k, glassY, 74 * k, h - glassY - 22 * k], [cx0 + 138 * k, glassY, 48 * k, h - glassY - 22 * k]], { line: lw, bars: [2, 1], frame: P.woodLight, glass: P.glassShade, light: P.glass, shade: shadeHex(P.glassShade, 0.4) });
+    inkGroup(ctx, P, [{ r: [cx0 + 98 * k, h - 2.1 * m, 32 * k, 2.1 * m], fill: P.wood }], lw);
+    fillRect(ctx, cx0 + 102 * k, h - 2.1 * m + 6 * k, 24 * k, 40 * k, P.glassShade); fillPoly(ctx, [[cx0 + 126 * k, h - 2.1 * m + 22 * k], [cx0 + 126 * k, h - 2.1 * m + 46 * k], [cx0 + 110 * k, h - 2.1 * m + 46 * k]], P.glass);
+    fillRect(ctx, cx0 + 121 * k, h - 40 * k, 4 * k, 9 * k, P.paintYellow);
+    const awn = [[cx0 + 6 * k, shop + 26 * k], [cx0 + cw - 6 * k, shop + 26 * k], [cx0 + cw + 2 * k, shop + 54 * k], [cx0 - 2 * k, shop + 54 * k]];
+    fillPoly(ctx, [[cx0 + 4 * k, shop + 58 * k], [cx0 + cw - 4 * k, shop + 58 * k], [cx0 + cw - 10 * k, shop + 76 * k], [cx0 + 10 * k, shop + 76 * k]], inkAlpha(P, 0.4));
+    inkGroup(ctx, P, [{ p: awn, fill: P.paint }, { r: [cx0 - 2 * k, shop + 54 * k, cw + 4 * k, 9 * k], fill: P.paint }], LINE.form * k);
+    for (let i = 0; i < 9; i += 2) {
+      const t0 = i / 9, t1 = (i + 1) / 9;
+      fillPoly(ctx, [lerp2(awn[0], awn[1], t0), lerp2(awn[0], awn[1], t1), lerp2(awn[3], awn[2], t1), lerp2(awn[3], awn[2], t0)], P.banners[0]);
+      fillRect(ctx, awn[3][0] + (cw + 4 * k) * t0, shop + 54 * k, (cw + 4 * k) / 9, 9 * k, shadeHex(P.banners[0], 0.25));
+    }
+    inkLine(ctx, cx0 - 2 * k, shop + 54 * k, cx0 + cw + 2 * k, shop + 54 * k, lw, P.ink);
+    fillRect(ctx, cx0, h - 12 * k, cw, 12 * k, P.concreteShade); inkLine(ctx, cx0, h - 12 * k, cx0 + cw, h - 12 * k, LINE.hair * k, P.ink);
+    void fh;
+  }
+  fillRect(ctx, 0, h - 4 * k, w, 4 * k, inkAlpha(P, 0.4));
+  ctx.restore();
+}
 
 /** Painters by family. */
-const BUILDING_PAINTERS = {};
+const BUILDING_PAINTERS = {
+  'strip.grandstand': grandstand,
+  'strip.pitbuilding': pitBuilding,
+  'strip.crowdbank': crowdBank,
+  'strip.facade': facade,
+};
 
 __modules["src/art/environments/buildings.js"] = { BUILDING_PAINTERS };
 })();
@@ -7972,44 +8618,953 @@ __modules["src/art/environments/scenery-painters.js"] = { registerSceneryPainter
 // Distant backdrops: three 120-degree panoramas per circuit theme (0 clouds, 1 far relief,
 // 2 near relief), painted once per circuit. Each must tile horizontally. The bottom edge of the
 // canvas sits slightly below the horizon (see backdrop-rules.js); colours get paler with distance.
+//
+// Every panorama is built from individual drawn objects (a peak, a hill, a mesa, a cloud...)
+// painted back to front; whatever crosses a vertical edge is drawn again one period away, so the
+// picture wraps. Far relief: two or three flat hazy tones, no ink. Near relief: more saturated,
+// light pen contours, trees and buildings. One pixel is about 1/1960 radian in both directions.
+//
+// Large objects are assembled on a work surface and then stamped on the panorama: their inner
+// tones are confined to the silhouette with 'source-atop' and the contour is slipped underneath
+// with 'destination-over' (no clipping paths: on big canvases they leave hairlines).
 
 const { BACKDROP_TAN_TOP, BACKDROP_TAN_BOTTOM } = __modules["src/art/environments/backdrop-rules.js"];
-const { closedCurve, blobPoints } = __modules["src/art/styles/ink.js"];
+const { seeded, sampleCurve, brushStroke, tracePolygon } = __modules["src/art/styles/ink.js"];
+const { mixHex, hexToRgb } = __modules["src/art/palettes/palettes.js"];
+
+const TAU = Math.PI * 2;
 
 /** y coordinate (pixels) of the horizon line inside a backdrop canvas of height h. */
 function backdropHorizon(h) { return (h * BACKDROP_TAN_TOP) / (BACKDROP_TAN_TOP - BACKDROP_TAN_BOTTOM); }
 
-function ridge(ctx, w, h, base, amp, freq, seed, color) {
-  const y0 = backdropHorizon(h);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(0, h);
-  for (let x = 0; x <= w; x += 8) {
-    const t = (x / w) * Math.PI * 2;
-    const y = y0 - base - amp * (0.5 + 0.3 * Math.sin(t * freq + seed) + 0.2 * Math.sin(t * (freq * 2 + 1) + seed * 2.3));
-    ctx.lineTo(x, y);
+// ------------------------------------------------------------------------------------ helpers
+
+function jit(rnd, amount) { return (rnd() - 0.5) * 2 * amount; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function newSeed(rnd) { return Math.floor(rnd() * 4294967295) + 1; }
+
+/** Run `draw` at its place and one period to the left / right when [minX, maxX] crosses an edge. */
+function wrapped(ctx, w, minX, maxX, draw) {
+  for (const dx of [0, -w, w]) {
+    if (maxX + dx < 0 || minX + dx > w) continue;
+    ctx.save(); ctx.translate(dx, 0); draw(); ctx.restore();
   }
-  ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
 }
 
-/** Provisional backdrop painter (replaced by the full panoramas of backdrop-painters.js). */
-function paintBackdropLayer(index, ctx, w, h, P, kind, rnd) {
-  ctx.clearRect(0, 0, w, h);
-  if (index === 0) {
-    for (let i = 0; i < 9; i++) {
-      const cx = ((i + rnd() * 0.6) / 9) * w, cy = h * (0.2 + rnd() * 0.45), rx = 90 + rnd() * 170, ry = 22 + rnd() * 30;
-      for (const dx of [-w, 0, w]) {
-        ctx.fillStyle = P.cloudShade; ctx.beginPath(); closedCurve(ctx, blobPoints(cx + dx, cy + 6, rx, ry, 7, 0.2, rnd)); ctx.fill();
-        ctx.fillStyle = P.cloudLight; ctx.beginPath(); closedCurve(ctx, blobPoints(cx + dx - 6, cy - 5, rx * 0.92, ry * 0.8, 7, 0.2, rnd)); ctx.fill();
+/** Place `count` objects on jittered slots along the panorama; each gets a private generator. */
+function scatter(rnd, w, count, jitter, place) {
+  const phase = rnd();
+  for (let i = 0; i < count; i++) place((((i + phase + jit(rnd, jitter)) / count) % 1) * w, seeded(newSeed(rnd)), i);
+}
+
+let surface = null;
+
+/**
+ * Paint one object (deterministic `paint(r, e)`, e = env whose ctx is the work surface) and stamp
+ * it on the panorama with its wrap-around copies. [minX, maxX] must contain the whole object.
+ */
+function stamp(env, minX, maxX, seed, paint) {
+  const { ctx, w, h } = env, pad = 6, x0 = Math.floor(minX) - pad, width = Math.min(w, Math.ceil(maxX - minX) + 2 * pad);
+  if (!surface || surface.width !== w || surface.height !== h) {
+    if (typeof OffscreenCanvas !== 'undefined') surface = new OffscreenCanvas(w, h);
+    else { surface = document.createElement('canvas'); surface.width = w; surface.height = h; }
+  }
+  const g = surface.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  g.clearRect(0, 0, w, h);
+  g.translate(-x0, 0);
+  paint(seeded(seed), { ...env, ctx: g });
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
+  for (const dx of [0, -w, w]) {
+    if (x0 + width + dx < 0 || x0 + dx > w) continue;
+    ctx.drawImage(surface, 0, 0, width, h, x0 + dx, 0, width, h);
+  }
+}
+
+/** Draw only on what the work surface already holds (inner tones of a silhouette). */
+function inside(ctx, draw) { ctx.globalCompositeOperation = 'source-atop'; draw(); ctx.globalCompositeOperation = 'source-over'; }
+
+function tones(light, base, shade, ink = null) { return { light, base, shade, ink }; }
+
+/** The same tones seen through more air. */
+function hazed(t, haze, amount) {
+  return { light: mixHex(t.light, haze, amount), base: mixHex(t.base, haze, amount), shade: mixHex(t.shade, haze, amount), ink: t.ink ? mixHex(t.ink, haze, amount) : null };
+}
+
+/** Mist at the foot of what is already painted (the only gradient allowed with the sky). */
+function groundHaze(env, height, alpha) {
+  const { ctx, w, y0, u, P } = env, [r, g, b] = hexToRgb(P.haze).map((v) => Math.round(v * 255));
+  const grad = ctx.createLinearGradient(0, y0 - height * u, 0, y0);
+  grad.addColorStop(0, `rgba(${r},${g},${b},0)`); grad.addColorStop(1, `rgba(${r},${g},${b},${alpha})`);
+  ctx.save(); ctx.globalCompositeOperation = 'source-atop';
+  ctx.fillStyle = grad; ctx.fillRect(0, y0 - height * u, w, height * u);
+  ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`; ctx.fillRect(0, y0, w, env.h - y0);
+  ctx.restore();
+}
+
+/** Thin contour slipped under a shape already painted on the work surface, heavier below / right. */
+function contour(ctx, trace, ink, width) {
+  if (!ink) return;
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = ink; ctx.lineWidth = width * 2;
+  ctx.beginPath(); trace(ctx); ctx.stroke();
+  ctx.save(); ctx.translate(width * 0.5, width * 0.5); ctx.beginPath(); trace(ctx); ctx.stroke(); ctx.restore();
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/** Line broken by random midpoint displacement (rock edges). Returns points from a to b. */
+function jagged(a, b, levels, rough, rnd, sag = 0) {
+  let pts = [a, b];
+  for (let l = 0; l < levels; l++) {
+    const next = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p = pts[i], q = pts[i + 1], dx = q[0] - p[0], dy = q[1] - p[1], d = jit(rnd, rough) + (l === 0 ? sag : 0);
+      next.push([(p[0] + q[0]) / 2 - dy * d, (p[1] + q[1]) / 2 + dx * d], q);
+    }
+    pts = next;
+  }
+  return pts;
+}
+
+/**
+ * Add a crest to the current path, from the current point through pts (left to right):
+ * 'smooth' straight joins, 'scallop' rounded tree crowns, 'fir' pointed conifer tops.
+ */
+function traceCrest(ctx, pts, style, tips) {
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    if (style === 'scallop') ctx.quadraticCurveTo((a[0] + b[0]) / 2 + (b[1] - a[1]) * 0.6, (a[1] + b[1]) / 2 - (b[0] - a[0]) * (0.45 + tips[i] * 0.35), b[0], b[1]);
+    else if (style === 'fir') { ctx.lineTo((a[0] + b[0]) / 2 + (b[0] - a[0]) * (tips[i] - 0.5) * 0.3, (a[1] + b[1]) / 2 - (b[0] - a[0]) * (0.9 + tips[i] * 1.1)); ctx.lineTo(b[0], b[1]); } else ctx.lineTo(b[0], b[1]);
+  }
+}
+
+// ------------------------------------------------------------------------- landforms (objects)
+
+/**
+ * Rounded hill. o: { x, halfW, height, base, tones, edge ('smooth' | 'scallop' | 'fir'), grain
+ * (size of a tree crown in pixels), skew, power, contour }. Three tones displaced toward the
+ * light; the canopy texture of the crest is repeated on the tone boundaries.
+ */
+function paintHill(env, o, rnd) {
+  const { ctx, h } = env;
+  const skew = o.skew ?? jit(rnd, 0.3), power = o.power ?? 0.9 + rnd() * 0.5, p1 = rnd() * 6, p2 = rnd() * 6;
+  const yAt = (x) => {
+    const t = (x - o.x) / o.halfW;
+    if (t <= -1 || t >= 1) return o.base;
+    const tt = t < skew ? (t - skew) / (1 + skew) : (t - skew) / (1 - skew);
+    const bell = Math.pow(0.5 + 0.5 * Math.cos(Math.PI * tt), power);
+    return o.base - o.height * bell * (1 + (0.09 * Math.sin(t * 5 + p1) + 0.05 * Math.sin(t * 11 + p2)) * (1 - t * t));
+  };
+  const grain = o.grain || 14, pts = [], tips = [];
+  for (let x = o.x - o.halfW; x < o.x + o.halfW; x += o.edge === 'smooth' ? 12 : grain * (0.7 + rnd() * 0.9)) { pts.push([x, yAt(x)]); tips.push(rnd()); }
+  pts.push([o.x + o.halfW, o.base]); tips.push(0.5);
+  const trace = (g) => { g.moveTo(pts[0][0], h + 4); g.lineTo(pts[0][0], pts[0][1]); traceCrest(g, pts, o.edge, tips); g.lineTo(o.x + o.halfW, h + 4); g.closePath(); };
+  const t = o.tones;
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = t.shade; ctx.fill();
+  inside(ctx, () => {
+    const copy = (dx, dy, color) => { ctx.save(); ctx.translate(dx, dy); ctx.beginPath(); trace(ctx); ctx.fillStyle = color; ctx.fill(); ctx.restore(); };
+    copy(-o.halfW * 0.1 - grain * 0.4, o.height * 0.02, t.base);
+    copy(-o.halfW * 0.2 - grain * 0.6, o.height * 0.07 + grain * 0.2, t.light);
+    copy(-o.halfW * 0.36 - grain * 0.6, o.height * (0.34 + rnd() * 0.14) + grain * 0.5, t.base);
+    if (o.detail) o.detail(yAt, rnd, ctx);
+  });
+  contour(ctx, trace, t.ink, o.contour || 1.3);
+  return yAt;
+}
+
+/**
+ * Alpine peak. o: { x, height, left, right, base, tones (light = sunlit rock, base = rock in
+ * shade), snow, snowShade, snowLine (pixels above the base, 0 = none), rough, detail }.
+ */
+function paintPeak(env, o, rnd) {
+  const { ctx, h } = env;
+  const top = [o.x, o.base - o.height], footL = [o.x - o.left, o.base], footR = [o.x + o.right, o.base];
+  const rough = o.rough ?? 0.1;
+  const sag = () => (rnd() < 0.3 ? -0.05 - rnd() * 0.05 : 0.03 + rnd() * 0.09);          // hollow flanks, sometimes a bulging shoulder
+  const edgeL = jagged(footL, top, 4, rough, rnd, sag()), edgeR = jagged(top, footR, 4, rough, rnd, sag());
+  const trace = (g) => { g.moveTo(footL[0], h + 4); for (const p of edgeL) g.lineTo(p[0], p[1]); for (const p of edgeR) g.lineTo(p[0], p[1]); g.lineTo(footR[0], h + 4); g.closePath(); };
+  // ridge running down from the summit toward the viewer: the boundary between light and shade
+  const ridgeEnd = o.x + o.right * (0.08 + rnd() * 0.22), ridge = [top], steps = 7;
+  for (let j = 1; j <= steps; j++) {
+    const s = j / steps, amp = (o.left + o.right) * 0.035 * (0.4 + s) * (0.6 + rnd() * 0.8);
+    ridge.push([lerp(o.x, ridgeEnd, s) + (j % 2 ? amp : -amp * 0.7), lerp(top[1], o.base, Math.pow(s, 0.9))]);
+  }
+  const shadeTrace = (g) => { g.moveTo(top[0], top[1]); for (const p of ridge) g.lineTo(p[0], p[1]); g.lineTo(ridgeEnd, h + 4); g.lineTo(footR[0] + 4, h + 4); for (let i = edgeR.length - 1; i >= 0; i--) g.lineTo(edgeR[i][0] + 2, edgeR[i][1] - 1); g.closePath(); };
+  // slivers of shadow behind the spurs of the sunlit face
+  const spurs = [];
+  for (let i = 0; i < (o.detail ?? 2); i++) {
+    const s = 0.2 + rnd() * 0.45, a = [lerp(top[0], footL[0], s * 0.8) + o.left * 0.1, lerp(top[1], o.base, s)], len = o.height * (0.2 + rnd() * 0.22), wd = o.left * (0.05 + rnd() * 0.06);
+    spurs.push([a, [a[0] - len * 0.25 + wd, a[1] + len * 0.6], [a[0] - len * 0.5 + wd * 1.6, a[1] + len], [a[0] - len * 0.62, a[1] + len * 1.05], [a[0] - len * 0.3, a[1] + len * 0.5]]);
+  }
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = o.tones.light; ctx.fill();
+  inside(ctx, () => {
+    ctx.fillStyle = o.tones.base;
+    ctx.beginPath(); shadeTrace(ctx); ctx.fill();
+    for (const s of spurs) { ctx.beginPath(); tracePolygon(ctx, s); ctx.fill(); }
+    if (!(o.snowLine > 0 && o.snowLine < o.height * 0.9)) return;
+    // snow cap: the outline of the summit above a ragged line, tongues of snow reaching lower in the gullies
+    const ySnow = o.base - o.snowLine, cap = [], tongues = [];
+    const crossing = (edge, i) => { const p = edge[i], q = edge[i + 1], f = (ySnow - p[1]) / ((q[1] - p[1]) || 1); return [lerp(p[0], q[0], f), ySnow]; };
+    let iL = 0; while (iL < edgeL.length - 2 && edgeL[iL + 1][1] > ySnow) iL++;
+    let iR = edgeR.length - 1; while (iR > 1 && edgeR[iR - 1][1] > ySnow) iR--;
+    const cl = crossing(edgeL, iL), cr = crossing(edgeR, iR - 1);
+    const span = cr[0] - cl[0], teeth = Math.max(3, Math.round(span / ((34 + rnd() * 22) * env.u)));
+    for (let i = 1; i < teeth; i++) {
+      const f = i / teeth, fade = Math.sin(Math.PI * f), step = span / teeth;
+      tongues.push([lerp(cr[0], cl[0], f - 0.5 / teeth), ySnow + step * (0.25 + rnd() * 0.75) * fade], [lerp(cr[0], cl[0], f) + jit(rnd, step * 0.2), ySnow - step * (0.1 + rnd() * 0.45) * fade]);
+    }
+    tongues.push([lerp(cr[0], cl[0], 1 - 0.5 / teeth), ySnow + (span / teeth) * 0.25]);
+    cap.push(cl); for (let i = iL + 1; i < edgeL.length; i++) cap.push(edgeL[i]); for (let i = 1; i < iR; i++) cap.push(edgeR[i]); cap.push(cr);
+    ctx.beginPath(); tracePolygon(ctx, cap.concat(tongues)); ctx.fillStyle = o.snow; ctx.fill();
+    // snow in the shade: the part of the cap that lies right of the ridge
+    const shaded = [top];
+    let ridgeX = top[0];
+    for (let j = 1; j < ridge.length; j++) {
+      if (ridge[j][1] < ySnow) { shaded.push(ridge[j]); ridgeX = ridge[j][0]; continue; }
+      const p = ridge[j - 1], q = ridge[j], f = (ySnow - p[1]) / ((q[1] - p[1]) || 1); ridgeX = lerp(p[0], q[0], f); shaded.push([ridgeX, ySnow]); break;
+    }
+    for (let i = tongues.length - 1; i >= 0; i--) if (tongues[i][0] > ridgeX) shaded.push(tongues[i]);
+    shaded.push(cr); for (let i = iR - 1; i >= 1; i--) shaded.push([edgeR[i][0] + 2, edgeR[i][1] - 1]);
+    ctx.beginPath(); tracePolygon(ctx, shaded); ctx.fillStyle = o.snowShade; ctx.fill();
+    for (const s of spurs) if (s[3][1] < ySnow - 4) { ctx.beginPath(); tracePolygon(ctx, s); ctx.fill(); }
+    // rock showing through the snow
+    for (let i = 0; i < 3; i++) {
+      const s = 0.3 + rnd() * 0.5, side = rnd() < 0.5 ? -1 : 1, y = lerp(top[1], ySnow, s), half = (side < 0 ? o.left : o.right) * ((y - top[1]) / o.height) * 0.7;
+      const x = top[0] + side * half * (0.2 + rnd() * 0.6), d = o.height * (0.02 + rnd() * 0.025);
+      ctx.beginPath(); tracePolygon(ctx, [[x, y], [x + d * 0.9, y + d * 2.2], [x - d * 0.7, y + d * 1.6]]); ctx.fillStyle = side < 0 ? o.tones.light : o.tones.base; ctx.fill();
+    }
+  });
+  contour(ctx, trace, o.tones.ink, 1.2);
+}
+
+/**
+ * Mesa or butte. o: { x, top (half width of the flat summit), height, cap (share of the height
+ * that is vertical cliff), apron (width of the scree on each side), base, tones, detail, strata }.
+ */
+function paintMesa(env, o, rnd) {
+  const { ctx, h, u } = env;
+  const yTop = o.base - o.height, yCliff = o.base - o.height * (1 - o.cap), apronL = o.apron * (0.8 + rnd() * 0.5), apronR = o.apron * (0.8 + rnd() * 0.5);
+  const xl = o.x - o.top, xr = o.x + o.top, batter = o.height * o.cap * 0.07;
+  // summit line with a few steps, cliffs with a ledge, concave scree
+  const summit = [[xl, yTop + jit(rnd, 2 * u)]];
+  for (let s = 1; s < 4; s++) { const x = lerp(xl, xr, s / 4 + jit(rnd, 0.08)), y = yTop + (rnd() < 0.35 ? o.height * 0.05 * rnd() : 0) + jit(rnd, 1.5 * u); summit.push([x - 2 * u, summit[summit.length - 1][1]], [x, y]); }
+  summit.push([xr, summit[summit.length - 1][1]]);
+  const ledge = yTop + (yCliff - yTop) * (0.45 + rnd() * 0.25), step = o.height * 0.035 * (0.5 + rnd());
+  const left = sampleCurve([[xl - batter - step - apronL, o.base], [xl - batter - step - apronL * 0.45, o.base - (o.base - yCliff) * 0.32], [xl - batter - step - 2, yCliff]], 5).concat([[xl - batter * 0.5 - step, ledge], [xl - batter * 0.5, ledge - 2 * u]]);
+  const right = [[xr + batter * 0.5, ledge - 2 * u], [xr + batter * 0.5 + step, ledge]].concat(sampleCurve([[xr + batter + step + 2, yCliff], [xr + batter + step + apronR * 0.45, o.base - (o.base - yCliff) * 0.32], [xr + batter + step + apronR, o.base]], 5));
+  const outline = left.concat(summit, right);
+  const trace = (g) => { g.moveTo(outline[0][0], h + 4); for (const p of outline) g.lineTo(p[0], p[1]); g.lineTo(outline[outline.length - 1][0], h + 4); g.closePath(); };
+  const t = o.tones, width = xr - xl;
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = t.base; ctx.fill();
+  inside(ctx, () => {
+    // sunlit cliff: everything above the ragged top of the scree cones
+    const cones = [[xl - batter - step - 6, yCliff]], count = Math.max(2, Math.round(width / (o.height * 0.3)));
+    for (let i = 0; i < count; i++) { const x0 = lerp(xl - batter, xr + batter, i / count), x1 = lerp(xl - batter, xr + batter, (i + 1) / count); cones.push([lerp(x0, x1, 0.5 + jit(rnd, 0.2)), yCliff - o.height * o.cap * (0.06 + rnd() * 0.16)], [x1, yCliff + jit(rnd, o.height * 0.02)]); }
+    cones.push([xr + batter + step + 6, yCliff], [xr + 40 * u, yTop - 30], [xl - 40 * u, yTop - 30]);
+    ctx.beginPath(); tracePolygon(ctx, cones); ctx.fillStyle = t.light; ctx.fill();
+    // strata: bands and pen lines following the bedding, the same on every mesa of a range
+    for (const [f, thick] of o.strata || []) {
+      const y = lerp(yTop, yCliff, f);
+      ctx.fillStyle = t.base; ctx.fillRect(xl - batter - step - 4, y, width + 2 * (batter + step) + 8, Math.max(1.2 * u, thick * (yCliff - yTop)));
+    }
+    // right end of the cliff and of the scree turned away from the light
+    const turn = Math.min(width * 0.5, o.height * (0.12 + rnd() * 0.14)), edge = [[xr - turn, yTop - 20]];
+    for (let i = 0; i <= 6; i++) edge.push([xr - turn + (i % 2 ? turn * 0.3 : 0) + (i / 6) * turn * 0.5, lerp(yTop, yCliff, i / 6)]);
+    edge.push([xr + batter + step - turn * 0.2 + apronR * 0.5, o.base], [xr + apronR * 2 + batter, h + 4], [xr + apronR * 2 + batter, yTop - 20]);
+    ctx.beginPath(); tracePolygon(ctx, edge); ctx.fillStyle = t.shade; ctx.fill();
+    if (o.detail) {
+      // fluting of the cliff and gullies in the scree
+      const pen = t.ink || t.shade;
+      for (let i = 0; i < Math.round(width / (9 * u)); i++) {
+        const x = lerp(xl, xr - turn, rnd()), ya = lerp(yTop, yCliff, rnd() * 0.5), len = (yCliff - yTop) * (0.2 + rnd() * 0.5);
+        brushStroke(ctx, [[x, ya], [x + jit(rnd, 1.5 * u), ya + len * 0.5], [x + jit(rnd, 2 * u), ya + len]], (1 + rnd() * 0.8) * u, { color: i % 3 ? t.base : pen, taper: 0.4, swell: 0.1 });
+      }
+      for (let i = 0; i < Math.round((width + apronL) / (26 * u)); i++) {
+        const x = lerp(xl - apronL * 0.5, xr - turn, rnd()), ya = yCliff + (o.base - yCliff) * 0.1, len = (o.base - yCliff) * (0.4 + rnd() * 0.5), lean = (x - o.x) / (width + apronL) * len * 0.9;
+        brushStroke(ctx, [[x, ya], [x + lean * 0.4 + jit(rnd, 3 * u), ya + len * 0.5], [x + lean, ya + len]], (1.2 + rnd()) * u, { color: t.shade, taper: 0.45, swell: 0.1 });
       }
     }
-  } else if (index === 1) {
-    ridge(ctx, w, h, 20, 90, 3, 1.3, P.farReliefLight);
-    ridge(ctx, w, h, 8, 60, 5, 4.1, P.farRelief);
-  } else {
-    ridge(ctx, w, h, 4, 26, 9, 2.2, P.nearRelief);
-    ridge(ctx, w, h, 0, 14, 14, 5.2, P.nearReliefShade);
+  });
+  contour(ctx, trace, t.ink, 1.3);
+}
+
+/**
+ * Sand dune. o: { x, halfW, height, base, tones, detail }. Gentle windward slope on the left,
+ * sharp crest, steep slip face in shadow; the crest line winds down toward the viewer.
+ */
+function paintDune(env, o, rnd) {
+  const { ctx, h, u } = env;
+  const crestX = o.x + o.halfW * (0.1 + rnd() * 0.25), top = o.base - o.height, L = crestX - (o.x - o.halfW), R = o.x + o.halfW - crestX;
+  const windward = sampleCurve([[crestX - L, o.base], [crestX - L * 0.62, o.base - o.height * 0.2], [crestX - L * 0.3, o.base - o.height * 0.62], [crestX - L * 0.08, o.base - o.height * 0.93], [crestX, top]], 6);
+  const slip = sampleCurve([[crestX, top], [crestX + R * 0.2, o.base - o.height * 0.62], [crestX + R * 0.55, o.base - o.height * 0.2], [crestX + R, o.base]], 6);
+  const trace = (g) => { g.moveTo(crestX - L, h + 4); for (const p of windward) g.lineTo(p[0], p[1]); for (const p of slip) g.lineTo(p[0], p[1]); g.lineTo(crestX + R, h + 4); g.closePath(); };
+  // crest winding down the face
+  const sway = (rnd() < 0.5 ? -1 : 1) * o.halfW * (0.12 + rnd() * 0.14);
+  const crest = sampleCurve([[crestX, top], [crestX - sway * 0.5, o.base - o.height * 0.66], [crestX + sway * 0.6, o.base - o.height * 0.3], [crestX + sway * 0.2 - o.halfW * 0.1, o.base + 8 * u]], 6);
+  const t = o.tones;
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = t.light; ctx.fill();
+  inside(ctx, () => {
+    // lower windward apron in the middle tone
+    const apron = sampleCurve([[crestX - L - 10, o.base - o.height * 0.1], [crestX - L * 0.5, o.base - o.height * (0.2 + rnd() * 0.12)], [crestX - L * 0.2, o.base - o.height * (0.42 + rnd() * 0.1)], [crestX + sway * 0.4, o.base - o.height * 0.36], [crestX + R, o.base - o.height * 0.3]], 6);
+    ctx.beginPath(); ctx.moveTo(crestX - L - 10, h + 4); for (const p of apron) ctx.lineTo(p[0], p[1]); ctx.lineTo(crestX + R, h + 4); ctx.closePath(); ctx.fillStyle = t.base; ctx.fill();
+    // slip face
+    ctx.beginPath(); ctx.moveTo(crest[0][0], crest[0][1]); for (const p of crest) ctx.lineTo(p[0], p[1]); ctx.lineTo(crestX + R + 10, h + 4); ctx.lineTo(crestX + R + 10, top - 10); ctx.closePath(); ctx.fillStyle = t.shade; ctx.fill();
+    if (o.detail) {
+      // wind ripples on the sunlit side, pen line along the crest
+      for (let i = 0; i < 5; i++) {
+        const f = 0.25 + i * 0.13 + jit(rnd, 0.03), x0 = crestX - L * (0.75 - f * 0.3), len = L * (0.3 + rnd() * 0.3), y = o.base - o.height * (0.12 + f * 0.6);
+        brushStroke(ctx, sampleCurve([[x0, y + 4 * u], [x0 + len * 0.5, y - o.height * 0.03], [x0 + len, y - o.height * 0.1]], 4), 1.3 * u, { color: i % 2 ? t.base : t.shade, taper: 0.45, swell: 0 });
+      }
+      if (t.ink) brushStroke(ctx, crest, 1.8 * u, { color: t.ink, taperStart: 0.05, taperEnd: 0.5, swell: 0.2 });
+    }
+  });
+  contour(ctx, trace, t.ink, 1.2);
+}
+
+// --------------------------------------------------------------------- small drawn structures
+
+/** House seen from afar: lit wall, shaded gable end, pitched or flat roof. c: { wallLight, wall, roof, roofShade, ink }. */
+function paintHouse(ctx, x, y, wd, ht, c, flat, rnd) {
+  const gable = wd * (0.28 + rnd() * 0.12), roofH = flat ? ht * 0.12 : ht * (0.34 + rnd() * 0.12);
+  if (c.ink) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.strokeRect(x - wd / 2, y - ht, wd, ht); }
+  ctx.fillStyle = c.wallLight; ctx.fillRect(x - wd / 2, y - ht, wd, ht);
+  ctx.fillStyle = c.wall; ctx.fillRect(x + wd / 2 - gable, y - ht, gable, ht);
+  const roof = flat ? [[x - wd / 2 - 1, y - ht], [x - wd / 2 - 1, y - ht - roofH], [x + wd / 2 + 1, y - ht - roofH], [x + wd / 2 + 1, y - ht]]
+    : [[x - wd / 2 - 2, y - ht], [x - wd / 2 + roofH * 0.5, y - ht - roofH], [x + wd / 2 - gable * 0.5, y - ht - roofH], [x + wd / 2 + 2, y - ht]];
+  ctx.beginPath(); tracePolygon(ctx, roof);
+  if (c.ink) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.stroke(); }
+  ctx.fillStyle = c.roof; ctx.fill();
+  if (!flat) { ctx.beginPath(); tracePolygon(ctx, [[x + wd / 2 - gable, y - ht], [x + wd / 2 - gable * 0.5, y - ht - roofH], [x + wd / 2 + 2, y - ht]]); ctx.fillStyle = c.roofShade; ctx.fill(); }
+  // dark openings
+  ctx.fillStyle = c.roofShade;
+  for (let i = 0, n = Math.max(1, Math.round(wd / 9)); i < n; i++) ctx.fillRect(x - wd / 2 + (wd - gable) * ((i + 0.5) / n) - 1, y - ht * 0.62, 2, ht * 0.26);
+}
+
+/** Cypress or poplar: narrow flame, two tones. */
+function paintSpike(ctx, x, y, ht, wd, dark, light, ink) {
+  const trace = (g) => { g.moveTo(x - wd * 0.3, y); g.quadraticCurveTo(x - wd * 0.62, y - ht * 0.45, x, y - ht); g.quadraticCurveTo(x + wd * 0.62, y - ht * 0.45, x + wd * 0.3, y); g.closePath(); };
+  if (ink) { ctx.beginPath(); trace(ctx); ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke(); }
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = dark; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - wd * 0.3, y); ctx.quadraticCurveTo(x - wd * 0.62, y - ht * 0.45, x, y - ht); ctx.quadraticCurveTo(x - wd * 0.1, y - ht * 0.5, x - wd * 0.08, y); ctx.closePath(); ctx.fillStyle = light; ctx.fill();
+}
+
+/** Round tree crown on a short trunk (umbrella pine when flat). */
+function paintTree(ctx, x, y, size, flat, dark, light, ink, rnd) {
+  const rx = size * (flat ? 0.75 : 0.5), ry = size * (flat ? 0.3 : 0.48), cy = y - size * (flat ? 0.78 : 0.56), lumps = [];
+  for (let i = 0; i < 7; i++) { const a = (i / 7) * TAU + rnd(); lumps.push([x + Math.cos(a) * rx * (0.9 + rnd() * 0.2), cy + Math.sin(a) * ry * (0.9 + rnd() * 0.2)]); }
+  const trace = (g) => { g.moveTo(lumps[0][0], lumps[0][1]); for (let i = 0; i < 7; i++) { const a = lumps[i], b = lumps[(i + 1) % 7]; g.quadraticCurveTo((a[0] + b[0]) / 2 + (b[1] - a[1]) * 0.5, (a[1] + b[1]) / 2 - (b[0] - a[0]) * 0.5, b[0], b[1]); } g.closePath(); };
+  ctx.fillStyle = ink || dark; ctx.fillRect(x - size * 0.05, cy, size * 0.1, y - cy);
+  if (ink) { ctx.beginPath(); trace(ctx); ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke(); }
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = dark; ctx.fill();
+  // lit side: the same crown, smaller, pulled toward the light
+  ctx.save(); ctx.translate(x - rx * 0.2, cy - ry * 0.24); ctx.scale(0.66, 0.62); ctx.translate(-x, -cy); ctx.beginPath(); trace(ctx); ctx.fillStyle = light; ctx.fill(); ctx.restore();
+}
+
+/** Small palm silhouette: bent trunk and a star of drooping fronds. */
+function paintPalm(ctx, x, y, size, dark, light, ink, rnd) {
+  const lean = jit(rnd, size * 0.25), top = [x + lean, y - size];
+  brushStroke(ctx, sampleCurve([[x, y], [x + lean * 0.3, y - size * 0.5], top], 5), size * 0.07, { color: ink || dark, taperStart: 0, taperEnd: 0.2, swell: 0 });
+  for (let i = 0; i < 7; i++) {
+    const a = -Math.PI * (0.04 + (i / 6) * 0.92) + jit(rnd, 0.12), len = size * (0.34 + rnd() * 0.12), dx = Math.cos(a), dy = Math.sin(a);
+    const frond = sampleCurve([top, [top[0] + dx * len * 0.55, top[1] + dy * len * 0.6 - len * 0.1], [top[0] + dx * len, top[1] + dy * len * 0.3 + len * 0.42]], 4);
+    brushStroke(ctx, frond, size * 0.1, { color: i % 2 ? dark : light, taperStart: 0.1, taperEnd: 0.6, swell: 0 });
   }
+}
+
+/** Sailing boat on the sea: hull stroke, main sail and jib. */
+function paintSail(ctx, x, y, size, sail, shade, hull, rnd) {
+  const heel = jit(rnd, size * 0.08), flip = rnd() < 0.5 ? -1 : 1;
+  ctx.fillStyle = hull; ctx.beginPath(); tracePolygon(ctx, [[x - size * 0.42, y - size * 0.07], [x + size * 0.46, y - size * 0.07], [x + size * 0.34, y], [x - size * 0.34, y]]); ctx.fill();
+  ctx.fillStyle = sail; ctx.beginPath(); tracePolygon(ctx, [[x + flip * size * 0.02, y - size * 0.1], [x + flip * size * 0.02 + heel, y - size], [x + flip * size * 0.36, y - size * 0.14]]); ctx.fill();
+  ctx.fillStyle = shade; ctx.beginPath(); tracePolygon(ctx, [[x - flip * size * 0.04, y - size * 0.1], [x - flip * size * 0.04 + heel, y - size * 0.86], [x - flip * size * 0.3, y - size * 0.12]]); ctx.fill();
+}
+
+/** City building: lit front, shaded side, roof clutter and rows of windows. c: { light, base, shade, ink }. */
+function paintBlock(ctx, x, y, wd, ht, c, style, u, rnd) {
+  const side = wd * (0.2 + rnd() * 0.16), x0 = x - wd / 2, top = y - ht;
+  const roof = [];
+  if (style === 'spire') roof.push([[x - wd * 0.12, top], [x - wd * 0.06, top - ht * 0.16], [x, top - ht * 0.42], [x + wd * 0.06, top - ht * 0.16], [x + wd * 0.12, top]]);
+  else if (style === 'step') roof.push([[x0 + wd * 0.16, top], [x0 + wd * 0.16, top - ht * 0.09], [x0 + wd * 0.34, top - ht * 0.09], [x0 + wd * 0.34, top - ht * 0.17], [x0 + wd * 0.7, top - ht * 0.17], [x0 + wd * 0.7, top - ht * 0.09], [x0 + wd * 0.86, top - ht * 0.09], [x0 + wd * 0.86, top]]);
+  else if (style === 'slant') roof.push([[x0, top], [x0, top - ht * 0.05], [x0 + wd, top - ht * 0.2], [x0 + wd, top]]);
+  else if (style === 'plant') roof.push([[x0 + wd * 0.12, top], [x0 + wd * 0.12, top - 5 * u], [x0 + wd * 0.4, top - 5 * u], [x0 + wd * 0.4, top]], [[x0 + wd * 0.62, top], [x0 + wd * 0.62, top - 9 * u], [x0 + wd * 0.68, top - 9 * u], [x0 + wd * 0.68, top]]);
+  const trace = (g) => { g.rect(x0, top, wd, ht + 4); for (const r of roof) tracePolygon(g, r); };
+  if (c.ink) { ctx.beginPath(); trace(ctx); ctx.strokeStyle = c.ink; ctx.lineWidth = 2.4 * u; ctx.lineJoin = 'miter'; ctx.stroke(); }
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = c.light; ctx.fill();
+  ctx.fillStyle = c.base; ctx.fillRect(x0 + wd - side, top, side, ht + 4);
+  if (style === 'spire' || style === 'step') { ctx.beginPath(); for (const r of roof) tracePolygon(ctx, r); ctx.fillStyle = c.base; ctx.fill(); }
+  if (c.windows) {
+    // window bands on the lit front, darker on the side
+    const rows = Math.max(2, Math.round(ht / (c.windows * u))), bandH = (ht / rows) * 0.36;
+    for (let r = 0; r < rows; r++) {
+      const yy = top + (r + 0.4) * (ht / rows);
+      ctx.fillStyle = c.base; ctx.fillRect(x0 + 2 * u, yy, wd - side - 4 * u, bandH);
+      ctx.fillStyle = c.shade; ctx.fillRect(x0 + wd - side + 1.5 * u, yy, side - 3 * u, bandH);
+    }
+  }
+}
+
+/** Tower crane: lattice mast, jib and counter-jib with ballast, hook line. */
+function paintCrane(ctx, x, y, ht, reach, color, u, rnd) {
+  const flip = rnd() < 0.5 ? -1 : 1, top = y - ht, lw = Math.max(1.6, 2.2 * u);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw; ctx.lineJoin = 'miter';
+  ctx.fillRect(x - 1.5 * lw, top, lw, ht); ctx.fillRect(x + 0.5 * lw, top, lw, ht);
+  ctx.lineWidth = lw * 0.5; ctx.beginPath();
+  for (let yy = top; yy < y; yy += lw * 4.5) { ctx.moveTo(x - 1.5 * lw, yy); ctx.lineTo(x + 1.5 * lw, yy + lw * 2.2); ctx.lineTo(x - 1.5 * lw, yy + lw * 4.5); }
+  ctx.stroke();
+  ctx.fillRect(x - flip * reach * 0.3, top - lw * 0.5, flip * reach * 1.3, lw * 1.2);
+  ctx.fillRect(x - flip * reach * 0.3, top + lw * 0.4, flip * reach * 0.12, lw * 2.6);
+  ctx.beginPath(); ctx.moveTo(x - flip * reach * 0.3, top); ctx.lineTo(x, top - ht * 0.11); ctx.lineTo(x + flip * reach * 0.62, top); ctx.stroke();
+  ctx.fillRect(x - lw, top - ht * 0.11, lw * 2, ht * 0.11);
+  const hook = x + flip * reach * (0.35 + rnd() * 0.5);
+  ctx.fillRect(hook, top, lw * 0.5, ht * (0.2 + rnd() * 0.4));
+}
+
+/** Factory chimney with a warning band and a flat plume of smoke leaning with the wind. */
+function paintChimney(ctx, x, y, ht, wd, c, plume, u, rnd) {
+  const top = y - ht, shaft = [[x - wd * 0.5, y], [x - wd * 0.32, top], [x + wd * 0.32, top], [x + wd * 0.5, y]];
+  if (plume) {
+    const puffs = [];
+    for (let i = 0; i < 5; i++) puffs.push([x + (8 + i * 15) * u * (1 + rnd() * 0.3), top - (5 + i * 5.5 + rnd() * 4) * u, (6 + i * 3.2 + rnd() * 2) * u]);
+    for (const [color, shift] of [[plume.shade, 0], [plume.light, -1]]) {
+      ctx.fillStyle = color; ctx.beginPath();
+      for (const [px, py, r] of puffs) { ctx.moveTo(px + r + shift * r * 0.25, py + shift * r * 0.3); ctx.arc(px + shift * r * 0.25, py + shift * r * 0.3, r * (shift ? 0.8 : 1), 0, TAU); }
+      ctx.fill();
+    }
+  }
+  if (c.ink) { ctx.beginPath(); tracePolygon(ctx, shaft); ctx.strokeStyle = c.ink; ctx.lineWidth = 2.4 * u; ctx.lineJoin = 'miter'; ctx.stroke(); }
+  ctx.beginPath(); tracePolygon(ctx, shaft); ctx.fillStyle = c.light; ctx.fill();
+  const half = (f) => wd * (0.32 + 0.18 * f);                               // half width at a fraction f of the height below the top
+  ctx.beginPath(); tracePolygon(ctx, [[x + wd * 0.06, y], [x + wd * 0.06, top], [x + half(0), top], [x + half(1), y]]); ctx.fillStyle = c.base; ctx.fill();
+  ctx.fillStyle = c.band;
+  for (const f of [0.06, 0.2]) { ctx.beginPath(); tracePolygon(ctx, [[x - half(f), top + ht * f], [x + half(f), top + ht * f], [x + half(f + 0.07), top + ht * (f + 0.07)], [x - half(f + 0.07), top + ht * (f + 0.07)]]); ctx.fill(); }
+}
+
+// ------------------------------------------------------------------------------------- clouds
+
+/**
+ * Cumulus: a heap of round billows on a flat base. o: { x, y (base), width, height, c: { light,
+ * shade, deep, line }, shadow (0..1 share of shade), deepBase }. Every billow is a circle cut at
+ * the base line; the big ones carry a crescent of shade, the underside is a scalloped flat tone.
+ */
+function paintCumulus(env, o, rnd) {
+  const { ctx, u } = env, W = o.width, H = o.height, base = o.y, puffs = [];
+  const summit = 0.34 + rnd() * 0.32, bigs = Math.max(2, Math.round(W / (H * 0.8)));
+  const dome = (t) => Math.pow(Math.max(0, 1 - Math.abs(t - summit) / Math.max(summit, 1 - summit)), 0.75);
+  for (let i = 0; i < bigs; i++) {
+    const t = (i + 0.5 + jit(rnd, 0.22)) / bigs, d = dome(t), r = H * (0.22 + 0.17 * d) * (0.9 + rnd() * 0.22), topY = base - H * (0.44 + 0.56 * d * (0.82 + rnd() * 0.18));
+    puffs.push({ x: o.x + (t - 0.5) * W * 0.7, y: topY + r, r, rank: topY, crescent: true });
+  }
+  for (let i = 0, n = bigs * 2 + 1; i < n; i++) {
+    const t = (i + rnd()) / n, r = H * (0.13 + rnd() * 0.1), topY = base - H * (0.26 + 0.52 * dome(t) * rnd());
+    puffs.push({ x: o.x + (t - 0.5) * W * 0.9, y: topY + r, r, rank: topY + H, crescent: rnd() < 0.45 });
+  }
+  for (let i = 0, n = Math.max(3, Math.round(W / (H * 0.34))); i < n; i++) {
+    const r = H * (0.13 + rnd() * 0.09), t = (i + 0.2 + rnd() * 0.6) / n;
+    puffs.push({ x: o.x - W / 2 + r * 0.7 + (W - r * 1.4) * t, y: base - r * (0.25 + rnd() * 0.5), r, rank: base + i, crescent: false });
+  }
+  puffs.sort((a, b) => a.rank - b.rank);
+  const puffPath = (g, p, dx = 0, dy = 0) => {
+    const cx = p.x + dx, cy = p.y + dy;
+    if (cy + p.r <= base) { g.moveTo(cx + p.r, cy); g.arc(cx, cy, p.r, 0, TAU); return; }
+    const a0 = Math.asin(Math.max(-1, Math.min(1, (base - cy) / p.r)));
+    g.moveTo(cx - Math.cos(a0) * p.r, base); g.arc(cx, cy, p.r, Math.PI - a0, TAU + a0); g.closePath();
+  };
+  const slab = (g) => g.rect(o.x - W * 0.3, base - H * 0.4, W * 0.6, H * 0.4);
+  const all = (g) => { slab(g); for (const p of puffs) puffPath(g, p); };
+  ctx.beginPath(); slab(ctx); ctx.fillStyle = o.c.light; ctx.fill();
+  const shift = 0.07 + o.shadow * 0.13;
+  for (const p of puffs) {
+    ctx.beginPath(); puffPath(ctx, p); ctx.fillStyle = p.crescent ? o.c.shade : o.c.light; ctx.fill();
+    if (p.crescent) inside(ctx, () => { ctx.beginPath(); puffPath(ctx, p, -p.r * shift * 0.8, -p.r * shift); ctx.fillStyle = o.c.light; ctx.fill(); });
+  }
+  // underside: flat tone with a scalloped upper edge, darker strip along the base of heavy clouds
+  inside(ctx, () => {
+    const band = (depth, color, bumps) => {
+      ctx.beginPath(); ctx.moveTo(o.x - W * 0.6, base + 2); ctx.lineTo(o.x - W * 0.6, base - H * depth * 0.5);
+      for (let i = 0; i < bumps; i++) { const x0 = o.x - W * 0.6 + (W * 1.2 * i) / bumps, x1 = o.x - W * 0.6 + (W * 1.2 * (i + 1)) / bumps, d = H * depth * (0.6 + rnd() * 0.8); ctx.quadraticCurveTo((x0 + x1) / 2, base - d * 1.5, x1, base - H * depth * (0.3 + rnd() * 0.3)); }
+      ctx.lineTo(o.x + W * 0.6, base + 2); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    };
+    band(0.16 + o.shadow * 0.26, o.c.shade, Math.max(3, Math.round(W / (H * 0.5))));
+    if (o.deepBase) band(0.07 + o.shadow * 0.1, o.c.deep, Math.max(3, Math.round(W / (H * 0.7))));
+  });
+  // thin soft outline in a darker cloud tone, slipped under the fills
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.lineJoin = 'round'; ctx.strokeStyle = o.c.line; ctx.lineWidth = 3 * u;
+  ctx.beginPath(); all(ctx); ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/** Stratus: a long flat streak, lit on top, shaded underneath, tapering at both ends. */
+function paintStratus(env, o, rnd) {
+  const { ctx } = env, half = o.width / 2, upper = [], lower = [];
+  const n = 9;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, taper = Math.pow(Math.sin(Math.PI * t), 0.6);
+    upper.push([o.x - half + o.width * t, o.y - o.height * taper * (0.55 + (i % 2) * 0.45) * (0.8 + rnd() * 0.4)]);
+    lower.push([o.x - half + o.width * t, o.y + o.height * 0.22 * taper * (0.5 + rnd())]);
+  }
+  const outline = sampleCurve(upper, 5).concat(sampleCurve(lower, 5).reverse());
+  const trace = (g) => tracePolygon(g, outline);
+  ctx.beginPath(); trace(ctx); ctx.fillStyle = o.c.shade; ctx.fill();
+  inside(ctx, () => { ctx.beginPath(); tracePolygon(ctx, outline.map(([x, y]) => [x - o.width * 0.02, y - o.height * (0.3 + 0.3 * (1 - o.shadow))])); ctx.fillStyle = o.c.light; ctx.fill(); });
+  contour(ctx, trace, o.c.line, 1.2 * env.u);
+}
+
+/** How overcast a palette is (0 clear blue sky .. 1 grey sky), read from the saturation of its zenith. */
+function overcast(P) {
+  const [r, g, b] = hexToRgb(P.skyTop), max = Math.max(r, g, b), min = Math.min(r, g, b);
+  return Math.max(0, Math.min(1, (0.7 - (max - min) / (max || 1)) / 0.24));
+}
+
+const CLOUD_STYLE = {
+  hills: { cumulus: 8, stratus: 3, size: 1 }, mountains: { cumulus: 7, stratus: 2, size: 1.15 }, sea: { cumulus: 9, stratus: 2, size: 0.9 },
+  dunes: { cumulus: 3, stratus: 5, size: 0.7 }, mesas: { cumulus: 4, stratus: 4, size: 0.85 }, city: { cumulus: 7, stratus: 4, size: 0.95 }, flat: { cumulus: 9, stratus: 2, size: 1.1 },
+};
+
+function paintClouds(env) {
+  const { w, h, u, y0, P, rnd } = env, grey = overcast(P), style = CLOUD_STYLE[env.kind];
+  // clouds near the horizon are seen through more air: paler, smaller, flatter
+  const colors = (depth, dark) => {
+    const air = depth * 0.5;
+    return { light: mixHex(dark ? mixHex(P.cloudLight, P.cloudShade, 0.35) : P.cloudLight, P.skyLow, air), shade: mixHex(dark ? mixHex(P.cloudShade, P.cloudDeep, 0.5) : P.cloudShade, P.skyLow, air),
+      deep: mixHex(P.cloudDeep, P.skyLow, air), line: mixHex(mixHex(P.cloudDeep, P.skyTop, 0.35), P.skyLow, air * 0.8) };
+  };
+  const items = [];
+  // high streaks first, then heaps from the horizon upward (the nearest, highest clouds last)
+  scatter(rnd, w, Math.round(style.stratus * (1 + grey * 1.6)), 0.4, (x, r) => {
+    const level = r(), y = lerp(y0 - 90 * u, 70 * u, level), width = (260 + r() * 420) * u * (0.6 + level * 0.6);
+    items.push({ order: level * 0.2, x, half: width / 2, seed: newSeed(r), paint: (rr, e) => paintStratus(e, { x, y, width, height: (9 + rr() * 9) * u * (0.6 + level * 0.7), c: colors(1 - level, grey > 0.5 && rr() < 0.6), shadow: 0.4 + grey * 0.4 }, rr) });
+  });
+  scatter(rnd, w, Math.round(style.cumulus * (1 + grey * 1.3)), 0.42, (x, r) => {
+    const level = Math.pow(r(), 1.25 - grey * 0.4), y = lerp(y0 - 70 * u, 190 * u, level), scale = style.size * (0.5 + level * 0.9) * (0.8 + r() * 0.5) * (1 + grey * 0.25);
+    const width = (190 + r() * 230) * u * scale, height = Math.min(y - 14 * u, (70 + r() * 60) * u * scale * (0.6 + level * 0.4));
+    const dark = grey > 0.3 && r() < grey * 0.75;
+    items.push({ order: 1 + level, x, half: width * 0.62 + height * 0.3, seed: newSeed(r), paint: (rr, e) => paintCumulus(e, { x, y, width, height, c: colors(1 - level, dark), shadow: 0.34 + grey * 0.5 + (dark ? 0.2 : 0), deepBase: dark || grey > 0.6 }, rr) });
+  });
+  items.sort((a, b) => a.order - b.order);
+  for (const it of items) stamp(env, it.x - it.half, it.x + it.half, it.seed, it.paint);
+  void h;
+}
+
+// ------------------------------------------------------------------------- far relief by kind
+
+function farTones(P, amount = 0) { return hazed(tones(P.farReliefLight, P.farRelief, P.farReliefShade), P.haze, amount); }
+
+/** Row of objects of one kind painted back to front (the tallest first). */
+function row(env, count, jitter, make) {
+  const list = [];
+  scatter(env.rnd, env.w, count, jitter, (x, r, i) => { const o = make(x, r, i); if (o) list.push({ o, seed: newSeed(r) }); });
+  list.sort((a, b) => (b.o.rank ?? b.o.height) - (a.o.rank ?? a.o.height));
+  for (const { o, seed } of list) stamp(env, o.x - o.reach, o.x + o.reach, seed, (r, e) => o.paint(o, r, e));
+}
+
+function farHills(env) {
+  const { u, y0, P } = env;
+  const back = farTones(P, 0.42), mid = farTones(P, 0.16), front = tones(P.farRelief, mixHex(P.farRelief, P.farReliefShade, 0.55), P.farReliefShade);
+  row(env, 6, 0.3, (x, r) => ({ x, halfW: (520 + r() * 420) * u, height: (120 + r() * 110) * u, base: y0, tones: back, edge: 'smooth', get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  row(env, 8, 0.3, (x, r) => ({ x, halfW: (380 + r() * 360) * u, height: (70 + r() * 80) * u, base: y0, tones: mid, edge: 'scallop', grain: 9 * u, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 320) * u, height: (36 + r() * 52) * u, base: y0, tones: front, edge: 'scallop', grain: 12 * u, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  groundHaze(env, 120, 0.5);
+}
+
+function farMountains(env) {
+  const { u, y0, P } = env;
+  const backRock = hazed(tones(P.farReliefLight, P.farRelief, P.farReliefShade), P.haze, 0.25);
+  const snowShade = mixHex(P.snow, P.farRelief, 0.42);
+  // main range: high snowy summits
+  row(env, 11, 0.32, (x, r) => {
+    const height = (190 + Math.pow(r(), 1.3) * 190) * u;
+    return { x, height, left: height * (1.0 + r() * 0.7), right: height * (0.9 + r() * 0.7), base: y0, tones: backRock, snow: P.snow, snowShade, snowLine: (150 + r() * 40) * u, detail: 2, get reach() { return Math.max(this.left, this.right) * 1.25; }, paint: (o, rr, e) => paintPeak(e, o, rr) };
+  });
+  // lower spurs in front of it, darker, with little snow
+  const frontRock = tones(P.farRelief, P.farReliefShade, P.farReliefShade);
+  row(env, 12, 0.35, (x, r) => {
+    const height = (80 + r() * 100) * u;
+    return { x, height, left: height * (1.5 + r() * 1.0), right: height * (1.4 + r() * 1.0), base: y0, tones: frontRock, snow: mixHex(P.snow, P.farReliefLight, 0.25), snowShade, snowLine: height > 158 * u ? 150 * u : 0, rough: 0.08, detail: 1, get reach() { return Math.max(this.left, this.right) * 1.25; }, paint: (o, rr, e) => paintPeak(e, o, rr) };
+  });
+  groundHaze(env, 150, 0.55);
+}
+
+function farSea(env) {
+  const { ctx, w, h, u, y0, P, rnd } = env;
+  // the sea rises a little above the true horizon so that it shows over the far end of the land
+  const seaTop = y0 - 44 * u, far = mixHex(P.waterB, P.haze, 0.55), mid = mixHex(P.waterB, P.haze, 0.2);
+  // headlands and islands standing on the sea horizon
+  const land = farTones(P, 0.3), nearer = farTones(P, 0.05);
+  row(env, 5, 0.4, (x, r) => ({ x, halfW: (300 + r() * 520) * u, height: (40 + r() * 90) * u, base: seaTop + 2 * u, tones: land, edge: 'smooth', power: 0.6 + r() * 0.3, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  ctx.fillStyle = far; ctx.fillRect(0, seaTop, w, h - seaTop);
+  ctx.fillStyle = mid; ctx.fillRect(0, seaTop + 13 * u, w, h - seaTop);
+  ctx.fillStyle = P.waterB; ctx.fillRect(0, seaTop + 27 * u, w, h - seaTop);
+  ctx.fillStyle = P.waterA; ctx.fillRect(0, seaTop + 40 * u, w, h - seaTop);
+  // ragged joins between the bands of water, glitter toward the horizon
+  const streak = (y, color, count, len) => scatter(rnd, w, count, 0.5, (x, r) => { const l = len * (0.4 + r()) * u, yy = y + jit(r, 2.5 * u); wrapped(ctx, w, x - l, x + l, () => brushStroke(ctx, [[x - l / 2, yy], [x, yy + 0.4 * u], [x + l / 2, yy]], (1.6 + r() * 1.6) * u, { color, taper: 0.45, swell: 0 })); });
+  streak(seaTop + 13 * u, far, 26, 150); streak(seaTop + 27 * u, mid, 22, 190); streak(seaTop + 40 * u, P.waterB, 18, 240);
+  streak(seaTop + 6 * u, mixHex(P.cloudLight, far, 0.35), 16, 120); streak(seaTop + 21 * u, mixHex(P.cloudLight, mid, 0.5), 10, 90);
+  // a nearer island with a lighthouse, sails
+  row(env, 2, 0.3, (x, r) => ({ x, halfW: (150 + r() * 160) * u, height: (26 + r() * 30) * u, base: seaTop + 9 * u, tones: nearer, edge: 'smooth', power: 0.7, get reach() { return this.halfW + 20 * u; }, paint: (o, rr, e) => {
+    const ctx = e.ctx, yAt = paintHill(e, o, rr), lx = o.x + o.halfW * jit(rr, 0.3), ly = yAt(lx) + 2 * u;
+    ctx.fillStyle = mixHex(P.cloudLight, P.haze, 0.3); ctx.fillRect(lx - 1.6 * u, ly - 15 * u, 3.2 * u, 15 * u);
+    ctx.fillStyle = nearer.shade; ctx.fillRect(lx - 2.4 * u, ly - 18 * u, 4.8 * u, 3.4 * u);
+    brushStroke(ctx, [[o.x - o.halfW * 0.9, o.base + 1.5 * u], [o.x, o.base + 2 * u], [o.x + o.halfW * 0.9, o.base + 1.5 * u]], 2 * u, { color: mixHex(P.cloudLight, far, 0.3), taper: 0.3, swell: 0.3 });
+  } }));
+  const sail = mixHex(P.cloudLight, P.haze, 0.15), sailShade = mixHex(P.cloudShade, P.haze, 0.2), hull = mixHex(P.farReliefShade, P.waterA, 0.4);
+  scatter(rnd, w, 9, 0.45, (x, r) => {
+    const depth = r(), size = (9 + depth * 17) * u, y = seaTop + (4 + depth * 30) * u, seed = newSeed(r);
+    wrapped(ctx, w, x - size, x + size, () => paintSail(ctx, x, y, size, sail, sailShade, hull, seeded(seed)));
+  });
+  // a freighter on the horizon
+  scatter(rnd, w, 2, 0.4, (x, r) => {
+    const s = (30 + r() * 16) * u, y = seaTop + 2.5 * u, c = mixHex(P.farReliefShade, P.haze, 0.25);
+    wrapped(ctx, w, x - s, x + s, () => { ctx.fillStyle = c; ctx.fillRect(x - s / 2, y - 3 * u, s, 3 * u); ctx.fillRect(x + s * 0.24, y - 7.5 * u, s * 0.16, 4.5 * u); ctx.fillRect(x + s * 0.3, y - 10 * u, 2 * u, 3 * u); });
+  });
+}
+
+function farDunes(env) {
+  const { u, y0, P } = env;
+  const back = farTones(P, 0.4), mid = farTones(P, 0.12);
+  // a distant plateau, then two ranks of sand ridges
+  row(env, 4, 0.3, (x, r) => ({ x, top: (160 + r() * 300) * u, height: (60 + r() * 50) * u, cap: 0.3, apron: (150 + r() * 120) * u, base: y0, tones: back, strata: [[0.5, 0.12]], get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr, e) => paintMesa(e, o, rr) }));
+  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 380) * u, height: (50 + r() * 80) * u, base: y0, tones: mid, get reach() { return this.halfW; }, paint: (o, rr, e) => paintDune(e, o, rr) }));
+  row(env, 10, 0.3, (x, r) => ({ x, halfW: (260 + r() * 300) * u, height: (26 + r() * 44) * u, base: y0, tones: tones(P.farReliefLight, P.farRelief, P.farReliefShade), get reach() { return this.halfW; }, paint: (o, rr, e) => paintDune(e, o, rr) }));
+  groundHaze(env, 100, 0.45);
+}
+
+function farMesas(env) {
+  const { u, y0, P } = env;
+  const back = farTones(P, 0.42), mid = farTones(P, 0.08);
+  const strataBack = [[0.3, 0.07]], strataMid = [[0.22, 0.06], [0.52, 0.1], [0.8, 0.04]];
+  row(env, 5, 0.35, (x, r) => { const height = (120 + r() * 90) * u; return { x, top: (120 + r() * r() * 520) * u, height, cap: 0.5 + r() * 0.15, apron: height * (0.7 + r() * 0.4), base: y0, tones: back, strata: strataBack, get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr, e) => paintMesa(e, o, rr) }; });
+  row(env, 7, 0.35, (x, r, i) => {
+    const spire = i % 3 === 1, height = (spire ? 110 + r() * 80 : 70 + r() * 80) * u;
+    return { x, top: (spire ? 12 + r() * 22 : 70 + r() * r() * 330) * u, height, cap: spire ? 0.66 : 0.48 + r() * 0.14, apron: height * (0.6 + r() * 0.4), base: y0, tones: mid, strata: strataMid, get reach() { return this.top + this.apron * 1.6; }, paint: (o, rr, e) => paintMesa(e, o, rr) };
+  });
+  groundHaze(env, 110, 0.45);
+}
+
+function farCity(env) {
+  const { ctx, w, h, u, y0, P, rnd } = env;
+  // low hills behind the town, then two ranks of towers lost in the haze
+  row(env, 5, 0.3, (x, r) => ({ x, halfW: (500 + r() * 500) * u, height: (30 + r() * 46) * u, base: y0, tones: farTones(P, 0.5), edge: 'smooth', get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  const ranks = [{ c: farTones(P, 0.42), count: 60, height: 54, width: 20 }, { c: farTones(P, 0.12), count: 54, height: 78, width: 26 }];
+  for (const rank of ranks) {
+    // towers cluster into a few districts
+    const centres = [rnd(), rnd(), rnd()];
+    scatter(rnd, w, rank.count, 0.5, (x, r) => {
+      let near = 1; for (const c of centres) { const d = Math.abs(((x / w - c + 1.5) % 1) - 0.5); near = Math.min(near, d); }
+      const cluster = Math.pow(Math.max(0, 1 - near * 7), 1.5), tall = cluster > 0.2 && r() < 0.6;
+      const ht = (tall ? rank.height * (0.8 + cluster * 1.4 + r() * 0.8) : rank.height * (0.2 + r() * 0.45)) * u, wd = rank.width * (0.7 + r() * (tall ? 0.7 : 1.8)) * u;
+      const style = tall ? ['flat', 'spire', 'step', 'slant', 'flat'][Math.floor(r() * 5)] : 'flat', seed = newSeed(r);
+      wrapped(ctx, w, x - wd, x + wd, () => paintBlock(ctx, x, y0, wd, ht, { light: rank.c.light, base: rank.c.base, shade: rank.c.shade, windows: tall && rank.height > 60 ? 9 : 0 }, style, u, seeded(seed)));
+    });
+  }
+  ctx.fillStyle = mixHex(P.farRelief, P.haze, 0.2); ctx.fillRect(0, y0 - 5 * u, w, h - y0 + 5 * u);
+  groundHaze(env, 90, 0.5);
+}
+
+function farFlat(env) {
+  const { ctx, w, h, u, y0, P, rnd } = env;
+  // very low swells on the horizon, a distant line of woods, a few landmarks
+  row(env, 5, 0.3, (x, r) => ({ x, halfW: (600 + r() * 600) * u, height: (16 + r() * 22) * u, base: y0, tones: farTones(P, 0.45), edge: 'smooth', power: 0.7, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  const wood = farTones(P, 0.1);
+  row(env, 12, 0.4, (x, r) => ({ x, halfW: (140 + r() * 260) * u, height: (9 + r() * 12) * u, base: y0, tones: wood, edge: 'scallop', grain: 8 * u, power: 0.35, skew: 0, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  // water towers, a church, pylons of a power line marching across the plain
+  scatter(rnd, w, 4, 0.4, (x, r, i) => {
+    const c = wood.shade, s = (16 + r() * 8) * u;
+    wrapped(ctx, w, x - s, x + s, () => {
+      ctx.fillStyle = c;
+      if (i % 2) { ctx.fillRect(x - s * 0.08, y0 - s * 1.5, s * 0.16, s * 1.5); ctx.beginPath(); ctx.ellipse(x, y0 - s * 1.55, s * 0.36, s * 0.2, 0, 0, TAU); ctx.fill(); } else { ctx.fillRect(x - s * 0.16, y0 - s, s * 0.32, s); ctx.beginPath(); tracePolygon(ctx, [[x - s * 0.2, y0 - s], [x, y0 - s * 2], [x + s * 0.2, y0 - s]]); ctx.fill(); ctx.fillRect(x + s * 0.16, y0 - s * 0.5, s * 0.9, s * 0.5); }
+    });
+  });
+  const pylonGap = w / 14, pylon = mixHex(P.farReliefShade, P.haze, 0.2);
+  for (let i = 0; i < 14; i++) {
+    const x = (i + 0.5) * pylonGap, s = 26 * u;
+    ctx.strokeStyle = pylon; ctx.lineWidth = 1.5 * u; ctx.beginPath();
+    ctx.moveTo(x - s * 0.16, y0); ctx.lineTo(x - s * 0.04, y0 - s); ctx.lineTo(x + s * 0.04, y0 - s); ctx.lineTo(x + s * 0.16, y0);
+    ctx.moveTo(x - s * 0.3, y0 - s * 0.82); ctx.lineTo(x + s * 0.3, y0 - s * 0.82); ctx.moveTo(x - s * 0.22, y0 - s * 0.62); ctx.lineTo(x + s * 0.22, y0 - s * 0.62);
+    ctx.stroke();
+    ctx.lineWidth = 1 * u; ctx.beginPath(); ctx.moveTo(x + s * 0.3, y0 - s * 0.82); ctx.quadraticCurveTo(x + pylonGap / 2, y0 - s * 0.62, x + pylonGap - s * 0.3, y0 - s * 0.82); ctx.stroke();
+  }
+  ctx.fillStyle = wood.base; ctx.fillRect(0, y0 - 3 * u, w, h - y0 + 3 * u);
+  groundHaze(env, 60, 0.45);
+}
+
+// ------------------------------------------------------------------------ near relief by kind
+
+function nearTones(P, amount = 0) {
+  return hazed(tones(P.nearReliefLight, P.nearRelief, P.nearReliefShade, mixHex(P.ink, P.nearReliefShade, 0.45)), P.haze, amount);
+}
+
+/** Colours of distant buildings: the palette's walls and roofs seen through some air. */
+function builtColors(P, amount, ink) {
+  return { wallLight: mixHex(P.wallLight, P.haze, amount), wall: mixHex(P.wallShade, P.haze, amount), roof: mixHex(P.roof, P.haze, amount), roofShade: mixHex(P.roofShade, P.haze, amount), ink };
+}
+
+function nearHills(env) {
+  const { ctx, u, y0, P } = env;
+  const back = nearTones(P, 0.34), front = nearTones(P, 0.08);
+  const field = [mixHex(P.mown, P.haze, 0.3), mixHex(P.gravelA, P.nearReliefLight, 0.45), mixHex(P.nearReliefLight, P.haze, 0.25)];
+  const built = builtColors(P, 0.25, front.ink);
+  row(env, 7, 0.3, (x, r) => ({ x, halfW: (420 + r() * 380) * u, height: (70 + r() * 70) * u, base: y0, tones: back, edge: 'scallop', grain: 11 * u, contour: 1, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  row(env, 8, 0.3, (x, r, i) => ({
+    x, halfW: (330 + r() * 330) * u, height: (30 + r() * 52) * u, base: y0 + 6 * u, tones: front, edge: 'scallop', grain: 17 * u, contour: 1.5, get reach() { return this.halfW; },
+    paint: (o, rr, e) => paintHill(e, { ...o, detail: (yAt, r2, ctx) => {
+      // clearings: fields that follow the roundness of the hill, edged with hedges
+      const cells = 2 + Math.floor(r2() * 3);
+      for (let c = 0; c < cells; c++) {
+        const t0 = -0.6 + r2() * 0.9, t1 = t0 + 0.12 + r2() * 0.2, v0 = 0.3 + r2() * 0.3, v1 = Math.min(1, v0 + 0.25 + r2() * 0.3), lean = jit(r2, 0.08);
+        const at = (t, v) => { const xx = o.x + (t + lean * v) * o.halfW, yy = yAt(xx) + 10 * u; return [xx, yy + (o.base - yy) * v]; };
+        const quad = [];
+        for (let q = 0; q <= 5; q++) quad.push(at(lerp(t0, t1, q / 5), v0));
+        for (let q = 5; q >= 0; q--) quad.push(at(lerp(t0, t1, q / 5), v1));
+        ctx.beginPath(); tracePolygon(ctx, quad); ctx.fillStyle = field[(c + i) % 3]; ctx.fill();
+        brushStroke(ctx, quad.slice(0, 6), 3.4 * u, { color: front.shade, taper: 0.1, swell: 0.5, seed: c });
+        brushStroke(ctx, [at(t0, v0), at(t0, (v0 + v1) / 2), at(t0, v1)], 2.6 * u, { color: front.shade, taper: 0.1, swell: 0.5, seed: c + 3 });
+      }
+      if (i % 3 === 0) {
+        // a village with its church at the foot of the hill
+        const vx = o.x + o.halfW * jit(r2, 0.4), vy = o.base - 6 * u;
+        for (let b = 0; b < 6; b++) paintHouse(ctx, vx + (b - 2.5) * 15 * u + jit(r2, 4 * u), vy - r2() * 6 * u, (11 + r2() * 7) * u, (7 + r2() * 4) * u, built, false, r2);
+        ctx.fillStyle = built.ink; ctx.fillRect(vx - 3.6 * u, vy - 25 * u, 7.2 * u, 22 * u);
+        ctx.fillStyle = built.wallLight; ctx.fillRect(vx - 2.6 * u, vy - 24 * u, 5.2 * u, 22 * u);
+        ctx.beginPath(); tracePolygon(ctx, [[vx - 3.6 * u, vy - 24 * u], [vx, vy - 38 * u], [vx + 3.6 * u, vy - 24 * u]]); ctx.fillStyle = built.roofShade; ctx.fill();
+      }
+    } }, rr),
+  }));
+  groundHaze(env, 46, 0.3);
+}
+
+function nearMountains(env) {
+  const { ctx, u, y0, P } = env;
+  const back = nearTones(P, 0.36), front = nearTones(P, 0.06);
+  const meadow = mixHex(P.mown, P.haze, 0.22), built = builtColors(P, 0.2, front.ink);
+  const rock = hazed(tones(P.rockLight, P.rock, P.rockShade, front.ink), P.haze, 0.3);
+  // steep wooded spurs: firs on the crests, alpine meadows and chalets lower down
+  row(env, 7, 0.3, (x, r) => ({ x, halfW: (330 + r() * 330) * u, height: (110 + r() * 80) * u, base: y0, tones: back, edge: 'fir', grain: 7 * u, power: 1.2 + r() * 0.5, contour: 1, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  row(env, 8, 0.3, (x, r, i) => ({
+    x, halfW: (300 + r() * 300) * u, height: (44 + r() * 70) * u, base: y0 + 6 * u, tones: front, edge: 'fir', grain: 11 * u, power: 1.1 + r() * 0.5, contour: 1.5, get reach() { return this.halfW; },
+    paint: (o, rr, e) => paintHill(e, { ...o, detail: (yAt, r2, ctx) => {
+      // a meadow below the tree line: a rounded clearing edged by a ragged row of firs
+      const t0 = -0.55 + r2() * 0.5, t1 = t0 + 0.34 + r2() * 0.3, upper = [], lower = [];
+      for (let q = 0; q <= 8; q++) { const xx = o.x + lerp(t0, t1, q / 8) * o.halfW, yy = yAt(xx), rise = Math.pow(Math.sin(Math.PI * q / 8), 0.6); upper.push([xx, lerp(o.base + 8 * u, yy + (o.base - yy) * (0.4 + 0.08 * Math.sin(q * 1.3)), rise)]); lower.push([xx, o.base + 8 * u]); }
+      ctx.beginPath(); tracePolygon(ctx, sampleCurve(upper, 4).concat(lower.reverse())); ctx.fillStyle = meadow; ctx.fill();
+      ctx.beginPath();
+      for (let q = 0; q < 30; q++) { const f = q / 29, a = upper[Math.min(7, Math.floor(f * 8))], b = upper[Math.min(8, Math.floor(f * 8) + 1)], g = f * 8 - Math.floor(f * 8), xx = lerp(a[0], b[0], g), yy = lerp(a[1], b[1], g) + 3 * u, s = (7 + r2() * 6) * u; ctx.moveTo(xx - s * 0.4, yy); ctx.lineTo(xx, yy - s * 1.5); ctx.lineTo(xx + s * 0.4, yy); }
+      ctx.fillStyle = front.shade; ctx.fill();
+      if (i % 2 === 0) for (let b = 0; b < 3; b++) { const xx = o.x + lerp(t0, t1, 0.25 + b * 0.25) * o.halfW; paintHouse(ctx, xx, upper[4][1] + (16 + r2() * 14) * u, (15 + r2() * 6) * u, (7 + r2() * 3) * u, built, false, r2); }
+      if (i % 3 === 1) {
+        // a bare rock face breaking through the forest
+        const xx = o.x + o.halfW * (0.1 + r2() * 0.2), yy = yAt(xx) + 14 * u, s = (26 + r2() * 20) * u, face = [[xx - s * 0.5, yy + s], [xx - s * 0.3, yy + s * 0.2], [xx, yy], [xx + s * 0.4, yy + s * 0.3], [xx + s * 0.6, yy + s * 1.1]];
+        ctx.beginPath(); tracePolygon(ctx, face); ctx.strokeStyle = rock.ink; ctx.lineWidth = 2 * u; ctx.lineJoin = 'round'; ctx.stroke(); ctx.fillStyle = rock.light; ctx.fill();
+        ctx.beginPath(); tracePolygon(ctx, [[xx, yy], [xx + s * 0.4, yy + s * 0.3], [xx + s * 0.6, yy + s * 1.1], [xx + s * 0.12, yy + s]]); ctx.fillStyle = rock.shade; ctx.fill();
+      }
+    } }, rr),
+  }));
+  groundHaze(env, 46, 0.3);
+}
+
+function nearSea(env) {
+  const { ctx, w, u, y0, P, rnd } = env;
+  const back = nearTones(P, 0.3), front = nearTones(P, 0.05);
+  const built = builtColors(P, 0.12, front.ink), cypress = [mixHex(P.cypressShade, P.haze, 0.15), mixHex(P.cypress, P.haze, 0.15)], pines = [mixHex(P.pineShade, P.haze, 0.15), mixHex(P.pine, P.haze, 0.15)];
+  const rock = hazed(tones(P.rockLight, P.rock, P.rockShade), P.haze, 0.2);
+  // two capes close the bay: the hills only stand on part of the panorama, the sea shows between them
+  const capes = [0.02 + rnd() * 0.08, 0.52 + rnd() * 0.1].map((c) => ({ centre: c * w, span: (0.17 + rnd() * 0.05) * w }));
+  for (const cape of capes) {
+    const hills = [];
+    for (let i = 0; i < 4; i++) hills.push({ x: cape.centre + ((i + 0.5) / 4 - 0.5) * 2 * cape.span * 0.8 + jit(rnd, 40 * u), halfW: (230 + rnd() * 200) * u, height: (60 + rnd() * 70) * u * (1 - Math.abs(i - 1.5) * 0.22), seed: newSeed(rnd), far: true });
+    for (let i = 0; i < 4; i++) hills.push({ x: cape.centre + ((i + 0.5) / 4 - 0.5) * 2 * cape.span + jit(rnd, 50 * u), halfW: (200 + rnd() * 170) * u, height: (36 + rnd() * 54) * u * (1 - Math.abs(i - 1.5) * 0.2), seed: newSeed(rnd), far: false, index: i });
+    for (const hill of hills) {
+      const o = { x: hill.x, halfW: hill.halfW, height: hill.height, base: y0 + 4 * u, tones: hill.far ? back : front, edge: 'scallop', grain: (hill.far ? 10 : 15) * u, contour: hill.far ? 1 : 1.5, power: 0.8 + (hill.seed % 5) * 0.08 };
+      stamp(env, o.x - o.halfW - 30 * u, o.x + o.halfW + 30 * u, hill.seed, (r, e) => {
+        const ctx = e.ctx, yAt = paintHill(e, hill.far ? o : { ...o, detail: (y2, r2) => {
+          // terraces drawn as pale lines across the slope
+          for (let i = 0; i < 3; i++) { const t0 = -0.5 + r2() * 0.6, v = 0.45 + i * 0.16, line = []; for (let q = 0; q <= 5; q++) { const xx = o.x + (t0 + q * 0.07) * o.halfW, yy = y2(xx); line.push([xx, yy + (o.base - yy) * v]); } brushStroke(ctx, line, 2 * u, { color: front.light, taper: 0.3, swell: 0.2 }); }
+        } }, r);
+        if (hill.far) return;
+        // villas, cypresses and umbrella pines scattered on the slope
+        for (let i = 0; i < 9; i++) {
+          const xx = o.x + o.halfW * jit(r, 0.62), yy = yAt(xx), ground = yy + (o.base - yy) * (0.3 + r() * 0.5), kind = r();
+          if (ground > y0 - 4 * u) continue;
+          if (kind < 0.36) { paintHouse(ctx, xx, ground, (15 + r() * 10) * u, (9 + r() * 5) * u, built, r() < 0.4, r); paintSpike(ctx, xx - (13 + r() * 6) * u, ground + u, (17 + r() * 9) * u, 6 * u, cypress[0], cypress[1], front.ink); } else if (kind < 0.72) for (let q = 0, n = 1 + Math.floor(r() * 3); q < n; q++) paintSpike(ctx, xx + q * 7 * u, ground + q * u, (16 + r() * 13) * u, (5 + r() * 2) * u, cypress[0], cypress[1], front.ink);
+          else paintTree(ctx, xx, ground, (20 + r() * 9) * u, true, pines[0], pines[1], front.ink, r);
+        }
+      });
+    }
+    // rocky point where the cape falls into the sea, with a line of surf
+    for (const side of [-1, 1]) {
+      const x = cape.centre + side * cape.span * 1.12, s = (40 + rnd() * 26) * u, base = y0 - 8 * u;
+      const cliff = [[x - s, base + 30 * u], [x - s * 0.9, base - s * 0.2], [x - s * 0.3, base - s * (0.5 + rnd() * 0.2)], [x + s * 0.2, base - s * 0.42], [x + s * 0.8, base - s * 0.12], [x + s, base + 30 * u]];
+      wrapped(ctx, w, x - s * 1.6, x + s * 1.6, () => {
+        ctx.beginPath(); tracePolygon(ctx, cliff); ctx.strokeStyle = front.ink; ctx.lineWidth = 2.4 * u; ctx.lineJoin = 'round'; ctx.stroke(); ctx.fillStyle = rock.light; ctx.fill();
+        ctx.beginPath(); tracePolygon(ctx, [cliff[2], cliff[3], cliff[4], cliff[5], [x + s * 0.1, base + 30 * u], [x - s * 0.05, base - s * 0.1]]); ctx.fillStyle = rock.shade; ctx.fill();
+        ctx.beginPath(); tracePolygon(ctx, [cliff[1], cliff[2], [x - s * 0.05, base - s * 0.1], [x - s * 0.5, base]]); ctx.fillStyle = rock.base; ctx.fill();
+        brushStroke(ctx, [[x - s * 1.4, base + 5 * u], [x, base + 6.5 * u], [x + s * 1.4, base + 5 * u]], 3 * u, { color: P.cloudLight, taper: 0.3, swell: 0.4 });
+      });
+    }
+  }
+}
+
+function nearDunes(env) {
+  const { ctx, w, u, y0, P, rnd } = env;
+  const back = nearTones(P, 0.3), front = nearTones(P, 0.04);
+  row(env, 7, 0.3, (x, r) => ({ x, halfW: (300 + r() * 330) * u, height: (50 + r() * 70) * u, base: y0, tones: back, detail: false, get reach() { return this.halfW; }, paint: (o, rr, e) => paintDune(e, o, rr) }));
+  // an oasis in a hollow between the two ranks of dunes
+  const palmDark = mixHex(P.palmShade, P.haze, 0.12), palmLight = mixHex(P.palm, P.haze, 0.12), built = builtColors(P, 0.15, front.ink);
+  scatter(rnd, w, 3, 0.3, (x, r) => {
+    const seed = newSeed(r), span = (90 + r() * 80) * u;
+    wrapped(ctx, w, x - span - 40 * u, x + span + 40 * u, () => {
+      const r2 = seeded(seed);
+      for (let i = 0; i < 3; i++) paintHouse(ctx, x + jit(r2, span * 0.5), y0 - (6 + r2() * 8) * u, (16 + r2() * 12) * u, (9 + r2() * 5) * u, built, true, r2);
+      for (let i = 0; i < 9; i++) paintPalm(ctx, x + jit(r2, span), y0 - r2() * 8 * u, (26 + r2() * 20) * u, palmDark, palmLight, front.ink, r2);
+    });
+  });
+  row(env, 7, 0.3, (x, r) => ({ x, halfW: (320 + r() * 360) * u, height: (22 + r() * 46) * u, base: y0 + 8 * u, tones: front, detail: true, get reach() { return this.halfW; }, paint: (o, rr, e) => paintDune(e, o, rr) }));
+  groundHaze(env, 30, 0.25);
+}
+
+function nearMesas(env) {
+  const { ctx, w, u, y0, P, rnd } = env;
+  const back = nearTones(P, 0.3), front = nearTones(P, 0.04);
+  const strata = [[0.16, 0.07], [0.4, 0.03], [0.58, 0.12], [0.86, 0.04]];
+  // the nearer buttes leave wide gaps: the far mesas show between them
+  row(env, 4, 0.3, (x, r) => { const height = (90 + r() * 60) * u; return { x, top: (90 + r() * 260) * u, height, cap: 0.5 + r() * 0.12, apron: height * (0.8 + r() * 0.4), base: y0, tones: back, strata, detail: true, get reach() { return this.top + this.apron * 1.7; }, paint: (o, rr, e) => paintMesa(e, o, rr) }; });
+  row(env, 3, 0.25, (x, r, i) => {
+    const spire = i === 1, height = (spire ? 150 + r() * 40 : 110 + r() * 60) * u;
+    return { x, top: (spire ? 20 + r() * 20 : 140 + r() * 240) * u, height, cap: spire ? 0.62 : 0.5 + r() * 0.1, apron: height * (0.7 + r() * 0.3), base: y0 + 6 * u, tones: front, strata, detail: true, get reach() { return this.top + this.apron * 1.7; }, paint: (o, rr, e) => paintMesa(e, o, rr) };
+  });
+  // low swells of the desert floor dotted with scrub
+  const floor = tones(mixHex(front.light, P.haze, 0.15), mixHex(front.base, P.haze, 0.1), front.shade, front.ink);
+  row(env, 9, 0.3, (x, r) => ({ x, halfW: (300 + r() * 300) * u, height: (8 + r() * 16) * u, base: y0 + 6 * u, tones: floor, edge: 'smooth', power: 0.7, contour: 1, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  const scrub = mixHex(P.dryShade, P.haze, 0.15), scrubLight = mixHex(P.dry, P.haze, 0.15);
+  scatter(rnd, w, 46, 0.5, (x, r) => { const s = (7 + r() * 9) * u, y = y0 - r() * 9 * u, seed = newSeed(r); wrapped(ctx, w, x - s, x + s, () => paintTree(ctx, x, y + s * 0.3, s, true, scrub, scrubLight, null, seeded(seed))); });
+  groundHaze(env, 30, 0.25);
+}
+
+function nearCity(env) {
+  const { ctx, w, h, u, y0, P, rnd } = env;
+  const concrete = (amount, ink) => ({ light: mixHex(P.concreteLight, P.haze, amount), base: mixHex(P.concrete, P.haze, amount), shade: mixHex(P.concreteShade, P.haze, amount), ink });
+  const brick = (amount, ink) => ({ light: mixHex(P.wallLight, P.haze, amount), base: mixHex(P.wall, P.haze, amount), shade: mixHex(P.wallShade, P.haze, amount), ink });
+  const ink = mixHex(P.ink, P.concreteShade, 0.4), steel = mixHex(P.metalShade, P.haze, 0.2);
+  const plume = { light: mixHex(P.smoke, P.haze, 0.2), shade: mixHex(P.smokeShade, P.haze, 0.2) };
+  // back rank: big housing blocks and office slabs
+  scatter(rnd, w, 30, 0.5, (x, r, i) => {
+    const slab = r() < 0.4, ht = (slab ? 44 + r() * 30 : 70 + r() * 80) * u, wd = (slab ? 90 + r() * 80 : 36 + r() * 34) * u, seed = newSeed(r), c = i % 3 ? concrete(0.34, null) : brick(0.34, null);
+    wrapped(ctx, w, x - wd, x + wd, () => paintBlock(ctx, x, y0, wd, ht, { ...c, windows: 8 }, ['flat', 'plant', 'step', 'flat'][seed % 4], u, seeded(seed)));
+  });
+  // chimneys and cranes stand between the two ranks
+  scatter(rnd, w, 7, 0.4, (x, r, i) => {
+    const seed = newSeed(r), ht = (110 + r() * 60) * u;
+    if (i % 2) wrapped(ctx, w, x - 30 * u, x + 130 * u, () => paintChimney(ctx, x, y0, ht, 14 * u, { light: mixHex(P.concreteLight, P.haze, 0.25), base: mixHex(P.concreteShade, P.haze, 0.25), band: mixHex(P.kerbA, P.haze, 0.3), ink: null }, plume, u, seeded(seed)));
+    else wrapped(ctx, w, x - ht, x + ht, () => paintCrane(ctx, x, y0, ht * 1.05, ht * 0.62, steel, u, seeded(seed)));
+  });
+  // front rank: lower buildings with a light pen contour, sheds, a gasometer
+  scatter(rnd, w, 26, 0.5, (x, r, i) => {
+    const seed = newSeed(r), kind = r();
+    if (kind < 0.12) {
+      const rad = (26 + r() * 14) * u, c = concrete(0.14, ink);
+      wrapped(ctx, w, x - rad * 1.2, x + rad * 1.2, () => {
+        ctx.strokeStyle = ink; ctx.lineWidth = 2.4 * u; ctx.strokeRect(x - rad, y0 - rad * 1.3, rad * 2, rad * 1.3 + 4);
+        ctx.fillStyle = c.light; ctx.fillRect(x - rad, y0 - rad * 1.3, rad * 2, rad * 1.3 + 4);
+        ctx.fillStyle = c.base; ctx.fillRect(x + rad * 0.2, y0 - rad * 1.3, rad * 0.8, rad * 1.3 + 4);
+        ctx.fillStyle = c.shade; ctx.fillRect(x + rad * 0.7, y0 - rad * 1.3, rad * 0.3, rad * 1.3 + 4);
+        ctx.fillStyle = ink; for (let b = 1; b < 4; b++) ctx.fillRect(x - rad, y0 - rad * 1.3 * (b / 4), rad * 2, 1.2 * u);
+      });
+      return;
+    }
+    const shed = kind < 0.4, ht = (shed ? 16 + r() * 12 : 30 + r() * 44) * u, wd = (shed ? 80 + r() * 90 : 40 + r() * 50) * u, c = i % 2 ? concrete(0.12, ink) : brick(0.12, ink);
+    wrapped(ctx, w, x - wd, x + wd, () => paintBlock(ctx, x, y0, wd, ht, { ...c, windows: shed ? 0 : 7 }, shed ? (seed % 2 ? 'slant' : 'flat') : ['flat', 'plant', 'flat', 'step'][seed % 4], u, seeded(seed)));
+  });
+  // trees of the avenues and parks at the foot of the buildings
+  const green = nearTones(P, 0.1);
+  row(env, 16, 0.45, (x, r) => ({ x, halfW: (70 + r() * 150) * u, height: (11 + r() * 13) * u, base: y0 + 4 * u, tones: green, edge: 'scallop', grain: 11 * u, power: 0.4, skew: 0, contour: 1.2, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  ctx.fillStyle = green.shade; ctx.fillRect(0, y0 + 2 * u, w, h - y0);
+  groundHaze(env, 26, 0.25);
+}
+
+function nearFlat(env) {
+  const { ctx, w, h, u, y0, P, rnd } = env;
+  const back = nearTones(P, 0.32), front = nearTones(P, 0.06);
+  const ink = front.ink, metal = { light: mixHex(P.metalLight, P.haze, 0.15), base: mixHex(P.metal, P.haze, 0.15), shade: mixHex(P.metalShade, P.haze, 0.15) };
+  const built = builtColors(P, 0.15, ink), poplar = [mixHex(P.leafShade, P.haze, 0.15), mixHex(P.leaf, P.haze, 0.15)];
+  // strips of crops just above the horizon, hedges and copses
+  const crops = [mixHex(P.mown, P.haze, 0.3), mixHex(P.gravelA, P.haze, 0.25), mixHex(P.beyondB, P.haze, 0.3), mixHex(P.grassA, P.haze, 0.3)];
+  scatter(rnd, w, 22, 0.4, (x, r, i) => {
+    const half = (120 + r() * 160) * u, top = y0 - (5 + r() * 7) * u, lean = jit(r, 30 * u), color = crops[i % 4];
+    wrapped(ctx, w, x - half - 40 * u, x + half + 40 * u, () => { ctx.beginPath(); tracePolygon(ctx, [[x - half, y0 + 6 * u], [x - half * 0.8 + lean, top], [x + half * 0.8 + lean, top + jit(seeded(i + 1), 2 * u)], [x + half, y0 + 6 * u]]); ctx.fillStyle = color; ctx.fill(); });
+  });
+  row(env, 14, 0.45, (x, r) => ({ x, halfW: (90 + r() * 220) * u, height: (12 + r() * 14) * u, base: y0, tones: back, edge: 'scallop', grain: 10 * u, power: 0.4, skew: 0, contour: 1, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  // the airfield: hangars, control tower, radar, wind sock; farms and rows of poplars elsewhere
+  const field = rnd() * w;
+  for (let i = 0; i < 4; i++) {
+    const x = field + (i - 1.5) * 150 * u + jit(rnd, 20 * u), wd = (110 + rnd() * 40) * u, ht = (30 + rnd() * 10) * u;
+    stamp(env, x - wd * 0.6, x + wd * 0.6, i + 1, (r, e) => {
+      const g = e.ctx;
+      const arch = (c) => { c.moveTo(x - wd / 2, y0 + 4); c.lineTo(x - wd / 2, y0 - ht * 0.45); c.quadraticCurveTo(x, y0 - ht * 1.5, x + wd / 2, y0 - ht * 0.45); c.lineTo(x + wd / 2, y0 + 4); c.closePath(); };
+      g.beginPath(); arch(g); g.fillStyle = metal.base; g.fill();
+      inside(g, () => {
+        g.save(); g.translate(-wd * 0.12, ht * 0.16); g.beginPath(); arch(g); g.fillStyle = metal.light; g.fill(); g.restore();
+        g.fillStyle = metal.shade; g.fillRect(x - wd * 0.34, y0 - ht * 0.56, wd * 0.68, ht);
+        g.fillStyle = ink; for (let d = 1; d < 4; d++) g.fillRect(x - wd * 0.34 + (wd * 0.68 * d) / 4, y0 - ht * 0.56, 1.2 * u, ht);
+      });
+      contour(g, arch, ink, 1.3 * u);
+    });
+  }
+  const tx = field + 330 * u, th = 78 * u;
+  wrapped(ctx, w, tx - 120 * u, tx + 120 * u, () => {
+    // control tower: shaft, overhanging glazed cab, antennas
+    const shaft = [[tx - 9 * u, y0 + 4], [tx - 7 * u, y0 - th * 0.74], [tx + 7 * u, y0 - th * 0.74], [tx + 9 * u, y0 + 4]], cab = [[tx - 13 * u, y0 - th * 0.74], [tx - 17 * u, y0 - th * 0.93], [tx + 17 * u, y0 - th * 0.93], [tx + 13 * u, y0 - th * 0.74]];
+    const roof = [[tx - 18.5 * u, y0 - th * 0.93], [tx - 14 * u, y0 - th], [tx + 14 * u, y0 - th], [tx + 18.5 * u, y0 - th * 0.93]];
+    ctx.strokeStyle = ink; ctx.lineWidth = 2.6 * u; ctx.lineJoin = 'round';
+    ctx.beginPath(); tracePolygon(ctx, shaft); tracePolygon(ctx, cab); tracePolygon(ctx, roof); ctx.stroke();
+    ctx.beginPath(); tracePolygon(ctx, shaft); ctx.fillStyle = built.wallLight; ctx.fill();
+    ctx.fillStyle = built.wall; ctx.beginPath(); tracePolygon(ctx, [[tx + 2 * u, y0 + 4], [tx + 2 * u, y0 - th * 0.74], [tx + 7 * u, y0 - th * 0.74], [tx + 9 * u, y0 + 4]]); ctx.fill();
+    ctx.beginPath(); tracePolygon(ctx, cab); ctx.fillStyle = mixHex(P.glass, P.haze, 0.15); ctx.fill();
+    ctx.beginPath(); tracePolygon(ctx, [[tx + 3 * u, y0 - th * 0.74], [tx + 4 * u, y0 - th * 0.93], [tx + 17 * u, y0 - th * 0.93], [tx + 13 * u, y0 - th * 0.74]]); ctx.fillStyle = mixHex(P.glassShade, P.haze, 0.15); ctx.fill();
+    ctx.fillStyle = ink; for (const d of [-8, -2.5, 3, 9]) ctx.fillRect(tx + d * u, y0 - th * 0.93, 1.2 * u, th * 0.19);
+    ctx.beginPath(); tracePolygon(ctx, roof); ctx.fillStyle = built.roof; ctx.fill();
+    ctx.fillStyle = ink; ctx.fillRect(tx - 1 * u, y0 - th * 1.22, 1.6 * u, th * 0.22); ctx.fillRect(tx + 7 * u, y0 - th * 1.12, 1.2 * u, th * 0.12);
+    // low terminal building, radar dish and wind sock
+    paintBlock(ctx, tx + 46 * u, y0, 70 * u, 15 * u, { light: built.wallLight, base: built.wall, shade: built.roofShade, ink, windows: 7 }, 'flat', u, seeded(7));
+    ctx.fillStyle = ink; ctx.fillRect(tx - 62 * u, y0 - 30 * u, 1.8 * u, 30 * u);
+    ctx.beginPath(); ctx.ellipse(tx - 61 * u, y0 - 34 * u, 12 * u, 5 * u, -0.35, 0, TAU); ctx.fillStyle = ink; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(tx - 61.5 * u, y0 - 34.6 * u, 10 * u, 3.4 * u, -0.35, 0, TAU); ctx.fillStyle = metal.light; ctx.fill();
+    ctx.fillStyle = ink; ctx.fillRect(tx - 98 * u, y0 - 22 * u, 1.4 * u, 22 * u);
+    ctx.beginPath(); tracePolygon(ctx, [[tx - 97 * u, y0 - 22 * u], [tx - 82 * u, y0 - 19 * u], [tx - 82 * u, y0 - 16.5 * u], [tx - 97 * u, y0 - 17 * u]]); ctx.fillStyle = mixHex(P.kerbA, P.haze, 0.15); ctx.fill();
+  });
+  scatter(rnd, w, 5, 0.3, (x, r, i) => {
+    const seed = newSeed(r);
+    if (Math.abs(((x - field) / w + 1.5) % 1 - 0.5) < 0.14) return;
+    wrapped(ctx, w, x - 190 * u, x + 190 * u, () => {
+      const r2 = seeded(seed);
+      if (i % 2) {
+        // farm: house, barn and silos
+        paintHouse(ctx, x, y0, 34 * u, 15 * u, built, false, r2); paintHouse(ctx, x + 44 * u, y0, 46 * u, 19 * u, { ...built, wallLight: built.roof, wall: built.roofShade, roof: metal.base, roofShade: metal.shade }, false, r2);
+        for (const d of [-36, -25]) { ctx.strokeStyle = ink; ctx.lineWidth = 2.4 * u; ctx.strokeRect(x + d * u, y0 - 32 * u, 9 * u, 32 * u); ctx.fillStyle = metal.light; ctx.fillRect(x + d * u, y0 - 32 * u, 9 * u, 32 * u); ctx.fillStyle = metal.base; ctx.fillRect(x + (d + 5) * u, y0 - 32 * u, 4 * u, 32 * u); ctx.beginPath(); ctx.ellipse(x + (d + 4.5) * u, y0 - 32 * u, 5.5 * u, 3 * u, 0, Math.PI, TAU); ctx.fillStyle = ink; ctx.fill(); }
+      }
+      // wind-break of poplars
+      for (let q = 0, n = 7 + Math.floor(r2() * 6); q < n; q++) paintSpike(ctx, x + (i % 2 ? 80 : -70) * u + q * 13 * u, y0 + u, (34 + r2() * 14) * u, 9 * u, poplar[0], poplar[1], ink);
+    });
+  });
+  // hedge line closing the foreground
+  row(env, 12, 0.45, (x, r) => ({ x, halfW: (120 + r() * 240) * u, height: (6 + r() * 8) * u, base: y0 + 4 * u, tones: front, edge: 'scallop', grain: 12 * u, power: 0.35, skew: 0, contour: 1.2, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  ctx.fillStyle = front.base; ctx.fillRect(0, y0 + 3 * u, w, h - y0);
+  groundHaze(env, 22, 0.25);
+}
+
+const FAR_RELIEF = { hills: farHills, mountains: farMountains, sea: farSea, dunes: farDunes, mesas: farMesas, city: farCity, flat: farFlat };
+const NEAR_RELIEF = { hills: nearHills, mountains: nearMountains, sea: nearSea, dunes: nearDunes, mesas: nearMesas, city: nearCity, flat: nearFlat };
+
+/**
+ * Paint one panorama. index: 0 clouds, 1 far relief, 2 near relief. `kind` is the backdrop
+ * family of the circuit theme ('hills', 'mountains', 'sea', 'dunes', 'mesas', 'city', 'flat').
+ * Colours come from the palette P only, so every kind works under every theme.
+ */
+function paintBackdropLayer(index, ctx, w, h, P, kind, rnd) {
+  ctx.clearRect(0, 0, w, h);
+  const env = { ctx, w, h, P, rnd, u: h / 768, y0: backdropHorizon(h), kind: FAR_RELIEF[kind] ? kind : 'hills' };
+  if (index === 0) paintClouds(env);
+  else if (index === 1) FAR_RELIEF[env.kind](env);
+  else NEAR_RELIEF[env.kind](env);
 }
 
 __modules["src/art/environments/backdrops.js"] = { backdropHorizon, paintBackdropLayer };
@@ -8820,12 +10375,14 @@ class GameApp {
     const renderer = this.renderer;
     if (!renderer) return;
     const t0 = performance.now();
-    const race = this.race, frame = this.frame, quads = this.quads;
-    const simDt = this.paused ? 0 : dt;
+    const frame = this.frame, quads = this.quads;
     this.time += dt;
     quads.reset();
-    if (this.hud) this.hud.update(this, simDt);
+    // the interface may start or stop a race: run it before reading the race
     if (this.ui) this.ui.update(this, dt);
+    const race = this.race;
+    const simDt = this.paused ? 0 : dt;
+    if (this.hud && race) this.hud.update(this, simDt);
     frame.viewCount = race ? this.viewCount : 0;
     if (race) {
       if (this.scene) this.scene.update(this, simDt, ahead);
@@ -9884,7 +11441,7 @@ const { QUAD_MODE } = __modules["src/rendering/drawing/quad-batch.js"];
 const { CAR_STATE } = __modules["src/physics/car-physics.js"];
 const { SURFACE } = __modules["src/tracks/track-builder.js"];
 const { closedCurve, blobPoints, brushStroke, seeded } = __modules["src/art/styles/ink.js"];
-const { drawText } = __modules["src/art/styles/lettering.js"];
+const { drawText, measureText } = __modules["src/art/styles/lettering.js"];
 const { hexToRgb } = __modules["src/art/palettes/palettes.js"];
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8;
@@ -9948,7 +11505,9 @@ function defineEffectsArt(art) {
   }, { wrapY: true });
   WORDS.forEach((word, i) => {
     art.defineStatic(`fx.word.${i}`, 720, 250, (ctx, w, h) => {
-      drawText(ctx, word, w / 2, h * 0.72, 118, { style: 'impact', color: WORD_COLORS[i], outline: '#16161f', outlineWidth: 14, align: 'center', bounce: 0.14, seed: 3 + i, shadow: { dx: 9, dy: 10, color: '#16161f' } });
+      const options = { style: 'impact', color: WORD_COLORS[i], outline: '#16161f', outlineWidth: 12, align: 'center', bounce: 0.12, seed: 3 + i, shadow: { dx: 8, dy: 9, color: '#16161f' } };
+      const size = Math.min(112, (112 * (w - 90)) / measureText(word, 112, options));
+      drawText(ctx, word, w / 2, h * 0.5 + size * 0.42, size, options);
     });
   });
 }
@@ -10153,7 +11712,7 @@ class EffectsLayer {
         quads.rotated(this.burst, cx, cy, s, s, p.angle * 2, 0.5, 0.5, 1, 1, 1, alpha * (1 - t * 0.5));
       } else {
         const sp = this.words[p.word];
-        quads.rotated(sp, cx, cy, sp.w * scale * 1.5, sp.h * scale * 1.5, p.angle - 0.08, 0.5, 0.5, 1, 1, 1, alpha);
+        quads.rotated(sp, cx, cy, sp.w * scale, sp.h * scale, p.angle - 0.08, 0.5, 0.5, 1, 1, 1, alpha);
       }
     }
   }
@@ -12754,7 +14313,7 @@ class PagePainter {
       for (let i = 0; i < 9; i++) ctx.fillRect(m + i * W * 0.12, m + off + top * 0.5, W * 0.06, top);
       this.trackMap(model.track, W * 0.4, m + off + 20 * S, W * 0.56, top - m - 70 * S);
       drawText(ctx, model.track.name, m + 50 * S, m + off + 150 * S, 110 * S, { style: 'impact', color: '#ffd42a', outline: INK, outlineWidth: 13 * S, shadow: { dx: 8 * S, dy: 9 * S, color: INK }, seed: 3 });
-      if (model.round) drawText(ctx, model.round, m + 56 * S, m + off + 220 * S, 40 * S, { style: 'bold', color: INK });
+      if (model.round) drawText(ctx, model.round, m + 56 * S, m + off + 236 * S, 40 * S, { style: 'bold', color: INK });
       this.endPanel(p);
       this.caption(model.captions[0], m + 50 * S, top - 150 * S + off, W * 0.34, 28 * S);
       ctx.globalAlpha = 1;
@@ -13347,7 +14906,7 @@ class GameFlow {
     const winner = result.classification[0];
     const rows = result.classification.map((row) => ({
       pos: row.position, name: row.driver.name, teamIndex: row.driver.team, human: row.isHuman, retired: row.retired,
-      time: row.retired ? t('results.dnf') : row.position === 1 || !row.finished ? formatTime(row.time) : row.lapsDown > 0 ? t('results.lapsDown', { n: row.lapsDown }) : `+${row.gap.toFixed(3)}`,
+      time: row.retired ? t('results.dnf') : row.position === 1 ? formatTime(row.time) : row.lapsDown > 0 ? t('results.lapsDown', { n: row.lapsDown }) : `+${row.gap.toFixed(3)}`,
       best: formatTime(row.bestLap), points: row.points,
     }));
     let sub = `${race.track.name} - ${t(result.position === 1 ? 'results.caption.win' : 'results.caption.other')}`;

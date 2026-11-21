@@ -199,12 +199,14 @@ export class GameApp {
     const renderer = this.renderer;
     if (!renderer) return;
     const t0 = performance.now();
-    const race = this.race, frame = this.frame, quads = this.quads;
-    const simDt = this.paused ? 0 : dt;
+    const frame = this.frame, quads = this.quads;
     this.time += dt;
     quads.reset();
-    if (this.hud) this.hud.update(this, simDt);
+    // the interface may start or stop a race: run it before reading the race
     if (this.ui) this.ui.update(this, dt);
+    const race = this.race;
+    const simDt = this.paused ? 0 : dt;
+    if (this.hud && race) this.hud.update(this, simDt);
     frame.viewCount = race ? this.viewCount : 0;
     if (race) {
       if (this.scene) this.scene.update(this, simDt, ahead);
