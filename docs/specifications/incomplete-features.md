@@ -19,7 +19,7 @@ par le rasteriseur logiciel SwiftShader).
 | Point | État |
 |---|---|
 | **Performances sur matériel réel** (60 i/s à 2560×1440, GPU ≤ 11 ms, aucun pic > 16,7 ms) | **Non vérifié.** Aucun GPU dans le conteneur : les benchmarks ont tourné sur SwiftShader (processeur) et ne disent rien d'une carte graphique. L'outil est fourni : `index.html#benchmark=all` ou `npm run benchmark`. |
-| **Comparaison de conduite avec le jeu de 1993** | **Non réalisée** : le jeu d'origine n'a pas été exécuté et les sources ne donnent aucune mesure. Les valeurs de conduite sont des estimations (voir `gameplay.md`). |
+| **Comparaison de conduite avec le jeu de 1993** | Le jeu d'origine n'a **pas** été exécuté. Une vidéo de gameplay de l'édition de 1991 a été analysée image par image (`docs/research/vroom-gameplay-analysis.md`) : elle donne des mesures (accélération, freinage, collisions, décollages) et une liste de corrections proposées, **dont aucune n'est implémentée**. Les valeurs de conduite actuelles restent des estimations (voir `gameplay.md`). |
 | **Son** | Vérifié par mesures automatiques (80 contrôles : niveaux, spectre, absence d'écrêtage, réponse aux événements) mais **jamais écouté** par une personne. |
 | **Manettes** | Code écrit pour la disposition « standard » de la Gamepad API (deux manettes) ; **non testé** avec un matériel réel. |
 | **Souris** | Direction relative avec verrouillage du pointeur ; **non testée** hors automatisation. |

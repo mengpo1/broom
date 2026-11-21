@@ -51,7 +51,8 @@ work/
   renders/            captures de référence (final/ : les 20 captures 2560x1440 de l'état final, en JPEG)
   benchmarks/         résultats bruts (JSON)
   reviews/            comptes rendus des critiques
-references/           volontairement vide : aucune image de référence n'est embarquée
+references/           volontairement vide : aucune image de référence n'est embarquée par le jeu
+work/reference-frames/  extraits d'une vidéo de gameplay tierce, pour analyse uniquement
 ```
 
 ## Construire et vérifier
@@ -98,6 +99,7 @@ résultats à l'écran et dans `window.virageBenchmark`).
 | Architecture | `docs/architecture/overview.md` |
 | Charte graphique | `docs/art-direction/charter.md` |
 | Recherche historique | `docs/research/genre-study.md`, `comic-art-reference.md` |
+| Analyse d'une vidéo de gameplay (collisions, décollages, perspective) | `docs/research/vroom-gameplay-analysis.md`, `work/reference-frames/` |
 | Règles, conduite, fidélité | `docs/specifications/gameplay.md` |
 | Résultats des tests | `docs/specifications/tests.md` |
 | Rapport de performances | `docs/specifications/performance.md` |
