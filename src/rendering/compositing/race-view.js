@@ -7,6 +7,7 @@ import { createProjection, updateProjection, focalForFov, depthOf, segmentAt } f
 import { createViewUniforms, set4, setColors, U } from './view-uniforms.js';
 import { MAX_ROWS } from './renderer.js';
 import { BACKDROP_PERIOD } from '../../art/environments/backdrop-rules.js';
+import { contactDive, crashPitch, slideTremble } from './crash-camera.js';
 
 export const CAMERA = { COCKPIT: 0, CHASE: 1, FRONT: 2, TRACKSIDE: 3 };
 
@@ -22,6 +23,7 @@ export class RaceView {
     this.yaw = 0; this.pitch = 0; this.dive = 0; this.stretch = 0;
     this.shakeX = 0; this.shakeY = 0; this.shakeAmp = 0; this.impact = 0; this.flash = 0;
     this.speedLines = 0; this.heading = 0; this.focusX = 0;
+    this.contactDive = 0; this.crashPitch = 0;
     this.tracksideS = 0; this.tracksideD = 0; this.tracksideTimer = 0; this.tracksideAim = 0; this.tracksideGap = 120; this.tracksideFresh = true;
     this.time = 0;
     this.wide = false; this.tall = false; this.horizonRatio = VIEW_CONFIG.horizonRatio;
@@ -135,8 +137,12 @@ export class RaceView {
     this.pitch = damp(this.pitch, pitchTarget, 6, dt);
     const ratio = this.wide ? cfg.horizonRatioWide : tall ? cfg.horizonRatioTall : cfg.horizonRatio;
     this.horizonRatio = ratio;
-    const diveShift = this.camera === CAMERA.COCKPIT ? this.dive * 0.012 * r.h : 0;
-    cam.s = camS; cam.d = camD; cam.eyeHeight = eye; cam.yaw = this.yaw; cam.dir = dir;
+    // nose dive: braking (smoothed) and contacts (driven by the car's own clock)
+    this.contactDive = this.camera === CAMERA.COCKPIT ? contactDive(car) : 0;
+    // accidents: the pitch of the whole flight and landing, and the trembling of a slide
+    this.crashPitch = this.camera === CAMERA.COCKPIT ? crashPitch(car) + (effects.cockpitShake ? slideTremble(car) : 0) : 0;
+    const diveShift = this.camera === CAMERA.COCKPIT ? (this.dive * cfg.brakeDive + this.contactDive + this.crashPitch) * r.h : 0;
+    cam.s = camS; cam.d = camD; cam.eyeHeight = eye + (this.camera === CAMERA.COCKPIT ? car.airHeight || 0 : 0); cam.yaw = this.yaw; cam.dir = dir;
     cam.width = r.w; cam.height = r.h; cam.focal = focal;
     cam.cx = r.w * 0.5 + this.shakeX * 0.35;
     cam.cy = r.h * ratio + focal * Math.tan(this.pitch) - diveShift + this.shakeY * 0.35;

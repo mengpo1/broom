@@ -1,0 +1,23 @@
+{
+ "speeds": [
+  8,
+  40,
+  120,
+  250
+ ],
+ "frames": 8,
+ "width": 1280,
+ "height": 720,
+ "builds": {
+  "before": "work/renders/sequence/index-before-wheels.html",
+  "after": "index.html"
+ },
+ "variants": {
+  "before": {
+   "placeCar": true
+  },
+  "after": {
+   "placeCar": true
+  }
+ }
+}

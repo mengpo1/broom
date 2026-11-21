@@ -11,6 +11,7 @@ export const VIEW_CONFIG = {
   hfovWide: 1.6,             // field of view of a short, very wide view: the cockpit then fits in its height
   cockpitScaleWide: 0.8,     // extra reduction of the cockpit drawing in a short view
   cockpitScaleTall: 0.84,    // and in a narrow view, so that both mirrors stay inside the frame
+  brakeDive: 0.045,          // dive of the cockpit view at full braking, as a fraction of the view height
   wallClearance: 2.3,        // least lateral distance (m) between the cockpit camera and a barrier
   cockpitDepth: 821,         // how far below the horizon the cockpit drawing reaches in the reference composition (its own units)
   eyeHeight: 0.95,           // driver's eye above the road (same as CAR_DIMENSIONS.eye in the car drawing)
@@ -35,6 +36,7 @@ export const DEFAULT_EFFECTS = {
   skidMarks: true,           // tyre marks on the asphalt
   insets: true,              // small caption panels (overtakes, fastest lap...)
   introPanels: true,         // comic strip shown before a race
+  explosions: true,          // drawn fireball and smoke after a hard landing
 };
 
 export const QUALITY_PRESETS = {

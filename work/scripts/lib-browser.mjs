@@ -11,17 +11,19 @@ export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const require = createRequire('/opt/node22/lib/node_modules/');
 export const { chromium } = require('playwright');
 let xvfb = null;
+let displayNumber = 90 + Math.floor(Math.random() * 9);
 
 async function ensureDisplay() {
   if (process.env.DISPLAY || process.env.WAYLAND_DISPLAY) return;
-  const display = `:${90 + Math.floor(Math.random() * 9)}`;
+  const display = `:${displayNumber++}`;          // a new number each time: the previous server may still be shutting down
   xvfb = spawn('Xvfb', [display, '-screen', '0', '2720x1620x24', '-nolisten', 'tcp'], { stdio: 'ignore' });
   process.env.DISPLAY = display;
   const lock = `/tmp/.X11-unix/X${display.slice(1)}`;
   for (let i = 0; i < 50 && !existsSync(lock); i++) await new Promise((r) => setTimeout(r, 100));
 }
 
-export function closeDisplay() { if (xvfb) { xvfb.kill(); xvfb = null; } }
+/** Stop the virtual X server started here, and forget its address so that the next game opened starts a new one. */
+export function closeDisplay() { if (xvfb) { xvfb.kill(); xvfb = null; delete process.env.DISPLAY; } }
 
 /** Open index.html from disk, wait until the game API is ready. Network requests are recorded. */
 export async function openGame({ width = 1280, height = 720, hash = '', extraArgs = [] } = {}) {

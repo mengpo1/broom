@@ -37,8 +37,8 @@ en écran partagé (haut/bas ou gauche/droite). 18 circuits originaux, 16 advers
 ## Contenu du dépôt
 
 ```
-index.html            le jeu autonome (construit depuis src/), 982 054 octets
-race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s
+index.html            le jeu autonome (construit depuis src/), 1 035 351 octets
+race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s (enregistrée avant le travail sur les collisions)
 src/                  sources (voir docs/architecture/overview.md)
 tests/                tests automatisés (Node et navigateur)
 docs/
@@ -48,9 +48,11 @@ docs/
   specifications/     règles et conduite, performances, compatibilité Linux, tests, limites
 work/
   scripts/            construction, captures, benchmark, vidéo, rapports
-  renders/            captures de référence (final/ : les 20 captures 2560x1440 de l'état final, en JPEG)
+  renders/            captures de référence (final/ : les 20 captures 2560x1440 de la revue artistique, en JPEG)
+    collisions/       scénarios de collision joués dans le jeu : vidéos 60 i/s, planches, télémétrie
+    comparison/       roues et rétroviseurs avant / après
   benchmarks/         résultats bruts (JSON)
-  reviews/            comptes rendus des critiques
+  reviews/            comptes rendus des critiques (revue artistique, revue des séquences de collision)
 references/           volontairement vide : aucune image de référence n'est embarquée par le jeu
 work/reference-frames/  extraits d'une vidéo de gameplay tierce, pour analyse uniquement
 ```
@@ -82,6 +84,14 @@ node work/scripts/pages-check.mjs
 ```
 
 ```bash
+node work/scripts/collision-comparison.mjs
+```
+
+```bash
+node work/scripts/collision-sequences.mjs all --width 960 --height 540
+```
+
+```bash
 npm run benchmark
 ```
 
@@ -101,6 +111,8 @@ résultats à l'écran et dans `window.virageBenchmark`).
 | Recherche historique | `docs/research/genre-study.md`, `comic-art-reference.md` |
 | Analyse d'une vidéo de gameplay (collisions, décollages, perspective) | `docs/research/vroom-gameplay-analysis.md`, `work/reference-frames/` |
 | Règles, conduite, fidélité | `docs/specifications/gameplay.md` |
+| Collisions, décollages, accidents ; comparaison avec l'analyse vidéo ; non-régression de la conduite | `docs/specifications/collisions.md` |
+| Rotation des roues avant et rétroviseurs du cockpit (avant / après) | `docs/specifications/wheels-and-mirrors.md` |
 | Résultats des tests | `docs/specifications/tests.md` |
 | Rapport de performances | `docs/specifications/performance.md` |
 | Compatibilité Linux | `docs/specifications/linux-compatibility.md` |

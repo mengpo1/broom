@@ -1,6 +1,8 @@
 // Entry point: boots the application and exposes a small automation API used by tests,
 // captures and benchmarks (window.virage).
 
+import { placeCar, CAR_STATE } from './physics/car-physics.js';
+import { COLLISION_TUNING } from './physics/collision-tuning.js';
 import { GameApp } from './core/game-app.js';
 import { GpuUnavailableError } from './rendering/gpu-context.js';
 import { CAMERA } from './rendering/compositing/race-view.js';
@@ -62,6 +64,7 @@ async function boot() {
         appRef.hud = new Hud(appRef, text);
         scene.effects = new EffectsLayer(appRef.art);
         scene.lamps = [appRef.art.sprite('hud.lamp.off'), appRef.art.sprite('hud.lamp.red'), appRef.art.sprite('hud.lamp.green')];
+        scene.shadow = appRef.art.sprite('fx.shadow');
       },
     });
   } catch (error) {
@@ -118,7 +121,8 @@ async function boot() {
     notice.textContent = results.runs.map((r) => `${r.scenario}: ${r.fps.toFixed(1)} fps — interval moy. ${r.frameInterval.mean.toFixed(2)} ms, p99 ${r.frameInterval.p99.toFixed(2)} ms, max ${r.frameInterval.max.toFixed(2)} ms — GPU ${r.gpuPass ? `${r.gpuPass.mean.toFixed(2)} / p99 ${r.gpuPass.p99.toFixed(2)} / max ${r.gpuPass.max.toFixed(2)} ms` : 'n/d'} — CPU ${r.cpuFrame.mean.toFixed(2)} ms — > 16,7 ms : ${r.framesOver16_7ms}/${r.frames}`).join('\n');
     return results;
   };
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate };
+  // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, debug: { placeCar, CAR_STATE, COLLISION_TUNING } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
   if (!params.manual) app.start();
   if (params.benchmark) benchmark(params.benchmark === 'all' ? Object.keys(BENCHMARK_SCENARIOS) : params.benchmark.split(','), +(params.seconds || 60));

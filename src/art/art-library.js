@@ -20,7 +20,7 @@ export const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degr
 /** Silhouette pen width of the cars in the race, in metres at the car: the same weight as the cockpit's own outlines. */
 export const CAR_INK_WORLD = 0.017;
 export const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
-const STATIC_LAYERS = 6;
+const STATIC_LAYERS = 8;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;
 
 /** Which team colour goes to which livery zone (body, flanks, wings) for each paint pattern. */

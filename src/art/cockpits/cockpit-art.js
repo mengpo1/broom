@@ -9,7 +9,7 @@
 // of view, relative to the point (screen centre, horizon line).
 
 import { VIEW_CONFIG } from '../../core/config.js';
-import { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES } from '../vehicles/car-model.js';
+import { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES, STREAK_PHASES, MIRROR_MOUNT } from '../vehicles/car-model.js';
 import { drawCar } from '../vehicles/car-illustrator.js';
 import { LINE, brushStroke, brushCurve, closedCurve } from '../styles/ink.js';
 import { drawText } from '../styles/lettering.js';
@@ -19,10 +19,21 @@ export const COCKPIT_REF_WIDTH = 2560;
 export const COCKPIT_REF_FOCAL = (COCKPIT_REF_WIDTH / 2) / Math.tan(VIEW_CONFIG.hfov / 2);
 export const STEER_FRAMES = 5;                 // drawn steering angles of a front wheel, from full right to full left
 export const MAX_DRAWN_STEER = 0.26;           // radians at the first / last frame
-export const WHEEL_VARIANTS = TREAD_PHASES + 1; // rolling phases, then the streaked "at speed" drawing
+export const WHEEL_VARIANTS = TREAD_PHASES + STREAK_PHASES; // rolling phases, then the phases of the streaked "at speed" drawing
 export const DIAL = { x: 0, y: 700, r: 92, minAngle: -2.2, maxAngle: 2.2, maxRpm: 14000 };
 export const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };   // extra: canvas height added below the wheel for the sleeves
-export const MIRROR = { x: -1010, y: 188, w: 300, h: 138, glassInset: 16 };   // left mirror (centre and size); the right one is its reflection
+/**
+ * Left mirror as the driver sees it (centre and size in the units of the cockpit drawing); the
+ * right one is its reflection. It is the projection of the mirror of the car model from the
+ * driver's eye, so that the cockpit and the exterior views show the same car.
+ */
+export const MIRROR = (() => {
+  const M = MIRROR_MOUNT, eye = CAR_DIMENSIONS.eye, k = COCKPIT_REF_FOCAL / (M.x - eye[0]);
+  return {
+    x: -M.y * k, y: (eye[2] - M.z) * k, w: (M.width + 0.012) * k, h: (M.height + 0.01) * k, glassInset: 14,
+    armX: -M.arm[1] * k, armY: (eye[2] - M.arm[2]) * k,          // where the arm meets the side of the cockpit
+  };
+})();
 const INK = '#16161f';
 const COCKPIT_INK = 4.2;
 const BOTTOM_LIMIT = 900;                      // nothing is needed further below the horizon than this
@@ -55,23 +66,13 @@ function paintBinnacle(ctx, ox, oy) {
 }
 
 /** Left rear-view mirror on its stalk: housing in the body colour, glass with a drawn reflection. */
-/** Bounds (in cockpit units) of the drawing of a mirror's support. */
-const STALK = { x0: MIRROR.x - 80, x1: MIRROR.x + 16, y0: MIRROR.y + MIRROR.h / 2 - 16, y1: BOTTOM_LIMIT };
-
-/**
- * Support of the left mirror: a strut from the housing down toward the side of the car. It is a
- * layer of its own, drawn behind the front wheel, so that only the short length above the tyre shows.
- */
-function paintMirrorStalk(ctx, ox, oy) {
-  const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hh = MIRROR.h / 2;
-  const path = [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]];
-  brushStroke(ctx, path, 30, { color: INK, taper: 0, swell: 0 });
-  brushStroke(ctx, path, 21, { color: '#30323d', taper: 0, swell: 0 });
-  brushStroke(ctx, [[cx - 11, cy + hh], [cx - 45, cy + 380], [cx - 57, cy + 760]], 5, { color: '#555866', taper: 0, swell: 0 });
-}
-
 function paintMirror(ctx, ox, oy, colors) {
   const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hw = MIRROR.w / 2, hh = MIRROR.h / 2;
+  // arm from the side of the cockpit to the inner lower corner of the housing
+  const arm = [[ox + MIRROR.armX, oy + MIRROR.armY], [cx + hw * 0.55, cy + hh * 1.3], [cx + hw * 0.5, cy + hh * 0.7]];
+  brushStroke(ctx, arm, 26, { color: INK, taper: 0, swell: 0 });
+  brushStroke(ctx, arm, 17, { color: '#30323d', taper: 0, swell: 0 });
+  brushStroke(ctx, arm.map((q) => [q[0] - 4, q[1] - 5]), 4, { color: '#555866', taper: 0, swell: 0 });
   const housing = [[cx - hw, cy - hh * 0.72], [cx - hw * 0.86, cy - hh], [cx + hw * 0.9, cy - hh], [cx + hw, cy - hh * 0.6], [cx + hw * 0.94, cy + hh * 0.86], [cx + hw * 0.8, cy + hh], [cx - hw * 0.88, cy + hh], [cx - hw, cy + hh * 0.7]];
   const trace = (pts) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); };
   trace(housing); ctx.fillStyle = shadeHex(colors[0], 0.16); ctx.fill();
@@ -239,7 +240,7 @@ function paintHand(ctx, c, rimMid, a, S, glove, suit) {
   brushStroke(ctx, [P(S * 0.03, -S * 0.04), P(S * 0.04, -S * 0.018)], 1.8, { color: INK, taper: 0.3 });
 }
 
-function paintSteeringWheel(ctx, S, glove, suit, accent) {
+function paintSteeringWheel(ctx, S, glove, suit, accent, hands = true) {
   const c = S / 2, R = S * 0.452, rimW = S * 0.074, rimMid = R - rimW / 2;
   // spokes (behind the rim)
   const spoke = (a, w0, w1) => {
@@ -284,8 +285,10 @@ function paintSteeringWheel(ctx, S, glove, suit, accent) {
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(c + bx, c - S * 0.012, S * 0.017, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke();
   }
-  paintHand(ctx, c, rimMid, Math.PI * 1.16, S, glove, suit);
-  paintHand(ctx, c, rimMid, -Math.PI * 0.16, S, glove, suit);
+  if (hands) {
+    paintHand(ctx, c, rimMid, Math.PI * 1.16, S, glove, suit);
+    paintHand(ctx, c, rimMid, -Math.PI * 0.16, S, glove, suit);
+  }
 }
 
 /**
@@ -302,8 +305,7 @@ export function defineCockpitArt(art, players) {
   const probe = { eye, focal, cx: 0, cy: 0 };
   const nearParts = (name) => name === 'tub' || name === 'suspension.left' || name === 'exhaust';
   const farParts = (name) => name === 'frontwing.main' || name === 'frontwing.flap.left' || name === 'frontwing.endplate.left' || name === 'frontwing.pylons';
-  const layout = { near: [], far: [], wheels: [], steering: [], dial: null, needle: null, stalk: 'cockpit.stalk' };
-  art.defineStatic('cockpit.stalk', STALK.x1 - STALK.x0, STALK.y1 - STALK.y0, (ctx) => paintMirrorStalk(ctx, -STALK.x0, -STALK.y0), { ox: STALK.x0, oy: STALK.y0 });
+  const layout = { near: [], far: [], wheels: [], steering: [], steeringFree: [], dial: null, needle: null };
 
   const nearBounds = drawCar(null, null, model, probe, { measure: true, include: nearParts });
   nearBounds.minY = Math.min(nearBounds.minY, MIRROR.y - MIRROR.h / 2 - 6); nearBounds.maxY = BOTTOM_LIMIT;
@@ -321,7 +323,9 @@ export function defineCockpitArt(art, players) {
       drawCar(ctx, null, model, camera(farCrop), { livery, ink: COCKPIT_INK * 0.8, shadow: false, include: farParts });
     }, { ox: farCrop.x, oy: farCrop.y });
     art.defineStatic(`cockpit.steering.${p}`, STEERING.size, Math.round(STEERING.size * (1 + STEERING.extra)), (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2]));
-    layout.near.push(`cockpit.near.${p}`); layout.far.push(`cockpit.far.${p}`); layout.steering.push(`cockpit.steering.${p}`);
+    // the same wheel let go of: shown while the car slides out of control
+    art.defineStatic(`cockpit.steeringfree.${p}`, STEERING.size, Math.round(STEERING.size * (1 + STEERING.extra)), (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2], false));
+    layout.near.push(`cockpit.near.${p}`); layout.far.push(`cockpit.far.${p}`); layout.steering.push(`cockpit.steering.${p}`); layout.steeringFree.push(`cockpit.steeringfree.${p}`);
   });
 
   // front-left wheel: steering frames x rolling variants, all sharing one crop so frames register
@@ -331,7 +335,7 @@ export function defineCockpitArt(art, players) {
   for (let k = 0; k < STEER_FRAMES; k++) {
     const row = [];
     for (let v = 0; v < WHEEL_VARIANTS; v++) {
-      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : { blur: true } });
+      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : { blur: true, phase: v - TREAD_PHASES } });
       row.push(wm);
       if (v === 0) {
         const b = drawCar(null, null, wm, probe, { measure: true });

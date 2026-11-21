@@ -19,20 +19,38 @@ par le rasteriseur logiciel SwiftShader).
 | Point | État |
 |---|---|
 | **Performances sur matériel réel** (60 i/s à 2560×1440, GPU ≤ 11 ms, aucun pic > 16,7 ms) | **Non vérifié.** Aucun GPU dans le conteneur : les benchmarks ont tourné sur SwiftShader (processeur) et ne disent rien d'une carte graphique. L'outil est fourni : `index.html#benchmark=all` ou `npm run benchmark`. |
-| **Comparaison de conduite avec le jeu de 1993** | Le jeu d'origine n'a **pas** été exécuté. Une vidéo de gameplay de l'édition de 1991 a été analysée image par image (`docs/research/vroom-gameplay-analysis.md`) : elle donne des mesures (accélération, freinage, collisions, décollages) et une liste de corrections proposées, **dont aucune n'est implémentée**. Les valeurs de conduite actuelles restent des estimations (voir `gameplay.md`). |
+| **Comparaison de conduite avec le jeu de 1993** | Le jeu d'origine n'a **pas** été exécuté. Une vidéo de gameplay de l'édition de 1991 a été analysée image par image (`docs/research/vroom-gameplay-analysis.md`) : elle donne des mesures (accélération, freinage, collisions, décollages) et dix corrections proposées. Les corrections C1 à C8 (collisions, décollages, accidents, mise en scène) sont implémentées et comparées aux mesures (`collisions.md`) ; **C9 (accélération et freinage) et C10 (bords de piste ouverts) ne le sont pas**, par décision : la conduite normale reste celle de Virage GP, dont les valeurs sont des estimations (voir `gameplay.md`). Les mesures de la vidéo sont approximatives et les seuils qu'elle ne montre pas sont des choix de conception. |
 | **Son** | Vérifié par mesures automatiques (80 contrôles : niveaux, spectre, absence d'écrêtage, réponse aux événements) mais **jamais écouté** par une personne. |
 | **Manettes** | Code écrit pour la disposition « standard » de la Gamepad API (deux manettes) ; **non testé** avec un matériel réel. |
 | **Souris** | Direction relative avec verrouillage du pointeur ; **non testée** hors automatisation. |
 | **Clavier** | Navigation des menus et flux complets testés par automatisation (touches synthétiques) ; pas par un joueur. |
 | **Navigateurs** | Testé sous Chromium (Playwright) uniquement ; Firefox et Chrome de bureau non testés. Wayland natif non testé (serveur X virtuel). |
-| **Sensations de pilotage** | Évaluées par mesures et par l'IA ; aucun essai humain au volant dans cet environnement. |
+| **Sensations de pilotage** | Évaluées par mesures et par l'IA ; aucun essai humain au volant dans cet environnement. Cela vaut pour les collisions et les accidents : leurs durées et leurs pertes de vitesse sont vérifiées, pas l'impression qu'ils donnent en jouant. |
 | Scintillement, continuité des animations | Contrôlés par tests (images identiques à l'arrêt, variation bornée des effets d'une image à l'autre) et par un critique sur séquences d'images ; pas par visionnage temps réel sur écran. |
 
 ## 3. Incomplet ou simplifié
 
 - **Rétroviseurs** : vue arrière simplifiée (ciel, relief, bas-côté et route aux couleurs du
   lieu, voitures qui suivent à leur place) ; les décors de bord de piste n'y figurent pas et
-  la route y est une courbe approchée.
+  la route y est une courbe approchée. Dans le cockpit ils sont placés là où le modèle de la
+  voiture les porte (bas, contre les flancs) : ils masquent le bas des roues avant
+  (`wheels-and-mirrors.md`).
+- **Collisions et accidents** (`collisions.md`) : simulation arcade par états, pas de physique
+  3D. Dans les vues extérieures une voiture en vol est soulevée, penchée et laisse son ombre
+  au sol, mais son tangage ne peut pas être dessiné de dos ; pas de son propre au décollage ;
+  les voitures de l'ordinateur ne subissent que 30 % de la perte de vitesse d'un contact et
+  frôlent plus souvent les barrières qu'avant ; une épave reste traversable par un autre
+  joueur ; seuls les panneaux de freinage sont des obstacles solides (arbres, bâtiments et
+  autres décors restent derrière les barrières) et un panneau heurté disparaît sans débris.
+  Un critique indépendant a relevé 7 défauts moyens et 13 mineurs sur les séquences
+  (`work/reviews/collision-review.md`) ; ce qui n'a pas été traité est listé dans
+  `collisions.md` § 9, et les corrections n'ont pas été revues à leur tour.
+- **Perte de roue** : demandée, **non implémentée**. La vidéo analysée n'en montre pas ; ce
+  qu'il faudrait pour la définir est listé dans `collisions.md` § 6.
+- **Roues** : seules les roues avant de la vue cockpit suivent la vitesse (marques
+  synchronisées à basse vitesse, rangées de traits au-delà : une convention de dessin, un pneu
+  lisse réel n'en montre pas) ; celles des autres voitures sont toujours dessinées en
+  rotation, même à l'arrêt.
 - **Monoplaces** : un seul modèle de carrosserie pour toutes les écuries (les livrées changent
   par trois couleurs et cinq schémas) ; les numéros de course n'apparaissent que sur les
   grandes illustrations (menus, planches d'introduction et de résultats), pas sur les voitures
@@ -55,8 +73,8 @@ par le rasteriseur logiciel SwiftShader).
   raffermi, effacement des objets trop grossis).
 - **Qualité graphique** : le changement d'anti-crénelage (MSAA) demande un rechargement de la
   page ; le niveau de détail et les distances s'appliquent immédiatement.
-- **Météo, nuit, dégâts visibles sur les voitures** : absents.
-- **Mémoire vidéo** : environ 390 Mo de textures (atlas 10 × 2048², 50 couches de voitures
+- **Météo, nuit, dégâts visibles sur les voitures** : absents (une voiture accidentée repart intacte).
+- **Mémoire vidéo** : environ 435 Mo de textures (atlas 12 × 2048², 50 couches de voitures
   1024×512, 3 panoramas 4096×768, mipmaps).
 - **Temps de chargement** : tous les dessins sont produits au lancement, avec un pourcentage
   d'avancement. Mesuré dans le conteneur (4 cœurs virtuels, tout en logiciel) : environ 25 s,
@@ -96,7 +114,9 @@ Défauts connus qui subsistent, par ordre d'importance :
   sphérique, pilote sans bras), les fonds de menu sont pauvres ;
 - les bords de piste lointains sont crénelés et leur motif change d'une image à l'autre (la
   route est calculée ligne par ligne) ;
-- les rétroviseurs de la vue cockpit ne sont pas fixés comme sur la vue extérieure ;
+- les rétroviseurs de la vue cockpit ne sont pas fixés comme sur la vue extérieure (traité
+  depuis : ils sont dessinés à la position du modèle, voir `wheels-and-mirrors.md` ; ce correctif
+  n'a pas été revu par un critique) ;
 - les lisières de forêt et les fins de grillage sont des coupes nettes ; les panneaux d'un
   côté de la piste ont leur texte inversé ;
 - la vitesse repose sur les traits au sol, les stries des pneus et le défilement : en image
@@ -111,3 +131,7 @@ pages de menu, onomatopées variées, avant-bras, lettrage de l'interface) à l'
 l'espacement des lettres de l'interface, des avant-bras du pilote, des étriers de frein
 (rouges dans la vidéo, métal ensuite), de l'extrémité des vibreurs et de l'ordre de quelques
 objets de bord de piste, visibles dans la vidéo dans leur état antérieur. La vidéo est réencodée à 5,5 Mbit/s pour tenir dans le dépôt.
+
+Elle est aussi **antérieure au travail sur les collisions** : on y voit les anciens contacts
+(impulsions), les anciens rétroviseurs et l'ancienne animation des roues avant. Les nouvelles
+collisions sont montrées par les séquences de `work/renders/collisions/`.

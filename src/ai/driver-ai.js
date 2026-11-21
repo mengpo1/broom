@@ -87,7 +87,7 @@ export function updateAiController(ai, car, race, dt) {
   const cars = race.cars;
   for (let k = 0; k < cars.length; k++) {
     const o = cars[k];
-    if (o === car || o.removed || o.inPit !== car.inPit || o.state === CAR_STATE.RESET) continue;
+    if (o === car || o.removed || o.inPit !== car.inPit || o.state === CAR_STATE.RESET || o.state === CAR_STATE.AIRBORNE) continue;      // a wreck is driven round like any stopped car
     let ds = o.s - car.s;
     if (ds > halfLength) ds -= track.length; else if (ds < -halfLength) ds += track.length;
     if (ds > -5.2 && ds < 5.2) {

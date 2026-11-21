@@ -6,8 +6,10 @@
 import { clamp, damp, moveToward, angleDiff, wrapAngle, lerp } from '../core/math.js';
 import { GRAVITY, gripLimit, powerFraction } from '../vehicles/car-spec.js';
 import { SURFACE, locateOnTrack, relativeS, sampleArray } from '../tracks/track-builder.js';
+import { COLLISION_TUNING } from './collision-tuning.js';
 
-export const CAR_STATE = { GRID: 0, RACING: 1, SPIN: 2, RESET: 3, SERVICE: 4, RETIRED: 5 };
+// AIRBORNE: thrown in the air by a contact; WRECKED: stopped on the spot after a hard landing.
+export const CAR_STATE = { GRID: 0, RACING: 1, SPIN: 2, RESET: 3, SERVICE: 4, RETIRED: 5, AIRBORNE: 6, WRECKED: 7 };
 
 const located = { index: 0, s: 0, d: 0 };
 
@@ -31,6 +33,11 @@ export function createCarState(index) {
     sectorStart: 0, lastSectorTime: 0, finished: false, finishTime: 0, position: 0, gridPosition: 0,
     overtakes: 0, contacts: 0, wallHits: 0, offTrackTime: 0, resets: 0, topSpeed: 0,
     lastContactTime: -10, compound: 'medium', nextCompound: 'medium',
+    // collisions and accidents (see collision-tuning.js): `clock` is the car's own simulation time,
+    // the other clocks are values of it at the last event, for the animations driven by the state
+    clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
+    airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
+    landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
   };
 }
 
@@ -58,10 +65,95 @@ export function startSpin(car, impact, direction, emit) {
   car.velX = ch * car.speed - sh * car.vLat;
   car.velZ = sh * car.speed + ch * car.vLat;
   car.state = CAR_STATE.SPIN;
+  car.slideGentle = false;
   car.spinTimer = 1.1 + Math.min(impact, 25) * 0.035;
   car.spinRate = (direction >= 0 ? 1 : -1) * (5 + Math.min(impact, 25) * 0.16);
   car.pitAuto = false;
   if (emit) emit('crash', car.index, impact);
+}
+
+/**
+ * Throw a car in the air (it rode over another car, or hit a roadside object). In flight it
+ * follows its velocity, cannot be steered and slows down; it comes down after `duration` seconds,
+ * hard (stopped on the spot, see WRECKED) or light (it slides out of control, see startSlide).
+ * @param side  -1 / 0 / +1: side of the car that took the hit (where the damage shows)
+ */
+export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
+  if (car.state !== CAR_STATE.RACING && car.state !== CAR_STATE.SPIN) return false;
+  if (car.state === CAR_STATE.RACING) {
+    const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
+    car.velX = ch * car.speed - sh * car.vLat;
+    car.velZ = sh * car.speed + ch * car.vLat;
+  }
+  car.state = CAR_STATE.AIRBORNE;
+  car.airTime = 0; car.airDuration = duration; car.airHard = hard; car.airHeight = 0;
+  car.launchSide = side; car.launchClock = car.clock; car.launchOther = other;
+  car.pitAuto = false; car.vLat = 0; car.yawRate = 0;
+  if (emit) emit('launch', car.index, Math.hypot(car.velX, car.velZ), other);
+  return true;
+}
+
+/** Loss of control after a light landing: the car slides on, turning slowly, until it stops. */
+function startSlide(car) {
+  car.state = CAR_STATE.SPIN;
+  car.slideGentle = true;
+  car.spinTimer = 0.2;
+  // it turns toward the track (positive heading error = moving toward positive d)
+  car.spinRate = (car.d > 0 ? -1 : 1) * COLLISION_TUNING.slideYawRate;
+}
+
+function stepAirborne(car, dt, emit) {
+  const T = COLLISION_TUNING, spec = car.params.spec;
+  const v = Math.hypot(car.velX, car.velZ);
+  const nv = Math.max(0, v - T.airDecel * dt);
+  const k = v > 1e-4 ? nv / v : 0;
+  car.velX *= k; car.velZ *= k;
+  car.x += car.velX * dt; car.z += car.velZ * dt;
+  car.airTime += dt;
+  const u = Math.min(1, car.airTime / car.airDuration), reach = car.airDuration / T.flightTimeCar;
+  car.airHeight = T.airPeakHeight * reach * reach * 4 * u * (1 - u);
+  car.speed = nv; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
+  car.throttle = 0; car.brake = 0; car.steer = moveToward(car.steer, 0, 3 * dt);
+  car.rpm = damp(car.rpm, spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * 0.35, 5, dt);
+  car.accelLong = -T.airDecel; car.accelLat = 0;
+  if (car.airTime < car.airDuration) return;
+  // ---- landing
+  car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard;
+  if (car.airHard) {
+    car.velX *= T.hardLandingSpeedFactor; car.velZ *= T.hardLandingSpeedFactor;
+    car.speed = nv * T.hardLandingSpeedFactor;
+    car.state = CAR_STATE.WRECKED;
+    car.wreckTimer = 0; car.wreckDecel = car.speed / T.hardLandingStopTime;
+    if (emit) { emit('landing', car.index, 1); emit('crash', car.index, 20); }
+  } else {
+    startSlide(car);
+    if (emit) emit('landing', car.index, 0);
+  }
+}
+
+/** After a hard landing: the car runs out of speed, stays where it stopped, then restarts in first gear. */
+function stepWrecked(car, track, dt, emit) {
+  const T = COLLISION_TUNING, spec = car.params.spec;
+  const v = Math.hypot(car.velX, car.velZ);
+  const nv = Math.max(0, v - car.wreckDecel * dt);
+  const k = v > 1e-4 ? nv / v : 0;
+  car.velX *= k; car.velZ *= k;
+  car.x += car.velX * dt; car.z += car.velZ * dt;
+  car.speed = nv; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
+  car.throttle = 0; car.brake = 1; car.steer = 0;
+  car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
+  car.accelLong = nv > 0 ? -car.wreckDecel : 0; car.accelLat = 0;
+  if (nv === 0) { car.gear = 1; car.reverse = false; }          // stopped: first gear, ready to restart
+  car.wreckTimer += dt;
+  if (car.wreckTimer < T.hardLandingStopTime + T.wreckHoldTime) return;
+  // restart on the spot when the car is on the road and pointing the right way; otherwise it is put back
+  car.velX = 0; car.velZ = 0; car.speed = 0; car.gear = 1; car.reverse = false; car.shiftTimer = 0;
+  if (Math.abs(car.d) > track.halfWidth + 1 || Math.abs(car.headingError) > 1.2 || car.engineOut) {
+    car.state = CAR_STATE.RESET; car.resetTimer = 0.1;
+  } else {
+    car.state = CAR_STATE.RACING; car.ghostTimer = T.restartGhostTime; car.stuckTimer = 0;
+  }
+  if (emit) emit('restart', car.index, 0);
 }
 
 export function requestReset(car, delay) {
@@ -108,6 +200,7 @@ export function stepCar(car, track, dt, rules, emit) {
   car.prevX = car.x; car.prevY = car.y; car.prevZ = car.z;
   car.prevHeading = car.heading; car.prevPitch = car.pitch;
   if (car.ghostTimer > 0) car.ghostTimer -= dt;
+  car.clock += dt;
   const spec = car.params.spec;
 
   switch (car.state) {
@@ -129,6 +222,12 @@ export function stepCar(car, track, dt, rules, emit) {
     case CAR_STATE.SPIN:
       stepSpin(car, dt);
       break;
+    case CAR_STATE.AIRBORNE:
+      stepAirborne(car, dt, emit);
+      break;
+    case CAR_STATE.WRECKED:
+      stepWrecked(car, track, dt, emit);
+      break;
     case CAR_STATE.RETIRED:
       car.inThrottle = 0; car.inBrake = car.speed > 0.5 ? 0.35 : 1; car.inSteer = 0;
       stepDrive(car, track, dt, rules, emit);
@@ -144,19 +243,36 @@ export function stepCar(car, track, dt, rules, emit) {
 function stepSpin(car, dt) {
   const spec = car.params.spec;
   const v = Math.hypot(car.velX, car.velZ);
-  const decel = 12 + 0.05 * v;
+  let decel = 12 + 0.05 * v;
+  if (car.slideGentle) {
+    // slide after a light landing: little grip at first, then the car digs in
+    const T = COLLISION_TUNING, t = car.clock - car.landClock;
+    decel = T.slideDecelStart + (T.slideDecelEnd - T.slideDecelStart) * clamp((t - T.slideDecelDelay) / T.slideDecelRamp, 0, 1);
+  }
   const nv = Math.max(0, v - decel * dt);
   const k = v > 1e-4 ? nv / v : 0;
   car.velX *= k; car.velZ *= k;
   car.x += car.velX * dt; car.z += car.velZ * dt;
   car.heading = wrapAngle(car.heading + car.spinRate * dt);
-  car.spinRate *= Math.exp(-0.9 * dt);
+  if (!car.slideGentle) car.spinRate *= Math.exp(-0.9 * dt); else if (nv < 2) car.spinRate = 0;
   car.spinTimer -= dt;
   car.speed = nv; car.vLat = 0; car.yawRate = car.spinRate;
   car.slip = Math.min(2, v * 0.1); car.wheelspin = 0;
   car.throttle = 0; car.brake = 1; car.steer = 0;
   car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
   car.accelLong = -decel; car.accelLat = 0;
+  if (car.slideGentle) {
+    // the slide after a light landing ends where the car stops: its driver takes it back from there
+    // (the usual watch puts it back on the track if it then stays stuck)
+    if ((car.spinTimer <= 0 && nv < 0.3) || car.spinTimer < -6) {
+      car.slideGentle = false;
+      car.velX = 0; car.velZ = 0; car.speed = 0; car.yawRate = 0; car.slip = 0;
+      car.gear = 1; car.reverse = false; car.shiftTimer = 0; car.stuckTimer = 0;
+      car.ghostTimer = COLLISION_TUNING.restartGhostTime;
+      car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING;
+    }
+    return;
+  }
   if ((car.spinTimer <= 0 && nv < 4) || car.spinTimer < -3) {
     car.state = CAR_STATE.RESET;
     car.resetTimer = 0.7;
@@ -352,11 +468,16 @@ function wallBounce(car, track, side, penetration, rules, emit) {
   car.z -= nz * side * penetration;
   car.d -= side * penetration;
   const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
-  const spinning = car.state === CAR_STATE.SPIN;
+  const spinning = car.state === CAR_STATE.SPIN || car.state === CAR_STATE.AIRBORNE || car.state === CAR_STATE.WRECKED;
   const vx = spinning ? car.velX : ch * car.speed - sh * car.vLat;
   const vz = spinning ? car.velZ : sh * car.speed + ch * car.vLat;
   const vn = (vx * nx + vz * nz) * side;
   if (vn <= 0.15) return;
+  if (car.state === CAR_STATE.AIRBORNE || car.state === CAR_STATE.WRECKED) {
+    // in flight or wrecked: kept inside the barriers, quietly (the accident is already being staged)
+    car.velX -= nx * side * vn; car.velZ -= nz * side * vn;
+    return;
+  }
   const vt = vx * tx + vz * tz;
   const profile = car.params.profile;
   car.wallHits++;
@@ -381,7 +502,7 @@ function wallBounce(car, track, side, penetration, rules, emit) {
 }
 
 function collideBoundaries(car, track, rules, emit) {
-  if (car.state !== CAR_STATE.RACING && car.state !== CAR_STATE.SPIN && car.state !== CAR_STATE.RETIRED) return;
+  if (car.state !== CAR_STATE.RACING && car.state !== CAR_STATE.SPIN && car.state !== CAR_STATE.RETIRED && car.state !== CAR_STATE.AIRBORNE && car.state !== CAR_STATE.WRECKED) return;
   const i = car.segIndex, hw = car.params.halfWidth, pit = track.pit;
   let limitR = track.barrierR[i] - hw, limitL = track.barrierL[i] - hw;
   const rel = relativeS(track, car.s);

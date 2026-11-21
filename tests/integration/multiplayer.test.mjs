@@ -37,7 +37,8 @@ test('controls are independent: one accelerates and turns, the other brakes', ()
     race.step(SIM_DT); race.eventCount = 0;
   }
   const a = race.playerCars[0], b = race.playerCars[1];
-  assert.ok(a.speed > 25, `player 1 accelerated (${a.speed})`);
+  // (off the grid at full throttle the player may bump the car ahead, which now costs 48 km/h: the bar is lower than free acceleration)
+  assert.ok(a.speed > 15, `player 1 accelerated (${a.speed})`);
   assert.ok(b.speed < 1, `player 2 held on the brakes (${b.speed})`);
   assert.ok(a.steer > 0.03 && Math.abs(b.steer) < 1e-6, 'steering inputs are not shared');
   assert.ok(a.throttle === 1 && b.throttle === 0 && b.brake === 1);
@@ -61,16 +62,19 @@ test('players collide with each other', () => {
   placeCar(a, track, 400, 0); placeCar(b, track, 420, 0);
   a.state = CAR_STATE.RACING; b.state = CAR_STATE.RACING; a.ghostTimer = 0; b.ghostTimer = 0;
   a.speed = 50; a.gear = 4; b.speed = 15; b.gear = 1;
-  let contact = false;
+  let contact = false, leaderBefore = 0, leaderAfter = 0, followerAfter = 0;
   for (let i = 0; i < 2 / SIM_DT; i++) {
     race.setPlayerInput(0, 0, 1, 0, 0, false, false); race.setPlayerInput(1, 0, 0, 0, 0, false, false);
+    const before = b.speed;
     race.step(SIM_DT);
-    for (let e = 0; e < race.eventCount; e++) if (race.events[e].type === 'contact') contact = true;
+    for (let e = 0; e < race.eventCount; e++) if (race.events[e].type === 'contact' && !contact) { contact = true; leaderBefore = before; leaderAfter = b.speed; followerAfter = a.speed; }
     race.eventCount = 0;
   }
   assert.ok(contact, 'contact event between the two players');
   assert.ok(a.contacts > 0 && b.contacts > 0);
-  assert.ok(b.speed > 15.5 || b.state === CAR_STATE.SPIN, 'the car in front was pushed');
+  // arcade contact model: the car that runs into the other pays, the car in front is not shoved
+  assert.ok(Math.abs(leaderAfter - leaderBefore) < 0.3, `the car in front keeps its speed (${leaderBefore.toFixed(2)} -> ${leaderAfter.toFixed(2)} m/s)`);
+  assert.ok(followerAfter < leaderAfter && a.state !== CAR_STATE.RESET, `the car behind was slowed below the one it hit (${followerAfter.toFixed(2)} m/s)`);
 });
 
 test('split screen: two non-overlapping views, top/bottom by default, side by side on request', () => {

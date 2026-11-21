@@ -6,21 +6,61 @@ import { VIEW_CONFIG } from '../../core/config.js';
 import { clamp, mod } from '../../core/math.js';
 import { CAMERA } from './race-view.js';
 import { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING, MIRROR } from '../../art/cockpits/cockpit-art.js';
-import { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES } from '../../art/vehicles/car-model.js';
+import { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES } from '../../art/vehicles/car-model.js';
 import { BASE_CAR_SPEC } from '../../vehicles/car-spec.js';
 import { QUAD_MODE } from '../drawing/quad-batch.js';
-
-const BLUR_SPEED = 17;       // m/s above which the tyre is drawn with speed streaks
+import { CAR_STATE } from '../../physics/car-physics.js';
 
 /**
- * Which drawing of the front wheel to show: rolling phase 0..TREAD_PHASES-1 synchronised with the
- * distance travelled, or TREAD_PHASES (streaks) at speed.
+ * Speed (m/s) up to which the drawn tread marks can follow the real rotation of the wheel: beyond
+ * it the marks would pass faster than the pictures follow each other and seem to stand still or
+ * turn backwards. Above it the tyre is drawn with streaks that cycle at an apparent rate.
  */
-export function wheelVariant(odometer, speed) {
-  if (Math.abs(speed) > BLUR_SPEED) return TREAD_PHASES;
+export const WHEEL_SYNC_SPEED = 4.5;
+/** Speed (m/s) from which the streaks start to show through the marks: the two drawings are cross-faded up to WHEEL_SYNC_SPEED. */
+export const WHEEL_BLEND_SPEED = 2.2;
+
+/**
+ * Apparent rotation of the streaked tyre: cycles of the streak pattern shown per metre travelled.
+ * The cycling rate grows with speed (7 per second where the streaks appear, 10 at top speed): with
+ * three drawn phases that is a new drawing every two or three pictures at 60 images per second,
+ * and never more than one phase per picture at 30, so the direction always reads.
+ */
+export function streakCyclesPerMetre(speed) {
+  const v = Math.max(Math.abs(speed), WHEEL_BLEND_SPEED);
+  return (7 + 3 * (1 - Math.exp(-(v - WHEEL_BLEND_SPEED) / 30))) / v;
+}
+
+/** Share of the streaked drawing in the picture of the tyre: 0 = marks only, 1 = streaks only. */
+export function streakBlend(speed) {
+  return clamp((Math.abs(speed) - WHEEL_BLEND_SPEED) / (WHEEL_SYNC_SPEED - WHEEL_BLEND_SPEED), 0, 1);
+}
+
+/** Drawing of the rolling marks (0..TREAD_PHASES-1), exactly synchronised with the distance travelled. */
+export function rollingVariant(odometer) {
   const angle = odometer / CAR_DIMENSIONS.frontTyre.radius;
   const period = (Math.PI * 2) / TREAD_MARKS;
   return Math.floor((mod(angle, period) / period) * TREAD_PHASES) % TREAD_PHASES;
+}
+
+/** Drawing of the streaks for a position in their cycle (see advanceStreak). */
+export function streakVariant(streakTurn) {
+  return TREAD_PHASES + (Math.floor(mod(streakTurn, 1) * STREAK_PHASES) % STREAK_PHASES);
+}
+
+/**
+ * The drawing of the front wheel that dominates at a speed. Up to WHEEL_SYNC_SPEED: rolling phase
+ * 0..TREAD_PHASES-1. Above: one of the STREAK_PHASES streaked drawings, chosen by `streakTurn`
+ * (cycles of the streak pattern accumulated along the distance travelled, see CockpitLayer).
+ * Between WHEEL_BLEND_SPEED and WHEEL_SYNC_SPEED the cockpit shows both, cross-faded (streakBlend).
+ */
+export function wheelVariant(odometer, speed, streakTurn = 0) {
+  return Math.abs(speed) > WHEEL_SYNC_SPEED ? streakVariant(streakTurn) : rollingVariant(odometer);
+}
+
+/** Advance the streak cycle of a wheel over a distance travelled (negative when reversing). */
+export function advanceStreak(turn, distance, speed) {
+  return mod(turn + distance * streakCyclesPerMetre(speed), 1);
 }
 
 /** Steering frame (0 = full right ... STEER_FRAMES-1 = full left) of the LEFT wheel for a steering value in -1..1 (+ = right). */
@@ -79,18 +119,22 @@ function place(view) {
   return placement;
 }
 
+/** Scale (k) and vertical origin (oy) of the cockpit drawing in a view, for what must be drawn on the car itself. */
+export function cockpitPlacement(view) { return place(view); }
+
 export class CockpitLayer {
   constructor(art, layout, text) {
     this.text = text;
     this.art = art;
     this.near = layout.near.map((id) => art.sprite(id));
     this.far = layout.far.map((id) => art.sprite(id));
-    this.stalk = art.sprite(layout.stalk);
     this.steering = layout.steering.map((id) => art.sprite(id));
+    this.steeringFree = layout.steeringFree.map((id) => art.sprite(id));
     this.wheels = layout.wheels.map((row) => row.map((id) => art.sprite(id)));
     this.dial = art.sprite(layout.dial);
     this.needle = art.sprite(layout.needle);
     this.needleAngle = [0, 0];
+    this.streakTurn = [0, 0]; this.lastOdometer = [NaN, NaN];
     this.wheelAngle = [0, 0];
   }
 
@@ -180,17 +224,25 @@ export class CockpitLayer {
     const ox = r.w * 0.5 + view.shakeX, oy = placement.oy + view.shakeY + Math.max(0, view.dive) * 6 * k;
     const am = app.scene.ambient;
     this.half(quads, this.far[p], ox, oy, k, am);
-    this.half(quads, this.stalk, ox, oy, k, am);          // mirror supports: behind the wheels, only their top shows
 
     // front wheels: steering frame and rolling variant
     const lock = BASE_CAR_SPEC.steerLock * (0.45 + 0.55 / (1 + Math.abs(car.speed) / 28));
     const frame = steerFrame(car.steer, lock);
-    const variant = wheelVariant(car.odometer, car.speed);
-    const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
-    const jolt = view.shakeAmp * 0.5 * k;
-    const wy = oy + left.oy * k + Math.sin(view.time * 61) * jolt;
-    quads.sprite(left, ox + left.ox * k, wy, left.w * k, left.h * k, am[0], am[1], am[2], 1, 0, false);
-    quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k - Math.sin(view.time * 53) * jolt, right.w * k, right.h * k, am[0], am[1], am[2], 1, 0, true);
+    // streaks cycle with the distance travelled, not with the images drawn: same motion at any display rate
+    const vi = view.index, travelled = car.odometer - this.lastOdometer[vi];
+    if (Number.isFinite(travelled) && Math.abs(travelled) < 30) this.streakTurn[vi] = advanceStreak(this.streakTurn[vi], travelled, car.speed);
+    this.lastOdometer[vi] = car.odometer;
+    // the marks, then the streaks over them as the speed rises (one drawing fades into the other)
+    const blend = streakBlend(car.speed), jolt = view.shakeAmp * 0.5 * k;
+    const joltL = Math.sin(view.time * 61) * jolt, joltR = -Math.sin(view.time * 53) * jolt;
+    for (let pass = 0; pass < 2; pass++) {
+      const alpha = pass === 0 ? 1 : blend;
+      if (pass === 0 ? blend >= 1 : blend <= 0) continue;
+      const variant = pass === 0 ? rollingVariant(car.odometer) : streakVariant(this.streakTurn[vi]);
+      const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
+      quads.sprite(left, ox + left.ox * k, oy + left.oy * k + joltL, left.w * k, left.h * k, am[0], am[1], am[2], alpha, 0, false);
+      quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k + joltR, right.w * k, right.h * k, am[0], am[1], am[2], alpha, 0, true);
+    }
 
     this.mirror(app, view, car, -1, ox, oy, k, am);
     this.mirror(app, view, car, 1, ox, oy, k, am);
@@ -213,8 +265,10 @@ export class CockpitLayer {
     }
 
     // steering wheel with the hands, rotated then flattened (the wheel is tilted toward the driver)
-    const sp = this.steering[p];
-    const angle = car.steer * 0.95;
+    // out of control (spin or slide): the driver has let go of the wheel, which turns on its own
+    const loose = car.state === CAR_STATE.SPIN;
+    const sp = loose ? this.steeringFree[p] : this.steering[p];
+    const angle = loose ? Math.sin(car.clock * 9) * 0.5 : car.steer * 0.95;
     const s = STEERING.size * k * 0.5;
     const cx = ox + STEERING.x * k + view.shakeX * 0.4, cy = oy + STEERING.y * k + view.shakeY * 0.6;
     const co = Math.cos(angle), si = Math.sin(angle), q = STEERING.squash;

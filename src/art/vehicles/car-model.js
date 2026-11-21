@@ -19,6 +19,9 @@ export const CAR_DIMENSIONS = {
   eye: [-0.35, 0, 0.95],       // driver's eye, used by the cockpit drawing
 };
 
+/** Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side (the cockpit view is drawn from these). */
+export const MIRROR_MOUNT = { x: 0.4, y: 0.42, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.3, 0.6] };
+
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
 
 class PartBuilder {
@@ -570,8 +573,9 @@ export function buildCarModel(options = {}) {
 
   // ---- mirrors
   const mirror = new PartBuilder('mirror.left', { ink: 0.7 });
-  box(mirror, 0.4, 0.42, 0.675, 0.04, 0.14, 0.075, { top: ROLE.BODY, bottom: ROLE.BODY, front: ROLE.BODY, rear: ROLE.GLASS, left: ROLE.BODY, right: ROLE.BODY });
-  mirror.rods.push({ a: [0.4, 0.3, 0.6], b: [0.4, 0.4, 0.655], radius: 0.009, role: ROLE.CARBON });
+  const MM = MIRROR_MOUNT;
+  box(mirror, MM.x, MM.y, MM.z, 0.04, MM.width, MM.height, { top: ROLE.BODY, bottom: ROLE.BODY, front: ROLE.BODY, rear: ROLE.GLASS, left: ROLE.BODY, right: ROLE.BODY });
+  mirror.rods.push({ a: MM.arm, b: [MM.x, MM.y - 0.02, MM.z - 0.02], radius: 0.009, role: ROLE.CARBON });
   parts.push(mirror, mirrorPart(mirror, 'mirror.right'));
 
   // ---- suspension, steering and driveshafts
@@ -629,6 +633,10 @@ function placeWheel(name, x, y, tyre, steerAngle, tread = null, spin = false) {
 /** Number of rolling marks around a tyre and of drawn phases between two marks. */
 export const TREAD_MARKS = 9;
 export const TREAD_PHASES = 3;
+/** Drawn phases of the streaks shown at speed: cycled, they make the tyre visibly turn. */
+export const STREAK_PHASES = 3;
+/** Groups of streaks around a tyre: close enough for two of them to be in sight on the tread, so that a phase is a short step. */
+export const STREAK_BANDS = 12;
 
 /**
  * Pen marks on the tread that make the rolling of a slick tyre visible.
@@ -647,11 +655,17 @@ function addTreadMarks(part, tyre, tread) {
   };
   const period = (Math.PI * 2) / TREAD_MARKS;
   if (tread.blur) {
+    // a tyre turning fast: STREAK_BANDS rows of short dashes around the tyre, one dash per lane, every
+    // lane of a row on (nearly) the same angle. A dash that slides along itself looks still: what
+    // shows the rotation is the row, a mark across the tread, moving as one piece. A phase moves all
+    // the rows together by a third of their spacing, the same way as the marks of the slow drawing.
+    const spacing = (Math.PI * 2) / STREAK_BANDS, shift = ((tread.phase || 0) / STREAK_PHASES) * spacing;
+    const lengths = [0.3, 0.38, 0.27, 0.36, 0.4, 0.29, 0.34], offsets = [0, 0.03, -0.02, 0.04, -0.03, 0.02, -0.04];   // shares of the spacing: ragged rows
     for (let lane = 0; lane < 7; lane++) {
-      const lat = -0.085 + lane * 0.028;
-      for (let k = 0; k < 30; k++) {
-        if ((k * 7 + lane * 3) % 5 === 0) continue;       // broken streaks
-        arc(lat, k * 0.2094, (k + 1) * 0.2094, lane % 2 ? '#4a4c58' : '#1c1c26', 1.1);
+      const lat = -0.085 + lane * 0.028, half = (lengths[lane] * spacing) / 2;
+      for (let k = 0; k < STREAK_BANDS; k++) {
+        const centre = (k + offsets[lane]) * spacing - shift;
+        arc(lat, centre - half, centre + half, lane % 2 ? '#7a7d90' : '#0e0e14', 2.1);
       }
     }
     return;
@@ -659,8 +673,9 @@ function addTreadMarks(part, tyre, tread) {
   for (let i = 0; i < TREAD_MARKS; i++) {
     const t0 = i * period - (tread.phase / TREAD_PHASES) * period;
     const len = 0.2 + (i % 3) * 0.05;
-    arc(lanes[i % lanes.length], t0, t0 + len, i % 2 ? '#565866' : '#191a23', 1.6);
-    arc(lanes[(i + 4) % lanes.length], t0 + 0.3, t0 + 0.3 + len * 0.6, i % 2 ? '#191a23' : '#565866', 1.2);
+    // (drawn boldly: on a slick tyre these marks are the only thing that shows the wheel turning)
+    arc(lanes[i % lanes.length], t0, t0 + len, i % 2 ? '#7a7d90' : '#0e0e14', 2.6);
+    arc(lanes[(i + 4) % lanes.length], t0 + 0.3, t0 + 0.3 + len * 0.6, i % 2 ? '#0e0e14' : '#7a7d90', 2);
   }
 }
 

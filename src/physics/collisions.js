@@ -1,7 +1,11 @@
 // Car-to-car contacts: oriented boxes, separating axis test, equal-mass impulse response.
 
 import { clamp } from '../core/math.js';
-import { CAR_STATE, startSpin } from './car-physics.js';
+import { CAR_STATE, startSpin, startAirborne } from './car-physics.js';
+import { COLLISION_TUNING } from './collision-tuning.js';
+
+/** Events emitted for a contact between two cars: `contact` always (sound, statistics), plus the kind when it has consequences. */
+export const CONTACT = { SIMPLE: 'contact', REAR_BUMP: 'bump', WHEEL: 'wheel', LAUNCH: 'launch' };
 
 const axes = new Float64Array(8);
 
@@ -35,6 +39,7 @@ export function resolveCarContacts(cars, rules, time, emit) {
   const n = cars.length;
   for (let i = 0; i < n; i++) {
     const a = cars[i];
+    if (a.state === CAR_STATE.AIRBORNE && a.launchOther >= 0) holdFlightBehind(a, cars);
     if (!collidable(a)) continue;
     for (let j = i + 1; j < n; j++) {
       const b = cars[j];
@@ -54,7 +59,7 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
   // axes: a forward, a right, b forward, b right
   axes[0] = ca; axes[1] = sa; axes[2] = -sa; axes[3] = ca;
   axes[4] = cb; axes[5] = sb; axes[6] = -sb; axes[7] = cb;
-  let minOverlap = 1e9, nx = 0, nz = 0;
+  let minOverlap = 1e9, nx = 0, nz = 0, minAxis = 0;
   for (let k = 0; k < 4; k++) {
     const ax = axes[k * 2], az = axes[k * 2 + 1];
     const ra = pa.halfLength * Math.abs(ax * ca + az * sa) + pa.halfWidth * Math.abs(-ax * sa + az * ca);
@@ -63,7 +68,7 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
     const overlap = ra + rb - Math.abs(dist);
     if (overlap <= 0) return false;
     if (overlap < minOverlap) {
-      minOverlap = overlap;
+      minOverlap = overlap; minAxis = k;
       const sign = dist >= 0 ? 1 : -1;
       nx = ax * sign; nz = az * sign;
     }
@@ -72,6 +77,33 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
   const push = minOverlap * 0.5 + 0.01;
   a.x -= nx * push; a.z -= nz * push;
   b.x += nx * push; b.z += nz * push;
+  // Two cars driving in the same direction: arcade contacts, with explicit, testable outcomes.
+  const T = COLLISION_TUNING;
+  if (a.state === CAR_STATE.RACING && b.state === CAR_STATE.RACING && ca * cb + sa * sb > T.alignedCos && a.speed > 0 && b.speed > 0) {
+    if ((minAxis & 1) === 0) {
+      // separated along a car: nose to tail. The follower is the one behind.
+      const follower = dx * ca + dz * sa > 0 ? a : b, leader = follower === a ? b : a;
+      const closing = follower.speed - leader.speed;
+      if (closing > 0.3) {
+        const lateral = -dx * sa + dz * ca;                       // sideways offset of b seen from a
+        const overlap = clamp((pa.halfWidth + pb.halfWidth - Math.abs(lateral)) / (2 * Math.min(pa.halfWidth, pb.halfWidth)), 0, 1);
+        // wheel over wheel at a high closing speed: the follower rides over the car ahead and takes off
+        if (rules.crashes !== false && closing >= T.launchClosingSpeed && follower.speed >= T.launchMinSpeed
+          && overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax) {
+          const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
+          startAirborne(follower, T.flightTimeCar, T.hardAfterCar, emit, leader.index, side);
+          countContact(follower, leader, time, emit, closing);
+          contactDamage(follower, leader, closing, rules);
+          return true;
+        }
+        rearContact(follower, leader, closing, rules, time, emit);
+        return true;
+      }
+    } else {
+      sideContact(a, b, nx, nz, rules, time, emit);
+      return true;
+    }
+  }
   worldVelocity(a, va); worldVelocity(b, vb);
   const rel = (vb[0] - va[0]) * nx + (vb[1] - va[1]) * nz;
   if (rel >= 0) return true;
@@ -91,10 +123,7 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
   if (time - a.lastContactTime > 0.4) { a.contacts++; if (emit) emit('contact', a.index, impact, b.index); }
   if (time - b.lastContactTime > 0.4) b.contacts++;
   a.lastContactTime = time; b.lastContactTime = time;
-  if (rules.damage) {
-    const dmg = Math.max(0, impact - 3) * 0.008;
-    a.damage = Math.min(1, a.damage + dmg); b.damage = Math.min(1, b.damage + dmg);
-  }
+  contactDamage(a, b, impact, rules);
   if (rules.crashes !== false) {
     const limit = Math.min(pa.profile.carCrashImpact, pb.profile.carCrashImpact);
     if (impact > limit) {
@@ -106,6 +135,102 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
     }
   }
   return true;
+}
+
+/** Damage rule (competition): both cars are damaged according to the speed at which they met, whatever the kind of contact. */
+function contactDamage(a, b, impact, rules) {
+  if (!rules.damage) return;
+  const dmg = Math.max(0, impact - 3) * 0.008;
+  a.damage = Math.min(1, a.damage + dmg); b.damage = Math.min(1, b.damage + dmg);
+}
+
+function countContact(a, b, time, emit, impact) {
+  if (time - a.lastContactTime > 0.4) { a.contacts++; if (emit) emit('contact', a.index, impact, b.index); }
+  if (time - b.lastContactTime > 0.4) b.contacts++;
+  a.lastContactTime = time; b.lastContactTime = time;
+}
+
+/**
+ * Speed penalty of a car that ran into another: a fixed loss, at most once per cooldown
+ * (reduced for computer-driven cars, see computerPenaltyScale), and never above `ceiling`.
+ * Returns the speed lost (m/s).
+ */
+function penalise(car, losses, ceiling) {
+  const T = COLLISION_TUNING;
+  const before = car.speed;
+  let after = before;
+  if (car.clock - car.lastPenaltyClock >= T.penaltyCooldown) {
+    after = before - losses * T.contactSpeedLoss * (car.isHuman && !car.autoDrive ? 1 : T.computerPenaltyScale);
+    car.lastPenaltyClock = car.clock;
+    car.bumpClock = car.clock; car.bumpStrength = losses;
+  }
+  if (after > ceiling) after = ceiling;
+  const floor = Math.min(before, T.penaltyFloorSpeed);
+  if (after < floor) after = floor;
+  car.speed = after;
+  return before - after;
+}
+
+/**
+ * Nose-to-tail contact. The follower loses the contact loss and leaves the contact slower than
+ * the car it hit: by a wide margin for a player (the two separate at once, so every bump is a
+ * contact that can be seen: no pushing, no penalty without a new contact), by a narrow one for a
+ * computer-driven car. The car ahead is not disturbed and neither car changes direction.
+ */
+function rearContact(follower, leader, closing, rules, time, emit) {
+  const T = COLLISION_TUNING;
+  const player = follower.isHuman && !follower.autoDrive;
+  const lost = penalise(follower, 1, Math.max(T.penaltyFloorSpeed, leader.speed - (player ? T.bumpSeparation : T.computerBumpSeparation)));
+  // a player's loss of speed is always a signalled bump; a computer car held behind another inside the cooldown is not one
+  if (lost > 0.5 && (player || follower.bumpClock === follower.clock)) {
+    follower.lastPenaltyClock = follower.clock;
+    follower.bumpClock = follower.clock; follower.bumpStrength = 1;
+    contactDamage(follower, leader, closing, rules);
+    if (emit) emit(CONTACT.REAR_BUMP, follower.index, lost, leader.index);
+  }
+  follower.yawRate *= 0.5;
+  countContact(follower, leader, time, emit, closing);
+}
+
+/**
+ * A car thrown in the air by another one does not fly past it: it is carried behind the car it
+ * rode over and comes down there (its own speed, shown to its driver, goes on falling as in any flight).
+ */
+function holdFlightBehind(car, cars) {
+  const other = cars[car.launchOther];
+  if (!other || other === car || other.removed) return;
+  const v = Math.hypot(car.velX, car.velZ);
+  if (v < 1) return;
+  const ux = car.velX / v, uz = car.velZ / v;
+  const along = (other.x - car.x) * ux + (other.z - car.z) * uz;
+  const gap = car.params.halfLength + other.params.halfLength + COLLISION_TUNING.flightGapBehind;
+  if (along > 0 && along < gap) { car.x -= ux * (gap - along); car.z -= uz * (gap - along); }
+}
+
+/**
+ * Side-by-side contact (wheel against wheel on open-wheel cars). The faster car pays, both are
+ * pushed apart sideways, neither is turned.
+ */
+function sideContact(a, b, nx, nz, rules, time, emit) {
+  const T = COLLISION_TUNING;
+  worldVelocity(a, va); worldVelocity(b, vb);
+  const closing = Math.max(0, -((vb[0] - va[0]) * nx + (vb[1] - va[1]) * nz));       // speed at which the cars came together sideways
+  const faster = a.speed >= b.speed ? a : b, other = faster === a ? b : a;
+  const lost = penalise(faster, T.sideContactLosses, faster.speed);
+  if (lost > 0.5) contactDamage(a, b, closing, rules);
+  // the car that was hit is not made to pay in turn while the two are still side by side
+  if (lost > 0.5) other.lastPenaltyClock = other.clock;
+  // lateral axis of a car is (-sin h, cos h); the normal (nx, nz) points from a to b
+  const la = -nx * Math.sin(a.heading) + nz * Math.cos(a.heading), lb = -nx * Math.sin(b.heading) + nz * Math.cos(b.heading);
+  const awayA = la >= 0 ? -1 : 1, awayB = lb >= 0 ? 1 : -1;
+  if (lost > 0.5) { a.vLat = awayA * T.sideKick; b.vLat = awayB * T.sideKick; }      // pushed apart once, at the contact that costs
+  else {                                                                             // then only kept from leaning on each other
+    if (a.vLat * awayA < 0) a.vLat = 0;
+    if (b.vLat * awayB < 0) b.vLat = 0;
+  }
+  a.yawRate *= 0.5; b.yawRate *= 0.5;
+  if (lost > 0.5 && emit) emit(CONTACT.WHEEL, faster.index, lost, other.index);
+  countContact(faster, other, time, emit, Math.abs(a.speed - b.speed) + 2);
 }
 
 /**

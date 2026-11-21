@@ -1,0 +1,176 @@
+{
+ "video": "work/renders/comparison/wheels-mirrors-before-after.mp4",
+ "frames_per_segment": 96,
+ "segments": {
+  "8 km/h": {
+   "before": {
+    "changes_per_second": 20.0,
+    "longest_still_run_images": 3,
+    "outer": {
+     "steps_up": 14,
+     "steps_down": 14,
+     "median_step_rows": 22.75
+    },
+    "inner": {
+     "steps_up": 0,
+     "steps_down": 0,
+     "median_step_rows": null
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   },
+   "after": {
+    "changes_per_second": 30.3,
+    "longest_still_run_images": 1,
+    "outer": {
+     "steps_up": 14,
+     "steps_down": 14,
+     "median_step_rows": 23.5
+    },
+    "inner": {
+     "steps_up": 0,
+     "steps_down": 0,
+     "median_step_rows": null
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   }
+  },
+  "40 km/h": {
+   "before": {
+    "changes_per_second": 20.7,
+    "longest_still_run_images": 3,
+    "outer": {
+     "steps_up": 15,
+     "steps_down": 15,
+     "median_step_rows": 23.75
+    },
+    "inner": {
+     "steps_up": 0,
+     "steps_down": 0,
+     "median_step_rows": null
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   },
+   "after": {
+    "changes_per_second": 23.4,
+    "longest_still_run_images": 2,
+    "outer": {
+     "steps_up": 28,
+     "steps_down": 0,
+     "median_step_rows": 13.5
+    },
+    "inner": {
+     "steps_up": 34,
+     "steps_down": 0,
+     "median_step_rows": 15.0
+    },
+    "halves_agree": true,
+    "direction": "up"
+   }
+  },
+  "120 km/h": {
+   "before": {
+    "changes_per_second": 0.0,
+    "longest_still_run_images": 87,
+    "outer": {
+     "steps_up": 0,
+     "steps_down": 0,
+     "median_step_rows": null
+    },
+    "inner": {
+     "steps_up": 0,
+     "steps_down": 0,
+     "median_step_rows": null
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   },
+   "after": {
+    "changes_per_second": 26.9,
+    "longest_still_run_images": 2,
+    "outer": {
+     "steps_up": 33,
+     "steps_down": 0,
+     "median_step_rows": 13.5
+    },
+    "inner": {
+     "steps_up": 38,
+     "steps_down": 5,
+     "median_step_rows": 14.0
+    },
+    "halves_agree": true,
+    "direction": "up"
+   }
+  },
+  "250 km/h": {
+   "before": {
+    "changes_per_second": 0.7,
+    "longest_still_run_images": 60,
+    "outer": {
+     "steps_up": 0,
+     "steps_down": 0,
+     "median_step_rows": null
+    },
+    "inner": {
+     "steps_up": 0,
+     "steps_down": 0,
+     "median_step_rows": null
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   },
+   "after": {
+    "changes_per_second": 29.0,
+    "longest_still_run_images": 2,
+    "outer": {
+     "steps_up": 31,
+     "steps_down": 0,
+     "median_step_rows": 16.5
+    },
+    "inner": {
+     "steps_up": 41,
+     "steps_down": 14,
+     "median_step_rows": 13.0
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   }
+  },
+  "4 to 30 km/h": {
+   "before": {
+    "changes_per_second": 26.9,
+    "longest_still_run_images": 12,
+    "outer": {
+     "steps_up": 21,
+     "steps_down": 18,
+     "median_step_rows": 22.0
+    },
+    "inner": {
+     "steps_up": 0,
+     "steps_down": 0,
+     "median_step_rows": null
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   },
+   "after": {
+    "changes_per_second": 25.5,
+    "longest_still_run_images": 2,
+    "outer": {
+     "steps_up": 15,
+     "steps_down": 12,
+     "median_step_rows": 8.5
+    },
+    "inner": {
+     "steps_up": 11,
+     "steps_down": 14,
+     "median_step_rows": 9.5
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   }
+  }
+ }
+}

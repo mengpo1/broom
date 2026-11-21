@@ -24,7 +24,7 @@ const pixels = async (file) => {
     const at = (x, y) => Array.from(g.getImageData(Math.round(x * img.width), Math.round(y * img.height), 1, 1).data.slice(0, 3));
     let hash = 0; const d = g.getImageData(0, 0, img.width, img.height).data;
     for (let i = 0; i < d.length; i += 97) hash = (hash * 31 + d[i]) >>> 0;
-    return { sky: at(0.33, 0.08), road: at(0.42, 0.58), tyre: at(0.14, 0.86), hud: at(0.092, 0.052), w: img.width, h: img.height, hash };
+    return { sky: at(0.33, 0.08), road: at(0.42, 0.58), tyre: at(0.08, 0.76), hud: at(0.092, 0.052), w: img.width, h: img.height, hash };
   }, buf.toString('base64'));
 };
 const frames = (n, ticks = 2) => page.evaluate(async ([n, ticks]) => { const { app } = window.virage; for (let i = 0; i < n; i++) await app.advanceFrame(ticks); }, [n, ticks]);

@@ -32,7 +32,7 @@ export const FR = {
   'options.press': 'APPUYEZ SUR UNE TOUCHE...', 'options.reset': 'RÉTABLIR LES COMMANDES',
   'effect.speedLines': 'TRAITS DE VITESSE', 'effect.perspectiveStretch': 'ÉTIREMENT DE PERSPECTIVE', 'effect.cockpitShake': 'VIBRATIONS',
   'effect.impactFrames': 'EFFETS D\'IMPACT', 'effect.onomatopoeia': 'ONOMATOPÉES', 'effect.dust': 'POUSSIÈRE ET FUMÉE', 'effect.skidMarks': 'TRACES DE GOMME',
-  'effect.insets': 'CARTOUCHES', 'effect.introPanels': 'PLANCHE D\'INTRODUCTION',
+  'effect.insets': 'CARTOUCHES', 'effect.introPanels': 'PLANCHE D\'INTRODUCTION', 'effect.explosions': 'EXPLOSIONS',
   'action.steerLeft': 'GAUCHE', 'action.steerRight': 'DROITE', 'action.throttle': 'ACCÉLÉRER', 'action.brake': 'FREINER',
   'action.shiftUp': 'RAPPORT +', 'action.shiftDown': 'RAPPORT -', 'action.boost': 'TURBO', 'action.reset': 'REMISE EN PISTE', 'action.camera': 'CAMÉRA', 'action.pause': 'PAUSE',
   // hud
@@ -75,6 +75,7 @@ export const FR = {
   'effect.skidMarks.desc': 'TRACES SOMBRES LAISSÉES PAR LES PNEUS QUI GLISSENT.',
   'effect.insets.desc': 'RÉCITATIFS POUR LES DÉPASSEMENTS ET LES MEILLEURS TOURS.',
   'effect.introPanels.desc': 'PLANCHE DE TROIS CASES AVANT CHAQUE DÉPART.',
+  'effect.explosions.desc': 'BOULE DE FEU ET FUMÉE DESSINÉES APRÈS UN ATTERRISSAGE VIOLENT.',
   'key.ArrowLeft': 'FLÈCHE GAUCHE', 'key.ArrowRight': 'FLÈCHE DROITE', 'key.ArrowUp': 'FLÈCHE HAUT', 'key.ArrowDown': 'FLÈCHE BAS',
   'key.ShiftRight': 'MAJ DROITE', 'key.ShiftLeft': 'MAJ GAUCHE', 'key.ControlRight': 'CTRL DROITE', 'key.ControlLeft': 'CTRL GAUCHE',
   'key.AltRight': 'ALT DROITE', 'key.AltLeft': 'ALT GAUCHE', 'key.Backspace': 'RETOUR ARRIÈRE', 'key.Space': 'ESPACE', 'key.Escape': 'ÉCHAP',
