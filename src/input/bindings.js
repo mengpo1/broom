@@ -25,9 +25,8 @@ export function cloneControls(controls) {
   return controls.map((c) => ({ device: c.device, keys: { ...c.keys }, mouseSensitivity: c.mouseSensitivity ?? 1 }));
 }
 
-/** Human-readable name of a KeyboardEvent.code for the options page. */
+/** Language-neutral name of a KeyboardEvent.code (letters, digits, function keys); named keys are in the dictionaries. */
 export function keyName(code) {
   if (!code) return '-';
-  return code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Arrow/, 'FL. ').replace('ShiftRight', 'MAJ D').replace('ShiftLeft', 'MAJ G')
-    .replace('ControlRight', 'CTRL D').replace('ControlLeft', 'CTRL G').replace('Backspace', 'RETOUR ARR.').replace('Space', 'ESPACE').replace('Escape', 'ECHAP').toUpperCase();
+  return code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'NUM ').toUpperCase();
 }

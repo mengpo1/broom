@@ -78,7 +78,7 @@ const VIEW_CONFIG = {
   hfovTall: 1.05,            // field of view of a view taller than wide (vertical split screen)
   chase: { back: 7.5, height: 2.2, side: 0, hfov: 1.0 },
   front: { ahead: 7.5, height: 0.85, side: 1.5, hfov: 0.82 },
-  tv: { height: 2.6, hfov: 0.5 },
+  tv: { height: 2.6, ahead: 125, hfovFar: 0.3, hfovNear: 0.95 },   // trackside camera: placed `ahead` metres in front of the car, zooms out as it approaches
 };
 
 /** Visual effects, each can be switched off individually (Options menu / saved settings). */
@@ -1336,7 +1336,7 @@ __modules["src/art/environments/backdrop-rules.js"] = { BACKDROP_PERIOD, BACKDRO
 
 const { clamp, damp, wrapAngle, mod } = __modules["src/core/math.js"];
 const { VIEW_CONFIG } = __modules["src/core/config.js"];
-const { createProjection, updateProjection, focalForFov } = __modules["src/rendering/projection/road-projection.js"];
+const { createProjection, updateProjection, focalForFov, depthOf, segmentAt } = __modules["src/rendering/projection/road-projection.js"];
 const { createViewUniforms, set4, setColors, U } = __modules["src/rendering/compositing/view-uniforms.js"];
 const { MAX_ROWS } = __modules["src/rendering/compositing/renderer.js"];
 const { BACKDROP_PERIOD } = __modules["src/art/environments/backdrop-rules.js"];
@@ -1355,7 +1355,7 @@ class RaceView {
     this.yaw = 0; this.pitch = 0; this.dive = 0; this.stretch = 0;
     this.shakeX = 0; this.shakeY = 0; this.shakeAmp = 0; this.impact = 0; this.flash = 0;
     this.speedLines = 0; this.heading = 0; this.focusX = 0;
-    this.tracksideS = 0; this.tracksideD = 0; this.tracksideTimer = 0;
+    this.tracksideS = 0; this.tracksideD = 0; this.tracksideTimer = 0; this.tracksideAim = 0; this.tracksideGap = 120; this.tracksideFresh = true;
     this.time = 0;
     this.wide = false;
     this.baseFocal = 1;      // focal at rest: cockpit art is scaled against it
@@ -1401,21 +1401,31 @@ class RaceView {
       camD = clamp(carD * 0.6 + cfg.front.side, -track.halfWidth + 1, track.halfWidth - 1);
       yawTarget = Math.atan2(camD - carD, cfg.front.ahead) * 0.75;      // turn toward the car for a three-quarter front view
     } else {
-      // trackside camera: fixed position, re-placed ahead of the car when it has gone past
+      // trackside camera: fixed position, re-placed ahead of the car as soon as it has gone past
       this.tracksideTimer -= dt;
       let gap = mod(this.tracksideS - carS + track.length / 2, track.length) - track.length / 2;
-      if (gap < -30 || gap > 260 || this.tracksideTimer < -40) {
-        this.tracksideS = mod(carS + 150, track.length);
+      if (gap < 3 || gap > 280 || this.tracksideTimer < -40 || this.tracksideFresh) {
+        // among a few places ahead, prefer the one the car reaches along the straightest stretch
+        let best = 0, bestTurn = 1e9;
+        for (let c = 0; c < 6; c++) {
+          const s1 = carS + cfg.tv.ahead + c * 18;
+          const i1 = Math.floor(mod(s1, track.length) / track.ds) % track.n, i0 = Math.floor(mod(s1 - cfg.tv.ahead, track.length) / track.ds) % track.n;
+          const turn = Math.abs(wrapAngle(track.heading[i1] - track.heading[i0])) + c * 0.02;
+          if (turn < bestTurn) { bestTurn = turn; best = s1; }
+        }
+        this.tracksideS = mod(best, track.length);
         const i = Math.floor(this.tracksideS / track.ds) % track.n;
         const side = track.kappa[i] > 0 ? -1 : 1;
         this.tracksideD = side * (track.halfWidth + 1.5);
         this.tracksideTimer = 0;
-        gap = 150;
+        this.tracksideFresh = true;
+        gap = mod(this.tracksideS - carS + track.length / 2, track.length) - track.length / 2;
       }
+      this.tracksideGap = gap;
       dir = -1; camS = this.tracksideS; camD = this.tracksideD; eye = cfg.tv.height;
-      yawTarget = clamp(Math.atan2((carD - camD) * -1, Math.max(gap, 4)) * 0.9, -0.9, 0.9);
+      yawTarget = this.tracksideAim;
     }
-    const rate = this.camera === CAMERA.COCKPIT ? 14 : 6;
+    const rate = this.camera === CAMERA.COCKPIT ? 14 : this.camera === CAMERA.TRACKSIDE ? 12 : 6;
     this.yaw = Math.abs(yawTarget - this.yaw) > 1.2 ? yawTarget : damp(this.yaw, yawTarget, rate, dt);
 
     // perspective breathing and nose dive
@@ -1424,7 +1434,9 @@ class RaceView {
     const stretchTarget = effects.perspectiveStretch ? speedRatio * speedRatio * cfg.hfovSpeedGain - Math.max(0, this.dive) * cfg.hfovBrakeLoss + (car.boosting ? 0.05 : 0) : 0;
     this.stretch = damp(this.stretch, stretchTarget, 3.5, dt);
     const tall = r.w < r.h * 1.1;
-    const restFov = this.camera === CAMERA.COCKPIT ? (tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : cfg.tv.hfov;
+    // the trackside camera zooms out as the car comes closer, like a television operator
+    const tvFov = cfg.tv.hfovFar + (cfg.tv.hfovNear - cfg.tv.hfovFar) * clamp(1 - (this.tracksideGap - 8) / (cfg.tv.ahead - 8), 0, 1) ** 1.6;
+    const restFov = this.camera === CAMERA.COCKPIT ? (tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : tvFov;
     const hfov = restFov + (this.camera === CAMERA.COCKPIT ? this.stretch : this.stretch * 0.3);
     const focal = focalForFov(r.w, hfov);
     this.baseFocal = focalForFov(r.w, restFov);
@@ -1453,6 +1465,21 @@ class RaceView {
     cam.cx = r.w * 0.5 + this.shakeX * 0.35;
     cam.cy = r.h * ratio + focal * Math.tan(this.pitch) - diveShift + this.shakeY * 0.35;
     updateProjection(this.projection, track, cam);
+    if (this.camera === CAMERA.TRACKSIDE) {
+      // pan: aim at the place where the car is actually drawn (the road may bend between camera and car)
+      const p = this.projection, z = depthOf(p, carS);
+      if (z > 1.5 && z < p.farZ) {
+        const k = segmentAt(p, z), t = z - p.nodeZ[k];
+        const offset = p.nodeX[k] + p.nodeTheta[k] * t + 0.5 * p.nodeKappa[k] * t * t + p.dir * carD - p.camD;
+        this.tracksideAim = clamp(Math.atan2(offset, z), -1.05, 1.05);
+      }
+      if (this.tracksideFresh) {
+        // first frame at a new place: point at the car at once instead of panning from the old angle
+        this.tracksideFresh = false;
+        this.yaw = this.tracksideAim; cam.yaw = this.yaw;
+        updateProjection(this.projection, track, cam);
+      }
+    } else this.tracksideFresh = true;
 
     // speed lines: speed, acceleration bursts, impacts
     let lines = 0;
@@ -11978,6 +12005,32 @@ const FR = {
   'results.arcadeOut': 'PAS ASSEZ DE DÉPASSEMENTS... FIN DE PARTIE', 'results.arcadeScore': 'SCORE FINAL', 'results.newBest': 'NOUVEAU RECORD !',
   'results.caption.win': 'LE DRAPEAU À DAMIER TOMBE : PERSONNE DEVANT !', 'results.caption.other': 'LE DRAPEAU À DAMIER TOMBE ENFIN...',
   'error.webgpu': 'WEBGPU EST REQUIS : UTILISEZ UN NAVIGATEUR RÉCENT AVEC L\'ACCÉLÉRATION MATÉRIELLE ACTIVÉE.',
+  'menu.back.desc': 'REVENIR À LA PAGE PRÉCÉDENTE.',
+  'options.language.desc': 'LANGUE DES TEXTES DU JEU.',
+  'options.split.desc': 'DISPOSITION DES DEUX VUES EN DUEL : L\'UNE AU-DESSUS DE L\'AUTRE OU CÔTE À CÔTE.',
+  'options.quality.desc': 'DÉTAIL DES DÉCORS ET LISSAGE DE L\'IMAGE. LE LISSAGE S\'APPLIQUE APRÈS RECHARGEMENT DE LA PAGE.',
+  'options.volume.master.desc': 'VOLUME D\'ENSEMBLE DU JEU.', 'options.volume.engine.desc': 'VOLUME DES MOTEURS, LE VÔTRE ET CEUX DES CONCURRENTS.',
+  'options.volume.effects.desc': 'VOLUME DES PNEUS, DES CHOCS ET DES SIGNAUX.', 'options.volume.ambience.desc': 'VOLUME DE LA FOULE ET DU VENT.',
+  'options.effects.desc': 'CHAQUE EFFET DE BANDE DESSINÉE SE RÈGLE SÉPARÉMENT.',
+  'options.controls.desc': 'CLAVIER, SOURIS OU MANETTE POUR CHAQUE JOUEUR, TOUCHES AU CHOIX.',
+  'options.player.desc': 'GAUCHE / DROITE : PASSER À L\'AUTRE JOUEUR.',
+  'options.device.desc': 'CLAVIER, SOURIS (DIRECTION À LA SOURIS) OU MANETTE.',
+  'options.rebind.desc': 'ENTRÉE, PUIS LA NOUVELLE TOUCHE. ÉCHAP ANNULE.',
+  'options.padkeys.desc': 'AVEC UNE MANETTE : GÂCHETTES POUR ACCÉLÉRER ET FREINER, MANCHE GAUCHE POUR TOURNER. LES TOUCHES CI-CONTRE SERVENT AU CLAVIER ET À LA SOURIS.',
+  'options.reset.desc': 'REVENIR AUX COMMANDES D\'ORIGINE POUR LES DEUX JOUEURS.',
+  'effect.speedLines.desc': 'TRAITS QUI RAYONNENT DU POINT DE FUITE À HAUTE VITESSE.',
+  'effect.perspectiveStretch.desc': 'LE CHAMP DE VISION S\'OUVRE AVEC LA VITESSE ET SE RESSERRE AU FREINAGE.',
+  'effect.cockpitShake.desc': 'TREMBLEMENTS DU COCKPIT SUR LES VIBREURS, DANS L\'HERBE ET À HAUTE VITESSE.',
+  'effect.impactFrames.desc': 'SECOUSSE, ÉCLAIR ET ÉCLATS LORS DES CHOCS.',
+  'effect.onomatopoeia.desc': 'CRAC ! BANG ! LES BRUITS DESSINÉS DES CHOCS ET DU DÉPART.',
+  'effect.dust.desc': 'BOUFFÉES DE POUSSIÈRE HORS PISTE ET FUMÉE DES PNEUS.',
+  'effect.skidMarks.desc': 'TRACES SOMBRES LAISSÉES PAR LES PNEUS QUI GLISSENT.',
+  'effect.insets.desc': 'RÉCITATIFS POUR LES DÉPASSEMENTS ET LES MEILLEURS TOURS.',
+  'effect.introPanels.desc': 'PLANCHE DE TROIS CASES AVANT CHAQUE DÉPART.',
+  'key.ArrowLeft': 'FLÈCHE GAUCHE', 'key.ArrowRight': 'FLÈCHE DROITE', 'key.ArrowUp': 'FLÈCHE HAUT', 'key.ArrowDown': 'FLÈCHE BAS',
+  'key.ShiftRight': 'MAJ DROITE', 'key.ShiftLeft': 'MAJ GAUCHE', 'key.ControlRight': 'CTRL DROITE', 'key.ControlLeft': 'CTRL GAUCHE',
+  'key.AltRight': 'ALT DROITE', 'key.AltLeft': 'ALT GAUCHE', 'key.Backspace': 'RETOUR ARRIÈRE', 'key.Space': 'ESPACE', 'key.Escape': 'ÉCHAP',
+  'key.Enter': 'ENTRÉE', 'key.Tab': 'TAB',
 };
 
 __modules["src/localization/fr.js"] = { FR };
@@ -12034,6 +12087,32 @@ const EN = {
   'results.arcadeOut': 'NOT ENOUGH OVERTAKES... GAME OVER', 'results.arcadeScore': 'FINAL SCORE', 'results.newBest': 'NEW RECORD!',
   'results.caption.win': 'THE CHEQUERED FLAG FALLS: NOBODY AHEAD!', 'results.caption.other': 'AT LAST, THE CHEQUERED FLAG...',
   'error.webgpu': 'WEBGPU IS REQUIRED: USE A RECENT BROWSER WITH HARDWARE ACCELERATION ENABLED.',
+  'menu.back.desc': 'BACK TO THE PREVIOUS PAGE.',
+  'options.language.desc': 'LANGUAGE OF THE GAME TEXTS.',
+  'options.split.desc': 'LAYOUT OF THE TWO VIEWS IN A DUEL: ONE ABOVE THE OTHER OR SIDE BY SIDE.',
+  'options.quality.desc': 'SCENERY DETAIL AND IMAGE SMOOTHING. SMOOTHING APPLIES AFTER THE PAGE IS RELOADED.',
+  'options.volume.master.desc': 'OVERALL VOLUME OF THE GAME.', 'options.volume.engine.desc': 'VOLUME OF THE ENGINES, YOURS AND YOUR RIVALS\'.',
+  'options.volume.effects.desc': 'VOLUME OF TYRES, IMPACTS AND SIGNALS.', 'options.volume.ambience.desc': 'VOLUME OF THE CROWD AND THE WIND.',
+  'options.effects.desc': 'EACH COMIC BOOK EFFECT CAN BE SWITCHED ON ITS OWN.',
+  'options.controls.desc': 'KEYBOARD, MOUSE OR GAMEPAD FOR EACH PLAYER, KEYS OF YOUR CHOICE.',
+  'options.player.desc': 'LEFT / RIGHT: SWITCH TO THE OTHER PLAYER.',
+  'options.device.desc': 'KEYBOARD, MOUSE (STEERING WITH THE MOUSE) OR GAMEPAD.',
+  'options.rebind.desc': 'ENTER, THEN THE NEW KEY. ESC CANCELS.',
+  'options.padkeys.desc': 'WITH A GAMEPAD: TRIGGERS TO ACCELERATE AND BRAKE, LEFT STICK TO STEER. THE KEYS LISTED HERE ARE FOR KEYBOARD AND MOUSE.',
+  'options.reset.desc': 'RESTORE THE ORIGINAL CONTROLS FOR BOTH PLAYERS.',
+  'effect.speedLines.desc': 'LINES RADIATING FROM THE VANISHING POINT AT HIGH SPEED.',
+  'effect.perspectiveStretch.desc': 'THE FIELD OF VIEW OPENS WITH SPEED AND TIGHTENS UNDER BRAKING.',
+  'effect.cockpitShake.desc': 'COCKPIT SHAKING ON KERBS, ON GRASS AND AT HIGH SPEED.',
+  'effect.impactFrames.desc': 'JOLT, FLASH AND BURSTS WHEN YOU HIT SOMETHING.',
+  'effect.onomatopoeia.desc': 'CRAC! BANG! DRAWN SOUNDS FOR IMPACTS AND THE START.',
+  'effect.dust.desc': 'PUFFS OF DUST OFF THE TRACK AND TYRE SMOKE.',
+  'effect.skidMarks.desc': 'DARK MARKS LEFT BY SLIDING TYRES.',
+  'effect.insets.desc': 'CAPTION BOXES FOR OVERTAKES AND BEST LAPS.',
+  'effect.introPanels.desc': 'A THREE-PANEL STRIP BEFORE EACH START.',
+  'key.ArrowLeft': 'LEFT ARROW', 'key.ArrowRight': 'RIGHT ARROW', 'key.ArrowUp': 'UP ARROW', 'key.ArrowDown': 'DOWN ARROW',
+  'key.ShiftRight': 'RIGHT SHIFT', 'key.ShiftLeft': 'LEFT SHIFT', 'key.ControlRight': 'RIGHT CTRL', 'key.ControlLeft': 'LEFT CTRL',
+  'key.AltRight': 'RIGHT ALT', 'key.AltLeft': 'LEFT ALT', 'key.Backspace': 'BACKSPACE', 'key.Space': 'SPACE', 'key.Escape': 'ESC',
+  'key.Enter': 'ENTER', 'key.Tab': 'TAB',
 };
 
 __modules["src/localization/en.js"] = { EN };
@@ -12678,11 +12757,10 @@ function cloneControls(controls) {
   return controls.map((c) => ({ device: c.device, keys: { ...c.keys }, mouseSensitivity: c.mouseSensitivity ?? 1 }));
 }
 
-/** Human-readable name of a KeyboardEvent.code for the options page. */
+/** Language-neutral name of a KeyboardEvent.code (letters, digits, function keys); named keys are in the dictionaries. */
 function keyName(code) {
   if (!code) return '-';
-  return code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Arrow/, 'FL. ').replace('ShiftRight', 'MAJ D').replace('ShiftLeft', 'MAJ G')
-    .replace('ControlRight', 'CTRL D').replace('ControlLeft', 'CTRL G').replace('Backspace', 'RETOUR ARR.').replace('Space', 'ESPACE').replace('Escape', 'ECHAP').toUpperCase();
+  return code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'NUM ').toUpperCase();
 }
 
 __modules["src/input/bindings.js"] = { ACTIONS, DEFAULT_CONTROLS, GAMEPAD_MAP, DEVICES, cloneControls, keyName };
@@ -15635,6 +15713,18 @@ class GameFlow {
     return { label: t('setup.difficulty'), value: () => t(`difficulty.${this.settings.difficulty}`), adjust: (d) => { this.settings.difficulty = cycle(DIFFICULTY_ORDER, this.settings.difficulty, d); } };
   }
 
+  /** Description of an entry from the dictionary key `<key>.desc`, or null when there is none. */
+  describe(key) {
+    const k = `${key}.desc`, text = t(k);
+    return text === k ? null : text;
+  }
+
+  /** Name of a key for the controls page, in the current language. */
+  keyLabel(code) {
+    const k = `key.${code}`, text = t(k);
+    return text === k ? keyName(code) : text;
+  }
+
   mainMenu() {
     const entry = (key, open) => ({ label: t(`menu.${key}`), desc: () => t(`menu.${key}.desc`), accept: open });
     return {
@@ -15657,7 +15747,7 @@ class GameFlow {
       info: () => [`${t('results.arcadeScore')} : ${this.storage.data.arcade.best}`],
       items: [...this.setupItems(0, false),
         { label: t('menu.start'), desc: () => t('menu.arcade.desc'), accept: () => this.startSession(new ArcadeSession({ setup: { ...this.settings.setups[0], wing: 2, tyres: 'medium' } })) },
-        { label: t('menu.back'), accept: () => this.pop() }],
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() }],
       selected: 1,
     };
   }
@@ -15679,7 +15769,7 @@ class GameFlow {
       this.storage.data.championship = session.state; this.storage.save();
       this.startSession(session);
     } });
-    items.push({ label: t('menu.back'), accept: () => this.pop() });
+    items.push({ label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() });
     return { id: 'championship', heading: () => t('menu.championship'), hero: { team: 9, yaw: 0.6 }, items, selected: 0,
       track: () => this.app.getTrack(SEASONS[this.choices.season].circuits[saved && !saved.finished && this.page && this.page.selected === 0 ? saved.round : 0]) };
   }
@@ -15695,7 +15785,7 @@ class GameFlow {
       id: 'training', heading: () => t('menu.training'), track: () => this.app.getTrack(this.choices.circuitId), info: () => this.trackInfo(),
       items: [this.circuitItem(), ...this.setupItems(0),
         { label: t('menu.start'), desc: () => t('menu.training.desc'), accept: () => this.startSession(new TrainingSession({ circuitId: this.choices.circuitId, setup: this.settings.setups[0] })) },
-        { label: t('menu.back'), accept: () => this.pop() }],
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() }],
       selected: 0,
     };
   }
@@ -15715,7 +15805,7 @@ class GameFlow {
       items: [...this.raceOptions(), ...this.setupItems(0, false),
         { label: t('menu.start'), desc: () => t('menu.turbo.desc'), accept: () => this.startSession(new SingleRaceSession('turbo', {
           circuitId: this.choices.circuitId, laps: this.choices.laps, opponents: this.choices.opponents, players: 1, rules: 'turbo', difficulty: this.settings.difficulty, setups: this.settings.setups })) },
-        { label: t('menu.back'), accept: () => this.pop() }],
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() }],
       selected: 0,
     };
   }
@@ -15729,24 +15819,24 @@ class GameFlow {
         ...this.setupItems(0), ...this.setupItems(1),
         { label: t('menu.start'), desc: () => t('menu.duel.desc'), accept: () => this.startSession(new SingleRaceSession('duel', {
           circuitId: this.choices.circuitId, laps: this.choices.laps, opponents: Math.min(this.choices.opponents, 15), players: 2, rules: this.choices.rules, difficulty: this.settings.difficulty, setups: this.settings.setups })) },
-        { label: t('menu.back'), accept: () => this.pop() }],
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() }],
       selected: 0,
     };
   }
 
   optionsMenu() {
     const s = this.settings;
-    const volume = (key) => ({ label: t(`options.volume.${key}`), value: () => `${Math.round(s.audio[key] * 100)} %`, adjust: (d) => { s.audio[key] = Math.round(clampStep(s.audio[key], d * 0.1, 0, 1) * 10) / 10; } });
+    const volume = (key) => ({ label: t(`options.volume.${key}`), desc: () => this.describe(`options.volume.${key}`), value: () => `${Math.round(s.audio[key] * 100)} %`, adjust: (d) => { s.audio[key] = Math.round(clampStep(s.audio[key], d * 0.1, 0, 1) * 10) / 10; } });
     return {
       id: 'options', heading: () => t('menu.options'), hero: { team: 10, yaw: 2.75 },
       items: [
-        { label: t('options.language'), value: () => t(`options.language.${s.language}`), adjust: (d) => { s.language = cycle(LANGUAGE_ORDER, s.language, d); setLanguage(s.language); this.rebuildStack(); } },
-        { label: t('options.split'), value: () => t(`options.split.${s.split}`), adjust: () => { s.split = s.split === 'horizontal' ? 'vertical' : 'horizontal'; } },
-        { label: t('options.quality'), value: () => t(`options.quality.${s.quality}`), adjust: (d) => { s.quality = cycle(['low', 'medium', 'high'], s.quality, d); } },
+        { label: t('options.language'), desc: () => this.describe('options.language'), value: () => t(`options.language.${s.language}`), adjust: (d) => { s.language = cycle(LANGUAGE_ORDER, s.language, d); setLanguage(s.language); this.rebuildStack(); } },
+        { label: t('options.split'), desc: () => this.describe('options.split'), value: () => t(`options.split.${s.split}`), adjust: () => { s.split = s.split === 'horizontal' ? 'vertical' : 'horizontal'; } },
+        { label: t('options.quality'), desc: () => this.describe('options.quality'), value: () => t(`options.quality.${s.quality}`), adjust: (d) => { s.quality = cycle(['low', 'medium', 'high'], s.quality, d); } },
         volume('master'), volume('engine'), volume('effects'), volume('ambience'),
-        { label: t('options.effects'), value: () => '>', accept: () => this.push(this.effectsMenu()) },
-        { label: t('options.controls'), value: () => '>', accept: () => this.push(this.controlsMenu(0)) },
-        { label: t('menu.back'), accept: () => this.pop() },
+        { label: t('options.effects'), desc: () => this.describe('options.effects'), value: () => '>', accept: () => this.push(this.effectsMenu()) },
+        { label: t('options.controls'), desc: () => this.describe('options.controls'), value: () => '>', accept: () => this.push(this.controlsMenu(0)) },
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() },
       ],
       selected: 0, onChange: () => this.saveSettings(),
     };
@@ -15754,8 +15844,8 @@ class GameFlow {
 
   effectsMenu() {
     const s = this.settings;
-    const items = Object.keys(DEFAULT_EFFECTS).map((key) => ({ label: t(`effect.${key}`), value: () => t(s.effects[key] ? 'options.on' : 'options.off'), adjust: () => { s.effects[key] = !s.effects[key]; } }));
-    items.push({ label: t('menu.back'), accept: () => this.pop() });
+    const items = Object.keys(DEFAULT_EFFECTS).map((key) => ({ label: t(`effect.${key}`), desc: () => this.describe(`effect.${key}`), value: () => t(s.effects[key] ? 'options.on' : 'options.off'), adjust: () => { s.effects[key] = !s.effects[key]; } }));
+    items.push({ label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() });
     return { id: 'effects', heading: () => t('options.effects'), hero: { team: 2, yaw: 1.2 }, items, selected: 0, onChange: () => this.saveSettings() };
   }
 
@@ -15763,17 +15853,17 @@ class GameFlow {
     const s = this.settings, c = s.controls[player];
     const deviceLabel = (d) => (d.startsWith('gamepad') ? t('options.device.gamepad', { n: +d.slice(7) + 1 }) : t(`options.device.${d}`));
     const items = [
-      { label: t('setup.player', { n: player + 1 }), value: () => '<>', adjust: () => { this.stack.pop(); this.push(this.controlsMenu(1 - player)); } },
-      { label: t('options.device'), value: () => deviceLabel(c.device), adjust: (d) => { c.device = cycle(DEVICES, c.device, d); } },
+      { label: t('setup.player', { n: player + 1 }), desc: () => this.describe('options.player'), value: () => '<>', adjust: () => { this.stack.pop(); this.push(this.controlsMenu(1 - player)); } },
+      { label: t('options.device'), desc: () => this.describe('options.device'), value: () => deviceLabel(c.device), adjust: (d) => { c.device = cycle(DEVICES, c.device, d); } },
     ];
     for (const action of ACTIONS) {
-      items.push({ label: t(`action.${action}`), value: () => (this.capturing === action ? t('options.press') : keyName(c.keys[action])), accept: () => {
+      items.push({ label: t(`action.${action}`), desc: () => this.describe(c.device.startsWith('gamepad') ? 'options.padkeys' : 'options.rebind'), value: () => (this.capturing === action ? t('options.press') : this.keyLabel(c.keys[action])), accept: () => {
         this.capturing = action; this.dirty = true;
         this.input.capture = (code) => { if (code !== 'Escape' || action === 'pause') c.keys[action] = code; this.capturing = null; this.input.clearMenuEvents(); this.saveSettings(); };
       } });
     }
-    items.push({ label: t('options.reset'), accept: () => { s.controls = cloneControls(DEFAULT_CONTROLS); this.saveSettings(); this.stack.pop(); this.push(this.controlsMenu(player)); } });
-    items.push({ label: t('menu.back'), accept: () => this.pop() });
+    items.push({ label: t('options.reset'), desc: () => this.describe('options.reset'), accept: () => { s.controls = cloneControls(DEFAULT_CONTROLS); this.saveSettings(); this.stack.pop(); this.push(this.controlsMenu(player)); } });
+    items.push({ label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() });
     return { id: 'controls', heading: () => t('options.controls'), hero: { team: player ? 10 : 9, yaw: 2.9 }, items, selected: 1, onChange: () => this.saveSettings() };
   }
 

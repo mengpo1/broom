@@ -82,6 +82,18 @@ export class GameFlow {
     return { label: t('setup.difficulty'), value: () => t(`difficulty.${this.settings.difficulty}`), adjust: (d) => { this.settings.difficulty = cycle(DIFFICULTY_ORDER, this.settings.difficulty, d); } };
   }
 
+  /** Description of an entry from the dictionary key `<key>.desc`, or null when there is none. */
+  describe(key) {
+    const k = `${key}.desc`, text = t(k);
+    return text === k ? null : text;
+  }
+
+  /** Name of a key for the controls page, in the current language. */
+  keyLabel(code) {
+    const k = `key.${code}`, text = t(k);
+    return text === k ? keyName(code) : text;
+  }
+
   mainMenu() {
     const entry = (key, open) => ({ label: t(`menu.${key}`), desc: () => t(`menu.${key}.desc`), accept: open });
     return {
@@ -104,7 +116,7 @@ export class GameFlow {
       info: () => [`${t('results.arcadeScore')} : ${this.storage.data.arcade.best}`],
       items: [...this.setupItems(0, false),
         { label: t('menu.start'), desc: () => t('menu.arcade.desc'), accept: () => this.startSession(new ArcadeSession({ setup: { ...this.settings.setups[0], wing: 2, tyres: 'medium' } })) },
-        { label: t('menu.back'), accept: () => this.pop() }],
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() }],
       selected: 1,
     };
   }
@@ -126,7 +138,7 @@ export class GameFlow {
       this.storage.data.championship = session.state; this.storage.save();
       this.startSession(session);
     } });
-    items.push({ label: t('menu.back'), accept: () => this.pop() });
+    items.push({ label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() });
     return { id: 'championship', heading: () => t('menu.championship'), hero: { team: 9, yaw: 0.6 }, items, selected: 0,
       track: () => this.app.getTrack(SEASONS[this.choices.season].circuits[saved && !saved.finished && this.page && this.page.selected === 0 ? saved.round : 0]) };
   }
@@ -142,7 +154,7 @@ export class GameFlow {
       id: 'training', heading: () => t('menu.training'), track: () => this.app.getTrack(this.choices.circuitId), info: () => this.trackInfo(),
       items: [this.circuitItem(), ...this.setupItems(0),
         { label: t('menu.start'), desc: () => t('menu.training.desc'), accept: () => this.startSession(new TrainingSession({ circuitId: this.choices.circuitId, setup: this.settings.setups[0] })) },
-        { label: t('menu.back'), accept: () => this.pop() }],
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() }],
       selected: 0,
     };
   }
@@ -162,7 +174,7 @@ export class GameFlow {
       items: [...this.raceOptions(), ...this.setupItems(0, false),
         { label: t('menu.start'), desc: () => t('menu.turbo.desc'), accept: () => this.startSession(new SingleRaceSession('turbo', {
           circuitId: this.choices.circuitId, laps: this.choices.laps, opponents: this.choices.opponents, players: 1, rules: 'turbo', difficulty: this.settings.difficulty, setups: this.settings.setups })) },
-        { label: t('menu.back'), accept: () => this.pop() }],
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() }],
       selected: 0,
     };
   }
@@ -176,24 +188,24 @@ export class GameFlow {
         ...this.setupItems(0), ...this.setupItems(1),
         { label: t('menu.start'), desc: () => t('menu.duel.desc'), accept: () => this.startSession(new SingleRaceSession('duel', {
           circuitId: this.choices.circuitId, laps: this.choices.laps, opponents: Math.min(this.choices.opponents, 15), players: 2, rules: this.choices.rules, difficulty: this.settings.difficulty, setups: this.settings.setups })) },
-        { label: t('menu.back'), accept: () => this.pop() }],
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() }],
       selected: 0,
     };
   }
 
   optionsMenu() {
     const s = this.settings;
-    const volume = (key) => ({ label: t(`options.volume.${key}`), value: () => `${Math.round(s.audio[key] * 100)} %`, adjust: (d) => { s.audio[key] = Math.round(clampStep(s.audio[key], d * 0.1, 0, 1) * 10) / 10; } });
+    const volume = (key) => ({ label: t(`options.volume.${key}`), desc: () => this.describe(`options.volume.${key}`), value: () => `${Math.round(s.audio[key] * 100)} %`, adjust: (d) => { s.audio[key] = Math.round(clampStep(s.audio[key], d * 0.1, 0, 1) * 10) / 10; } });
     return {
       id: 'options', heading: () => t('menu.options'), hero: { team: 10, yaw: 2.75 },
       items: [
-        { label: t('options.language'), value: () => t(`options.language.${s.language}`), adjust: (d) => { s.language = cycle(LANGUAGE_ORDER, s.language, d); setLanguage(s.language); this.rebuildStack(); } },
-        { label: t('options.split'), value: () => t(`options.split.${s.split}`), adjust: () => { s.split = s.split === 'horizontal' ? 'vertical' : 'horizontal'; } },
-        { label: t('options.quality'), value: () => t(`options.quality.${s.quality}`), adjust: (d) => { s.quality = cycle(['low', 'medium', 'high'], s.quality, d); } },
+        { label: t('options.language'), desc: () => this.describe('options.language'), value: () => t(`options.language.${s.language}`), adjust: (d) => { s.language = cycle(LANGUAGE_ORDER, s.language, d); setLanguage(s.language); this.rebuildStack(); } },
+        { label: t('options.split'), desc: () => this.describe('options.split'), value: () => t(`options.split.${s.split}`), adjust: () => { s.split = s.split === 'horizontal' ? 'vertical' : 'horizontal'; } },
+        { label: t('options.quality'), desc: () => this.describe('options.quality'), value: () => t(`options.quality.${s.quality}`), adjust: (d) => { s.quality = cycle(['low', 'medium', 'high'], s.quality, d); } },
         volume('master'), volume('engine'), volume('effects'), volume('ambience'),
-        { label: t('options.effects'), value: () => '>', accept: () => this.push(this.effectsMenu()) },
-        { label: t('options.controls'), value: () => '>', accept: () => this.push(this.controlsMenu(0)) },
-        { label: t('menu.back'), accept: () => this.pop() },
+        { label: t('options.effects'), desc: () => this.describe('options.effects'), value: () => '>', accept: () => this.push(this.effectsMenu()) },
+        { label: t('options.controls'), desc: () => this.describe('options.controls'), value: () => '>', accept: () => this.push(this.controlsMenu(0)) },
+        { label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() },
       ],
       selected: 0, onChange: () => this.saveSettings(),
     };
@@ -201,8 +213,8 @@ export class GameFlow {
 
   effectsMenu() {
     const s = this.settings;
-    const items = Object.keys(DEFAULT_EFFECTS).map((key) => ({ label: t(`effect.${key}`), value: () => t(s.effects[key] ? 'options.on' : 'options.off'), adjust: () => { s.effects[key] = !s.effects[key]; } }));
-    items.push({ label: t('menu.back'), accept: () => this.pop() });
+    const items = Object.keys(DEFAULT_EFFECTS).map((key) => ({ label: t(`effect.${key}`), desc: () => this.describe(`effect.${key}`), value: () => t(s.effects[key] ? 'options.on' : 'options.off'), adjust: () => { s.effects[key] = !s.effects[key]; } }));
+    items.push({ label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() });
     return { id: 'effects', heading: () => t('options.effects'), hero: { team: 2, yaw: 1.2 }, items, selected: 0, onChange: () => this.saveSettings() };
   }
 
@@ -210,17 +222,17 @@ export class GameFlow {
     const s = this.settings, c = s.controls[player];
     const deviceLabel = (d) => (d.startsWith('gamepad') ? t('options.device.gamepad', { n: +d.slice(7) + 1 }) : t(`options.device.${d}`));
     const items = [
-      { label: t('setup.player', { n: player + 1 }), value: () => '<>', adjust: () => { this.stack.pop(); this.push(this.controlsMenu(1 - player)); } },
-      { label: t('options.device'), value: () => deviceLabel(c.device), adjust: (d) => { c.device = cycle(DEVICES, c.device, d); } },
+      { label: t('setup.player', { n: player + 1 }), desc: () => this.describe('options.player'), value: () => '<>', adjust: () => { this.stack.pop(); this.push(this.controlsMenu(1 - player)); } },
+      { label: t('options.device'), desc: () => this.describe('options.device'), value: () => deviceLabel(c.device), adjust: (d) => { c.device = cycle(DEVICES, c.device, d); } },
     ];
     for (const action of ACTIONS) {
-      items.push({ label: t(`action.${action}`), value: () => (this.capturing === action ? t('options.press') : keyName(c.keys[action])), accept: () => {
+      items.push({ label: t(`action.${action}`), desc: () => this.describe(c.device.startsWith('gamepad') ? 'options.padkeys' : 'options.rebind'), value: () => (this.capturing === action ? t('options.press') : this.keyLabel(c.keys[action])), accept: () => {
         this.capturing = action; this.dirty = true;
         this.input.capture = (code) => { if (code !== 'Escape' || action === 'pause') c.keys[action] = code; this.capturing = null; this.input.clearMenuEvents(); this.saveSettings(); };
       } });
     }
-    items.push({ label: t('options.reset'), accept: () => { s.controls = cloneControls(DEFAULT_CONTROLS); this.saveSettings(); this.stack.pop(); this.push(this.controlsMenu(player)); } });
-    items.push({ label: t('menu.back'), accept: () => this.pop() });
+    items.push({ label: t('options.reset'), desc: () => this.describe('options.reset'), accept: () => { s.controls = cloneControls(DEFAULT_CONTROLS); this.saveSettings(); this.stack.pop(); this.push(this.controlsMenu(player)); } });
+    items.push({ label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() });
     return { id: 'controls', heading: () => t('options.controls'), hero: { team: player ? 10 : 9, yaw: 2.9 }, items, selected: 1, onChange: () => this.saveSettings() };
   }
 

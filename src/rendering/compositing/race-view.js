@@ -3,7 +3,7 @@
 
 import { clamp, damp, wrapAngle, mod } from '../../core/math.js';
 import { VIEW_CONFIG } from '../../core/config.js';
-import { createProjection, updateProjection, focalForFov } from '../projection/road-projection.js';
+import { createProjection, updateProjection, focalForFov, depthOf, segmentAt } from '../projection/road-projection.js';
 import { createViewUniforms, set4, setColors, U } from './view-uniforms.js';
 import { MAX_ROWS } from './renderer.js';
 import { BACKDROP_PERIOD } from '../../art/environments/backdrop-rules.js';
@@ -22,7 +22,7 @@ export class RaceView {
     this.yaw = 0; this.pitch = 0; this.dive = 0; this.stretch = 0;
     this.shakeX = 0; this.shakeY = 0; this.shakeAmp = 0; this.impact = 0; this.flash = 0;
     this.speedLines = 0; this.heading = 0; this.focusX = 0;
-    this.tracksideS = 0; this.tracksideD = 0; this.tracksideTimer = 0;
+    this.tracksideS = 0; this.tracksideD = 0; this.tracksideTimer = 0; this.tracksideAim = 0; this.tracksideGap = 120; this.tracksideFresh = true;
     this.time = 0;
     this.wide = false;
     this.baseFocal = 1;      // focal at rest: cockpit art is scaled against it
@@ -68,21 +68,31 @@ export class RaceView {
       camD = clamp(carD * 0.6 + cfg.front.side, -track.halfWidth + 1, track.halfWidth - 1);
       yawTarget = Math.atan2(camD - carD, cfg.front.ahead) * 0.75;      // turn toward the car for a three-quarter front view
     } else {
-      // trackside camera: fixed position, re-placed ahead of the car when it has gone past
+      // trackside camera: fixed position, re-placed ahead of the car as soon as it has gone past
       this.tracksideTimer -= dt;
       let gap = mod(this.tracksideS - carS + track.length / 2, track.length) - track.length / 2;
-      if (gap < -30 || gap > 260 || this.tracksideTimer < -40) {
-        this.tracksideS = mod(carS + 150, track.length);
+      if (gap < 3 || gap > 280 || this.tracksideTimer < -40 || this.tracksideFresh) {
+        // among a few places ahead, prefer the one the car reaches along the straightest stretch
+        let best = 0, bestTurn = 1e9;
+        for (let c = 0; c < 6; c++) {
+          const s1 = carS + cfg.tv.ahead + c * 18;
+          const i1 = Math.floor(mod(s1, track.length) / track.ds) % track.n, i0 = Math.floor(mod(s1 - cfg.tv.ahead, track.length) / track.ds) % track.n;
+          const turn = Math.abs(wrapAngle(track.heading[i1] - track.heading[i0])) + c * 0.02;
+          if (turn < bestTurn) { bestTurn = turn; best = s1; }
+        }
+        this.tracksideS = mod(best, track.length);
         const i = Math.floor(this.tracksideS / track.ds) % track.n;
         const side = track.kappa[i] > 0 ? -1 : 1;
         this.tracksideD = side * (track.halfWidth + 1.5);
         this.tracksideTimer = 0;
-        gap = 150;
+        this.tracksideFresh = true;
+        gap = mod(this.tracksideS - carS + track.length / 2, track.length) - track.length / 2;
       }
+      this.tracksideGap = gap;
       dir = -1; camS = this.tracksideS; camD = this.tracksideD; eye = cfg.tv.height;
-      yawTarget = clamp(Math.atan2((carD - camD) * -1, Math.max(gap, 4)) * 0.9, -0.9, 0.9);
+      yawTarget = this.tracksideAim;
     }
-    const rate = this.camera === CAMERA.COCKPIT ? 14 : 6;
+    const rate = this.camera === CAMERA.COCKPIT ? 14 : this.camera === CAMERA.TRACKSIDE ? 12 : 6;
     this.yaw = Math.abs(yawTarget - this.yaw) > 1.2 ? yawTarget : damp(this.yaw, yawTarget, rate, dt);
 
     // perspective breathing and nose dive
@@ -91,7 +101,9 @@ export class RaceView {
     const stretchTarget = effects.perspectiveStretch ? speedRatio * speedRatio * cfg.hfovSpeedGain - Math.max(0, this.dive) * cfg.hfovBrakeLoss + (car.boosting ? 0.05 : 0) : 0;
     this.stretch = damp(this.stretch, stretchTarget, 3.5, dt);
     const tall = r.w < r.h * 1.1;
-    const restFov = this.camera === CAMERA.COCKPIT ? (tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : cfg.tv.hfov;
+    // the trackside camera zooms out as the car comes closer, like a television operator
+    const tvFov = cfg.tv.hfovFar + (cfg.tv.hfovNear - cfg.tv.hfovFar) * clamp(1 - (this.tracksideGap - 8) / (cfg.tv.ahead - 8), 0, 1) ** 1.6;
+    const restFov = this.camera === CAMERA.COCKPIT ? (tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : tvFov;
     const hfov = restFov + (this.camera === CAMERA.COCKPIT ? this.stretch : this.stretch * 0.3);
     const focal = focalForFov(r.w, hfov);
     this.baseFocal = focalForFov(r.w, restFov);
@@ -120,6 +132,21 @@ export class RaceView {
     cam.cx = r.w * 0.5 + this.shakeX * 0.35;
     cam.cy = r.h * ratio + focal * Math.tan(this.pitch) - diveShift + this.shakeY * 0.35;
     updateProjection(this.projection, track, cam);
+    if (this.camera === CAMERA.TRACKSIDE) {
+      // pan: aim at the place where the car is actually drawn (the road may bend between camera and car)
+      const p = this.projection, z = depthOf(p, carS);
+      if (z > 1.5 && z < p.farZ) {
+        const k = segmentAt(p, z), t = z - p.nodeZ[k];
+        const offset = p.nodeX[k] + p.nodeTheta[k] * t + 0.5 * p.nodeKappa[k] * t * t + p.dir * carD - p.camD;
+        this.tracksideAim = clamp(Math.atan2(offset, z), -1.05, 1.05);
+      }
+      if (this.tracksideFresh) {
+        // first frame at a new place: point at the car at once instead of panning from the old angle
+        this.tracksideFresh = false;
+        this.yaw = this.tracksideAim; cam.yaw = this.yaw;
+        updateProjection(this.projection, track, cam);
+      }
+    } else this.tracksideFresh = true;
 
     // speed lines: speed, acceleration bursts, impacts
     let lines = 0;
