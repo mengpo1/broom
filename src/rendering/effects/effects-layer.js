@@ -11,8 +11,9 @@ import { SURFACE } from '../../tracks/track-builder.js';
 import { closedCurve, blobPoints, brushStroke, seeded } from '../../art/styles/ink.js';
 import { drawText, measureText } from '../../art/styles/lettering.js';
 import { hexToRgb } from '../../art/palettes/palettes.js';
+import { COLLISION_TUNING } from '../../physics/collision-tuning.js';
 
-const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8;
+const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8, MAX_FLASHES = 6;
 const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR'];
 const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6 };
 const FLATOUT_WORDS = 3;        // the engine at full cry has several spellings
@@ -108,6 +109,11 @@ export class EffectsLayer {
     this.pops = [];
     for (let v = 0; v < 2; v++) this.pops.push(Array.from({ length: MAX_POPS }, () => ({ age: 9, life: 0, x: 0, y: 0, word: -1, size: 1, burst: false, angle: 0 })));
     this.popCursor = [0, 0];
+    // contact flashes: short stars drawn in the world, at the point where two cars (or a car and a
+    // board) touch; attached to a car they travel with it
+    this.flashes = Array.from({ length: MAX_FLASHES }, () => ({ car: -1, s: 0, d: 0, h: 0, age: 9, life: 0, size: 1, seg: -1, z: 0 }));
+    this.flashCursor = 0;
+    this.typedCar = -1; this.typedClock = 9;
     this.popClock = [9, 9];
     this.roarClock = [0, 0]; this.wasFlatOut = [false, false];
     this.dust = [0.85, 0.79, 0.64]; this.dirt = [0.55, 0.6, 0.38]; this.smoke = [0.93, 0.92, 0.9];
@@ -121,6 +127,8 @@ export class EffectsLayer {
     this.markCount = 0; this.markCursor = 0;
     this.emitTimer.fill(0); this.markOdo.fill(0);
     for (const list of this.pops) for (const p of list) p.life = 0;
+    for (const f of this.flashes) f.life = 0;
+    this.typedCar = -1; this.typedClock = 9;
     this.popClock[0] = 9; this.popClock[1] = 9;
     this.roarClock[0] = 0; this.roarClock[1] = 0; this.wasFlatOut[0] = false; this.wasFlatOut[1] = false;
     if (palette) { this.dust = hexToRgb(palette.dust); this.dirt = hexToRgb(palette.grassDark); this.smoke = hexToRgb(palette.smoke); }
@@ -158,6 +166,10 @@ export class EffectsLayer {
       if (fx.onomatopoeia) for (let v = 0; v < app.viewCount; v++) this.pop(v, WORD.VROAR, 0.5, 0.36, 1.15, false);
       return;
     }
+    if (event.type === 'bump' || event.type === 'wheel') { this.onTypedContact(event, app); return; }
+    if (event.type === 'obstacle') { this.onObstacle(event, app); return; }
+    // (a contact that already has its own staging does not get the generic burst as well)
+    if (event.type === 'contact' && this.typedClock < 0.1 && (event.car === this.typedCar || event.other === this.typedCar)) return;
     const hit = event.type === 'wall' || event.type === 'contact' || event.type === 'crash';
     if (!hit) return;
     const car = race.cars[event.car];
@@ -187,6 +199,58 @@ export class EffectsLayer {
     }
   }
 
+  /** Star at a point of the world. `car` >= 0 attaches it to that car: (s, d) are then offsets from the car. */
+  flash(car, s, d, h, size, life) {
+    const f = this.flashes[this.flashCursor];
+    this.flashCursor = (this.flashCursor + 1) % MAX_FLASHES;
+    f.car = car; f.s = s; f.d = d; f.h = h; f.size = size; f.age = 0; f.life = life;
+  }
+
+  /** Rear-end bump or wheel-to-wheel contact: a spark where the cars touch, a few flying sparks, a sound word. */
+  onTypedContact(event, app) {
+    const fx = app.effects, race = app.race, track = this.track;
+    const car = race.cars[event.car], other = race.cars[event.other];
+    let ds = other.s - car.s;
+    if (ds > track.length / 2) ds -= track.length; else if (ds < -track.length / 2) ds += track.length;
+    const wheel = event.type === 'wheel';
+    this.typedCar = event.car; this.typedClock = 0;
+    if (fx.impactFrames) this.flash(event.car, ds * 0.5, (other.d - car.d) * 0.5, wheel ? 0.36 : 0.42, wheel ? 1.5 : 1.2, COLLISION_TUNING.sparkLife);
+    if (fx.dust) {
+      for (let k = 0; k < 5; k++) {
+        this.spawn(1, car.s + ds * 0.5, car.d + (other.d - car.d) * 0.5, 0.35, car.speed * 0.8 + (this.random() - 0.5) * 6, (this.random() - 0.5) * 7, 1.5 + this.random() * 3, 0.25 + this.random() * 0.2, 0.22, 0.2, [1, 0.85, 0.3], 1);
+      }
+    }
+    if (!fx.onomatopoeia) return;
+    for (let v = 0; v < app.viewCount; v++) {
+      const view = app.views[v];
+      if ((view.carIndex !== event.car && view.carIndex !== event.other) || this.popClock[v] < 0.5) continue;
+      this.popClock[v] = 0;
+      const mine = race.cars[view.carIndex], theirs = mine === car ? other : car;
+      const x = wheel ? (theirs.d > mine.d ? 0.68 : 0.32) : 0.5 + (this.random() - 0.5) * 0.2;
+      this.pop(v, wheel ? WORD.TCHAK : WORD.BANG, x, 0.33, 0.6, false);
+    }
+  }
+
+  /** A roadside board is knocked down: star on the spot, splinters, dust, a sound word for the driver. */
+  onObstacle(event, app) {
+    const fx = app.effects, race = app.race;
+    const car = race.cars[event.car], o = race.obstacles[event.other];
+    if (!o) return;
+    if (fx.impactFrames) this.flash(-1, o.s, o.d, 0.9, 2.6, 0.22);
+    if (fx.dust) {
+      for (let k = 0; k < 10; k++) {
+        this.spawn(1, o.s, o.d + (this.random() - 0.5) * 1.4, 0.4 + this.random() * 1.2, car.speed * (0.3 + this.random() * 0.5), (this.random() - 0.5) * 9, 3 + this.random() * 5, 0.45 + this.random() * 0.3, 0.3, 0.2, [0.95, 0.94, 0.9], 1);
+      }
+      for (let k = 0; k < 3; k++) this.spawn(0, o.s + this.random() * 2, o.d + (this.random() - 0.5), 0.4, car.speed * 0.3, (this.random() - 0.5) * 2, 1.2, 0.7 + this.random() * 0.3, 1, 1.6, this.dust, 1);
+    }
+    for (let v = 0; v < app.viewCount; v++) {
+      const view = app.views[v];
+      if (view.carIndex !== event.car) continue;
+      view.addImpact(0.6);
+      if (fx.onomatopoeia && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, WORD.CRAC, o.d > car.d ? 0.62 : 0.38, 0.35, 0.8, false); }
+    }
+  }
+
   update(app, dt) {
     if (dt <= 0) return;
     const fx = app.effects, cars = app.race.cars, track = this.track;
@@ -198,6 +262,8 @@ export class EffectsLayer {
       this.pvs[i] *= drag; this.pvd[i] *= drag;
       if (this.pkind[i] === 1) { this.pvh[i] -= 14 * dt; if (this.ph[i] < 0.05) { this.ph[i] = 0.05; this.pvh[i] *= -0.4; } }
     }
+    for (const f of this.flashes) if (f.life > 0) { f.age += dt; if (f.age > f.life) f.life = 0; }
+    this.typedClock += dt;
     for (const list of this.pops) for (const p of list) if (p.life > 0) { p.age += dt; if (p.age > p.life) p.life = 0; }
     this.popClock[0] += dt; this.popClock[1] += dt;
     // the engine at full cry: a sound word low in the picture when a player reaches top speed
@@ -249,6 +315,14 @@ export class EffectsLayer {
   beginView(app, view) {
     const p = view.projection, quads = app.quads, sp = this.mark;
     const W = view.rect.w;
+    // where each contact flash is along the projected road in this view
+    for (const f of this.flashes) {
+      f.seg = -1;
+      if (f.life <= 0) continue;
+      const anchor = f.car >= 0 ? app.race.cars[f.car] : null;
+      f.z = depthOf(p, anchor ? anchor.s + f.s : f.s);
+      if (f.z > 0.6 && f.z < p.farZ - 3) f.seg = segmentAt(p, f.z);
+    }
     for (let i = 0; i < this.markCount; i++) {
       const z0 = depthOf(p, this.ms[i]);
       const zA = p.dir > 0 ? z0 : z0 - this.mlen[i], zB = zA + this.mlen[i];
@@ -274,9 +348,18 @@ export class EffectsLayer {
   }
 
   buildSegment(app, view, k) {
+    const p = view.projection, quads = app.quads;
+    for (const f of this.flashes) {
+      if (f.seg !== k) continue;
+      const anchor = f.car >= 0 ? app.race.cars[f.car] : null;
+      if (!projectAtDepth(p, f.z, anchor ? anchor.d + f.d : f.d, f.h, pt)) continue;
+      // the star snaps to full size at once, then shrinks: a drawn flash, not a fade
+      const t = f.age / f.life;
+      const size = Math.min(view.rect.h * 0.3, f.size * pt.scale) * (t < 0.25 ? 0.7 + 1.2 * t : 1 - (t - 0.25) * 0.55);
+      quads.rotated(this.burst, pt.x, pt.y, size, size, f.s * 7, 0.5, 0.5, 1, 1, 1, 1);
+    }
     let i = this.segHead[k];
     if (i < 0) return;
-    const p = view.projection, quads = app.quads;
     for (; i >= 0; i = this.pnext[i]) {
       if (!projectAtDepth(p, this.pz[i], this.pd[i], this.ph[i], pt)) continue;
       const t = this.page[i] / this.plife[i];

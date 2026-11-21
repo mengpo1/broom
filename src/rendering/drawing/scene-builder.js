@@ -58,6 +58,7 @@ export class SceneBuilder {
   /** Bind a race: resolve the drawings named by the circuit layout. */
   reset(race, track, layout, palette) {
     this.track = track; this.layout = layout;
+    this.obstacleDown = race.obstacleDown || null;
     // light of the place over the cars and the cockpit; colours of the rear view in the mirrors
     this.ambient = hexToRgb(palette.ambient);
     this.mirror = {
@@ -279,7 +280,7 @@ export class SceneBuilder {
     const start = dir > 0 ? to - 1 : from, end = dir > 0 ? from - 1 : to, inc = dir > 0 ? -1 : 1;
     for (let q = start; q !== end; q += inc) {
       const prop = layout.props[q];
-      if (prop.slot !== slot) continue;
+      if (prop.slot !== slot || (prop.obstacle >= 0 && this.obstacleDown && this.obstacleDown[prop.obstacle])) continue;
       const z = depthOf(p, prop.s);
       const reach = prop.reach < reachLimit ? prop.reach : reachLimit;
       if (z < 1.2 || z > reach * detail) continue;

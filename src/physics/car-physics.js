@@ -7,7 +7,8 @@ import { clamp, damp, moveToward, angleDiff, wrapAngle, lerp } from '../core/mat
 import { GRAVITY, gripLimit, powerFraction } from '../vehicles/car-spec.js';
 import { SURFACE, locateOnTrack, relativeS, sampleArray } from '../tracks/track-builder.js';
 
-export const CAR_STATE = { GRID: 0, RACING: 1, SPIN: 2, RESET: 3, SERVICE: 4, RETIRED: 5 };
+// AIRBORNE: thrown in the air by a contact; WRECKED: stopped on the spot after a hard landing.
+export const CAR_STATE = { GRID: 0, RACING: 1, SPIN: 2, RESET: 3, SERVICE: 4, RETIRED: 5, AIRBORNE: 6, WRECKED: 7 };
 
 const located = { index: 0, s: 0, d: 0 };
 
@@ -31,6 +32,9 @@ export function createCarState(index) {
     sectorStart: 0, lastSectorTime: 0, finished: false, finishTime: 0, position: 0, gridPosition: 0,
     overtakes: 0, contacts: 0, wallHits: 0, offTrackTime: 0, resets: 0, topSpeed: 0,
     lastContactTime: -10, compound: 'medium', nextCompound: 'medium',
+    // collisions and accidents (see collision-tuning.js): `clock` is the car's own simulation time,
+    // the other clocks are values of it at the last event, for the animations driven by the state
+    clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
   };
 }
 
@@ -108,6 +112,7 @@ export function stepCar(car, track, dt, rules, emit) {
   car.prevX = car.x; car.prevY = car.y; car.prevZ = car.z;
   car.prevHeading = car.heading; car.prevPitch = car.pitch;
   if (car.ghostTimer > 0) car.ghostTimer -= dt;
+  car.clock += dt;
   const spec = car.params.spec;
 
   switch (car.state) {

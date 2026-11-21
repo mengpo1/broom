@@ -14,7 +14,7 @@ import { SceneBuilder } from '../rendering/drawing/scene-builder.js';
 import { getPalette, shaderColors } from '../art/palettes/palettes.js';
 import { ArtLibrary, CAR_ANGLES } from '../art/art-library.js';
 import { ALL_TEAMS } from '../vehicles/liveries.js';
-import { buildSceneryLayout } from '../tracks/scenery-layout.js';
+import { getSceneryLayout } from '../tracks/scenery-layout.js';
 import { getCircuit } from '../tracks/track-catalog.js';
 import { buildTrack } from '../tracks/track-builder.js';
 import { Race, RACE_PHASE, SIM_DT } from '../gameplay/race.js';
@@ -98,7 +98,7 @@ export class GameApp {
   startRace(config) {
     const track = this.getTrack(config.circuitId);
     let layout = this.layouts.get(track.id);
-    if (!layout) { layout = buildSceneryLayout(track); this.layouts.set(track.id, layout); }
+    if (!layout) { layout = getSceneryLayout(track); this.layouts.set(track.id, layout); }
     this.layout = layout;
     if (this.track !== track) {
       this.track = track;

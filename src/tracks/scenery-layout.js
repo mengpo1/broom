@@ -27,7 +27,8 @@ function pickWeighted(rng, table) {
  *   strips: object[], stripsAt: number[][], props: object[], propStart: Int32Array,
  *   theme: object }}
  * strip: { id, side, from, count, offset, absolute, base, height, tile, phase }
- * prop:  { id, s, d, sample, scale, flip, reach }  (reach: draw distance in metres)
+ * prop:  { id, s, d, sample, scale, flip, reach, solidHalfWidth, obstacle }  (reach: draw distance in metres;
+ *         obstacle: index in `obstacles` when the object is solid, else -1)
  */
 export function buildSceneryLayout(track) {
   const theme = getTheme(track.theme);
@@ -54,7 +55,8 @@ export function buildSceneryLayout(track) {
     if (opt.block) for (let k = -2; k < strip.count + 2; k++) blocked[sideIndex(side)][mod(strip.from + k, n)] = 1;
   };
   const addProp = (id, s, d, opt = {}) => {
-    props.push({ id, s: mod(s, length), d, sample: Math.floor(mod(s, length) / ds) % n, scale: opt.scale ?? 1, flip: !!opt.flip, reach: opt.reach ?? 1300 });
+    props.push({ id, s: mod(s, length), d, sample: Math.floor(mod(s, length) / ds) % n, scale: opt.scale ?? 1, flip: !!opt.flip, reach: opt.reach ?? 1300,
+      solidHalfWidth: opt.solidHalfWidth ?? 0, obstacle: -1 });
   };
   const barrierOf = (side, i) => (side > 0 ? track.barrierR[i] : track.barrierL[i]);
   const vergeOf = (side, i) => (side > 0 ? track.vergeR[i] : track.vergeL[i]);
@@ -178,7 +180,9 @@ export function buildSceneryLayout(track) {
     for (const dist of [300, 200, 100]) {
       const j = mod(i - Math.round(dist / ds), n);
       if (side === pit.side && inPitWall(j)) continue;
-      addProp(`sign.brake.${dist}`, j * ds, side * (barrierOf(side, j) - 0.75), { reach: 600 });
+      // braking boards stand on the verge, clear of the barrier: they are solid (see physics/obstacles.js)
+      const verge = barrierOf(side, j) - halfWidth;
+      addProp(`sign.brake.${dist}`, j * ds, side * (barrierOf(side, j) - (verge > 3.6 ? 1.4 : 0.9)), { reach: 600, solidHalfWidth: 0.85 });
     }
   }
 
@@ -237,5 +241,18 @@ export function buildSceneryLayout(track) {
   const propStart = new Int32Array(n + 1);
   for (const p of props) propStart[p.sample + 1]++;
   for (let i = 0; i < n; i++) propStart[i + 1] += propStart[i];
-  return { strips, stripsAt, props, propStart, theme };
+  // solid objects a car can run into: the simulation only knows this list (position and width)
+  const obstacles = [];
+  props.forEach((prop, index) => {
+    if (prop.solidHalfWidth <= 0) return;
+    prop.obstacle = obstacles.length;
+    obstacles.push({ index: obstacles.length, prop: index, s: prop.s, d: prop.d, halfWidth: prop.solidHalfWidth });
+  });
+  return { strips, stripsAt, props, propStart, theme, obstacles };
+}
+
+/** Layout of a track, built once (the race and the renderer must see the same objects). */
+export function getSceneryLayout(track) {
+  if (!track.sceneryLayout) track.sceneryLayout = buildSceneryLayout(track);
+  return track.sceneryLayout;
 }
