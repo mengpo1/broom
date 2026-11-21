@@ -3,7 +3,7 @@
 // Everything that crosses a vertical edge is drawn again one tile away (see `wrapped`); the top
 // 3 % of the canvas stays transparent so the irregular silhouette is anti-aliased.
 
-import { LINE, seeded, sampleCurve, brushCurve, brushStroke, clipped, tracePolygon } from '../styles/ink.js';
+import { LINE, seeded, brushCurve, brushStroke, clipped, tracePolygon } from '../styles/ink.js';
 import { shadeHex, mixHex } from '../palettes/palettes.js';
 import { foliageMass, inkUnion, grassTuft, trunk, ringPoints, traceScallops } from './vegetation.js';
 

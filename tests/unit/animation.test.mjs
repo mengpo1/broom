@@ -32,7 +32,7 @@ test('car views: turning a car through 360 degrees walks through neighbouring dr
   assert.equal(carViewFrame(Math.PI / 2, CAR_ANGLES), (CAR_ANGLES - 1) / 2, 'side view');
   assert.ok(carViewFrame(-0.5, CAR_ANGLES) < 0 && index(carViewFrame(-0.5, CAR_ANGLES)) === carViewFrame(0.5, CAR_ANGLES), 'the other side is the mirrored drawing');
   // the step between two drawings is small enough for a smooth turn
-  assert.ok(180 / (CAR_ANGLES - 1) <= 6, 'at most 6 degrees between two drawings');
+  assert.ok(180 / (CAR_ANGLES - 1) <= 7.5, 'at most 7.5 degrees between two drawings');
 });
 
 test('front wheels: rolling marks advance in step with the distance travelled', () => {

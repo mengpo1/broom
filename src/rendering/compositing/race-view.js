@@ -64,8 +64,9 @@ export class RaceView {
     } else if (this.camera === CAMERA.CHASE) {
       camS = carS - cfg.chase.back; eye = cfg.chase.height; camD = carD * 0.82; yawTarget = he * 0.25;
     } else if (this.camera === CAMERA.FRONT) {
-      dir = -1; camS = carS + cfg.front.ahead; eye = cfg.front.height; yawTarget = 0;
+      dir = -1; camS = carS + cfg.front.ahead; eye = cfg.front.height;
       camD = clamp(carD * 0.6 + cfg.front.side, -track.halfWidth + 1, track.halfWidth - 1);
+      yawTarget = Math.atan2(camD - carD, cfg.front.ahead) * 0.75;      // turn toward the car for a three-quarter front view
     } else {
       // trackside camera: fixed position, re-placed ahead of the car when it has gone past
       this.tracksideTimer -= dt;
@@ -89,9 +90,11 @@ export class RaceView {
     this.dive = damp(this.dive, diveTarget, 7, dt);
     const stretchTarget = effects.perspectiveStretch ? speedRatio * speedRatio * cfg.hfovSpeedGain - Math.max(0, this.dive) * cfg.hfovBrakeLoss + (car.boosting ? 0.05 : 0) : 0;
     this.stretch = damp(this.stretch, stretchTarget, 3.5, dt);
-    const hfov = cfg.hfov + (this.camera === CAMERA.COCKPIT ? this.stretch : this.stretch * 0.4);
+    const tall = r.w < r.h * 1.1;
+    const restFov = this.camera === CAMERA.COCKPIT ? (tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : cfg.tv.hfov;
+    const hfov = restFov + (this.camera === CAMERA.COCKPIT ? this.stretch : this.stretch * 0.3);
     const focal = focalForFov(r.w, hfov);
-    this.baseFocal = focalForFov(r.w, cfg.hfov);
+    this.baseFocal = focalForFov(r.w, restFov);
 
     // vibration: speed buzz, kerbs, loose surfaces, impacts
     this.impact = Math.max(0, this.impact - dt * 2.6);

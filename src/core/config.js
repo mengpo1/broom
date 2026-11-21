@@ -12,9 +12,10 @@ export const VIEW_CONFIG = {
   drawDistance: 1300,
   yawFollow: 0.82,           // share of the car's heading error shown as view rotation
   pitchFollow: 0.55,         // share of the road grade applied to the horizon
-  chase: { back: 8.5, height: 2.3, side: 0 },
-  front: { ahead: 13, height: 1.25, side: 1.6 },
-  tv: { height: 3.2 },
+  hfovTall: 1.05,            // field of view of a view taller than wide (vertical split screen)
+  chase: { back: 7.5, height: 2.2, side: 0, hfov: 1.0 },
+  front: { ahead: 7.5, height: 0.85, side: 1.5, hfov: 0.82 },
+  tv: { height: 2.6, hfov: 0.5 },
 };
 
 /** Visual effects, each can be switched off individually (Options menu / saved settings). */

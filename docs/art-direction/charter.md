@@ -79,7 +79,7 @@ L'image est composée de neuf plans, du fond vers l'avant :
 3. relief proche / ligne d'arbres / ville (défile un peu plus vite) ;
 4. objets de bord de piste (panneaux dressés, bandes le long de la route) ;
 5. sol : route, vibreurs, bas-côtés (projection 2D par lignes) ;
-6. voitures concurrentes (vues dessinées sous 64 angles, 33 dessins + miroir) ;
+6. voitures concurrentes (vues dessinées sous 48 angles, 25 dessins + miroir) ;
 7. effets (poussière, fumée, traits de vitesse, impacts, onomatopées) ;
 8. cockpit (éléments animables) ;
 9. interface (cartouches, instruments).
@@ -98,7 +98,7 @@ resserre au freinage ; l'horizon suit partiellement la pente.
 
 ## 7. Animation
 
-- Voitures : 33 dessins de 0° (arrière) à 180° (avant) par pas de 5,6°, miroir pour
+- Voitures : 25 dessins de 0° (arrière) à 180° (avant) par pas de 7,5°, miroir pour
   l'autre côté ; la vue choisie dépend de l'angle réel entre la voiture et la ligne de
   visée, ce qui donne du volume sans rotation d'image plate.
 - Cockpit : volant et mains tournent ; roues avant dessinées sous plusieurs angles de

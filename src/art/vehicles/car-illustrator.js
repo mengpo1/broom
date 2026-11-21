@@ -29,7 +29,7 @@ const SHADOW_OUTLINE = (() => {
 })();
 const SHADE_INK = '#1b1b3a';
 /** Blend factors of the four tones relative to the base colour (shared with the mask encoding). */
-export const TONE_MIX = { shade: 0.46, mid: 0.15, gloss: 0.72 };
+export const TONE_MIX = { shade: 0.46, mid: 0.15, gloss: 0.9 };
 
 /** Fixed materials: [shade, base, light] */
 const FIXED = {

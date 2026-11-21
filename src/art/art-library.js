@@ -16,9 +16,9 @@ import { expandScenerySpecs } from './environments/scenery-specs.js';
 import { sceneryPainter } from './environments/scenery-painters.js';
 import { paintBackdropLayer } from './environments/backdrops.js';
 
-export const CAR_ANGLES = 33;                 // views from 0 (rear) to 180 degrees (front); the other side is mirrored
+export const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degrees (front) every 7.5 degrees; the other side is mirrored
 export const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
-const STATIC_LAYERS = 9;
+const STATIC_LAYERS = 6;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;
 
 /** Which team colour goes to which livery zone (body, flanks, wings) for each paint pattern. */
@@ -55,7 +55,7 @@ export class ArtLibrary {
   /** Draw the car from every angle: one layer of fixed colours and one livery mask per angle. */
   buildCars() {
     const t0 = performance.now();
-    const model = buildCarModel({ detail: 0 });
+    const model = buildCarModel({ detail: 1 });
     const fixed = makeCanvas(CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT), mask = makeCanvas(CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
     const ctx = fixed.getContext('2d'), mctx = mask.getContext('2d');
     this.cars.length = 0;
@@ -63,7 +63,7 @@ export class ArtLibrary {
       ctx.clearRect(0, 0, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
       mctx.clearRect(0, 0, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
       const yaw = (i / (CAR_ANGLES - 1)) * Math.PI;
-      const meta = drawCarFitted(ctx, mctx, model, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT, { yaw, pitch: CAR_VIEW_PITCH, distance: 16 }, { margin: 10 });
+      const meta = drawCarFitted(ctx, mctx, model, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT, { yaw, pitch: CAR_VIEW_PITCH, distance: 16 }, { margin: 14 });
       this.renderer.uploadLayer('cars', i * 2, fixed);
       this.renderer.uploadLayer('cars', i * 2 + 1, mask);
       this.cars.push({ layer: i * 2, ppm: meta.ppm, ax: meta.ax, ay: meta.ay, w: CAR_LAYER_WIDTH, h: CAR_LAYER_HEIGHT });

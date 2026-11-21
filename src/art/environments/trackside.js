@@ -180,6 +180,15 @@ export function wrapped(ctx, w, rnd, draw) {
   for (const dx of [0, -w, w]) { ctx.save(); ctx.translate(dx, 0); draw(seeded(seed)); ctx.restore(); }
 }
 
+/** Scratch canvas for a motif that is painted once and stamped several times. */
+export function scratchCanvas(width, height) {
+  const w = Math.max(1, Math.ceil(width)), h = Math.max(1, Math.ceil(height));
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  return canvas;
+}
+
 /** Rounded-box outline (superellipse), used for tyres, lamps, soft panels. */
 export function superEllipse(cx, cy, a, b, n = 3, steps = 28) {
   const pts = [];
@@ -243,24 +252,21 @@ export function drawFigure(ctx, P, x, y, H, o = {}) {
     traceEllipse(g, hx, hy, rx, ry);
     if (hat !== 'bald') hairPath(g);
   };
-  contour(ctx, body, P.ink, lw, 1, 'round');
+  contour(ctx, body, P.ink, lw, H > 95 ? 1 : 0, 'round');
   const trouserShade = shadeHex(trousers, 0.3), shirtShade = shadeHex(shirt, 0.3), skinShade = shadeHex(skin, 0.26);
   if (hat === 'long') fillTrace(ctx, hairPath, hairTone);
   fillPoly(ctx, leg(-1), trousers); fillPoly(ctx, leg(1), trouserShade);
   fillPoly(ctx, shoe(-1), P.ink); fillPoly(ctx, shoe(1), P.ink);
   fillPoly(ctx, torso, shirt);
-  clipped(ctx, (g) => tracePolygon(g, torso), () => {
-    fillPoly(ctx, [[cx + sw * 0.38, shY - 0.03 * u], [cx + sw * 1.2, shY - 0.03 * u], [x + hw * 1.2, hipY + 0.05 * u], [x + hw * 0.5, hipY + 0.05 * u]], shirtShade);
-    if (o.overalls) fillRect(ctx, x - hw * 1.2, waistY - 0.012 * u, hw * 2.4, 0.026 * u, P.ink);
-    else fillRect(ctx, x - hw * 1.2, hipY - 0.012 * u, hw * 2.4, 0.06 * u, trousers);
-  });
+  fillPoly(ctx, [[cx + sw * 0.4, shY - 0.012 * u], [cx + sw, shY + 0.014 * u], [cx + sw * 0.94, shY + 0.11 * u], [xm + ww, waistY], [x + hw, hipY + 0.035 * u], [x + hw * 0.5, hipY + 0.035 * u]], shirtShade);
+  if (o.overalls) fillRect(ctx, xm - ww, waistY - 0.012 * u, ww * 2, 0.026 * u, P.ink);
+  else { fillRect(ctx, x - hw * 0.95, hipY - 0.012 * u, hw * 1.45, 0.048 * u, trousers); fillRect(ctx, x + hw * 0.5, hipY - 0.012 * u, hw * 0.46, 0.048 * u, trouserShade); }
   brushStroke(ctx, [[x, hipY + 0.06 * u], [x + spread * 0.2, kneeY], [x + spread * 0.3, ankleY]], lw, { color: P.ink, taperStart: 0, taperEnd: 0.4 });
   fillRect(ctx, cx - 0.026 * u, y - 0.878 * u, 0.052 * u, 0.05 * u, skinShade);
   fillEllipse(ctx, hx, hy, rx, ry, skin);
-  clipped(ctx, (g) => traceEllipse(g, hx, hy, rx, ry), () => {
-    fillEllipse(ctx, hx + rx * 0.95, hy + ry * 0.15, rx * 0.62, ry * 1.2, skinShade);
-    if (hat === 'cap' || hat === 'sunhat') fillRect(ctx, hx - rx, hy - ry * 0.4, rx * 2, ry * 0.42, skinShade);
-  });
+  // flat shadow on the side of the face away from the light, and under a cap
+  fillTrace(ctx, (g) => { g.moveTo(hx + rx * 0.3, hy + ry * 0.98); g.quadraticCurveTo(hx + rx * 0.5, hy, hx + rx * 0.72, hy - ry * 0.64); g.quadraticCurveTo(hx + rx * 1.26, hy, hx + rx * 0.3, hy + ry * 0.98); }, skinShade);
+  if (hat === 'cap' || hat === 'sunhat') fillEllipse(ctx, hx, hy - ry * 0.16, rx * 0.95, ry * 0.2, skinShade);
   if (hat === 'long') {
     fillTrace(ctx, (g) => { g.moveTo(hx - rx * 1.1, hy + ry * 0.1); g.ellipse(hx, hy, rx * 1.1, ry * 1.08, 0, Math.PI, TAU); g.quadraticCurveTo(hx + rx * 0.2, hy - ry * 0.75, hx - rx * 1.1, hy + ry * 0.1); }, hairTone);
   } else if (hat !== 'bald') {
@@ -307,7 +313,8 @@ export function armPose(name) { return ARM_POSES[name] || ARM_POSES.down; }
  * A row of spectators shown as busts (shoulders and head, a few raised arms), inked as a group.
  * `u` is the head height in pixels, `yBase` the line where the busts are cut by whatever stands
  * in front. o: { density, stagger, arms (chance of a raised arm), tint (colour -> colour),
- * wrap (tile width: figures crossing an edge are repeated), line, skip (x -> true where nobody sits) }.
+ * wrap (tile width: figures crossing an edge are repeated), line, skip (x -> true where nobody sits),
+ * shade (false: no flat shadow on shirts and faces, for the smallest figures) }.
  */
 export function crowdRow(ctx, P, rnd, x0, x1, yBase, u, o = {}) {
   const lw = o.line ?? Math.max(0.9, u * 0.1), tint = o.tint || ((c) => c);
@@ -320,18 +327,18 @@ export function crowdRow(ctx, P, rnd, x0, x1, yBase, u, o = {}) {
     people.push(person);
     if (o.wrap) for (const dx of [-o.wrap, o.wrap]) if (person.x + dx > x0 - u * 2 && person.x + dx < x1 + u * 2) people.push({ ...person, x: person.x + dx });
   }
-  const shoulders = (g, p) => {
-    const s = p.s, b = p.look.build, top = p.y - p.lift - s * 0.86;
-    g.moveTo(p.x - s * b, p.y + 1); g.lineTo(p.x - s * b, top + s * 0.42);
-    g.quadraticCurveTo(p.x - s * b * 0.97, top + s * 0.06, p.x - s * 0.36, top); g.lineTo(p.x + s * 0.36, top);
-    g.quadraticCurveTo(p.x + s * b * 0.97, top + s * 0.06, p.x + s * b, top + s * 0.42); g.lineTo(p.x + s * b, p.y + 1); g.closePath();
+  const shoulders = (g, p, grow = 0) => {
+    const s = p.s, hw = s * p.look.build + grow, top = p.y - p.lift - s * 0.86 - grow;
+    g.moveTo(p.x - hw, p.y + 1); g.lineTo(p.x - hw, top + s * 0.42);
+    g.quadraticCurveTo(p.x - hw * 0.97, top + s * 0.06, p.x - s * 0.36, top); g.lineTo(p.x + s * 0.36, top);
+    g.quadraticCurveTo(p.x + hw * 0.97, top + s * 0.06, p.x + hw, top + s * 0.42); g.lineTo(p.x + hw, p.y + 1); g.closePath();
   };
   const headY = (p) => p.y - p.lift - p.s * 1.3;
-  const hair = (g, p) => {
+  const hair = (g, p, grow = 0) => {
     const s = p.s, hy = headY(p), cap = p.look.hat === 'cap' || p.look.hat === 'sunhat';
-    if (p.look.hat === 'sunhat') traceEllipse(g, p.x, hy - s * 0.16, s * 0.82, s * 0.14);
-    g.moveTo(p.x - s * 0.44, hy); g.ellipse(p.x, hy, s * 0.44, s * 0.55, 0, Math.PI, TAU);
-    g.quadraticCurveTo(p.x, hy - s * (cap ? 0.12 : 0.34), p.x - s * 0.44, hy); g.closePath();
+    if (p.look.hat === 'sunhat') traceEllipse(g, p.x, hy - s * 0.16, s * 0.82 + grow, s * 0.14 + grow);
+    g.moveTo(p.x - s * 0.44 - grow, hy); g.ellipse(p.x, hy, s * 0.44 + grow, s * 0.55 + grow, 0, Math.PI, TAU);
+    g.quadraticCurveTo(p.x, hy - s * (cap ? 0.12 : 0.34), p.x - s * 0.44 - grow, hy); g.closePath();
   };
   const byColor = (list, keyOf, trace) => {
     const groups = new Map();
@@ -354,21 +361,32 @@ export function crowdRow(ctx, P, rnd, x0, x1, yBase, u, o = {}) {
       fillEllipse(ctx, hd[0], hd[1], s * 0.24 + lw, s * 0.24 + lw, P.ink); fillEllipse(ctx, hd[0], hd[1], s * 0.24, s * 0.24, skin);
     }
   }
-  ctx.strokeStyle = P.ink; ctx.lineWidth = lw * 2;
-  ctx.beginPath(); for (const p of people) shoulders(ctx, p); ctx.stroke();
-  byColor(people, (p) => tint(p.look.shirt), shoulders);
-  ctx.fillStyle = inkAlpha(P, 0.26);
+  // one ink shape per figure around shoulders, head and hair (the contour of their union)
+  ctx.fillStyle = P.ink;
   ctx.beginPath();
-  for (const p of people) { const s = p.s, b = p.look.build, top = p.y - p.lift - s * 0.86; ctx.moveTo(p.x + s * 0.42, p.y + 1); ctx.lineTo(p.x + s * 0.5, top + s * 0.05); ctx.quadraticCurveTo(p.x + s * b * 0.95, top + s * 0.1, p.x + s * b, top + s * 0.44); ctx.lineTo(p.x + s * b, p.y + 1); ctx.closePath(); }
+  for (const p of people) {
+    const s = p.s, hw = s * p.look.build + lw, top = p.y - p.lift - s * 0.86 - lw, hy = headY(p), long = p.look.hat === 'long';
+    ctx.moveTo(p.x - hw, p.y + 1); ctx.lineTo(p.x - hw, top + s * 0.42);
+    ctx.quadraticCurveTo(p.x - hw * 0.97, top + s * 0.06, p.x - s * 0.36, top);
+    ctx.ellipse(p.x, long ? hy + s * 0.1 : hy, s * (long ? 0.52 : 0.45) + lw, s * (long ? 0.7 : 0.56) + lw, 0, Math.PI * 0.75, Math.PI * 2.25);
+    ctx.lineTo(p.x + s * 0.36, top);
+    ctx.quadraticCurveTo(p.x + hw * 0.97, top + s * 0.06, p.x + hw, top + s * 0.42); ctx.lineTo(p.x + hw, p.y + 1); ctx.closePath();
+    if (p.look.hat === 'sunhat') traceEllipse(ctx, p.x, hy - s * 0.16, s * 0.82 + lw, s * 0.14 + lw);
+  }
   ctx.fill();
-  // heads
-  ctx.beginPath();
-  for (const p of people) { traceEllipse(ctx, p.x, headY(p), p.s * 0.4, p.s * 0.5); if (p.look.hat !== 'long') hair(ctx, p); else traceEllipse(ctx, p.x, headY(p) + p.s * 0.12, p.s * 0.52, p.s * 0.66); }
-  ctx.stroke();
+  byColor(people, (p) => tint(p.look.shirt), shoulders);
+  if (o.shade !== false) {
+    ctx.fillStyle = inkAlpha(P, 0.26);
+    ctx.beginPath();
+    for (const p of people) { const s = p.s, b = p.look.build, top = p.y - p.lift - s * 0.86; ctx.moveTo(p.x + s * 0.42, p.y + 1); ctx.lineTo(p.x + s * 0.5, top + s * 0.05); ctx.quadraticCurveTo(p.x + s * b * 0.95, top + s * 0.1, p.x + s * b, top + s * 0.44); ctx.lineTo(p.x + s * b, p.y + 1); ctx.closePath(); }
+    ctx.fill();
+  }
   byColor(people.filter((p) => p.look.hat === 'long'), (p) => tint(p.look.hair), (g, p) => traceEllipse(g, p.x, headY(p) + p.s * 0.12, p.s * 0.52, p.s * 0.66));
   byColor(people, (p) => tint(p.look.skin), (g, p) => traceEllipse(g, p.x, headY(p), p.s * 0.4, p.s * 0.5));
-  ctx.fillStyle = inkAlpha(P, 0.2);
-  ctx.beginPath(); for (const p of people) { const hy = headY(p); ctx.moveTo(p.x + p.s * 0.12, hy + p.s * 0.5); ctx.quadraticCurveTo(p.x + p.s * 0.2, hy, p.x + p.s * 0.3, hy - p.s * 0.3); ctx.quadraticCurveTo(p.x + p.s * 0.5, hy, p.x + p.s * 0.12, hy + p.s * 0.5); } ctx.fill();
+  if (o.shade !== false) {
+    ctx.fillStyle = inkAlpha(P, 0.2);
+    ctx.beginPath(); for (const p of people) { const hy = headY(p); ctx.moveTo(p.x + p.s * 0.12, hy + p.s * 0.5); ctx.quadraticCurveTo(p.x + p.s * 0.2, hy, p.x + p.s * 0.3, hy - p.s * 0.3); ctx.quadraticCurveTo(p.x + p.s * 0.5, hy, p.x + p.s * 0.12, hy + p.s * 0.5); } ctx.fill();
+  }
   byColor(people, (p) => tint(p.look.hat === 'cap' || p.look.hat === 'sunhat' ? p.look.hatColor : p.look.hair), hair);
   ctx.restore();
   return people;
@@ -1326,7 +1344,7 @@ function bridge(ctx, w, h, P, rnd, variant) {
         { paths: [[[X(cOut), top], [X(cIn), top]]], width: 6 * k, fill: steel.base, light: steel.light },
         { paths: [[[X(cOut), ground - 3 * k], [X(cOut), top - 3 * k]], [[X(cIn), ground - 3 * k], [X(cIn), top - 3 * k]]], width: 9 * k, fill: steel.base, light: steel.light, shade: steel.shade },
       ], LINE.form * k * 0.9, 'butt');
-      for (const x of [cOut, cIn]) { inkGroup(ctx, P, [{ r: [X(x) - 15 * k, ground - 7 * k, 30 * k, 7 * k], fill: P.concrete }], LINE.detail * k); fillRect(ctx, X(x) - 15 * k, ground - 7 * k, 30 * k, 2.4 * k, P.concreteLight); }
+      for (const x of [cOut, cIn]) { inkGroup(ctx, P, [{ r: [X(x) - 9 * k, ground - 7 * k, 18 * k, 7 * k], fill: P.concrete }], LINE.detail * k); fillRect(ctx, X(x) - 9 * k, ground - 7 * k, 18 * k, 2.4 * k, P.concreteLight); }
     }
     // deck girder, parapet with the sponsor banner, top chord
     inkGroup(ctx, P, [{ r: [cOut - 6 * k, deckY, w - 2 * cOut + 12 * k, girder], fill: P.metal }, { r: [cIn, parapet, w - 2 * cIn, deckY - parapet], fill: P.metalLight }], LINE.silhouette * k);
@@ -1345,19 +1363,19 @@ function bridge(ctx, w, h, P, rnd, variant) {
     return;
   }
   // ---- advertising arch
-  const spring = 150 * k, cx = w / 2, orange = paintTones(P.banners[5]);
+  const spring = 148 * k, cx = w / 2, orange = paintTones(P.banners[5]);
   const arc = (rx, ry, x0, x1, n = 48, dy = 0) => { const pts = []; for (let i = 0; i <= n; i++) { const x = x0 + ((x1 - x0) * i) / n, q = Math.max(0, 1 - ((x - cx) / rx) ** 2); pts.push([x, spring + dy - ry * Math.sqrt(q)]); } return pts; };
-  const outerRx = 700 * k, outerRy = 136 * k, innerRx = 528 * k, innerRy = 44 * k;
+  const outerRx = 700 * k, outerRy = 134 * k, innerRx = 532 * k, innerRy = 44 * k;
   const face = arc(outerRx, outerRy, cx - outerRx, cx + outerRx).concat(arc(innerRx, innerRy, cx + innerRx, cx - innerRx));
   const soffit = arc(innerRx, innerRy, cx - innerRx, cx + innerRx).concat(arc(innerRx, innerRy, cx + innerRx, cx - innerRx, 48, 7 * k));
   for (const right of [false, true]) {
     const X = sideX(w, right);
     groundShadow(ctx, X(104 * k) + 14 * k, ground, 108 * k, 6 * k);
-    const pylon = [[X(14 * k), ground], [X(30 * k), spring - 4 * k], [X(190 * k), spring - 4 * k], [X(190 * k), ground]];
+    const pylon = [[X(14 * k), ground], [X(30 * k), spring - 4 * k], [X(186 * k), spring - 4 * k], [X(186 * k), ground]];
     inkGroup(ctx, P, [{ p: pylon, fill: P.concreteLight }], LINE.silhouette * k);
     clipped(ctx, (g) => tracePolygon(g, pylon), () => {
       // shaded return on the right, cast shadow of the arch at the top
-      const sx = right ? w - 76 * k : 138 * k;
+      const sx = right ? w - 74 * k : 134 * k;
       fillRect(ctx, sx, spring - 10 * k, 60 * k, ground - spring + 12 * k, P.concrete);
       fillRect(ctx, sx + 30 * k, spring - 10 * k, 30 * k, ground - spring + 12 * k, P.concreteShade);
       fillPoly(ctx, [[X(0), spring - 6 * k], [X(200 * k), spring - 6 * k], [X(200 * k), spring + 22 * k], [X(0), spring + 34 * k]], inkAlpha(P, 0.3));

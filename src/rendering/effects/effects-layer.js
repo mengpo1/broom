@@ -105,6 +105,7 @@ export class EffectsLayer {
     this.pops = [];
     for (let v = 0; v < 2; v++) this.pops.push(Array.from({ length: MAX_POPS }, () => ({ age: 9, life: 0, x: 0, y: 0, word: -1, size: 1, burst: false, angle: 0 })));
     this.popCursor = [0, 0];
+    this.popClock = [9, 9];
     this.dust = [0.85, 0.79, 0.64]; this.dirt = [0.55, 0.6, 0.38]; this.smoke = [0.93, 0.92, 0.9];
     this.track = null;
     this.seed = 1;
@@ -116,6 +117,7 @@ export class EffectsLayer {
     this.markCount = 0; this.markCursor = 0;
     this.emitTimer.fill(0); this.markOdo.fill(0);
     for (const list of this.pops) for (const p of list) p.life = 0;
+    this.popClock[0] = 9; this.popClock[1] = 9;
     if (palette) { this.dust = hexToRgb(palette.dust); this.dirt = hexToRgb(palette.grassDark); this.smoke = hexToRgb(palette.smoke); }
   }
 
@@ -167,11 +169,15 @@ export class EffectsLayer {
       const view = app.views[v];
       const mine = view.carIndex === event.car || view.carIndex === event.other;
       if (!mine || strength < 0.3) continue;
+      // one burst and one sound word at a time: effects punctuate, they do not pile up
+      if (this.popClock[v] < 0.5 && event.type !== 'crash') continue;
+      if (event.type === 'crash' && this.popClock[v] < 0.12) continue;
+      this.popClock[v] = 0;
       const sideX = event.type === 'wall' ? (car.d > 0 ? 0.78 : 0.22) : 0.5 + (this.random() - 0.5) * 0.3;
-      if (fx.impactFrames) this.pop(v, -1, sideX, 0.5, 0.5 + strength * 0.7, true);
+      if (fx.impactFrames) this.pop(v, -1, sideX, 0.52, 0.4 + strength * 0.35, true);
       if (fx.onomatopoeia && strength > 0.45) {
         const word = event.type === 'crash' ? WORD.BOUM : event.type === 'wall' ? (strength > 0.7 ? WORD.CRAC : WORD.SCRI) : (strength > 0.7 ? WORD.BANG : WORD.TCHAK);
-        this.pop(v, word, clamp(sideX + (sideX > 0.5 ? -0.16 : 0.16), 0.25, 0.75), 0.3, 0.75 + strength * 0.45, false);
+        this.pop(v, word, clamp(sideX + (sideX > 0.5 ? -0.2 : 0.2), 0.25, 0.75), 0.27, 0.7 + strength * 0.3, false);
       }
     }
   }
@@ -188,6 +194,7 @@ export class EffectsLayer {
       if (this.pkind[i] === 1) { this.pvh[i] -= 14 * dt; if (this.ph[i] < 0.05) { this.ph[i] = 0.05; this.pvh[i] *= -0.4; } }
     }
     for (const list of this.pops) for (const p of list) if (p.life > 0) { p.age += dt; if (p.age > p.life) p.life = 0; }
+    this.popClock[0] += dt; this.popClock[1] += dt;
     const count = Math.min(cars.length, 32);
     for (let i = 0; i < count; i++) {
       const car = cars[i];

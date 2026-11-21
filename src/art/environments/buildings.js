@@ -7,7 +7,7 @@
 import { LINE, closedCurve, brushStroke, brushCurve, tracePolygon, clipped, blobPoints } from '../styles/ink.js';
 import { mixHex, shadeHex, lightHex } from '../palettes/palettes.js';
 import { groundShadow } from './vegetation.js';
-import { inkAlpha, paintTones, fillRect, fillPoly, fillTrace, traceEllipse, fillEllipse, inkLine, contour, inkGroup, inkTubes, latticeMembers, drawLattice, label, checker, clipTile, wrapped, drawFigure, randomLook, armPose, crowdRow, sponsorPanel, emblem, roundRectPath, lerp2 } from './trackside.js';
+import { inkAlpha, paintTones, fillRect, fillPoly, fillTrace, traceEllipse, fillEllipse, inkLine, contour, inkGroup, inkTubes, latticeMembers, drawLattice, label, clipTile, wrapped, scratchCanvas, drawFigure, randomLook, armPose, crowdRow, sponsorPanel, emblem, roundRectPath, lerp2 } from './trackside.js';
 
 const TAU = Math.PI * 2;
 
@@ -136,63 +136,105 @@ function pennant(ctx, P, x, y, dx, len, cw, ch, colorA, colorB, k) {
 function grandstand(ctx, w, h, P, rnd) {
   const k = w / 1024;
   ctx.save(); clipTile(ctx, w, h);
-  const fasciaTop = 10 * k, fasciaBot = 44 * k, wallTop = 132 * k, railY = 428 * k, bannerBot = 488 * k;
-  const columns = [w * 0.25, w * 0.75], aisles = [0, w * 0.5], aisleHalf = 29 * k;
+  const fasciaTop = 10 * k, fasciaBot = 44 * k, wallTop = 166 * k, railY = 446 * k, bannerBot = 506 * k;
+  const columns = [w * 0.25, w * 0.75], aisles = [0, w * 0.5], aisleHalf = 27 * k;
   const inAisle = (x) => aisles.some((a) => { const d = (((x - a) % w) + w) % w; return Math.min(d, w - d) < aisleHalf + 9 * k; });
   const rows = [];
   let base = railY;
-  for (let r = 9; r >= 0; r--) { const u = 13.4 * k * (0.72 + (0.28 * r) / 9); rows[r] = { u, base, top: base - u * 1.62 }; base -= u * 1.62; }
+  for (let r = 9; r >= 0; r--) { const u = 15 * k * (0.7 + (0.3 * r) / 9); rows[r] = { u, base, top: base - u * 1.62 }; base -= u * 1.62; }
   const tierTop = rows[0].top;
-  // roof underside: lit near the front edge, deep shade toward the back wall, rafters and purlins
-  const soffit = shadeHex(P.metal, 0.3), soffitDeep = shadeHex(P.metalShade, 0.36);
-  fillRect(ctx, 0, fasciaBot - 2 * k, w, wallTop - fasciaBot + 2 * k, soffit);
-  fillRect(ctx, 0, 92 * k, w, wallTop - 92 * k, soffitDeep);
-  for (const y of [62 * k, 78 * k, 108 * k, 120 * k]) inkLine(ctx, 0, y, w, y, LINE.hair * k, P.inkSoft);
-  inkLine(ctx, 0, 92 * k, w, 92 * k, LINE.detail * k, P.ink);
-  for (let i = 0; i < 16; i++) inkLine(ctx, (i + 0.5) * (w / 16), fasciaBot, (i + 0.5) * (w / 16), wallTop, LINE.hair * k * 1.2, P.inkSoft);
-  // back wall with the glazed boxes, in the shade of the roof
-  fillRect(ctx, 0, wallTop, w, tierTop - wallTop + 20 * k, P.concreteShade);
-  fillRect(ctx, 0, wallTop, w, 12 * k, shadeHex(P.concreteShade, 0.3));
+  // roof underside seen from below: three flat values getting deeper toward the back wall
+  const soffit = [P.metal, shadeHex(P.metal, 0.3), shadeHex(P.metalShade, 0.32)];
+  fillRect(ctx, 0, fasciaBot - 2 * k, w, 44 * k, soffit[0]);
+  fillRect(ctx, 0, 84 * k, w, 44 * k, soffit[1]);
+  fillRect(ctx, 0, 126 * k, w, wallTop - 126 * k, soffit[2]);
+  for (const y of [64 * k, 105 * k, 146 * k]) inkLine(ctx, 0, y, w, y, LINE.hair * k, P.inkSoft);
+  inkLine(ctx, 0, 84 * k, w, 84 * k, LINE.detail * k, P.ink); inkLine(ctx, 0, 126 * k, w, 126 * k, LINE.detail * k, P.ink);
+  // secondary rafters, then the main rafters over the columns (white steel, shaded flank)
+  for (let i = 0; i < 16; i++) {
+    const x = (i + 0.5) * (w / 16);
+    fillRect(ctx, x - 2.5 * k, fasciaBot, 5 * k, wallTop - fasciaBot, P.ink); fillRect(ctx, x - 1.4 * k, fasciaBot, 2.8 * k, wallTop - fasciaBot, soffit[0]);
+  }
+  for (const cx of columns) {
+    fillRect(ctx, cx - 11 * k, fasciaBot, 22 * k, wallTop - fasciaBot, P.ink);
+    fillRect(ctx, cx - 9 * k, fasciaBot, 18 * k, wallTop - fasciaBot, shadeHex(P.paint, 0.14));
+    fillRect(ctx, cx - 9 * k, fasciaBot, 6 * k, wallTop - fasciaBot, P.paint);
+    fillRect(ctx, cx + 2 * k, fasciaBot, 7 * k, wallTop - fasciaBot, shadeHex(P.paint, 0.36));
+    fillRect(ctx, cx + 11 * k, fasciaBot, 12 * k, wallTop - fasciaBot, inkAlpha(P, 0.24));
+  }
+  // back wall with the glazed boxes
+  fillRect(ctx, 0, wallTop, w, tierTop - wallTop + 20 * k, P.concrete);
+  fillRect(ctx, 0, wallTop, w, 13 * k, P.concreteShade);
   const boxes = [];
-  for (let i = 0; i < 16; i++) boxes.push([i * (w / 16) + 5 * k, wallTop + 22 * k, w / 16 - 10 * k, 44 * k]);
-  windows(ctx, P, boxes, { line: LINE.detail * k, glass: P.glassShade, shade: shadeHex(P.glassShade, 0.4), light: P.glass, blinds: 0.25, rnd, blindColor: P.concrete });
+  for (let i = 0; i < 16; i++) boxes.push([i * (w / 16) + 5 * k, wallTop + 22 * k, w / 16 - 10 * k, 40 * k]);
+  windows(ctx, P, boxes, { line: LINE.detail * k, glass: P.glass, shade: P.glassShade, light: P.glassLight, blinds: 0.22, rnd, blindColor: P.concreteLight, sill: P.concreteLight });
+  // guests behind some of the panes
+  for (let i = 0; i < 16; i++) {
+    if (rnd() < 0.55) continue;
+    const bx = boxes[i][0] + boxes[i][2] * (0.3 + rnd() * 0.4), by = boxes[i][1] + boxes[i][3];
+    fillTrace(ctx, (g) => { g.moveTo(bx - 9 * k, by); g.quadraticCurveTo(bx - 9 * k, by - 15 * k, bx - 3 * k, by - 16 * k); g.lineTo(bx + 3 * k, by - 16 * k); g.quadraticCurveTo(bx + 9 * k, by - 15 * k, bx + 9 * k, by); g.closePath(); traceEllipse(g, bx, by - 21 * k, 4 * k, 5 * k); }, mixHex(P.glassShade, P.ink, 0.55));
+  }
   inkLine(ctx, 0, wallTop, w, wallTop, LINE.form * k, P.ink);
-  inkLine(ctx, 0, wallTop + 78 * k, w, wallTop + 78 * k, LINE.detail * k, P.ink);
+  inkLine(ctx, 0, wallTop + 76 * k, w, wallTop + 76 * k, LINE.detail * k, P.ink);
+  fillRect(ctx, 0, wallTop + 76 * k, w, tierTop - wallTop - 56 * k, P.concreteShade);
+  // the tier (seats, stair aisles, crowd) is painted once for half a tile and stamped twice:
+  // the stand is built of identical 10 m bays
+  const half = w / 2, y0 = Math.floor(tierTop - 36 * k), tierH = Math.ceil(railY - y0), tier = scratchCanvas(half, tierH), t = tier.getContext('2d');
+  t.translate(0, -y0);
   // seats: plastic shells in three values, visible wherever nobody sits
   const seat = mixHex(P.banners[2], P.concrete, 0.3), seatShade = shadeHex(seat, 0.42), seatLight = lightHex(seat, 0.35);
   for (let r = 0; r < 10; r++) {
-    const { u, base: by, top } = rows[r], count = Math.max(1, Math.round(w / (u * 2.12))), step = w / count, off = r % 2 ? 0.5 : 0;
-    fillRect(ctx, 0, top - 1, w, by - top + 2, seatShade);
-    ctx.fillStyle = seat; ctx.beginPath();
-    for (let i = -1; i <= count; i++) { const x = (i + 0.5 + off) * step; roundRectPath(ctx, x - u * 0.82, by - u * 1.12, u * 1.64, u * 1.2, u * 0.3); }
-    ctx.fill();
-    ctx.fillStyle = seatLight; ctx.beginPath();
-    for (let i = -1; i <= count; i++) { const x = (i + 0.5 + off) * step; ctx.rect(x - u * 0.6, by - u * 1.08, u * 1.2, u * 0.18); }
-    ctx.fill();
-    inkLine(ctx, 0, top, w, top, LINE.hair * k, P.ink);
+    const { u, base: by, top } = rows[r], count = Math.max(1, Math.round(half / (u * 2.12))), step = half / count, off = r % 2 ? 0.5 : 0;
+    fillRect(t, 0, top - 1, half, by - top + 2, seatShade);
+    t.fillStyle = seat; t.beginPath();
+    for (let i = -1; i <= count; i++) { const x = (i + 0.5 + off) * step; roundRectPath(t, x - u * 0.82, by - u * 1.12, u * 1.64, u * 1.2, u * 0.3); }
+    t.fill();
+    t.fillStyle = seatLight; t.beginPath();
+    for (let i = -1; i <= count; i++) { const x = (i + 0.5 + off) * step; t.rect(x - u * 0.6, by - u * 1.08, u * 1.2, u * 0.18); }
+    t.fill();
+    inkLine(t, 0, top, half, top, LINE.hair * k, P.ink);
   }
-  // stair aisles
-  for (const a of [0, w * 0.5, w]) {
-    fillRect(ctx, a - aisleHalf, tierTop, aisleHalf * 2, railY - tierTop, P.concrete);
+  // stair aisles: lit treads, risers in the base value, central handrail
+  for (const a of [0, half]) {
+    fillRect(t, a - aisleHalf, tierTop, aisleHalf * 2, railY - tierTop, P.concrete);
     for (let r = 0; r < 10; r++) {
-      fillRect(ctx, a - aisleHalf, rows[r].top, aisleHalf * 2, rows[r].u * 0.6, P.concreteLight);
-      inkLine(ctx, a - aisleHalf, rows[r].top + rows[r].u * 0.6, a + aisleHalf, rows[r].top + rows[r].u * 0.6, LINE.hair * k, P.ink);
+      fillRect(t, a - aisleHalf, rows[r].top, aisleHalf * 2, rows[r].u * 0.6, P.concreteLight);
+      inkLine(t, a - aisleHalf, rows[r].top + rows[r].u * 0.6, a + aisleHalf, rows[r].top + rows[r].u * 0.6, LINE.hair * k, P.ink);
     }
-    fillRect(ctx, a + aisleHalf - 7 * k, tierTop, 7 * k, railY - tierTop, inkAlpha(P, 0.22));
-    inkLine(ctx, a - aisleHalf, tierTop, a - aisleHalf, railY, LINE.detail * k, P.ink); inkLine(ctx, a + aisleHalf, tierTop, a + aisleHalf, railY, LINE.detail * k, P.ink);
-    inkTubes(ctx, P, [{ paths: [[[a, rows[1].base], [a, railY - 4 * k]], [[a - 5 * k, rows[1].base], [a + 5 * k, rows[1].base]], [[a - 5 * k, rows[5].base], [a + 5 * k, rows[5].base]]], width: 2.6 * k, fill: P.metalLight }], LINE.detail * k);
+    fillRect(t, a + aisleHalf - 8 * k, tierTop, 8 * k, railY - tierTop, inkAlpha(P, 0.22));
+    inkLine(t, a - aisleHalf, tierTop, a - aisleHalf, railY, LINE.detail * k, P.ink); inkLine(t, a + aisleHalf, tierTop, a + aisleHalf, railY, LINE.detail * k, P.ink);
+    inkTubes(t, P, [{ paths: [[[a, rows[1].base], [a, railY - 4 * k]], [[a - 5 * k, rows[1].base], [a + 5 * k, rows[1].base]], [[a - 5 * k, rows[5].base], [a + 5 * k, rows[5].base]]], width: 2.6 * k, fill: P.metalLight }], LINE.detail * k);
   }
   // the crowd, back rows first; the three top rows sit in the shadow of the roof
+  const shadowBot = rows[2].base - rows[3].u * 0.2;
   for (let r = 0; r < 10; r++) {
-    const { u, base: by } = rows[r];
-    crowdRow(ctx, P, rnd, 0, w, by, u, { density: 0.9, stagger: r % 2 ? 0.5 : 0, arms: 0.1, wrap: w, skip: inAisle, line: Math.max(0.9, LINE.detail * k * (0.8 + r * 0.03)) });
-    if (r === 2) fillRect(ctx, 0, wallTop, w, rows[2].base - wallTop - rows[3].u * 0.2, inkAlpha(P, 0.3));
+    crowdRow(t, P, rnd, 0, half, rows[r].base, rows[r].u, { density: 0.9, stagger: r % 2 ? 0.5 : 0, arms: 0.08, wrap: half, skip: inAisle, shade: r > 3, line: Math.max(0.9, LINE.detail * k * (0.8 + r * 0.03)) });
+    if (r === 2) fillRect(t, 0, y0, half, shadowBot - y0, inkAlpha(P, 0.26));
   }
+  fillRect(ctx, 0, wallTop, w, y0 - wallTop, inkAlpha(P, 0.26));
+  ctx.drawImage(tier, 0, 0, half, tierH, 0, y0, half, tierH);
+  ctx.drawImage(tier, 0, 0, half, tierH, half, y0, half, tierH);
+  // what differs from one bay to the next: fans on their feet, a steward and a latecomer on the stairs
+  for (const r of [3, 5, 7, 9]) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, rows[r].base - rows[r].u * 0.16); ctx.clip();
+    crowdRow(ctx, P, rnd, 0, w, rows[r].base, rows[r].u * 1.04, { density: 0.11, stagger: r % 2 ? 0.5 : 0, arms: 0.8, wrap: w, skip: inAisle, line: Math.max(0.9, LINE.detail * k * (0.8 + r * 0.03)) });
+    ctx.restore();
+  }
+  drawFigure(ctx, P, w * 0.5 - 9 * k, rows[5].base + 2 * k, 70 * k, { shirt: P.banners[5], trousers: P.inkSoft, skin: P.skin[1], hair: P.ink, hat: 'cap', hatColor: P.banners[5], sleeves: 'long', arms: { l: armPose('hip'), r: armPose('down') }, line: LINE.detail * k });
+  drawFigure(ctx, P, w * 0.5 + 11 * k, rows[8].base + 2 * k, 82 * k, { ...randomLook(P, rnd), arms: { l: armPose('down'), r: armPose('wave') }, line: LINE.detail * k * 1.1 });
   // a few supporters' pennants (kept away from the tile edges)
-  for (let i = 0; i < 6; i++) {
-    const r = 3 + Math.floor(rnd() * 6), x = w * (0.08 + 0.14 * i + rnd() * 0.07);
+  for (let i = 0; i < 4; i++) {
+    const r = 3 + Math.floor(rnd() * 6), x = w * (0.08 + 0.22 * i + rnd() * 0.1);
     if (inAisle(x) || columns.some((c) => Math.abs(c - x) < 40 * k)) continue;
-    pennant(ctx, P, x, rows[r].base - rows[r].u * 1.9, (rnd() - 0.3) * 10 * k, 40 * k, 30 * k, 21 * k, P.banners[Math.floor(rnd() * 7)], P.banners[Math.floor(rnd() * 7)], k);
+    pennant(ctx, P, x, rows[r].base - rows[r].u * 1.9, (rnd() - 0.3) * 10 * k, 42 * k, 32 * k, 22 * k, P.banners[Math.floor(rnd() * 7)], P.banners[Math.floor(rnd() * 7)], k);
+  }
+  // stair numbers hanging from the roof over the aisles
+  for (const [a, text] of [[0, 'A1'], [w * 0.5, 'A2'], [w, 'A1']]) {
+    inkTubes(ctx, P, [{ paths: [[[a - 16 * k, wallTop - 62 * k], [a - 16 * k, wallTop - 40 * k]], [[a + 16 * k, wallTop - 62 * k], [a + 16 * k, wallTop - 40 * k]]], width: 1.8 * k, fill: P.metal }], LINE.hair * k * 1.3, 'butt');
+    inkGroup(ctx, P, [{ r: [a - 26 * k, wallTop - 40 * k, 52 * k, 30 * k], fill: P.paint }], LINE.form * k * 0.9);
+    fillRect(ctx, a - 26 * k, wallTop - 40 * k, 52 * k, 7 * k, P.kerbA);
+    fillPoly(ctx, [[a + 26 * k, wallTop - 26 * k], [a + 26 * k, wallTop - 10 * k], [a + 4 * k, wallTop - 10 * k]], shadeHex(P.paint, 0.16));
+    label(ctx, text, a, wallTop - 21 * k, 44 * k, 14 * k, { weight: 1.25, color: P.ink, slant: 0.06, seed: 2 });
   }
   // front rail, banner wall of the sponsors, concrete base
   const ids = ['montevo', 'freinor', 'virage', 'solgane'];
@@ -202,45 +244,46 @@ function grandstand(ctx, w, h, P, rnd) {
   });
   fillRect(ctx, 0, railY, w, 4 * k, inkAlpha(P, 0.22));
   fillRect(ctx, 0, bannerBot, w, h - bannerBot, P.concrete);
-  fillRect(ctx, 0, bannerBot, w, 7 * k, P.concreteLight);
-  fillRect(ctx, 0, bannerBot + 7 * k, w, 5 * k, P.concreteShade);
-  fillRect(ctx, 0, h - 18 * k, w, 18 * k, P.concreteShade);
+  fillRect(ctx, 0, bannerBot, w, 6 * k, P.concreteLight);
+  fillRect(ctx, 0, bannerBot + 6 * k, w, 5 * k, P.concreteShade);
+  fillRect(ctx, 0, h - 14 * k, w, 14 * k, P.concreteShade);
   for (let i = 0; i < 8; i++) {
     const x = (i + 0.5) * (w / 8);
-    inkLine(ctx, i * (w / 8), bannerBot + 12 * k, i * (w / 8), h, LINE.hair * k, P.inkSoft);
-    fillRect(ctx, x - 20 * k, bannerBot + 30 * k, 40 * k, 12 * k, P.ink);
-    ribs(ctx, x - 20 * k, bannerBot + 30 * k, 40 * k, 12 * k, 5 * k, P.concreteShade, 1.2 * k, true);
+    inkLine(ctx, i * (w / 8), bannerBot + 11 * k, i * (w / 8), h, LINE.hair * k, P.inkSoft);
+    fillRect(ctx, x - 20 * k, bannerBot + 21 * k, 40 * k, 11 * k, P.ink);
+    ribs(ctx, x - 20 * k, bannerBot + 21 * k, 40 * k, 11 * k, 5 * k, P.concreteShade, 1.2 * k, true);
   }
   wrapped(ctx, w, rnd, (r) => {
-    for (let i = 0; i < 9; i++) { const x = r() * w, y = bannerBot + (14 + r() * 40) * k; brushStroke(ctx, [[x, y], [x + 0.6 * k, y + (8 + r() * 18) * k]], (1.2 + r() * 1.4) * k, { color: P.concreteShade, taperStart: 0, taperEnd: 0.7 }); }
+    for (let i = 0; i < 9; i++) { const x = r() * w, y = bannerBot + (12 + r() * 22) * k; brushStroke(ctx, [[x, y], [x + 0.6 * k, y + (8 + r() * 14) * k]], (1.2 + r() * 1.4) * k, { color: P.concreteShade, taperStart: 0, taperEnd: 0.7 }); }
   });
   inkLine(ctx, 0, bannerBot, w, bannerBot, LINE.form * k, P.ink);
-  inkLine(ctx, 0, h - 18 * k, w, h - 18 * k, LINE.hair * k, P.inkSoft);
+  inkLine(ctx, 0, h - 14 * k, w, h - 14 * k, LINE.hair * k, P.inkSoft);
   inkTubes(ctx, P, [{ paths: [[[-4, railY - 3 * k], [w + 4, railY - 3 * k]]], width: 5 * k, fill: P.metal, light: P.metalLight }], LINE.form * k * 0.9, 'butt');
   fillRect(ctx, 0, h - 5 * k, w, 5 * k, inkAlpha(P, 0.4));
-  // steel columns with haunches under the roof
+  // steel columns: cast shadow on the tier, haunch under the rafter
   for (const cx of columns) {
-    fillPoly(ctx, [[cx + 7 * k, fasciaBot + 4 * k], [cx + 20 * k, fasciaBot + 4 * k], [cx + 20 * k, wallTop + 40 * k], [cx + 7 * k, wallTop + 70 * k]], inkAlpha(P, 0.2));
-    inkGroup(ctx, P, [{ p: [[cx - 44 * k, fasciaBot - 2 * k], [cx + 44 * k, fasciaBot - 2 * k], [cx + 7 * k, fasciaBot + 52 * k], [cx - 7 * k, fasciaBot + 52 * k]], fill: P.metalShade }, { r: [cx - 7 * k, fasciaBot, 14 * k, railY - fasciaBot + 2 * k], fill: P.metal }, { r: [cx - 13 * k, railY - 4 * k, 26 * k, 9 * k], fill: P.metalShade }], LINE.form * k);
-    fillRect(ctx, cx - 7 * k, fasciaBot + 50 * k, 4 * k, railY - fasciaBot - 54 * k, P.metalLight);
-    fillRect(ctx, cx + 3 * k, fasciaBot + 50 * k, 4 * k, railY - fasciaBot - 54 * k, P.metalShade);
-    fillPoly(ctx, [[cx - 44 * k, fasciaBot - 2 * k], [cx - 7 * k, fasciaBot - 2 * k], [cx - 7 * k, fasciaBot + 52 * k]], P.metal);
-    for (let y = fasciaBot + 90 * k; y < railY - 20 * k; y += 96 * k) { fillEllipse(ctx, cx, y, 1.8 * k, 1.8 * k, P.ink); fillEllipse(ctx, cx, y + 9 * k, 1.8 * k, 1.8 * k, P.ink); }
+    fillPoly(ctx, [[cx + 7 * k, wallTop], [cx + 22 * k, wallTop], [cx + 22 * k, railY - 30 * k], [cx + 7 * k, railY - 8 * k]], inkAlpha(P, 0.2));
+    inkGroup(ctx, P, [{ p: [[cx - 30 * k, wallTop - 2 * k], [cx + 30 * k, wallTop - 2 * k], [cx + 7 * k, wallTop + 40 * k], [cx - 7 * k, wallTop + 40 * k]], fill: P.metalShade }, { r: [cx - 7 * k, wallTop, 14 * k, railY - wallTop + 2 * k], fill: P.metal }, { r: [cx - 13 * k, railY - 4 * k, 26 * k, 9 * k], fill: P.metalShade }], LINE.form * k);
+    fillRect(ctx, cx - 7 * k, wallTop + 38 * k, 4 * k, railY - wallTop - 42 * k, P.metalLight);
+    fillRect(ctx, cx + 3 * k, wallTop + 38 * k, 4 * k, railY - wallTop - 42 * k, P.metalShade);
+    fillPoly(ctx, [[cx - 30 * k, wallTop - 2 * k], [cx - 7 * k, wallTop - 2 * k], [cx - 7 * k, wallTop + 40 * k]], P.metal);
+    for (let y = wallTop + 80 * k; y < railY - 20 * k; y += 86 * k) { fillEllipse(ctx, cx, y, 1.8 * k, 1.8 * k, P.ink); fillEllipse(ctx, cx, y + 9 * k, 1.8 * k, 1.8 * k, P.ink); }
   }
   // floodlights under the front edge, then the roof fascia over everything
-  for (let i = 0; i < 8; i++) {
-    const x = (i + 0.5) * (w / 8);
-    if (columns.some((c) => Math.abs(c - x) < 50 * k)) continue;
-    inkGroup(ctx, P, [{ r: [x - 11 * k, fasciaBot, 22 * k, 10 * k], fill: P.glassLight }], LINE.detail * k);
-    fillRect(ctx, x - 11 * k, fasciaBot, 22 * k, 3 * k, P.metalShade);
+  for (const [grow, dy, hgt, color] of [[LINE.detail * k, 0, 9 * k, P.ink], [0, 0, 9 * k, P.glassLight], [0, 0, 3 * k, P.metalShade]]) {
+    ctx.fillStyle = color; ctx.beginPath();
+    for (let i = 0; i < 16; i++) ctx.rect((i + 0.5) * (w / 16) - 9 * k - grow, fasciaBot + dy, 18 * k + grow * 2, hgt + grow * 1.6);
+    ctx.fill();
   }
+  fillRect(ctx, 0, fasciaBot + LINE.silhouette * k, w, 9 * k, inkAlpha(P, 0.3));
   fillRect(ctx, 0, fasciaTop - LINE.form * k, w, fasciaBot - fasciaTop + LINE.form * k + LINE.silhouette * k, P.ink);
   fillRect(ctx, 0, fasciaTop, w, fasciaBot - fasciaTop, P.paint);
   fillRect(ctx, 0, fasciaTop, w, 4 * k, P.metalLight);
   fillRect(ctx, 0, fasciaBot - 12 * k, w, 7 * k, P.kerbA);
   fillRect(ctx, 0, fasciaBot - 5 * k, w, 5 * k, shadeHex(P.paint, 0.3));
   inkLine(ctx, 0, fasciaBot - 12 * k, w, fasciaBot - 12 * k, LINE.hair * k, P.ink); inkLine(ctx, 0, fasciaBot - 5 * k, w, fasciaBot - 5 * k, LINE.hair * k, P.ink);
-  for (const cx of [w * 0.5]) label(ctx, 'TRIBUNE ' + 'ABCD'[Math.floor(rnd() * 4)], cx, fasciaTop + 11.5 * k, 300 * k, 13 * k, { weight: 1.2, color: P.ink, tracking: 0.12, slant: 0.08 });
+  const letter = 'ABCD'[Math.floor(rnd() * 4)];
+  for (const cx of [w * 0.25, w * 0.75]) label(ctx, 'TRIBUNE ' + letter, cx, fasciaTop + 11.5 * k, 300 * k, 13 * k, { weight: 1.2, color: P.ink, tracking: 0.12, slant: 0.08 });
   ctx.restore();
 }
 
@@ -250,7 +293,7 @@ function pitBuilding(ctx, w, h, P, rnd) {
   ctx.save(); clipTile(ctx, w, h);
   const roofTop = 62 * k, roofBot = 86 * k, floorY = 262 * k, slabBot = 276 * k, fasciaBot = 332 * k, pier = 106 * k;
   const doorX = pier, doorW = w - 2 * pier, doorTop = 350 * k, doorH = h - doorTop, team = paintTones(P.banners[2]);
-  const dim = (c, t = 0.5) => mixHex(c, P.ink, t);
+  const dim = (c, t = 0.5) => mixHex(c, P.ink, t), bayNumber = String(4 + Math.floor(rnd() * 20)).padStart(2, '0');
   // ---- first floor: curtain wall behind the balcony
   fillRect(ctx, 0, roofBot, w, floorY - roofBot, P.glass);
   fillRect(ctx, 0, roofBot, w, 30 * k, P.glassShade);
@@ -279,15 +322,16 @@ function pitBuilding(ctx, w, h, P, rnd) {
   for (let i = 0; i < 8; i++) posts.push([[(i + 0.5) * 96 * k, floorY], [(i + 0.5) * 96 * k, railTop]]);
   inkTubes(ctx, P, [{ paths: [[[-4, floorY - 22 * k], [w + 4, floorY - 22 * k]], [[-4, floorY - 44 * k], [w + 4, floorY - 44 * k]]], width: 1.4 * k, fill: P.metalLight }, { paths: posts, width: 3.6 * k, fill: P.metal, light: P.metalLight }, { paths: [[[-4, railTop], [w + 4, railTop]]], width: 5 * k, fill: P.metal, light: P.metalLight }], LINE.detail * k, 'butt');
   // ---- roof edge and what stands on it
-  const flagAt = [150, 384, 618];
-  flagAt.forEach((fx, i) => {
-    const x = fx * k, c = P.banners[[0, 1, 4][i]];
-    inkTubes(ctx, P, [{ paths: [[[x, roofTop], [x, 12 * k]]], width: 2.4 * k, fill: P.metalLight }], LINE.detail * k);
-    const cloth = [[x + 1 * k, 14 * k], [x + 18 * k, 18 * k], [x + 38 * k, 14 * k], [x + 37 * k, 34 * k], [x + 18 * k, 38 * k], [x + 1 * k, 35 * k]];
-    const path = (g) => closedCurve(g, cloth, 0.3);
+  // team pennants on short masts
+  [150, 384, 618].forEach((fx, i) => {
+    const x = fx * k, c = P.banners[[0, 1, 4][i]], c2 = P.banners[[3, 7, 3][i]];
+    inkTubes(ctx, P, [{ paths: [[[x, roofTop], [x, 10 * k]]], width: 2.4 * k, fill: P.metalLight }], LINE.detail * k);
+    const cloth = [[x + 1.5 * k, 12 * k], [x + 24 * k, 17 * k], [x + 44 * k, 24 * k], [x + 22 * k, 30 * k], [x + 1.5 * k, 38 * k]];
+    const path = (g) => closedCurve(g, cloth, 0.2);
     contour(ctx, path, P.ink, LINE.detail * k * 1.2, 1, 'round');
     fillTrace(ctx, path, c);
-    clipped(ctx, path, () => { fillRect(ctx, x, 23 * k, 40 * k, 7 * k, P.banners[i === 1 ? 7 : 3]); fillRect(ctx, x + 14 * k, 8 * k, 9 * k, 36 * k, inkAlpha(P, 0.25)); });
+    clipped(ctx, path, () => { fillPoly(ctx, [[x, 8 * k], [x + 13 * k, 8 * k], [x + 13 * k, 42 * k], [x, 42 * k]], c2); fillRect(ctx, x + 20 * k, 8 * k, 8 * k, 36 * k, inkAlpha(P, 0.25)); });
+    inkLine(ctx, x + 13 * k, 13 * k, x + 13 * k, 36 * k, LINE.hair * k, P.ink);
   });
   // air-conditioning unit, antenna mast with a dish
   inkGroup(ctx, P, [{ r: [236 * k, roofTop - 30 * k, 66 * k, 30 * k], fill: P.metalLight }], LINE.form * k);
@@ -357,11 +401,10 @@ function pitBuilding(ctx, w, h, P, rnd) {
     fillRect(ctx, dx - pier + 6 * k, h - 16 * k, 2 * pier - 12 * k, 16 * k, P.concreteShade);
     inkLine(ctx, dx - pier + 6 * k, h - 16 * k, dx + pier - 6 * k, h - 16 * k, LINE.hair * k, P.ink);
     // numbered bay sign, service door, extinguisher, conduit
-    const number = String(4 + Math.floor(rnd() * 20)).padStart(2, '0');
     inkGroup(ctx, P, [{ r: [dx - 38 * k, fasciaBot + 22 * k, 76 * k, 46 * k], fill: P.paint }], LINE.form * k);
     fillRect(ctx, dx - 38 * k, fasciaBot + 22 * k, 76 * k, 11 * k, team.base);
     fillPoly(ctx, [[dx + 38 * k, fasciaBot + 44 * k], [dx + 38 * k, fasciaBot + 68 * k], [dx + 6 * k, fasciaBot + 68 * k]], shadeHex(P.paint, 0.14));
-    label(ctx, dx ? numberCache.value : (numberCache.value = number), dx, fasciaBot + 51 * k, 60 * k, 24 * k, { weight: 1.25, color: P.ink, slant: 0.06, seed: 1 });
+    label(ctx, bayNumber, dx, fasciaBot + 51 * k, 60 * k, 24 * k, { weight: 1.25, color: P.ink, slant: 0.06, seed: 1 });
     label(ctx, 'BOX', dx, fasciaBot + 27.5 * k, 60 * k, 6.5 * k, { color: P.paint, tracking: 0.2 });
     const ddx = dx - 27 * k, ddy = h - 129 * k;
     inkGroup(ctx, P, [{ r: [ddx, ddy, 55 * k, 129 * k], fill: P.metal }], LINE.form * k);
@@ -380,7 +423,6 @@ function pitBuilding(ctx, w, h, P, rnd) {
   fillRect(ctx, 0, h - 4 * k, w, 4 * k, inkAlpha(P, 0.4));
   ctx.restore();
 }
-const numberCache = { value: '' };
 
 /** Grass bank with spectators sitting and standing, parasols, pennants; a wire fence at its foot. */
 function crowdBank(ctx, w, h, P, rnd) {
@@ -396,49 +438,48 @@ function crowdBank(ctx, w, h, P, rnd) {
     // lit shoulder of the bank, broad darker bands, deep green at the foot
     const strip = (dy0, dy1, phase, color) => { const pts = []; for (let x = -16 * k; x <= w + 16 * k; x += 16 * k) pts.push([x, crestAt(x) + (dy0 + 3 * Math.sin((x / w) * TAU * 4 + phase)) * k]); for (let x = w + 16 * k; x >= -16 * k; x -= 16 * k) pts.push([x, crestAt(x) + (dy1 + 5 * Math.sin((x / w) * TAU * 5 + phase * 2)) * k]); fillPoly(ctx, pts, color); };
     strip(-4, 9, 0.4, P.mown); strip(34, 52, 1.7, P.grassB); strip(72, 110, 2.9, P.grassDark);
-    wrapped(ctx, w, rnd, (r) => {
-      for (let i = 0; i < 40; i++) {
-        const x = r() * w, y = crestAt(x) + (6 + r() * 84) * k, s = (3 + r() * 4) * k;
-        brushStroke(ctx, [[x, y], [x - s * 0.3, y - s]], LINE.hair * k * 1.3, { color: P.ink, taperStart: 0, taperEnd: 0.6 });
-        brushStroke(ctx, [[x + s * 0.5, y], [x + s * 0.7, y - s * 0.8]], LINE.hair * k * 1.3, { color: P.ink, taperStart: 0, taperEnd: 0.6 });
-      }
-    });
+    for (let i = 0; i < 40; i++) {
+      const x = (0.02 + rnd() * 0.96) * w, y = crestAt(x) + (6 + rnd() * 84) * k, s = (3 + rnd() * 4) * k;
+      brushStroke(ctx, [[x, y], [x - s * 0.3, y - s]], LINE.hair * k * 1.3, { color: P.ink, taperStart: 0, taperEnd: 0.6 });
+      brushStroke(ctx, [[x + s * 0.5, y], [x + s * 0.7, y - s * 0.8]], LINE.hair * k * 1.3, { color: P.ink, taperStart: 0, taperEnd: 0.6 });
+    }
   });
   // tall pennants planted on the crest (clear of the edges)
   for (const [fx, a, b] of [[0.21, 0, 3], [0.64, 2, 1], [0.86, 5, 7]]) pennant(ctx, P, w * fx, crestAt(w * fx) + 4 * k, 3 * k, 106 * k, 44 * k, 28 * k, P.banners[a], P.banners[b], k);
-  wrapped(ctx, w, rnd, (r) => {
-    const lookOf = () => randomLook(P, r);
-    const shade = (x, y, rx) => fillEllipse(ctx, x + 5 * k, y + 1 * k, rx, 4 * k, inkAlpha(P, 0.28));
-    // crest: people standing against the sky
-    for (let i = 0; i < 15; i++) {
-      const x = (i + 0.2 + r() * 0.6) * (w / 15), pose = r(), look = lookOf(), H = (74 + r() * 12) * k;
-      if (r() < 0.22) continue;
-      drawFigure(ctx, P, x, crestAt(x) + 5 * k, H, { ...look, arms: pose < 0.2 ? { l: armPose('up'), r: armPose('up') } : pose < 0.4 ? { l: armPose('down'), r: armPose('wave') } : pose < 0.65 ? { l: armPose('hip'), r: armPose('hip') } : undefined, lean: (r() - 0.5) * 0.03, stance: 0.02 + r() * 0.03, line: LINE.detail * k * 1.05 });
-    }
-    // parasols with their owners, half-way up
-    for (const [fx, a, b] of [[0.12, 0, 3], [0.47, 1, 2], [0.76, 3, 4]]) {
-      const x = w * fx + (r() - 0.5) * 30 * k, y = crestAt(x) + 46 * k;
-      shade(x, y, 46 * k);
-      drawSitter(ctx, P, x - 22 * k, y - 2 * k, 84 * k, lookOf(), LINE.detail * k);
-      drawSitter(ctx, P, x + 26 * k, y + 2 * k, 82 * k, lookOf(), LINE.detail * k);
-      parasol(ctx, P, x, y + 4 * k, 44 * k, 78 * k, P.banners[a], P.banners[b], k);
-    }
-    // rows of people sitting on the slope, a few standing among them
-    for (const [dy, n] of [[40, 13], [74, 12]]) {
-      for (let i = 0; i < n; i++) {
-        const x = (i + 0.25 + r() * 0.5) * (w / n), y = crestAt(x) + (dy + r() * 10) * k, look = lookOf(), what = r();
-        if ([0.12, 0.47, 0.76].some((f) => Math.abs((((x - w * f) % w) + w) % w) < 70 * k && dy < 60)) continue;
-        if (what < 0.12) continue;
+  // everything on the bank is listed back to front; what stands near a tile edge is drawn again on the other side
+  const items = [], lookOf = () => randomLook(P, rnd), parasolAt = [0.12, 0.47, 0.76];
+  const shade = (x, y, rx) => fillEllipse(ctx, x + 5 * k, y + 1 * k, rx, 4 * k, inkAlpha(P, 0.28));
+  // crest: people standing against the sky
+  for (let i = 0; i < 15; i++) {
+    const x = (i + 0.2 + rnd() * 0.6) * (w / 15), pose = rnd(), look = lookOf(), H = (74 + rnd() * 12) * k, lean = (rnd() - 0.5) * 0.03, stance = 0.02 + rnd() * 0.03;
+    if (rnd() < 0.22) continue;
+    const arms = pose < 0.2 ? { l: armPose('up'), r: armPose('up') } : pose < 0.4 ? { l: armPose('down'), r: armPose('wave') } : pose < 0.65 ? { l: armPose('hip'), r: armPose('hip') } : undefined;
+    items.push({ x, reach: 36 * k, draw: () => drawFigure(ctx, P, x, crestAt(x) + 5 * k, H, { ...look, arms, lean, stance, line: LINE.detail * k * 1.05 }) });
+  }
+  // parasols with their owners, half-way up
+  for (const [fx, a, b] of [[parasolAt[0], 0, 3], [parasolAt[1], 1, 2], [parasolAt[2], 3, 4]]) {
+    const x = w * fx + (rnd() - 0.5) * 30 * k, y = crestAt(x) + 46 * k, la = lookOf(), lb = lookOf();
+    items.push({ x, reach: 60 * k, draw: () => { shade(x, y, 46 * k); drawSitter(ctx, P, x - 22 * k, y - 2 * k, 84 * k, la, LINE.detail * k); drawSitter(ctx, P, x + 26 * k, y + 2 * k, 82 * k, lb, LINE.detail * k); parasol(ctx, P, x, y + 4 * k, 44 * k, 78 * k, P.banners[a], P.banners[b], k); } });
+  }
+  // rows of people sitting on the slope, a few standing among them
+  for (const [dy, n] of [[40, 13], [74, 12]]) {
+    for (let i = 0; i < n; i++) {
+      const x = (i + 0.25 + rnd() * 0.5) * (w / n), y = crestAt(x) + (dy + rnd() * 10) * k, look = lookOf(), what = rnd(), H = (80 + rnd() * 10) * k, wave = rnd() < 0.4;
+      if (dy < 60 && parasolAt.some((f) => { const d = (((x - w * f) % w) + w) % w; return Math.min(d, w - d) < 70 * k; })) continue;
+      if (what < 0.12) continue;
+      items.push({ x, reach: 40 * k, draw: () => {
         shade(x, y, 20 * k);
-        if (what < 0.3) drawFigure(ctx, P, x, y, (80 + r() * 10) * k, { ...look, arms: r() < 0.4 ? { l: armPose('wave'), r: armPose('down') } : { l: armPose('hip'), r: armPose('down') }, stance: 0.03, line: LINE.detail * k * 1.1 });
-        else drawSitter(ctx, P, x, y, (84 + r() * 8) * k, look, LINE.detail * k * 1.05);
-        if (what > 0.9) {
-          // cool box next to them
-          inkGroup(ctx, P, [{ r: [x + 20 * k, y - 12 * k, 22 * k, 14 * k], fill: P.banners[2] }, { r: [x + 19 * k, y - 16 * k, 24 * k, 5 * k], fill: P.paint }], LINE.detail * k);
-        }
-      }
+        if (what < 0.3) drawFigure(ctx, P, x, y, H, { ...look, arms: wave ? { l: armPose('wave'), r: armPose('down') } : { l: armPose('hip'), r: armPose('down') }, stance: 0.03, line: LINE.detail * k * 1.1 });
+        else drawSitter(ctx, P, x, y, H, look, LINE.detail * k * 1.05);
+        // cool box next to some of them
+        if (what > 0.9) inkGroup(ctx, P, [{ r: [x + 20 * k, y - 12 * k, 22 * k, 14 * k], fill: P.banners[2] }, { r: [x + 19 * k, y - 16 * k, 24 * k, 5 * k], fill: P.paint }], LINE.detail * k);
+      } });
     }
-  });
+  }
+  for (const item of items) {
+    item.draw();
+    for (const dx of [-w, w]) { if (item.x + dx > -item.reach && item.x + dx < w + item.reach) { ctx.save(); ctx.translate(dx, 0); item.draw(); ctx.restore(); } }
+  }
   // wire fence at the foot of the bank
   const posts = [];
   for (let i = 0; i < 8; i++) posts.push([[(i + 0.5) * (w / 8), h], [(i + 0.5) * (w / 8), h - 30 * k]]);
@@ -466,32 +507,32 @@ function facade(ctx, w, h, P, rnd) {
   fillRect(ctx, ax, aTop + 28 * k, aw, 9 * k, inkAlpha(P, 0.34));
   inkLine(ctx, ax, aTop + 16 * k, ax + aw, aTop + 16 * k, lw, P.ink); inkLine(ctx, ax, aTop + 28 * k, ax + aw, aTop + 28 * k, LINE.form * k, P.ink);
   for (let x = ax + 12 * k; x < ax + aw - 8 * k; x += 14 * k) fillRect(ctx, x, aTop + 28 * k, 6 * k, 5 * k, brick.base);
-  const floorH = 3.05 * m, groundH = 4.05 * m, cells = [];
-  for (let f = 0; f < 3; f++) for (let c = 0; c < 3; c++) if (!(f === 0 && c === 1)) cells.push([ax + aw * (1 / 6 + c / 3) - 29 * k, aTop + 54 * k + f * floorH, 58 * k, 74 * k]);
+  const floorH = 2.72 * m, groundH = 4.05 * m, cells = [];
+  for (let f = 0; f < 3; f++) for (let c = 0; c < 3; c++) if (!(f === 0 && c === 1)) cells.push([ax + aw * (1 / 6 + c / 3) - 29 * k, aTop + 54 * k + f * floorH, 58 * k, 66 * k]);
   // segmental brick arches over the openings
   for (const c of cells) { fillTrace(ctx, (g) => { g.moveTo(c[0] - 5 * k, c[1] + 4 * k); g.quadraticCurveTo(c[0] + c[2] / 2, c[1] - 16 * k, c[0] + c[2] + 5 * k, c[1] + 4 * k); g.lineTo(c[0] + c[2] + 5 * k, c[1] - 6 * k); g.quadraticCurveTo(c[0] + c[2] / 2, c[1] - 26 * k, c[0] - 5 * k, c[1] - 6 * k); g.closePath(); }, brick.light); }
   windows(ctx, P, cells, { line: lw, bars: [3, 4], frame: P.wallLight, sill: P.concreteLight, glass: P.glassShade, shade: shadeHex(P.glassShade, 0.35), light: P.glass });
   for (const c of cells) brushStroke(ctx, [[c[0] + c[2] * 0.3, c[1] + c[3] + 6 * k], [c[0] + c[2] * 0.32, c[1] + c[3] + (16 + rnd() * 16) * k]], 1.6 * k, { color: brick.shade, taperStart: 0, taperEnd: 0.7 });
   // loading door of the top floor with its hoist beam
-  const ldx = ax + aw / 2 - 31 * k, ldy = aTop + 46 * k;
-  inkGroup(ctx, P, [{ r: [ldx, ldy, 62 * k, 86 * k], fill: P.wood }], lw);
-  fillRect(ctx, ldx + 31 * k, ldy, 31 * k, 86 * k, P.woodShade); ribs(ctx, ldx, ldy, 62 * k, 86 * k, 10.3 * k, P.ink, LINE.hair * k, true);
+  const ldx = ax + aw / 2 - 31 * k, ldy = aTop + 44 * k;
+  inkGroup(ctx, P, [{ r: [ldx, ldy, 62 * k, 80 * k], fill: P.wood }], lw);
+  fillRect(ctx, ldx + 31 * k, ldy, 31 * k, 80 * k, P.woodShade); ribs(ctx, ldx, ldy, 62 * k, 80 * k, 10.3 * k, P.ink, LINE.hair * k, true);
   fillRect(ctx, ldx, ldy, 62 * k, 8 * k, inkAlpha(P, 0.35));
   inkGroup(ctx, P, [{ r: [ax + aw / 2 - 6 * k, aTop + 30 * k, 12 * k, 12 * k], fill: P.metalShade }], lw);
   brushStroke(ctx, [[ax + aw / 2, aTop + 42 * k], [ax + aw / 2 + 1 * k, aTop + 64 * k]], 1.6 * k, { color: P.ink, taper: 0.05 });
   ctx.strokeStyle = P.ink; ctx.lineWidth = 2 * k; ctx.beginPath(); ctx.arc(ax + aw / 2 + 1 * k, aTop + 69 * k, 5 * k, -Math.PI * 0.5, Math.PI * 0.9); ctx.stroke();
   // painted sign band
-  const signY = h - groundH - 6 * k;
-  fillRect(ctx, ax + 16 * k, signY, aw - 32 * k, 30 * k, P.wallLight);
-  fillRect(ctx, ax + 16 * k, signY + 24 * k, aw - 32 * k, 6 * k, P.wall);
-  inkLine(ctx, ax + 16 * k, signY, ax + aw - 16 * k, signY, lw, P.ink); inkLine(ctx, ax + 16 * k, signY + 30 * k, ax + aw - 16 * k, signY + 30 * k, lw, P.ink);
-  label(ctx, 'ENTREPÔTS MARLOC', ax + aw / 2, signY + 14 * k, aw - 60 * k, 15 * k, { weight: 1.2, color: P.brickShade, tracking: 0.08, seed: 6 });
+  const signY = h - groundH - 3 * k;
+  fillRect(ctx, ax + 16 * k, signY, aw - 32 * k, 27 * k, P.wallLight);
+  fillRect(ctx, ax + 16 * k, signY + 22 * k, aw - 32 * k, 5 * k, P.wall);
+  inkLine(ctx, ax + 16 * k, signY, ax + aw - 16 * k, signY, lw, P.ink); inkLine(ctx, ax + 16 * k, signY + 27 * k, ax + aw - 16 * k, signY + 27 * k, lw, P.ink);
+  label(ctx, 'ENTREPÔTS MARLOC', ax + aw / 2, signY + 11.5 * k, aw - 60 * k, 14 * k, { weight: 1.2, color: P.brickShade, tracking: 0.08, seed: 6 });
   // ground floor: roller door, entrance, barred window
-  const rdx = ax + 28 * k, rdw = 128 * k, rdy = h - 3.4 * m;
+  const rdx = ax + 28 * k, rdw = 128 * k, rdy = h - 2.95 * m;
   fillRect(ctx, rdx - 5 * k, rdy - 5 * k, rdw + 10 * k, h - rdy + 5 * k, P.ink);
   fillRect(ctx, rdx, rdy, rdw, h - rdy, P.ink);
   rollerDoor(ctx, P, rdx, rdy, rdw, h - rdy, 0, k * 1.1);
-  fillRect(ctx, rdx - 5 * k, rdy - 16 * k, rdw + 10 * k, 12 * k, P.concreteLight); inkLine(ctx, rdx - 5 * k, rdy - 16 * k, rdx + rdw + 5 * k, rdy - 16 * k, lw, P.ink);
+  fillRect(ctx, rdx - 5 * k, rdy - 13 * k, rdw + 10 * k, 9 * k, P.concreteLight); inkLine(ctx, rdx - 5 * k, rdy - 13 * k, rdx + rdw + 5 * k, rdy - 13 * k, lw, P.ink);
   const pdx = ax + 186 * k, pdy = h - 2.1 * m;
   inkGroup(ctx, P, [{ r: [pdx, pdy - 22 * k, 36 * k, 2.1 * m + 22 * k], fill: P.shutterShade }], lw);
   fillRect(ctx, pdx + 4 * k, pdy - 18 * k, 28 * k, 14 * k, P.glassShade); fillPoly(ctx, [[pdx + 32 * k, pdy - 14 * k], [pdx + 32 * k, pdy - 4 * k], [pdx + 16 * k, pdy - 4 * k]], P.glass);
@@ -568,7 +609,7 @@ function facade(ctx, w, h, P, rnd) {
     fillRect(ctx, cx0 + cw - 22 * k, cTop, 22 * k, h - cTop, wall.base);
     fillRect(ctx, cx0, cTop, cw, 10 * k, P.paint); fillRect(ctx, cx0, cTop + 10 * k, cw, 8 * k, inkAlpha(P, 0.3));
     inkLine(ctx, cx0, cTop + 10 * k, cx0 + cw, cTop + 10 * k, LINE.form * k, P.ink); inkLine(ctx, cx0 - 3 * k, cTop, cx0 + cw + 3 * k, cTop, LINE.form * k, P.ink);
-    const fh = 2.85 * m, shop = h - 3.5 * m, cellsC = [];
+    const shop = h - 3.5 * m, cellsC = [];
     for (let f = 0; f < 4; f++) {
       const y = cTop + 34 * k + f * (shop - cTop - 26 * k) / 4;
       for (const fx of [0.27, 0.73]) cellsC.push([cx0 + cw * fx - 17 * k, y, 34 * k, (f === 3 ? 72 : 60) * k]);
@@ -604,7 +645,6 @@ function facade(ctx, w, h, P, rnd) {
     }
     inkLine(ctx, cx0 - 2 * k, shop + 54 * k, cx0 + cw + 2 * k, shop + 54 * k, lw, P.ink);
     fillRect(ctx, cx0, h - 12 * k, cw, 12 * k, P.concreteShade); inkLine(ctx, cx0, h - 12 * k, cx0 + cw, h - 12 * k, LINE.hair * k, P.ink);
-    void fh;
   }
   fillRect(ctx, 0, h - 4 * k, w, 4 * k, inkAlpha(P, 0.4));
   ctx.restore();
@@ -655,11 +695,13 @@ function villa(ctx, w, h, P, rnd, variant) {
     clipped(ctx, arch, () => { fillRect(ctx, x1 + 34 * k, ground - 14 * k, 56 * k, 14 * k, mixHex(P.wallShade, P.ink, 0.35)); fillRect(ctx, x1 + 58 * k, ground - 44 * k, 22 * k, 30 * k, mixHex(P.wood, P.ink, 0.45)); fillEllipse(ctx, x1 + 46 * k, ground - 18 * k, 7 * k, 9 * k, mixHex(P.roof, P.ink, 0.35)); });
     plinth(x1, wx1);
     // vine on the pergola
-    const clumps = [[x1 + 30 * k, wingTop - 70 * k, 20], [x1 + 60 * k, wingTop - 76 * k, 17], [x1 + 92 * k, wingTop - 70 * k, 19], [wx1 - 8 * k, wingTop - 58 * k, 16], [wx1 - 4 * k, wingTop - 34 * k, 11]].map(([x, y, r]) => blobPoints(x, y, r * k, r * 0.7 * k, 5, 0.2, rnd));
+    const vine = [[x1 + 30 * k, wingTop - 70 * k, 20], [x1 + 60 * k, wingTop - 76 * k, 17], [x1 + 92 * k, wingTop - 70 * k, 19], [wx1 - 8 * k, wingTop - 58 * k, 16], [wx1 - 4 * k, wingTop - 34 * k, 11]];
+    const clumps = vine.map(([x, y, r]) => blobPoints(x, y, r * k, r * 0.7 * k, 5, 0.2, rnd));
     contour(ctx, (g) => { for (const c of clumps) closedCurve(g, c); }, P.ink, LINE.form * k, 1, 'round');
     for (const c of clumps) fillTrace(ctx, (g) => closedCurve(g, c), P.leafShade);
-    for (const c of clumps) fillTrace(ctx, (g) => closedCurve(g, c.map(([x, y]) => [x - 3 * k, y - 3 * k]).map(([x, y], i, a) => [x * 0.86 + a[0][0] * 0.14, y * 0.8 + a[0][1] * 0.2])), P.leaf);
-    for (let i = 0; i < 16; i++) { const c = clumps[i % clumps.length][i % 8]; fillEllipse(ctx, c[0] + (rnd() - 0.5) * 16 * k, c[1] + (rnd() - 0.2) * 9 * k, 2.4 * k, 2.4 * k, P.crowd[6]); }
+    for (const [x, y, r] of vine) fillTrace(ctx, (g) => closedCurve(g, blobPoints(x - r * 0.16 * k, y - r * 0.16 * k, r * 0.76 * k, r * 0.5 * k, 5, 0.18, rnd)), P.leaf);
+    for (const [x, y, r] of vine) fillTrace(ctx, (g) => closedCurve(g, blobPoints(x - r * 0.3 * k, y - r * 0.28 * k, r * 0.42 * k, r * 0.26 * k, 4, 0.2, rnd)), P.leafLight);
+    for (const [x, y, r] of vine) for (let i = 0; i < 4; i++) fillEllipse(ctx, x + (rnd() - 0.5) * r * 1.5 * k, y + (rnd() - 0.3) * r * 0.9 * k, 2.3 * k, 2.3 * k, P.crowd[6]);
     // main block: hipped tiled roof, chimney
     const roofPoly = [[x0 - 16 * k, eaves + 2 * k], [x0 + 36 * k, ridge], [x1 - 36 * k, ridge], [x1 + 16 * k, eaves + 2 * k]];
     inkGroup(ctx, P, [{ r: [x1 - 96 * k, ridge - 18 * k, 20 * k, 34 * k], fill: wall.base }, { r: [x1 - 99 * k, ridge - 22 * k, 26 * k, 6 * k], fill: P.roof }, { p: roofPoly, fill: P.roof }, { r: [x0, eaves, x1 - x0, ground - eaves], fill: wall.light }], LINE.silhouette * k);
@@ -898,7 +940,7 @@ function tent(ctx, w, h, P, rnd, variant) {
   inkGroup(ctx, P, [{ r: [196 * k, ground - 34 * k, 34 * k, 4 * k], fill: dim(P.wood, 0.25) }, { r: [210 * k, ground - 30 * k, 6 * k, 8 * k], fill: dim(P.woodShade, 0.25) }, { trace: (g) => traceEllipse(g, 213 * k, ground - 41 * k, 6 * k, 7 * k), fill: dim(P.metalLight, 0.2) }], LINE.hair * k * 1.4, 0, 'round');
   // side flaps
   for (const s of [-1, 1]) {
-    const xe = s < 0 ? 20 * k : 364 * k, flap = [[xe, edge + 4 * k], [xe - s * 6 * k, ground], [xe + s * 36 * k, ground], [xe + s * 40 * k, edge - 4 * k]];
+    const xe = s < 0 ? 20 * k : 364 * k, flap = [[xe, edge + 4 * k], [xe + s * 8 * k, ground], [xe - s * 34 * k, ground], [xe - s * 40 * k, edge - 4 * k]];
     inkGroup(ctx, P, [{ p: flap, fill: s < 0 ? cream : shadeHex(cream, 0.25) }], LINE.form * k, 1, 'round');
     clipped(ctx, (g) => tracePolygon(g, flap), () => { for (const [y, c] of [[edge + 22 * k, dark], [edge + 34 * k, P.banners[0]], [edge + 58 * k, dark]]) fillRect(ctx, xe - 44 * k, y, 88 * k, 8 * k, s < 0 ? c : shadeHex(c, 0.25)); });
   }
@@ -1035,28 +1077,32 @@ function cityBlock(ctx, w, h, P, rnd, variant) {
     const sx = 8 * k, sTop = ground - 4 * storey - 6 * k, sw = 112 * k;
     body(sx, sTop, sw, brick, 0.14);
     parapet(sx, sTop, sw, brick);
-    windows(ctx, P, windowGrid(sx + 4 * k, sTop + 14 * k, sw - 12 * k, 3 * storey, 3, 3, 21 * k, 28 * k), { line: lw, bars: [2, 2], sill: P.concreteLight, blinds: 0.3, rnd });
+    windows(ctx, P, windowGrid(sx + 4 * k, sTop + 12 * k, sw - 12 * k, ground - 3.4 * m - sTop - 14 * k, 3, 3, 21 * k, 28 * k), { line: lw, bars: [2, 2], sill: P.concreteLight, blinds: 0.3, rnd });
     shops(sx, sw, [P.banners[4], P.banners[1]]);
     const x0 = 96 * k, bw = 250 * k, top = ground - 7 * storey - 4 * k;
     roofKit(ctx, P, x0 + 40 * k, top, k, 'lift'); roofKit(ctx, P, x0 + 150 * k, top, k, 'tank'); roofKit(ctx, P, x0 + 208 * k, top, k, 'mast');
     body(x0, top, bw, wall);
     parapet(x0, top, bw, wall);
     fillPoly(ctx, [[x0, sTop], [x0 + 30 * k, sTop], [x0 + 12 * k, ground], [x0, ground]], inkAlpha(P, 0.2));
+    const pitch = (ground - 3.4 * m - top - 16 * k) / 6;
     for (let f = 0; f < 6; f++) {
-      const fy = top + 12 * k + f * storey;
+      const fy = top + 10 * k + f * pitch;
       // recessed balconies in two stacks, windows between
       for (const bx of [x0 + 18 * k, x0 + 148 * k]) {
-        fillRect(ctx, bx - lw, fy + 6 * k - lw, 64 * k + lw * 2, storey - 10 * k + lw * 2, P.ink);
-        fillRect(ctx, bx, fy + 6 * k, 64 * k, storey - 10 * k, mixHex(P.wallShade, P.ink, 0.45));
-        fillRect(ctx, bx + 6 * k, fy + 12 * k, 22 * k, storey - 16 * k, P.glassShade); fillPoly(ctx, [[bx + 28 * k, fy + 26 * k], [bx + 28 * k, fy + storey - 4 * k], [bx + 14 * k, fy + storey - 4 * k]], P.glass);
+        fillRect(ctx, bx - lw, fy + 6 * k - lw, 64 * k + lw * 2, pitch - 10 * k + lw * 2, P.ink);
+        fillRect(ctx, bx, fy + 6 * k, 64 * k, pitch - 10 * k, mixHex(P.wallShade, P.ink, 0.45));
+        fillRect(ctx, bx + 6 * k, fy + 12 * k, 22 * k, pitch - 16 * k, P.glassShade); fillPoly(ctx, [[bx + 28 * k, fy + 26 * k], [bx + 28 * k, fy + pitch - 4 * k], [bx + 14 * k, fy + pitch - 4 * k]], P.glass);
         if ((f * 7 + bx) % 3 < 1) fillRect(ctx, bx + 36 * k, fy + 14 * k, 18 * k, 12 * k, P.crowd[(f * 3 + Math.round(bx)) % P.crowd.length]);
-        fillRect(ctx, bx, fy + storey - 22 * k, 64 * k, 18 * k, f % 2 ? wall.light : P.glassLight);
-        fillRect(ctx, bx + 44 * k, fy + storey - 22 * k, 20 * k, 18 * k, f % 2 ? wall.base : P.glass);
-        inkLine(ctx, bx, fy + storey - 22 * k, bx + 64 * k, fy + storey - 22 * k, lw, P.ink);
+        fillRect(ctx, bx, fy + pitch - 22 * k, 64 * k, 18 * k, f % 2 ? wall.light : P.glassLight);
+        fillRect(ctx, bx + 44 * k, fy + pitch - 22 * k, 20 * k, 18 * k, f % 2 ? wall.base : P.glass);
+        inkLine(ctx, bx, fy + pitch - 22 * k, bx + 64 * k, fy + pitch - 22 * k, lw, P.ink);
       }
     }
-    windows(ctx, P, [...windowGrid(x0 + 86 * k, top + 12 * k, 58 * k, 6 * storey, 2, 6, 19 * k, 27 * k), ...windowGrid(x0 + 214 * k, top + 12 * k, 30 * k, 6 * storey, 1, 6, 19 * k, 27 * k)], { line: lw, bars: [2, 1], sill: P.concreteLight, blinds: 0.35, rnd });
-    shops(x0 + 16 * k, bw - 16 * k, [P.banners[0], P.banners[2], P.banners[5]]);
+    windows(ctx, P, [...windowGrid(x0 + 86 * k, top + 10 * k, 58 * k, 6 * pitch, 2, 6, 19 * k, 27 * k), ...windowGrid(x0 + 214 * k, top + 10 * k, 30 * k, 6 * pitch, 1, 6, 19 * k, 27 * k)], { line: lw, bars: [2, 1], sill: P.concreteLight, blinds: 0.35, rnd });
+    shops(x0 + 34 * k, bw - 34 * k, [P.banners[0], P.banners[2], P.banners[5]]);
+    // entrance of the flats
+    inkGroup(ctx, P, [{ r: [x0 + 8 * k, ground - 2.2 * m, 20 * k, 2.2 * m], fill: P.wood }, { r: [x0 + 4 * k, ground - 2.2 * m - 7 * k, 28 * k, 6 * k], fill: P.concrete }], lw);
+    fillRect(ctx, x0 + 18 * k, ground - 2.2 * m, 10 * k, 2.2 * m, P.woodShade); fillRect(ctx, x0 + 11 * k, ground - 2.2 * m + 5 * k, 6 * k, 14 * k, P.glassShade);
   } else if (variant % 3 === 1) {
     // office block: curtain wall with sky reflections, concrete podium
     const x0 = 78 * k, bw = 236 * k, top = ground - 7.4 * storey;
@@ -1175,7 +1221,7 @@ const SHIPPERS = ['MARLOC', 'TRANSBORA', 'CARGOLIS', 'NORDVIK', 'SEALVA'];
 
 /** One shipping container seen from the side: corrugated panel, frame, corner castings, fictional markings. */
 function containerBox(ctx, P, x, y, bw, bh, color, name, k, rnd) {
-  const t = paintTones(color, 0.26, 0.34), lw = LINE.detail * k;
+  const t = paintTones(color, 0.26, 0.34);
   inkGroup(ctx, P, [{ r: [x, y, bw, bh], fill: t.base }], LINE.form * k);
   ribs(ctx, x + 6 * k, y + 7 * k, bw - 12 * k, bh - 15 * k, 6.5 * k, t.shade, 1.5 * k, true);
   ctx.fillStyle = t.light; for (let px = x + 6 * k + 6.5 * k; px < x + bw - 6.5 * k; px += 6.5 * k) ctx.fillRect(px + 1.2 * k, y + 7 * k, 1.1 * k, bh - 15 * k);
@@ -1190,7 +1236,6 @@ function containerBox(ctx, P, x, y, bw, bh, color, name, k, rnd) {
   fillRect(ctx, x + bw * 0.74, y + bh * 0.52, bw * 0.16, 12 * k, ink); fillRect(ctx, x + bw * 0.745, y + bh * 0.535, bw * 0.15, 3 * k, t.base);
   // wear: rust runs and scuffs
   for (let i = 0; i < 4; i++) { const px = x + 10 * k + rnd() * (bw - 20 * k), py = y + 8 * k + rnd() * bh * 0.4; brushStroke(ctx, [[px, py], [px + 0.6 * k, py + (8 + rnd() * 16) * k]], (1.2 + rnd() * 1.6) * k, { color: mixHex(t.shade, P.brickShade, 0.5), taperStart: 0, taperEnd: 0.7 }); }
-  void lw;
 }
 
 /** Stacked shipping containers with fictional markings (two arrangements). */
@@ -1237,7 +1282,12 @@ function warehouse(ctx, w, h, P, rnd) {
   fillRect(ctx, x1 - 40 * k, brickTop, 40 * k, ground - brickTop, P.brickShade); fillRect(ctx, x0, brickTop, x1 - x0, 4 * k, P.brickLight);
   inkLine(ctx, x0, brickTop, x1, brickTop, lw, P.ink);
   for (let i = 0; i < 50; i++) { const x = x0 + 6 * k + rnd() * (x1 - x0 - 30 * k), y = brickTop + 8 * k + rnd() * (ground - brickTop - 12 * k); inkLine(ctx, x, y, x + (6 + rnd() * 14) * k, y, LINE.hair * k, rnd() < 0.3 ? P.brickLight : P.brickShade); }
-  label(ctx, 'ENTREPÔTS TRANSBORA', x0 + (x1 - x0) * 0.42, eaves + 24 * k, 360 * k, 17 * k, { weight: 1.3, color: P.banners[2], tracking: 0.1, seed: 5 });
+  const sx = x0 + 486 * k, sy = eaves + 16 * k;
+  inkGroup(ctx, P, [{ r: [sx, sy, 112 * k, 46 * k], fill: P.paint }], lw);
+  fillRect(ctx, sx, sy, 112 * k, 13 * k, P.banners[2]);
+  fillPoly(ctx, [[sx + 112 * k, sy + 24 * k], [sx + 112 * k, sy + 46 * k], [sx + 60 * k, sy + 46 * k]], shadeHex(P.paint, 0.14));
+  label(ctx, 'ENTREPÔTS', sx + 56 * k, sy + 6.5 * k, 100 * k, 6.5 * k, { color: P.paint, tracking: 0.2 });
+  label(ctx, 'TRANSBORA', sx + 56 * k, sy + 30 * k, 100 * k, 15 * k, { weight: 1.3, color: P.banners[2], slant: 0.08, seed: 5 });
   // loading doors: one open, one half open
   const doorW = 68 * k, doorTop = ground - 4.9 * m, open = [0, 1, 0.45, 0];
   for (let i = 0; i < 4; i++) {
@@ -1262,7 +1312,7 @@ function warehouse(ctx, w, h, P, rnd) {
   inkGroup(ctx, P, [{ r: [cxa - 6 * k, cy, cxb - cxa + 12 * k, 8 * k], fill: P.metal }], LINE.form * k);
   fillRect(ctx, cxa - 6 * k, cy, cxb - cxa + 12 * k, 3 * k, P.metalLight);
   ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.hair * k * 1.4; ctx.beginPath();
-  for (let x = cxa + 20 * k; x < cxb; x += 112 * k) { ctx.moveTo(x, cy); ctx.lineTo(x + 26 * k, cy - 20 * k); }
+  for (let x = cxa + 68 * k; x < cxb; x += 112 * k) { ctx.moveTo(x, cy); ctx.lineTo(x + 24 * k, cy - 18 * k); }
   ctx.stroke();
   // raised dock with steps, office door and window on the right
   inkGroup(ctx, P, [{ r: [x0 - 6 * k, dock, 486 * k, ground - dock], fill: P.concreteLight }, { r: [x0 + 480 * k, dock + 8 * k, 14 * k, ground - dock - 8 * k], fill: P.concrete }, { r: [x0 + 494 * k, dock + 16 * k, 14 * k, ground - dock - 16 * k], fill: P.concrete }], LINE.form * k);

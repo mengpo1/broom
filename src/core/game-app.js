@@ -53,6 +53,7 @@ export class GameApp {
     this.session = null;         // current game mode controller (gameplay/modes), may be null in automation
     this.forcedSize = null;
     this.frameHook = null;
+    this.skipRender = false;     // automation: advance presentation state without drawing (replay audio pass)
     this.stats = { fps: 0, frameMs: 0, simMs: 0, buildMs: 0, renderMs: 0 };
     this.frame = { viewCount: 0, views: [], quads: this.quads, page: { visible: false, alpha: 1, wipe: 1 } };
     for (const view of this.views) {
@@ -228,7 +229,7 @@ export class GameApp {
       }
     }
     const t1 = performance.now();
-    renderer.render(frame);
+    if (!this.skipRender) renderer.render(frame);
     if (this.audio) this.audio.update(this, dt);
     this.stats.buildMs = t1 - t0; this.stats.renderMs = performance.now() - t1;
   }

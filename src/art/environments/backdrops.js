@@ -40,27 +40,35 @@ function scatter(rnd, w, count, jitter, place) {
   for (let i = 0; i < count; i++) place((((i + phase + jit(rnd, jitter)) / count) % 1) * w, seeded(newSeed(rnd)), i);
 }
 
-let surface = null;
+let surface = null, dirty = null;
 
 /**
  * Paint one object (deterministic `paint(r, e)`, e = env whose ctx is the work surface) and stamp
- * it on the panorama with its wrap-around copies. [minX, maxX] must contain the whole object.
+ * it on the panorama with its wrap-around copies. The box [minX, maxX] x [top, bottom] must
+ * contain the whole object: only that part of the work surface is cleared, painted and copied.
  */
-function stamp(env, minX, maxX, seed, paint) {
+function stamp(env, minX, maxX, seed, paint, top = 0, bottom = env.h) {
   const { ctx, w, h } = env, pad = 6, x0 = Math.floor(minX) - pad, width = Math.min(w, Math.ceil(maxX - minX) + 2 * pad);
+  const y0 = Math.max(0, Math.floor(top)), height = Math.min(h, Math.ceil(bottom)) - y0;
+  if (height <= 0) return;
   if (!surface || surface.width !== w || surface.height !== h) {
     if (typeof OffscreenCanvas !== 'undefined') surface = new OffscreenCanvas(w, h);
     else { surface = document.createElement('canvas'); surface.width = w; surface.height = h; }
+    dirty = null;
   }
   const g = surface.getContext('2d');
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
-  g.clearRect(0, 0, w, h);
+  if (dirty) g.clearRect(0, dirty[0], dirty[1], dirty[2]); else g.clearRect(0, 0, w, h);
+  dirty = [y0, width, height];
+  g.save();
+  g.beginPath(); g.rect(0, y0, width, height); g.clip();
   g.translate(-x0, 0);
   paint(seeded(seed), { ...env, ctx: g });
+  g.restore();
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
   for (const dx of [0, -w, w]) {
     if (x0 + width + dx < 0 || x0 + dx > w) continue;
-    ctx.drawImage(surface, 0, 0, width, h, x0 + dx, 0, width, h);
+    ctx.drawImage(surface, 0, y0, width, height, x0 + dx, y0, width, height);
   }
 }
 
@@ -507,7 +515,7 @@ const CLOUD_STYLE = {
 };
 
 function paintClouds(env) {
-  const { w, h, u, y0, P, rnd } = env, grey = overcast(P), style = CLOUD_STYLE[env.kind];
+  const { w, u, y0, P, rnd } = env, grey = overcast(P), style = CLOUD_STYLE[env.kind];
   // clouds near the horizon are seen through more air: paler, smaller, flatter
   const colors = (depth, dark) => {
     const air = depth * 0.5;
@@ -518,17 +526,16 @@ function paintClouds(env) {
   // high streaks first, then heaps from the horizon upward (the nearest, highest clouds last)
   scatter(rnd, w, Math.round(style.stratus * (1 + grey * 1.6)), 0.4, (x, r) => {
     const level = r(), y = lerp(y0 - 90 * u, 70 * u, level), width = (260 + r() * 420) * u * (0.6 + level * 0.6);
-    items.push({ order: level * 0.2, x, half: width / 2, seed: newSeed(r), paint: (rr, e) => paintStratus(e, { x, y, width, height: (9 + rr() * 9) * u * (0.6 + level * 0.7), c: colors(1 - level, grey > 0.5 && rr() < 0.6), shadow: 0.4 + grey * 0.4 }, rr) });
+    items.push({ order: level * 0.2, x, half: width / 2, top: y - 40 * u, bottom: y + 20 * u, seed: newSeed(r), paint: (rr, e) => paintStratus(e, { x, y, width, height: (9 + rr() * 9) * u * (0.6 + level * 0.7), c: colors(1 - level, grey > 0.5 && rr() < 0.6), shadow: 0.4 + grey * 0.4 }, rr) });
   });
   scatter(rnd, w, Math.round(style.cumulus * (1 + grey * 1.3)), 0.42, (x, r) => {
     const level = Math.pow(r(), 1.25 - grey * 0.4), y = lerp(y0 - 70 * u, 190 * u, level), scale = style.size * (0.5 + level * 0.9) * (0.8 + r() * 0.5) * (1 + grey * 0.25);
     const height = Math.min(y - 14 * u, (70 + r() * 60) * u * scale * (0.6 + level * 0.4)), width = Math.min((190 + r() * 230) * u * scale, height * (2.6 + r() * 1.6));
     const dark = grey > 0.3 && r() < grey * 0.75;
-    items.push({ order: 1 + level, x, half: width * 0.62 + height * 0.3, seed: newSeed(r), paint: (rr, e) => paintCumulus(e, { x, y, width, height, c: colors(1 - level, dark), shadow: 0.34 + grey * 0.5 + (dark ? 0.2 : 0), deepBase: dark || grey > 0.6 }, rr) });
+    items.push({ order: 1 + level, x, half: width * 0.62 + height * 0.3, top: y - height * 1.2 - 8 * u, bottom: y + 8 * u, seed: newSeed(r), paint: (rr, e) => paintCumulus(e, { x, y, width, height, c: colors(1 - level, dark), shadow: 0.34 + grey * 0.5 + (dark ? 0.2 : 0), deepBase: dark || grey > 0.6 }, rr) });
   });
   items.sort((a, b) => a.order - b.order);
-  for (const it of items) stamp(env, it.x - it.half, it.x + it.half, it.seed, it.paint);
-  void h;
+  for (const it of items) stamp(env, it.x - it.half, it.x + it.half, it.seed, it.paint, it.top, it.bottom);
 }
 
 // ------------------------------------------------------------------------- far relief by kind
@@ -540,7 +547,7 @@ function row(env, count, jitter, make) {
   const list = [];
   scatter(env.rnd, env.w, count, jitter, (x, r, i) => { const o = make(x, r, i); if (o) list.push({ o, seed: newSeed(r) }); });
   list.sort((a, b) => (b.o.rank ?? b.o.height) - (a.o.rank ?? a.o.height));
-  for (const { o, seed } of list) stamp(env, o.x - o.reach, o.x + o.reach, seed, (r, e) => o.paint(o, r, e));
+  for (const { o, seed } of list) stamp(env, o.x - o.reach, o.x + o.reach, seed, (r, e) => o.paint(o, r, e), o.base - o.height * 1.3 - 60 * env.u);
 }
 
 function farHills(env) {
@@ -649,7 +656,23 @@ function farCity(env) {
 function farFlat(env) {
   const { ctx, w, h, u, y0, P, rnd } = env;
   // very low swells on the horizon, a distant line of woods, a few landmarks
-  row(env, 5, 0.3, (x, r) => ({ x, halfW: (600 + r() * 600) * u, height: (16 + r() * 22) * u, base: y0, tones: farTones(P, 0.45), edge: 'smooth', power: 0.7, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  const crops = [mixHex(P.mown, P.haze, 0.5), mixHex(P.gravelA, P.haze, 0.45), mixHex(P.beyondB, P.haze, 0.5), mixHex(P.grassA, P.haze, 0.5)], hedge = mixHex(P.farReliefShade, P.haze, 0.2);
+  row(env, 6, 0.3, (x, r, i) => ({
+    x, halfW: (600 + r() * 600) * u, height: (20 + r() * 26) * u, base: y0, tones: farTones(P, 0.45), plain: true, edge: 'smooth', power: 0.7, get reach() { return this.halfW; },
+    paint: (o, rr, e) => paintHill(e, { ...o, detail: (yAt, r2, g) => {
+      // a quilt of fields that follows the swell of the ground
+      const cells = 7 + Math.floor(r2() * 4), lean = jit(r2, 0.25);
+      for (let c = 0; c < cells; c++) {
+        const t0 = -0.9 + (c / cells) * 1.8, t1 = t0 + 1.8 / cells, v0 = r2() < 0.3 ? 0.45 : 0.12 + r2() * 0.1;
+        const at = (t, v) => { const xx = o.x + (t + lean * v) * o.halfW, yy = yAt(xx); return [xx, yy + (o.base + 4 * u - yy) * v]; };
+        const quad = [];
+        for (let q = 0; q <= 4; q++) quad.push(at(lerp(t0, t1, q / 4), v0));
+        for (let q = 4; q >= 0; q--) quad.push(at(lerp(t0, t1, q / 4), 1));
+        g.beginPath(); tracePolygon(g, quad); g.fillStyle = crops[(c * 3 + i) % 4]; g.fill();
+        brushStroke(g, [at(t0, v0), at(t0, (v0 + 1) / 2), at(t0, 1)], 1.6 * u, { color: hedge, taper: 0.2, swell: 0.4, seed: c });
+      }
+    } }, rr),
+  }));
   const wood = farTones(P, 0.1);
   row(env, 12, 0.4, (x, r) => ({ x, halfW: (140 + r() * 260) * u, height: (9 + r() * 12) * u, base: y0, tones: wood, edge: 'scallop', grain: 8 * u, power: 0.35, skew: 0, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   // water towers, a church, pylons of a power line marching across the plain
@@ -660,10 +683,10 @@ function farFlat(env) {
       if (i % 2) { ctx.fillRect(x - s * 0.08, y0 - s * 1.5, s * 0.16, s * 1.5); ctx.beginPath(); ctx.ellipse(x, y0 - s * 1.55, s * 0.36, s * 0.2, 0, 0, TAU); ctx.fill(); } else { ctx.fillRect(x - s * 0.16, y0 - s, s * 0.32, s); ctx.beginPath(); tracePolygon(ctx, [[x - s * 0.2, y0 - s], [x, y0 - s * 2], [x + s * 0.2, y0 - s]]); ctx.fill(); ctx.fillRect(x + s * 0.16, y0 - s * 0.5, s * 0.9, s * 0.5); }
     });
   });
-  const pylonGap = w / 14, pylon = mixHex(P.farReliefShade, P.haze, 0.2);
+  const pylonGap = w / 14, pylon = mixHex(P.farReliefShade, P.inkSoft, 0.2);
   for (let i = 0; i < 14; i++) {
     const x = (i + 0.5) * pylonGap, s = 26 * u;
-    ctx.strokeStyle = pylon; ctx.lineWidth = 1.5 * u; ctx.beginPath();
+    ctx.strokeStyle = pylon; ctx.lineWidth = 1.8 * u; ctx.beginPath();
     ctx.moveTo(x - s * 0.16, y0); ctx.lineTo(x - s * 0.04, y0 - s); ctx.lineTo(x + s * 0.04, y0 - s); ctx.lineTo(x + s * 0.16, y0);
     ctx.moveTo(x - s * 0.3, y0 - s * 0.82); ctx.lineTo(x + s * 0.3, y0 - s * 0.82); ctx.moveTo(x - s * 0.22, y0 - s * 0.62); ctx.lineTo(x + s * 0.22, y0 - s * 0.62);
     ctx.stroke();
@@ -753,7 +776,7 @@ function nearSea(env) {
   const built = builtColors(P, 0.12, front.ink), cypress = [mixHex(P.cypressShade, P.haze, 0.15), mixHex(P.cypress, P.haze, 0.15)], pines = [mixHex(P.pineShade, P.haze, 0.15), mixHex(P.pine, P.haze, 0.15)];
   const rock = hazed(tones(P.rockLight, P.rock, P.rockShade), P.haze, 0.2);
   // two capes close the bay: the hills only stand on part of the panorama, the sea shows between them
-  const capes = [0.02 + rnd() * 0.08, 0.52 + rnd() * 0.1].map((c) => ({ centre: c * w, span: (0.17 + rnd() * 0.05) * w }));
+  const capes = [0.02 + rnd() * 0.08, 0.5 + rnd() * 0.1].map((c) => ({ centre: c * w, span: (0.12 + rnd() * 0.04) * w }));
   for (const cape of capes) {
     const hills = [];
     for (let i = 0; i < 4; i++) hills.push({ x: cape.centre + ((i + 0.5) / 4 - 0.5) * 2 * cape.span * 0.8 + jit(rnd, 40 * u), halfW: (230 + rnd() * 200) * u, height: (60 + rnd() * 70) * u * (1 - Math.abs(i - 1.5) * 0.22), seed: newSeed(rnd), far: true });
@@ -773,7 +796,7 @@ function nearSea(env) {
           if (kind < 0.36) { paintHouse(ctx, xx, ground, (15 + r() * 10) * u, (9 + r() * 5) * u, built, r() < 0.4, r); paintSpike(ctx, xx - (13 + r() * 6) * u, ground + u, (17 + r() * 9) * u, 6 * u, cypress[0], cypress[1], front.ink); } else if (kind < 0.72) for (let q = 0, n = 1 + Math.floor(r() * 3); q < n; q++) paintSpike(ctx, xx + q * 7 * u, ground + q * u, (16 + r() * 13) * u, (5 + r() * 2) * u, cypress[0], cypress[1], front.ink);
           else paintTree(ctx, xx, ground, (20 + r() * 9) * u, true, pines[0], pines[1], front.ink, r);
         }
-      });
+      }, o.base - o.height * 1.3 - 70 * u);
     };
     for (const hill of hills) if (hill.far) drawHill(hill);
     // headland sloping down to a rocky point, with a line of surf at its foot
@@ -797,7 +820,7 @@ function nearSea(env) {
         });
         contour(g, shape, front.ink, 1.4 * u);
         brushStroke(g, [[inland + side * len * 0.3, base + 4 * u], [tip - side * s, base + 5.5 * u], [tip + side * s * 0.5, base + 4 * u]], 3 * u, { color: P.cloudLight, taper: 0.3, swell: 0.4 });
-      });
+      }, base - s * 1.4 - 20 * u);
     }
     for (const hill of hills) if (!hill.far) drawHill(hill);
   }
@@ -897,9 +920,10 @@ function nearFlat(env) {
   // the airfield: hangars, control tower, radar, wind sock; farms and rows of poplars elsewhere
   const field = rnd() * w;
   for (let i = 0; i < 4; i++) {
-    const x = field + (i - 1.5) * 150 * u + jit(rnd, 20 * u), wd = (110 + rnd() * 40) * u, ht = (30 + rnd() * 10) * u;
-    stamp(env, x - wd * 0.6, x + wd * 0.6, i + 1, (r, e) => {
+    const x = field + (i - 1.5) * 215 * u + jit(rnd, 20 * u), wd = (110 + rnd() * 40) * u, ht = (30 + rnd() * 10) * u;
+    stamp(env, x - wd, x + wd, i + 1, (r, e) => {
       const g = e.ctx;
+      g.translate(x, y0); g.scale(1.4, 1.4); g.translate(-x, -y0);
       const arch = (c) => { c.moveTo(x - wd / 2, y0 + 4); c.lineTo(x - wd / 2, y0 - ht * 0.45); c.quadraticCurveTo(x, y0 - ht * 1.5, x + wd / 2, y0 - ht * 0.45); c.lineTo(x + wd / 2, y0 + 4); c.closePath(); };
       g.beginPath(); arch(g); g.fillStyle = metal.base; g.fill();
       inside(g, () => {
@@ -908,10 +932,11 @@ function nearFlat(env) {
         g.fillStyle = ink; for (let d = 1; d < 4; d++) g.fillRect(x - wd * 0.34 + (wd * 0.68 * d) / 4, y0 - ht * 0.56, 1.2 * u, ht);
       });
       contour(g, arch, ink, 1.3 * u);
-    });
+    }, y0 - ht * 2.4 - 10 * u);
   }
-  const tx = field + 330 * u, th = 78 * u;
-  wrapped(ctx, w, tx - 120 * u, tx + 120 * u, () => {
+  const tx = field + 480 * u, th = 78 * u;
+  wrapped(ctx, w, tx - 170 * u, tx + 170 * u, () => {
+    ctx.translate(tx, y0); ctx.scale(1.4, 1.4); ctx.translate(-tx, -y0);
     // control tower: shaft, overhanging glazed cab, antennas
     const shaft = [[tx - 9 * u, y0 + 4], [tx - 7 * u, y0 - th * 0.74], [tx + 7 * u, y0 - th * 0.74], [tx + 9 * u, y0 + 4]], cab = [[tx - 13 * u, y0 - th * 0.74], [tx - 17 * u, y0 - th * 0.93], [tx + 17 * u, y0 - th * 0.93], [tx + 13 * u, y0 - th * 0.74]];
     const roof = [[tx - 18.5 * u, y0 - th * 0.93], [tx - 14 * u, y0 - th], [tx + 14 * u, y0 - th], [tx + 18.5 * u, y0 - th * 0.93]];
@@ -934,9 +959,10 @@ function nearFlat(env) {
   });
   scatter(rnd, w, 5, 0.3, (x, r, i) => {
     const seed = newSeed(r);
-    if (Math.abs(((x - field) / w + 1.5) % 1 - 0.5) < 0.14) return;
-    wrapped(ctx, w, x - 190 * u, x + 190 * u, () => {
+    if (Math.abs(((x - field) / w + 1.5) % 1 - 0.5) < 0.2) return;
+    wrapped(ctx, w, x - 260 * u, x + 260 * u, () => {
       const r2 = seeded(seed);
+      ctx.translate(x, y0); ctx.scale(1.3, 1.3); ctx.translate(-x, -y0);
       if (i % 2) {
         // farm: house, barn and silos
         paintHouse(ctx, x, y0, 34 * u, 15 * u, built, false, r2); paintHouse(ctx, x + 44 * u, y0, 46 * u, 19 * u, { ...built, wallLight: built.roof, wall: built.roofShade, roof: metal.base, roofShade: metal.shade }, false, r2);
@@ -946,6 +972,9 @@ function nearFlat(env) {
       for (let q = 0, n = 7 + Math.floor(r2() * 6); q < n; q++) paintSpike(ctx, x + (i % 2 ? 80 : -70) * u + q * 13 * u, y0 + u, (34 + r2() * 14) * u, 9 * u, poplar[0], poplar[1], ink);
     });
   });
+  // copses and lone trees standing in the fields
+  row(env, 8, 0.45, (x, r) => ({ x, halfW: (50 + r() * 110) * u, height: (26 + r() * 22) * u, base: y0 + 2 * u, tones: front, edge: 'scallop', grain: 15 * u, power: 0.45 + r() * 0.3, contour: 1.4, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
+  scatter(rnd, w, 9, 0.45, (x, r) => { const seed = newSeed(r), size = (30 + r() * 20) * u; wrapped(ctx, w, x - size, x + size, () => paintTree(ctx, x, y0 + 2 * u, size, false, poplar[0], poplar[1], ink, seeded(seed))); });
   // hedge line closing the foreground
   row(env, 12, 0.45, (x, r) => ({ x, halfW: (120 + r() * 240) * u, height: (6 + r() * 8) * u, base: y0 + 4 * u, tones: front, edge: 'scallop', grain: 12 * u, power: 0.35, skew: 0, contour: 1.2, get reach() { return this.halfW; }, paint: (o, rr, e) => paintHill(e, o, rr) }));
   ctx.fillStyle = front.base; ctx.fillRect(0, y0 + 3 * u, w, h - y0);
@@ -960,7 +989,8 @@ const NEAR_RELIEF = { hills: nearHills, mountains: nearMountains, sea: nearSea, 
  * family of the circuit theme ('hills', 'mountains', 'sea', 'dunes', 'mesas', 'city', 'flat').
  * Colours come from the palette P only, so every kind works under every theme.
  */
-export function paintBackdropLayer(index, ctx, w, h, P, kind, rnd) {
+export function paintBackdropLayer(index, ctx, w, h, P, kind, rnd, theme) {
+  void theme;                                                              // cloud cover is read from the palette itself
   ctx.clearRect(0, 0, w, h);
   const env = { ctx, w, h, P, rnd, u: h / 768, y0: backdropHorizon(h), kind: FAR_RELIEF[kind] ? kind : 'hills' };
   if (index === 0) paintClouds(env);

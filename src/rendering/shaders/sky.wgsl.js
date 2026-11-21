@@ -27,8 +27,8 @@ fn layer(u: f32, t: f32, index: i32) -> vec4f {
   let turns = ang / 2.0943951;                            // 120 degrees per panorama
   // banded gradient: a handful of flat tones with soft joints
   let g = clamp(t / 0.62, 0.0, 1.0);
-  let bands = 7.0;
-  let gb = (floor(g * bands) + smoothstep(0.42, 0.58, fract(g * bands))) / bands;
+  let bands = 9.0;
+  let gb = (floor(g * bands) + smoothstep(0.25, 0.75, fract(g * bands))) / bands;
   var c = mix(view.colors[C_SKY_LOW].rgb, view.colors[C_SKY_MID].rgb, smoothstep(0.0, 0.45, gb));
   c = mix(c, view.colors[C_SKY_TOP].rgb, smoothstep(0.35, 1.0, gb));
   let heading = view.misc.y;

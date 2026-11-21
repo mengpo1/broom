@@ -21,7 +21,7 @@ export const STEER_FRAMES = 5;                 // drawn steering angles of a fro
 export const MAX_DRAWN_STEER = 0.26;           // radians at the first / last frame
 export const WHEEL_VARIANTS = TREAD_PHASES + 1; // rolling phases, then the streaked "at speed" drawing
 export const DIAL = { x: 0, y: 700, r: 92, minAngle: -2.2, maxAngle: 2.2, maxRpm: 14000 };
-export const STEERING = { x: 0, y: 872, size: 800, squash: 0.9 };
+export const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };   // extra: canvas height added below the wheel for the sleeves
 export const MIRROR = { x: -1010, y: 188, w: 300, h: 138 };   // left mirror (centre and size); the right one is its reflection
 const INK = '#16161f';
 const COCKPIT_INK = 4.2;
@@ -157,7 +157,7 @@ function paintHand(ctx, c, rimMid, a, S, glove, suit) {
   // sleeve from the wrist to beyond the lower corner of the drawing
   const side = ux < 0 ? -1 : 1;
   const wrist = P(-S * 0.085, S * 0.03);
-  const elbow = [c + side * S * 0.62, c + S * 0.78];
+  const elbow = [c + side * S * 0.56, c + S * 1.25];
   const nx = -(elbow[1] - wrist[1]), ny = elbow[0] - wrist[0];
   const nl = Math.hypot(nx, ny) || 1;
   const wx = (nx / nl) * S * 0.06, wy = (ny / nl) * S * 0.06;
@@ -282,7 +282,7 @@ export function defineCockpitArt(art, players) {
     art.defineStatic(`cockpit.far.${p}`, farCrop.w, farCrop.h, (ctx) => {
       drawCar(ctx, null, model, camera(farCrop), { livery, ink: COCKPIT_INK * 0.8, shadow: false, include: farParts });
     }, { ox: farCrop.x, oy: farCrop.y });
-    art.defineStatic(`cockpit.steering.${p}`, STEERING.size, STEERING.size, (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2]));
+    art.defineStatic(`cockpit.steering.${p}`, STEERING.size, Math.round(STEERING.size * (1 + STEERING.extra)), (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2]));
     layout.near.push(`cockpit.near.${p}`); layout.far.push(`cockpit.far.${p}`); layout.steering.push(`cockpit.steering.${p}`);
   });
 

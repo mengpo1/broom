@@ -197,7 +197,7 @@ function plate(part, outline, y0, y1, roleOut, roleIn, roleEdge) {
       const z0 = minZ + ((maxZ - minZ) * iz) / nzCells, z1 = minZ + ((maxZ - minZ) * (iz + 1)) / nzCells;
       const poly = clipCell([[x0, z0], [x1, z0], [x1, z1], [x0, z1]]);
       if (poly.length < 3) continue;
-      part.face(poly.map((q) => part.vertex(q[0], y, q[1], 0, ny, 0)), role);
+      part.face(poly.map((q) => part.vertex(q[0], y, q[1], 0, ny, 0)), typeof role === 'function' ? role((x0 + x1) / 2, (z0 + z1) / 2) : role);
     }
   };
   side(hi, 1, y1 > y0 ? roleOut : roleIn);
@@ -356,7 +356,7 @@ export function buildCarModel(options = {}) {
     { x: -1.2, zb: 0.09, zt: 0.52, w: 0.25, nt: 2.8, nb: 4.5 },
     { x: -1.6, zb: 0.12, zt: 0.42, w: 0.17, nt: 2.6, nb: 4 },
     { x: -1.93, zb: 0.16, zt: 0.36, w: 0.11, nt: 2.4, nb: 3 },
-  ], { around, spacing, role: (x, y, z) => (z < 0.2 ? ROLE.CARBON : ROLE.BODY), capStart: null, capEnd: ROLE.CARBON });
+  ], { around, spacing, role: (x, y, z, u, j, i, n) => (u > 0.56 && u < 0.94 ? ROLE.CARBON : (j === 0 || j === Math.round(n / 2) - 1) ? ROLE.SIDE : ROLE.BODY), capStart: null, capEnd: ROLE.CARBON });
   parts.push(cover);
   const spine = new PartBuilder('airbox', { ink: 1, gloss: true });
   loft(spine, [
@@ -385,7 +385,7 @@ export function buildCarModel(options = {}) {
     { x: -1.5, y: 0.32, zb: 0.11, zt: 0.22, w: 0.05, nt: 2.6, nb: 3 },
   ], {
     around, spacing,
-    role: (x, y, z, u) => (u > 0.56 && u < 0.94 ? ROLE.CARBON : ROLE.SIDE),
+    role: (x, y, z, u, j, i, n) => (u > 0.56 && u < 0.94 ? ROLE.CARBON : j === Math.round(n * 0.08) || j === Math.round(n * 0.08) + 1 ? ROLE.WING : ROLE.SIDE),
     capStart: ROLE.BLACK, capEnd: ROLE.CARBON,
   });
   parts.push(pod, mirrorPart(pod, 'sidepod.right'));
@@ -403,7 +403,7 @@ export function buildCarModel(options = {}) {
   box(flap, 1.96, 0.405, 0.175, 0.2, 0.585, 0.02, { top: ROLE.BODY, bottom: ROLE.BODY, front: ROLE.BODY, rear: ROLE.BODY, right: ROLE.BODY }, 0.42, 0.11);
   parts.push(flap, mirrorPart(flap, 'frontwing.flap.right'));
   const fep = new PartBuilder('frontwing.endplate.left', { ink: 0.9, outward: [0, 1, 0] });
-  plate(fep, [[1.84, 0.05], [2.31, 0.05], [2.31, 0.19], [2.12, 0.3], [1.84, 0.3]], 0.7, 0.715, ROLE.SIDE, ROLE.SIDE, ROLE.SIDE);
+  plate(fep, [[1.84, 0.05], [2.31, 0.05], [2.31, 0.19], [2.12, 0.3], [1.84, 0.3]], 0.7, 0.715, (x, z) => (z < 0.13 ? ROLE.WING : ROLE.SIDE), ROLE.SIDE, ROLE.SIDE);
   parts.push(fep, mirrorPart(fep, 'frontwing.endplate.right'));
   const pyl = new PartBuilder('frontwing.pylons', { ink: 0.6 });
   box(pyl, 2.07, 0.07, 0.155, 0.1, 0.02, 0.09, ROLE.CARBON);
@@ -412,7 +412,7 @@ export function buildCarModel(options = {}) {
 
   // ---- rear wing
   const rep = new PartBuilder('rearwing.endplate.left', { ink: 1, outward: [0, 1, 0] });
-  plate(rep, [[-1.72, 0.3], [-2.27, 0.3], [-2.27, 0.97], [-1.82, 0.97], [-1.72, 0.8]], 0.5, 0.515, ROLE.SIDE, ROLE.SIDE, ROLE.SIDE);
+  plate(rep, [[-1.72, 0.3], [-2.27, 0.3], [-2.27, 0.97], [-1.82, 0.97], [-1.72, 0.8]], 0.5, 0.515, (x, z) => (z > 0.84 ? ROLE.WING : z < 0.45 ? ROLE.BODY : ROLE.SIDE), ROLE.SIDE, ROLE.SIDE);
   parts.push(rep, mirrorPart(rep, 'rearwing.endplate.right'));
   const rw = new PartBuilder('rearwing.main', { ink: 0.9 });
   box(rw, -2.06, 0, 0.8, 0.33, 0.996, 0.035, { top: ROLE.WING, bottom: ROLE.WING, front: ROLE.WING, rear: ROLE.WING }, -0.16, 0.12);

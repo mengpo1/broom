@@ -99,10 +99,11 @@ export class CockpitLayer {
     const angle = car.steer * 0.95;
     const s = STEERING.size * k * 0.5;
     const cx = ox + STEERING.x * k + view.shakeX * 0.4, cy = oy + STEERING.y * k + view.shakeY * 0.6;
-    const c = Math.cos(angle) * s, sn = Math.sin(angle) * s, q = STEERING.squash;
+    const co = Math.cos(angle), si = Math.sin(angle), q = STEERING.squash;
+    const yb = s * (1 + 2 * STEERING.extra);       // bottom edge of the taller drawing, below the wheel centre
     quads.quad(
-      cx - c + sn, cy + (-sn - c) * q, 1, cx + c + sn, cy + (sn - c) * q, 1,
-      cx - c - sn, cy + (-sn + c) * q, 1, cx + c - sn, cy + (sn + c) * q, 1,
+      cx + (-s * co + s * si), cy + (-s * si - s * co) * q, 1, cx + (s * co + s * si), cy + (s * si - s * co) * q, 1,
+      cx + (-s * co - yb * si), cy + (-s * si + yb * co) * q, 1, cx + (s * co - yb * si), cy + (s * si + yb * co) * q, 1,
       sp.u0, sp.v0, sp.u1, sp.v1, sp.layer, QUAD_MODE.SPRITE, 1, 1, 1, 1, 0);
   }
 }
