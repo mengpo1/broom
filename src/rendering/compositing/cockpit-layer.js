@@ -31,7 +31,7 @@ export function steerFrame(steer, lock) {
 }
 
 // rear view of a mirror: a small perspective of its own (pixels per metre at one metre, eye height, reach)
-const MIRROR_FOCAL = 640, MIRROR_EYE = 0.75, MIRROR_REACH = 120;
+const MIRROR_FOCAL = 860, MIRROR_EYE = 0.75, MIRROR_REACH = 120;
 const MIRROR_DEPTHS = [0, 13, 22, 38, 65, 120];        // road drawn in bands between these distances behind (0 = bottom of the glass)
 const polyA = new Float32Array(48), polyB = new Float32Array(48);
 const behindOrder = new Int16Array(40), behindGap = new Float32Array(40);
@@ -85,6 +85,7 @@ export class CockpitLayer {
     this.art = art;
     this.near = layout.near.map((id) => art.sprite(id));
     this.far = layout.far.map((id) => art.sprite(id));
+    this.stalk = art.sprite(layout.stalk);
     this.steering = layout.steering.map((id) => art.sprite(id));
     this.wheels = layout.wheels.map((row) => row.map((id) => art.sprite(id)));
     this.dial = art.sprite(layout.dial);
@@ -133,6 +134,12 @@ export class CockpitLayer {
       polyA[0] = xv + cf - wf; polyA[1] = yf; polyA[2] = xv + cf + wf; polyA[3] = yf;
       polyA[4] = xv + cn + wn; polyA[5] = yn; polyA[6] = xv + cn - wn; polyA[7] = yn;
       flatClipped(quads, x0, y0, x1, y1, colors.road[0], colors.road[1], colors.road[2]);
+      for (let e = -1; e <= 1; e += 2) {                       // barriers on both sides, a metre high
+        const bn = (half + 4.5) * (f / zn), bf = (half + 4.5) * (f / zf), hn = f / zn, hf = f / zf;
+        polyA[0] = xv + cf + e * bf; polyA[1] = yf - hf; polyA[2] = xv + cf + e * bf; polyA[3] = yf;
+        polyA[4] = xv + cn + e * bn; polyA[5] = yn; polyA[6] = xv + cn + e * bn; polyA[7] = yn - hn;
+        flatClipped(quads, x0, y0, x1, y1, colors.barrier[0], colors.barrier[1], colors.barrier[2]);
+      }
       for (let e = -1; e <= 1; e += 2) {                       // edge lines
         const ln = 0.22 * (f / zn), lf = 0.22 * (f / zf);
         polyA[0] = xv + cf + e * wf - lf; polyA[1] = yf; polyA[2] = xv + cf + e * wf + lf; polyA[3] = yf;
@@ -173,6 +180,7 @@ export class CockpitLayer {
     const ox = r.w * 0.5 + view.shakeX, oy = placement.oy + view.shakeY + Math.max(0, view.dive) * 6 * k;
     const am = app.scene.ambient;
     this.half(quads, this.far[p], ox, oy, k, am);
+    this.half(quads, this.stalk, ox, oy, k, am);          // mirror supports: behind the wheels, only their top shows
 
     // front wheels: steering frame and rolling variant
     const lock = BASE_CAR_SPEC.steerLock * (0.45 + 0.55 / (1 + Math.abs(car.speed) / 28));

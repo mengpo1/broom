@@ -55,14 +55,23 @@ function paintBinnacle(ctx, ox, oy) {
 }
 
 /** Left rear-view mirror on its stalk: housing in the body colour, glass with a drawn reflection. */
+/** Bounds (in cockpit units) of the drawing of a mirror's support. */
+const STALK = { x0: MIRROR.x - 80, x1: MIRROR.x + 16, y0: MIRROR.y + MIRROR.h / 2 - 16, y1: BOTTOM_LIMIT };
+
+/**
+ * Support of the left mirror: a strut from the housing down toward the side of the car. It is a
+ * layer of its own, drawn behind the front wheel, so that only the short length above the tyre shows.
+ */
+function paintMirrorStalk(ctx, ox, oy) {
+  const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hh = MIRROR.h / 2;
+  const path = [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]];
+  brushStroke(ctx, path, 30, { color: INK, taper: 0, swell: 0 });
+  brushStroke(ctx, path, 21, { color: '#30323d', taper: 0, swell: 0 });
+  brushStroke(ctx, [[cx - 11, cy + hh], [cx - 45, cy + 380], [cx - 57, cy + 760]], 5, { color: '#555866', taper: 0, swell: 0 });
+}
+
 function paintMirror(ctx, ox, oy, colors) {
   const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hw = MIRROR.w / 2, hh = MIRROR.h / 2;
-  // stalk running down to the cockpit side, out of the picture
-  const stalk = [[cx - 14, cy + hh - 6], [cx - 46, cy + 380], [cx - 64, BOTTOM_LIMIT - oy + oy]];
-  brushStroke(ctx, [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]], 30, { color: INK, taper: 0, swell: 0 });
-  brushStroke(ctx, [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]], 21, { color: '#30323d', taper: 0, swell: 0 });
-  brushStroke(ctx, [[cx - 11, cy + hh], [cx - 45, cy + 380], [cx - 57, cy + 760]], 5, { color: '#555866', taper: 0, swell: 0 });
-  void stalk;
   const housing = [[cx - hw, cy - hh * 0.72], [cx - hw * 0.86, cy - hh], [cx + hw * 0.9, cy - hh], [cx + hw, cy - hh * 0.6], [cx + hw * 0.94, cy + hh * 0.86], [cx + hw * 0.8, cy + hh], [cx - hw * 0.88, cy + hh], [cx - hw, cy + hh * 0.7]];
   const trace = (pts) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); };
   trace(housing); ctx.fillStyle = shadeHex(colors[0], 0.16); ctx.fill();
@@ -293,7 +302,8 @@ export function defineCockpitArt(art, players) {
   const probe = { eye, focal, cx: 0, cy: 0 };
   const nearParts = (name) => name === 'tub' || name === 'suspension.left' || name === 'exhaust';
   const farParts = (name) => name === 'frontwing.main' || name === 'frontwing.flap.left' || name === 'frontwing.endplate.left' || name === 'frontwing.pylons';
-  const layout = { near: [], far: [], wheels: [], steering: [], dial: null, needle: null };
+  const layout = { near: [], far: [], wheels: [], steering: [], dial: null, needle: null, stalk: 'cockpit.stalk' };
+  art.defineStatic('cockpit.stalk', STALK.x1 - STALK.x0, STALK.y1 - STALK.y0, (ctx) => paintMirrorStalk(ctx, -STALK.x0, -STALK.y0), { ox: STALK.x0, oy: STALK.y0 });
 
   const nearBounds = drawCar(null, null, model, probe, { measure: true, include: nearParts });
   nearBounds.minY = Math.min(nearBounds.minY, MIRROR.y - MIRROR.h / 2 - 6); nearBounds.maxY = BOTTOM_LIMIT;

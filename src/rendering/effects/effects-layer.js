@@ -205,7 +205,7 @@ export class EffectsLayer {
       const followed = cars[app.views[v].carIndex];
       const flat = !!followed && followed.speed > FLATOUT_SPEED && followed.throttle > 0.8;
       if (flat && !this.wasFlatOut[v] && this.roarClock[v] <= 0 && fx.onomatopoeia && this.popClock[v] > 1) {
-        this.pop(v, WORD.FLATOUT, 0.8, 0.5, 0.5, false);
+        this.pop(v, WORD.FLATOUT, 0.25, 0.6, 0.85, false);
         this.roarClock[v] = 16;
       }
       this.wasFlatOut[v] = flat;
@@ -277,16 +277,18 @@ export class EffectsLayer {
       if (!projectAtDepth(p, this.pz[i], this.pd[i], this.ph[i], pt)) continue;
       const t = this.page[i] / this.plife[i];
       if (this.pkind[i] === 1) {
-        const s = this.psize[i] * pt.scale * (1 - t * 0.5);
-        quads.sprite(this.spark, pt.x - s / 2, pt.y - s / 2, s, s, this.pr[i], this.pg[i], this.pb[i], 1 - t * t, this.pz[i], false);
+        if (this.pz[i] < 4) continue;                         // a spark against the lens would be a blurred blot
+        const s = Math.min(view.rect.h * 0.03, this.psize[i] * pt.scale) * (1 - t * 0.8);
+        quads.sprite(this.spark, pt.x - s / 2, pt.y - s / 2, s, s, this.pr[i], this.pg[i], this.pb[i], 1, this.pz[i], false);
       } else {
         // drawn smoke stays opaque (no ghosting of contours), swells, then shrinks away at the end of its life
-        // (a puff never fills the picture: its drawn size is capped, and right in front of the camera it thins out)
+        // (a puff is always opaque: it swells in, shrinks away, never fills the picture, and none is drawn against the camera)
+        if (this.pz[i] < 6) continue;
         const cap = view.rect.h * 0.16;
-        const size = Math.min(cap, (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1));
-        const near = clamp((this.pz[i] - 3.5) / 5, 0, 1);
-        if (near <= 0) continue;
-        const alpha = (t < 0.08 ? t / 0.08 : t > 0.85 ? (1 - t) / 0.15 : 1) * near;
+        const grow = t < 0.1 ? t / 0.1 : t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
+        const size = Math.min(cap, (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale) * grow;
+        if (size < 2) continue;
+        const alpha = 1;
         quads.sprite(this.puffs[i % 3], pt.x - size / 2, pt.y - size * 0.85, size, size, this.pr[i], this.pg[i], this.pb[i], alpha, this.pz[i], (i & 1) === 1);
       }
     }
@@ -305,10 +307,12 @@ export class EffectsLayer {
       const cx = p.x * r.w, cy = p.y * r.h;
       if (p.burst) {
         const s = 620 * scale;
-        quads.rotated(this.burst, cx, cy, s, s, p.angle * 2, 0.5, 0.5, 1, 1, 1, alpha * (1 - t * 0.5));
+        const out = t > 0.75 ? 1 - (t - 0.75) / 0.25 : 1;         // leaves by shrinking, never by fading
+        quads.rotated(this.burst, cx, cy, s * out, s * out, p.angle * 2, 0.5, 0.5, 1, 1, 1, 1);
       } else {
         const sp = this.words[p.word];
-        quads.rotated(sp, cx, cy, sp.w * scale, sp.h * scale, p.angle - 0.08, 0.5, 0.5, 1, 1, 1, alpha);
+        const out = t > 0.8 ? 1 - (t - 0.8) / 0.2 : 1;
+        quads.rotated(sp, cx, cy, sp.w * scale * out, sp.h * scale * out, p.angle - 0.08, 0.5, 0.5, 1, 1, 1, 1);
       }
     }
   }

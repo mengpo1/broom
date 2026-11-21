@@ -73,7 +73,8 @@ export class TextPainter {
       for (let code = 0; code < 0x180; code++) set.advance[code] = space;
       for (const ch of set.chars) {
         const code = ch.charCodeAt(0);
-        set.advance[code] = glyphAdvance(ch, set.style);
+        // outlined lettering needs air between the characters, or their contours weld together
+        set.advance[code] = glyphAdvance(ch, set.style) + (key === 'o' && ch !== ' ' ? 0.09 : 0);
         if (ch !== ' ') set.sprites[code] = art.sprite(`glyph.${key}.${code}`);
       }
       // lowercase maps to capitals, unknown characters to '?'

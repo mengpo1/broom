@@ -39,7 +39,7 @@ export function carViewFrame(alpha, count) {
 export class SceneBuilder {
   constructor(art) {
     this.ambient = [1, 1, 1];
-    this.mirror = { sky: [0.8, 0.9, 0.95], relief: [0.6, 0.7, 0.8], verge: [0.4, 0.65, 0.3], road: [0.42, 0.43, 0.47], line: [0.95, 0.94, 0.9] };
+    this.mirror = { sky: [0.8, 0.9, 0.95], relief: [0.6, 0.7, 0.8], verge: [0.4, 0.65, 0.3], road: [0.42, 0.43, 0.47], line: [0.95, 0.94, 0.9], barrier: [0.72, 0.71, 0.69] };
     this.art = art;
     this.layout = null;
     this.track = null;
@@ -62,7 +62,7 @@ export class SceneBuilder {
     this.ambient = hexToRgb(palette.ambient);
     this.mirror = {
       sky: hexToRgb(palette.skyLow), relief: hexToRgb(palette.farRelief), verge: hexToRgb(palette.grassA),
-      road: hexToRgb(palette.asphalt), line: hexToRgb(palette.paint),
+      road: hexToRgb(palette.asphalt), line: hexToRgb(palette.paint), barrier: hexToRgb(palette.concrete),
     };
     this.greenTimer = 99;
     for (const strip of layout.strips) {
@@ -70,7 +70,7 @@ export class SceneBuilder {
       // buildings along the road are volumes: the end of a run shows a gable of this depth (m)
       strip.gable = /grandstand/.test(strip.id) ? 16 : /pitbuilding|facade/.test(strip.id) ? 12 : /crowdbank/.test(strip.id) ? 9 : 0;
     }
-    this.gableWall = hexToRgb(palette.concreteShade); this.gableTop = hexToRgb(palette.metalShade); this.inkColor = hexToRgb(palette.ink);
+    this.gableWall = hexToRgb(palette.concrete); this.gableTop = hexToRgb(palette.metalShade); this.gableGlass = hexToRgb(palette.glassShade); this.inkColor = hexToRgb(palette.ink);
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
       prop.behind = false;
@@ -186,6 +186,18 @@ export class SceneBuilder {
     flat(xa, y - h * 0.34, xb - xa, h * 0.34, wall, 0.86);           // plinth in shade
     flat(xa, y - h, xb - xa, line, ink, 1); flat(xa, y - h * 0.9, xb - xa, line * 0.6, ink, 1); flat(xa, y - h * 0.34, xb - xa, line * 0.6, ink, 1);
     flat(xa, y - h, line, h, ink, 1); flat(xb - line, y - h, line, h, ink, 1);
+    // two rows of windows and a service door, so that the wall reads as a building
+    const gw = xb - xa, glass = this.gableGlass;
+    if (gw > 30) {
+      for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) {
+        const wx = xa + gw * (0.14 + col * 0.27), wy = y - h * (0.82 - row * 0.22), ww = gw * 0.18, wh = h * 0.12;
+        flat(wx - line * 0.5, wy - line * 0.5, ww + line, wh + line, ink, 1);
+        flat(wx, wy, ww, wh, glass, 1);
+        flat(wx, wy, ww, wh * 0.35, glass, 1.25);
+      }
+      flat(xa + gw * 0.42 - line * 0.5, y - h * 0.2 - line * 0.5, gw * 0.16 + line, h * 0.2, ink, 1);
+      flat(xa + gw * 0.42, y - h * 0.2, gw * 0.16, h * 0.2, top, 0.8);
+    }
   }
 
   emitStrip(quads, p, track, strip, kNear, kFar, sample, W, H) {
@@ -196,8 +208,14 @@ export class SceneBuilder {
     const dNear = side * (strip.absolute ? strip.offset : barrier[sampleNear] + strip.offset);
     const dFar = side * (strip.absolute ? strip.offset : barrier[sampleFar] + strip.offset);
     let zN, xN, yNb, yNt;
-    if (kNear === 0) {
-      zN = p.near;
+    // the part of a strip right against the camera would be blown up far beyond the size it was
+    // inked at: it starts where it is at most three times that size
+    // (low barriers only, and never more than a few metres: a building must not lose its near end)
+    const zCrisp = strip.height <= 3.5 ? Math.min(4, (strip.height * p.focal) / (sp.h * 3)) : 0;
+    if (p.nodeZ[kFar] <= zCrisp) return;
+    const clipped = kNear === 0 || p.nodeZ[kNear] < zCrisp;
+    if (clipped) {
+      zN = Math.max(p.near, zCrisp);
       if (p.nodeZ[kFar] <= zN + 0.05) return;
       if (!projectAtDepth(p, zN, dNear, strip.base, pt)) return;
       xN = pt.x; yNb = pt.y; yNt = pt.y - strip.height * pt.scale;
@@ -214,10 +232,10 @@ export class SceneBuilder {
     let aPos, bPos;       // sample positions of the lower-s and higher-s ends
     if (dir > 0) {
       bPos = sampleFar;
-      aPos = kNear === 0 ? sampleFar - (p.nodeZ[kFar] - zN) / p.ds : sampleFar - (kFar - kNear);
+      aPos = clipped ? sampleFar - (p.nodeZ[kFar] - zN) / p.ds : sampleFar - (kFar - kNear);
     } else {
       // looking backwards: the near end has the higher s
-      const nearPos = kNear === 0 ? sampleFar + (p.nodeZ[kFar] - zN) / p.ds : sampleFar + (kFar - kNear);
+      const nearPos = clipped ? sampleFar + (p.nodeZ[kFar] - zN) / p.ds : sampleFar + (kFar - kNear);
       aPos = sampleFar; bPos = nearPos;
     }
     let ua = mod(aPos - strip.from + strip.phase, tile) / tile;
@@ -244,10 +262,9 @@ export class SceneBuilder {
       const w = sp.worldW * prop.scale * pt.scale, h = sp.worldH * prop.scale * pt.scale;
       if (h < 3 || pt.x + w * 0.5 < 0 || pt.x - w * 0.5 > W) continue;
       // fade in at the limit of the draw distance instead of popping; an object the camera is right
-      // against would be drawn far above the size it was inked at, so it thins out instead
-      const magnified = h / (sp.h || h);
-      if (magnified > 3) continue;
-      const fade = (z > reach * detail - 60 ? (reach * detail - z) / 60 : 1) * (magnified > 2.2 ? (3 - magnified) / 0.8 : 1);
+      // against would be drawn far above the size it was inked at, so it is left out
+      if (h > (sp.h || h) * 2.4) continue;                 // (dropped outright: a half-faded object reads as a ghost)
+      const fade = z > reach * detail - 60 ? (reach * detail - z) / 60 : 1;
       quads.sprite(sp, pt.x - w * 0.5, pt.y - h, w, h, 1, 1, 1, fade, z, prop.flip);
       if (prop.lights && this.lamps && z < 400) {
         const left = pt.x - w * 0.5, top = pt.y - h;

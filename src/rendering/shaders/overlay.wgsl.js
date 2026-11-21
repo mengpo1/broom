@@ -24,7 +24,7 @@ export const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
     let f = fract(a) - 0.5;
     let hsh = hash22(vec2f(cell, 17.0));
     let hs2 = hash22(vec2f(cell, 91.0));
-    let present = step(hsh.x, 0.2 + 0.45 * intensity);
+    let present = step(hsh.x, 0.28 + 0.6 * intensity);
     let speedK = 0.45 + 0.5 * hs2.x;
     let phase = fract(view.cam.z * speedK * (0.45 + 0.55 * intensity) + hsh.y);
     let start = mix(0.3, 1.0, phase);
@@ -36,7 +36,7 @@ export const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
     let line = (1.0 - aastep(halfW, abs(f), aw)) * step(0.0, along) * step(along, 1.0);
     let life = smoothstep(0.0, 0.12, phase) * (1.0 - smoothstep(0.82, 1.0, phase));
     let ground = smoothstep(0.015, 0.07, p.y);       // below the horizon only
-    let periphery = smoothstep(0.34, 0.58, r) * (0.3 + 0.7 * smoothstep(0.05, 0.3, abs(p.x))) * ground;
+    let periphery = smoothstep(0.26, 0.5, r) * (0.25 + 0.75 * smoothstep(0.04, 0.26, abs(p.x))) * ground;
     let alpha = line * present * periphery * life * clamp(intensity * 1.6, 0.0, 1.0);
     let lightLine = hs2.x > 0.38;
     let rgb = select(view.colors[C_SPEED_DARK].rgb, view.colors[C_SPEED_LIGHT].rgb, lightLine);
@@ -44,7 +44,7 @@ export const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
     outC = vec4f(rgb * al, al);
   }
   if (flash > 0.004) {
-    let fa = clamp(flash, 0.0, 1.0) * 0.55;
+    let fa = clamp(flash, 0.0, 1.0) * 0.16;          // a brief lightening only: a veil would make the drawing look washed out
     outC = vec4f(outC.rgb * (1.0 - fa) + vec3f(1.0, 0.98, 0.9) * fa, outC.a * (1.0 - fa) + fa);
   }
   if (outC.a <= 0.0) { discard; }

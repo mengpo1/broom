@@ -18,7 +18,7 @@ import { paintBackdropLayer } from './environments/backdrops.js';
 
 export const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degrees (front) every 7.5 degrees; the other side is mirrored
 /** Silhouette pen width of the cars in the race, in metres at the car: the same weight as the cockpit's own outlines. */
-export const CAR_INK_WORLD = 0.021;
+export const CAR_INK_WORLD = 0.017;
 export const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
 const STATIC_LAYERS = 6;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;

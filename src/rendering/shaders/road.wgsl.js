@@ -71,15 +71,13 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
   if (ad <= hw) {
     // ---------------------------------------------------------------- asphalt
     c = col(C_ASPHALT);
-    // rubber laid on the racing line: a band whose edges are frayed into long pen strokes (each
-    // narrow lane of the surface ends at its own distance), so that it never reads as a seam
-    let wob = (vnoise(vec2f(s * 0.045, 7.0)) - 0.5) * 0.9;
+    // rubber laid on the racing line: a darker band with a wandering, hand-drawn edge (two scales
+    // of wobble, so that it never runs straight like a seam) and a lighter fringe along it
+    let wob = (vnoise(vec2f(s * 0.045, 7.0)) - 0.5) * 1.0 + (vnoise(vec2f(s * 0.21, 19.0)) - 0.5) * 0.45;
     let gd = abs(d - lineOffset * 0.9);
-    let lane = floor(d / 0.2);
-    let laneN = hash21(vec2f(lane, floor(s / 11.0 + hash21(vec2f(lane, 3.0)) * 11.0)));
-    let fray = mix(0.55, laneN, clamp(0.16 / mpp, 0.0, 1.0));
-    let groove = 1.0 - aastep(0.95 + fray * 1.25 + wob, gd, mpp * 2.0 + 0.05);
-    c = mix(c, col(C_GROOVE), groove * 0.62);
+    let groove = 1.0 - aastep(1.45 + wob, gd, mpp * 2.0 + 0.05);
+    let fringe = 1.0 - aastep(2.0 + wob * 1.6, gd, mpp * 2.0 + 0.05);
+    c = mix(c, col(C_GROOVE), fringe * 0.22 + groove * 0.36);
     let patchN = vnoise(vec2f(s * 0.021, d * 0.16 + 11.0));
     c = mix(c, col(C_ASPHALT_LIGHT), aastep(0.66, patchN, 0.02 + mpr * 0.02) * 0.35 * (1.0 - groove));
     let dash = dashField(s, d, 0.9, 13.0, 0.05, 0.5, mpp, mpr, 1.0);
@@ -158,11 +156,12 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
       c = mix(c, mix(col(C_GRAVEL_B), ink, 0.22), pebble * 0.75 * detail * clamp(0.1 / mpp, 0.0, 1.0));
       c = mix(c, ink, (1.0 - aastep(inkW, ad - (hw + 3.0), mpp)) * inkA * 0.7);
     } else {
-      let warp = (vnoise(vec2f(d * 0.22, s * 0.035)) - 0.5) * 7.0;
-      let band = fract((s + warp) / 22.0);
-      let bw = mpr / 22.0 + 0.004;
+      // mowing stripes run along the track (they converge toward the horizon with the road)
+      let warp = (vnoise(vec2f(s * 0.02, 3.0)) - 0.5) * 1.6;
+      let band = fract((ad + warp) / 3.6);
+      let bw = mpp / 3.6 + 0.004;
       let stripe = aastep(0.5, band, bw) * (1.0 - aastep(1.0, band, bw)) + (1.0 - aastep(0.0, band, bw));
-      let bandFade = clamp(1.0 - (mpr - 4.0) / 6.0, 0.0, 1.0);
+      let bandFade = clamp(1.0 - (mpp - 0.5) / 0.9, 0.0, 1.0);
       c = mix(mix(col(C_GRASS_A), col(C_GRASS_B), 0.5), mix(col(C_GRASS_A), col(C_GRASS_B), stripe), bandFade);
       let blot = vnoise(vec2f(s * 0.028 + 31.0, d * 0.085));
       c = mix(c, col(C_GRASS_DARK), aastep(0.7, blot, 0.015 + mpr * 0.01) * 0.5);

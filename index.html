@@ -349,15 +349,13 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
   if (ad <= hw) {
     // ---------------------------------------------------------------- asphalt
     c = col(C_ASPHALT);
-    // rubber laid on the racing line: a band whose edges are frayed into long pen strokes (each
-    // narrow lane of the surface ends at its own distance), so that it never reads as a seam
-    let wob = (vnoise(vec2f(s * 0.045, 7.0)) - 0.5) * 0.9;
+    // rubber laid on the racing line: a darker band with a wandering, hand-drawn edge (two scales
+    // of wobble, so that it never runs straight like a seam) and a lighter fringe along it
+    let wob = (vnoise(vec2f(s * 0.045, 7.0)) - 0.5) * 1.0 + (vnoise(vec2f(s * 0.21, 19.0)) - 0.5) * 0.45;
     let gd = abs(d - lineOffset * 0.9);
-    let lane = floor(d / 0.2);
-    let laneN = hash21(vec2f(lane, floor(s / 11.0 + hash21(vec2f(lane, 3.0)) * 11.0)));
-    let fray = mix(0.55, laneN, clamp(0.16 / mpp, 0.0, 1.0));
-    let groove = 1.0 - aastep(0.95 + fray * 1.25 + wob, gd, mpp * 2.0 + 0.05);
-    c = mix(c, col(C_GROOVE), groove * 0.62);
+    let groove = 1.0 - aastep(1.45 + wob, gd, mpp * 2.0 + 0.05);
+    let fringe = 1.0 - aastep(2.0 + wob * 1.6, gd, mpp * 2.0 + 0.05);
+    c = mix(c, col(C_GROOVE), fringe * 0.22 + groove * 0.36);
     let patchN = vnoise(vec2f(s * 0.021, d * 0.16 + 11.0));
     c = mix(c, col(C_ASPHALT_LIGHT), aastep(0.66, patchN, 0.02 + mpr * 0.02) * 0.35 * (1.0 - groove));
     let dash = dashField(s, d, 0.9, 13.0, 0.05, 0.5, mpp, mpr, 1.0);
@@ -436,11 +434,12 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
       c = mix(c, mix(col(C_GRAVEL_B), ink, 0.22), pebble * 0.75 * detail * clamp(0.1 / mpp, 0.0, 1.0));
       c = mix(c, ink, (1.0 - aastep(inkW, ad - (hw + 3.0), mpp)) * inkA * 0.7);
     } else {
-      let warp = (vnoise(vec2f(d * 0.22, s * 0.035)) - 0.5) * 7.0;
-      let band = fract((s + warp) / 22.0);
-      let bw = mpr / 22.0 + 0.004;
+      // mowing stripes run along the track (they converge toward the horizon with the road)
+      let warp = (vnoise(vec2f(s * 0.02, 3.0)) - 0.5) * 1.6;
+      let band = fract((ad + warp) / 3.6);
+      let bw = mpp / 3.6 + 0.004;
       let stripe = aastep(0.5, band, bw) * (1.0 - aastep(1.0, band, bw)) + (1.0 - aastep(0.0, band, bw));
-      let bandFade = clamp(1.0 - (mpr - 4.0) / 6.0, 0.0, 1.0);
+      let bandFade = clamp(1.0 - (mpp - 0.5) / 0.9, 0.0, 1.0);
       c = mix(mix(col(C_GRASS_A), col(C_GRASS_B), 0.5), mix(col(C_GRASS_A), col(C_GRASS_B), stripe), bandFade);
       let blot = vnoise(vec2f(s * 0.028 + 31.0, d * 0.085));
       c = mix(c, col(C_GRASS_DARK), aastep(0.7, blot, 0.015 + mpr * 0.01) * 0.5);
@@ -589,7 +588,7 @@ const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
     let f = fract(a) - 0.5;
     let hsh = hash22(vec2f(cell, 17.0));
     let hs2 = hash22(vec2f(cell, 91.0));
-    let present = step(hsh.x, 0.2 + 0.45 * intensity);
+    let present = step(hsh.x, 0.28 + 0.6 * intensity);
     let speedK = 0.45 + 0.5 * hs2.x;
     let phase = fract(view.cam.z * speedK * (0.45 + 0.55 * intensity) + hsh.y);
     let start = mix(0.3, 1.0, phase);
@@ -601,7 +600,7 @@ const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
     let line = (1.0 - aastep(halfW, abs(f), aw)) * step(0.0, along) * step(along, 1.0);
     let life = smoothstep(0.0, 0.12, phase) * (1.0 - smoothstep(0.82, 1.0, phase));
     let ground = smoothstep(0.015, 0.07, p.y);       // below the horizon only
-    let periphery = smoothstep(0.34, 0.58, r) * (0.3 + 0.7 * smoothstep(0.05, 0.3, abs(p.x))) * ground;
+    let periphery = smoothstep(0.26, 0.5, r) * (0.25 + 0.75 * smoothstep(0.04, 0.26, abs(p.x))) * ground;
     let alpha = line * present * periphery * life * clamp(intensity * 1.6, 0.0, 1.0);
     let lightLine = hs2.x > 0.38;
     let rgb = select(view.colors[C_SPEED_DARK].rgb, view.colors[C_SPEED_LIGHT].rgb, lightLine);
@@ -609,7 +608,7 @@ const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
     outC = vec4f(rgb * al, al);
   }
   if (flash > 0.004) {
-    let fa = clamp(flash, 0.0, 1.0) * 0.55;
+    let fa = clamp(flash, 0.0, 1.0) * 0.16;          // a brief lightening only: a veil would make the drawing look washed out
     outC = vec4f(outC.rgb * (1.0 - fa) + vec3f(1.0, 0.98, 0.9) * fa, outC.a * (1.0 - fa) + fa);
   }
   if (outC.a <= 0.0) { discard; }
@@ -6501,7 +6500,7 @@ function carViewFrame(alpha, count) {
 class SceneBuilder {
   constructor(art) {
     this.ambient = [1, 1, 1];
-    this.mirror = { sky: [0.8, 0.9, 0.95], relief: [0.6, 0.7, 0.8], verge: [0.4, 0.65, 0.3], road: [0.42, 0.43, 0.47], line: [0.95, 0.94, 0.9] };
+    this.mirror = { sky: [0.8, 0.9, 0.95], relief: [0.6, 0.7, 0.8], verge: [0.4, 0.65, 0.3], road: [0.42, 0.43, 0.47], line: [0.95, 0.94, 0.9], barrier: [0.72, 0.71, 0.69] };
     this.art = art;
     this.layout = null;
     this.track = null;
@@ -6524,7 +6523,7 @@ class SceneBuilder {
     this.ambient = hexToRgb(palette.ambient);
     this.mirror = {
       sky: hexToRgb(palette.skyLow), relief: hexToRgb(palette.farRelief), verge: hexToRgb(palette.grassA),
-      road: hexToRgb(palette.asphalt), line: hexToRgb(palette.paint),
+      road: hexToRgb(palette.asphalt), line: hexToRgb(palette.paint), barrier: hexToRgb(palette.concrete),
     };
     this.greenTimer = 99;
     for (const strip of layout.strips) {
@@ -6532,7 +6531,7 @@ class SceneBuilder {
       // buildings along the road are volumes: the end of a run shows a gable of this depth (m)
       strip.gable = /grandstand/.test(strip.id) ? 16 : /pitbuilding|facade/.test(strip.id) ? 12 : /crowdbank/.test(strip.id) ? 9 : 0;
     }
-    this.gableWall = hexToRgb(palette.concreteShade); this.gableTop = hexToRgb(palette.metalShade); this.inkColor = hexToRgb(palette.ink);
+    this.gableWall = hexToRgb(palette.concrete); this.gableTop = hexToRgb(palette.metalShade); this.gableGlass = hexToRgb(palette.glassShade); this.inkColor = hexToRgb(palette.ink);
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
       prop.behind = false;
@@ -6648,6 +6647,18 @@ class SceneBuilder {
     flat(xa, y - h * 0.34, xb - xa, h * 0.34, wall, 0.86);           // plinth in shade
     flat(xa, y - h, xb - xa, line, ink, 1); flat(xa, y - h * 0.9, xb - xa, line * 0.6, ink, 1); flat(xa, y - h * 0.34, xb - xa, line * 0.6, ink, 1);
     flat(xa, y - h, line, h, ink, 1); flat(xb - line, y - h, line, h, ink, 1);
+    // two rows of windows and a service door, so that the wall reads as a building
+    const gw = xb - xa, glass = this.gableGlass;
+    if (gw > 30) {
+      for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) {
+        const wx = xa + gw * (0.14 + col * 0.27), wy = y - h * (0.82 - row * 0.22), ww = gw * 0.18, wh = h * 0.12;
+        flat(wx - line * 0.5, wy - line * 0.5, ww + line, wh + line, ink, 1);
+        flat(wx, wy, ww, wh, glass, 1);
+        flat(wx, wy, ww, wh * 0.35, glass, 1.25);
+      }
+      flat(xa + gw * 0.42 - line * 0.5, y - h * 0.2 - line * 0.5, gw * 0.16 + line, h * 0.2, ink, 1);
+      flat(xa + gw * 0.42, y - h * 0.2, gw * 0.16, h * 0.2, top, 0.8);
+    }
   }
 
   emitStrip(quads, p, track, strip, kNear, kFar, sample, W, H) {
@@ -6658,8 +6669,14 @@ class SceneBuilder {
     const dNear = side * (strip.absolute ? strip.offset : barrier[sampleNear] + strip.offset);
     const dFar = side * (strip.absolute ? strip.offset : barrier[sampleFar] + strip.offset);
     let zN, xN, yNb, yNt;
-    if (kNear === 0) {
-      zN = p.near;
+    // the part of a strip right against the camera would be blown up far beyond the size it was
+    // inked at: it starts where it is at most three times that size
+    // (low barriers only, and never more than a few metres: a building must not lose its near end)
+    const zCrisp = strip.height <= 3.5 ? Math.min(4, (strip.height * p.focal) / (sp.h * 3)) : 0;
+    if (p.nodeZ[kFar] <= zCrisp) return;
+    const clipped = kNear === 0 || p.nodeZ[kNear] < zCrisp;
+    if (clipped) {
+      zN = Math.max(p.near, zCrisp);
       if (p.nodeZ[kFar] <= zN + 0.05) return;
       if (!projectAtDepth(p, zN, dNear, strip.base, pt)) return;
       xN = pt.x; yNb = pt.y; yNt = pt.y - strip.height * pt.scale;
@@ -6676,10 +6693,10 @@ class SceneBuilder {
     let aPos, bPos;       // sample positions of the lower-s and higher-s ends
     if (dir > 0) {
       bPos = sampleFar;
-      aPos = kNear === 0 ? sampleFar - (p.nodeZ[kFar] - zN) / p.ds : sampleFar - (kFar - kNear);
+      aPos = clipped ? sampleFar - (p.nodeZ[kFar] - zN) / p.ds : sampleFar - (kFar - kNear);
     } else {
       // looking backwards: the near end has the higher s
-      const nearPos = kNear === 0 ? sampleFar + (p.nodeZ[kFar] - zN) / p.ds : sampleFar + (kFar - kNear);
+      const nearPos = clipped ? sampleFar + (p.nodeZ[kFar] - zN) / p.ds : sampleFar + (kFar - kNear);
       aPos = sampleFar; bPos = nearPos;
     }
     let ua = mod(aPos - strip.from + strip.phase, tile) / tile;
@@ -6706,10 +6723,9 @@ class SceneBuilder {
       const w = sp.worldW * prop.scale * pt.scale, h = sp.worldH * prop.scale * pt.scale;
       if (h < 3 || pt.x + w * 0.5 < 0 || pt.x - w * 0.5 > W) continue;
       // fade in at the limit of the draw distance instead of popping; an object the camera is right
-      // against would be drawn far above the size it was inked at, so it thins out instead
-      const magnified = h / (sp.h || h);
-      if (magnified > 3) continue;
-      const fade = (z > reach * detail - 60 ? (reach * detail - z) / 60 : 1) * (magnified > 2.2 ? (3 - magnified) / 0.8 : 1);
+      // against would be drawn far above the size it was inked at, so it is left out
+      if (h > (sp.h || h) * 2.4) continue;                 // (dropped outright: a half-faded object reads as a ghost)
+      const fade = z > reach * detail - 60 ? (reach * detail - z) / 60 : 1;
       quads.sprite(sp, pt.x - w * 0.5, pt.y - h, w, h, 1, 1, 1, fade, z, prop.flip);
       if (prop.lights && this.lamps && z < 400) {
         const left = pt.x - w * 0.5, top = pt.y - h;
@@ -7107,7 +7123,7 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePh
           rim.lines.push({ pts: [[cx + r0 * Math.cos(t), y + sign * 0.004, cz + r0 * Math.sin(t)], [cx + r1 * Math.cos(t + 0.22), y + sign * 0.004, cz + r1 * Math.sin(t + 0.22)]], normal: [0, sign, 0], weight: 0.8, hex: '#59616d' });
         }
       }
-      box(rim, cx - rimR * 0.56, y + sign * 0.03, cz + rimR * 0.1, 0.085, 0.05, 0.19, ROLE.CARBON, 0, 0.1);
+      box(rim, cx - rimR * 0.56, y + sign * 0.025, cz + rimR * 0.1, 0.07, 0.04, 0.16, ROLE.RED, 0, 0.1);        // caliper, painted red
     }
     if (outer) {
       // sidewall marking: a pale ring, as drawn on racing tyres
@@ -7323,7 +7339,7 @@ function buildCarModel(options = {}) {
   }, hLat, hLon);
   parts.push(helmet);
   const shoulders = new PartBuilder('driver', { ink: 0.6 });
-  sphere(shoulders, -0.14, 0, 0.585, 0.2, 0.225, 0.085, () => ROLE.SUIT, detail > 0 ? 10 : 6, detail > 0 ? 24 : 14);
+  sphere(shoulders, -0.16, 0, 0.6, 0.23, 0.26, 0.125, () => ROLE.SUIT, detail > 0 ? 10 : 6, detail > 0 ? 24 : 14);     // shoulders rising out of the cockpit opening
   const shoulderSolid = shoulders.solid;
   trimPart(shoulders, tub.solid); trimPart(tub, shoulderSolid);
   parts.push(shoulders);
@@ -7825,9 +7841,16 @@ function drawCar(ctx, maskCtx, model, cam, options = {}) {
       const scale = k / ((s[2] + s[5]) / 2);
       const w = Math.max(1.3, rod.radius * 2 * scale);
       const tones = colors.get(rod.role);
-      strokeSeg(s[0], s[1], s[3], s[4], w + inkBase * part.ink * 1.5, INK, '#000', 'butt');
-      strokeSeg(s[0], s[1], s[3], s[4], w, tones[1][0], tones[1][1], 'butt');
-      strokeSeg(s[0], s[1] - w * 0.22, s[3], s[4] - w * 0.22, w * 0.3, tones[2][0], tones[2][1], 'butt');
+      const inkW = w + inkBase * part.ink * 1.5;
+      // a rod is drawn in short pieces (for depth sorting): the colour of each piece overlaps its
+      // neighbours a little so that no notch shows between them; the two real ends get a joint
+      const ex = s[3] - s[0], ey = s[4] - s[1], el2 = Math.hypot(ex, ey) || 1, ox = (ex / el2) * 1.5, oy = (ey / el2) * 1.5;
+      const x0 = el.first ? s[0] : s[0] - ox, y0 = el.first ? s[1] : s[1] - oy, x1 = el.last ? s[3] : s[3] + ox, y1 = el.last ? s[4] : s[4] + oy;
+      strokeSeg(s[0], s[1], s[3], s[4], inkW, INK, '#000', 'butt');
+      if (el.first) strokeSeg(s[0], s[1], s[0] + ox * 0.1, s[1] + oy * 0.1, inkW * 1.25, INK, '#000', 'round');
+      if (el.last) strokeSeg(s[3], s[4], s[3] - ox * 0.1, s[4] - oy * 0.1, inkW * 1.25, INK, '#000', 'round');
+      strokeSeg(x0, y0, x1, y1, w, tones[1][0], tones[1][1], 'butt');
+      strokeSeg(x0, y0 - w * 0.22, x1, y1 - w * 0.22, w * 0.3, tones[2][0], tones[2][1], 'butt');
     } else {
       const line = part.lines[el.index], s = el.seg;
       const style = line.hex || (line.color === 'tyreMark' ? '#70737f' : INK);
@@ -10675,7 +10698,7 @@ const { paintBackdropLayer } = __modules["src/art/environments/backdrops.js"];
 
 const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degrees (front) every 7.5 degrees; the other side is mirrored
 /** Silhouette pen width of the cars in the race, in metres at the car: the same weight as the cockpit's own outlines. */
-const CAR_INK_WORLD = 0.021;
+const CAR_INK_WORLD = 0.017;
 const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
 const STATIC_LAYERS = 6;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;
@@ -11589,14 +11612,23 @@ function paintBinnacle(ctx, ox, oy) {
 }
 
 /** Left rear-view mirror on its stalk: housing in the body colour, glass with a drawn reflection. */
+/** Bounds (in cockpit units) of the drawing of a mirror's support. */
+const STALK = { x0: MIRROR.x - 80, x1: MIRROR.x + 16, y0: MIRROR.y + MIRROR.h / 2 - 16, y1: BOTTOM_LIMIT };
+
+/**
+ * Support of the left mirror: a strut from the housing down toward the side of the car. It is a
+ * layer of its own, drawn behind the front wheel, so that only the short length above the tyre shows.
+ */
+function paintMirrorStalk(ctx, ox, oy) {
+  const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hh = MIRROR.h / 2;
+  const path = [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]];
+  brushStroke(ctx, path, 30, { color: INK, taper: 0, swell: 0 });
+  brushStroke(ctx, path, 21, { color: '#30323d', taper: 0, swell: 0 });
+  brushStroke(ctx, [[cx - 11, cy + hh], [cx - 45, cy + 380], [cx - 57, cy + 760]], 5, { color: '#555866', taper: 0, swell: 0 });
+}
+
 function paintMirror(ctx, ox, oy, colors) {
   const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hw = MIRROR.w / 2, hh = MIRROR.h / 2;
-  // stalk running down to the cockpit side, out of the picture
-  const stalk = [[cx - 14, cy + hh - 6], [cx - 46, cy + 380], [cx - 64, BOTTOM_LIMIT - oy + oy]];
-  brushStroke(ctx, [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]], 30, { color: INK, taper: 0, swell: 0 });
-  brushStroke(ctx, [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]], 21, { color: '#30323d', taper: 0, swell: 0 });
-  brushStroke(ctx, [[cx - 11, cy + hh], [cx - 45, cy + 380], [cx - 57, cy + 760]], 5, { color: '#555866', taper: 0, swell: 0 });
-  void stalk;
   const housing = [[cx - hw, cy - hh * 0.72], [cx - hw * 0.86, cy - hh], [cx + hw * 0.9, cy - hh], [cx + hw, cy - hh * 0.6], [cx + hw * 0.94, cy + hh * 0.86], [cx + hw * 0.8, cy + hh], [cx - hw * 0.88, cy + hh], [cx - hw, cy + hh * 0.7]];
   const trace = (pts) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); };
   trace(housing); ctx.fillStyle = shadeHex(colors[0], 0.16); ctx.fill();
@@ -11827,7 +11859,8 @@ function defineCockpitArt(art, players) {
   const probe = { eye, focal, cx: 0, cy: 0 };
   const nearParts = (name) => name === 'tub' || name === 'suspension.left' || name === 'exhaust';
   const farParts = (name) => name === 'frontwing.main' || name === 'frontwing.flap.left' || name === 'frontwing.endplate.left' || name === 'frontwing.pylons';
-  const layout = { near: [], far: [], wheels: [], steering: [], dial: null, needle: null };
+  const layout = { near: [], far: [], wheels: [], steering: [], dial: null, needle: null, stalk: 'cockpit.stalk' };
+  art.defineStatic('cockpit.stalk', STALK.x1 - STALK.x0, STALK.y1 - STALK.y0, (ctx) => paintMirrorStalk(ctx, -STALK.x0, -STALK.y0), { ox: STALK.x0, oy: STALK.y0 });
 
   const nearBounds = drawCar(null, null, model, probe, { measure: true, include: nearParts });
   nearBounds.minY = Math.min(nearBounds.minY, MIRROR.y - MIRROR.h / 2 - 6); nearBounds.maxY = BOTTOM_LIMIT;
@@ -11927,7 +11960,7 @@ function steerFrame(steer, lock) {
 }
 
 // rear view of a mirror: a small perspective of its own (pixels per metre at one metre, eye height, reach)
-const MIRROR_FOCAL = 640, MIRROR_EYE = 0.75, MIRROR_REACH = 120;
+const MIRROR_FOCAL = 860, MIRROR_EYE = 0.75, MIRROR_REACH = 120;
 const MIRROR_DEPTHS = [0, 13, 22, 38, 65, 120];        // road drawn in bands between these distances behind (0 = bottom of the glass)
 const polyA = new Float32Array(48), polyB = new Float32Array(48);
 const behindOrder = new Int16Array(40), behindGap = new Float32Array(40);
@@ -11981,6 +12014,7 @@ class CockpitLayer {
     this.art = art;
     this.near = layout.near.map((id) => art.sprite(id));
     this.far = layout.far.map((id) => art.sprite(id));
+    this.stalk = art.sprite(layout.stalk);
     this.steering = layout.steering.map((id) => art.sprite(id));
     this.wheels = layout.wheels.map((row) => row.map((id) => art.sprite(id)));
     this.dial = art.sprite(layout.dial);
@@ -12029,6 +12063,12 @@ class CockpitLayer {
       polyA[0] = xv + cf - wf; polyA[1] = yf; polyA[2] = xv + cf + wf; polyA[3] = yf;
       polyA[4] = xv + cn + wn; polyA[5] = yn; polyA[6] = xv + cn - wn; polyA[7] = yn;
       flatClipped(quads, x0, y0, x1, y1, colors.road[0], colors.road[1], colors.road[2]);
+      for (let e = -1; e <= 1; e += 2) {                       // barriers on both sides, a metre high
+        const bn = (half + 4.5) * (f / zn), bf = (half + 4.5) * (f / zf), hn = f / zn, hf = f / zf;
+        polyA[0] = xv + cf + e * bf; polyA[1] = yf - hf; polyA[2] = xv + cf + e * bf; polyA[3] = yf;
+        polyA[4] = xv + cn + e * bn; polyA[5] = yn; polyA[6] = xv + cn + e * bn; polyA[7] = yn - hn;
+        flatClipped(quads, x0, y0, x1, y1, colors.barrier[0], colors.barrier[1], colors.barrier[2]);
+      }
       for (let e = -1; e <= 1; e += 2) {                       // edge lines
         const ln = 0.22 * (f / zn), lf = 0.22 * (f / zf);
         polyA[0] = xv + cf + e * wf - lf; polyA[1] = yf; polyA[2] = xv + cf + e * wf + lf; polyA[3] = yf;
@@ -12069,6 +12109,7 @@ class CockpitLayer {
     const ox = r.w * 0.5 + view.shakeX, oy = placement.oy + view.shakeY + Math.max(0, view.dive) * 6 * k;
     const am = app.scene.ambient;
     this.half(quads, this.far[p], ox, oy, k, am);
+    this.half(quads, this.stalk, ox, oy, k, am);          // mirror supports: behind the wheels, only their top shows
 
     // front wheels: steering frame and rolling variant
     const lock = BASE_CAR_SPEC.steerLock * (0.45 + 0.55 / (1 + Math.abs(car.speed) / 28));
@@ -12193,7 +12234,8 @@ class TextPainter {
       for (let code = 0; code < 0x180; code++) set.advance[code] = space;
       for (const ch of set.chars) {
         const code = ch.charCodeAt(0);
-        set.advance[code] = glyphAdvance(ch, set.style);
+        // outlined lettering needs air between the characters, or their contours weld together
+        set.advance[code] = glyphAdvance(ch, set.style) + (key === 'o' && ch !== ' ' ? 0.09 : 0);
         if (ch !== ' ') set.sprites[code] = art.sprite(`glyph.${key}.${code}`);
       }
       // lowercase maps to capitals, unknown characters to '?'
@@ -12934,7 +12976,7 @@ class EffectsLayer {
       const followed = cars[app.views[v].carIndex];
       const flat = !!followed && followed.speed > FLATOUT_SPEED && followed.throttle > 0.8;
       if (flat && !this.wasFlatOut[v] && this.roarClock[v] <= 0 && fx.onomatopoeia && this.popClock[v] > 1) {
-        this.pop(v, WORD.FLATOUT, 0.8, 0.5, 0.5, false);
+        this.pop(v, WORD.FLATOUT, 0.25, 0.6, 0.85, false);
         this.roarClock[v] = 16;
       }
       this.wasFlatOut[v] = flat;
@@ -13006,16 +13048,18 @@ class EffectsLayer {
       if (!projectAtDepth(p, this.pz[i], this.pd[i], this.ph[i], pt)) continue;
       const t = this.page[i] / this.plife[i];
       if (this.pkind[i] === 1) {
-        const s = this.psize[i] * pt.scale * (1 - t * 0.5);
-        quads.sprite(this.spark, pt.x - s / 2, pt.y - s / 2, s, s, this.pr[i], this.pg[i], this.pb[i], 1 - t * t, this.pz[i], false);
+        if (this.pz[i] < 4) continue;                         // a spark against the lens would be a blurred blot
+        const s = Math.min(view.rect.h * 0.03, this.psize[i] * pt.scale) * (1 - t * 0.8);
+        quads.sprite(this.spark, pt.x - s / 2, pt.y - s / 2, s, s, this.pr[i], this.pg[i], this.pb[i], 1, this.pz[i], false);
       } else {
         // drawn smoke stays opaque (no ghosting of contours), swells, then shrinks away at the end of its life
-        // (a puff never fills the picture: its drawn size is capped, and right in front of the camera it thins out)
+        // (a puff is always opaque: it swells in, shrinks away, never fills the picture, and none is drawn against the camera)
+        if (this.pz[i] < 6) continue;
         const cap = view.rect.h * 0.16;
-        const size = Math.min(cap, (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1));
-        const near = clamp((this.pz[i] - 3.5) / 5, 0, 1);
-        if (near <= 0) continue;
-        const alpha = (t < 0.08 ? t / 0.08 : t > 0.85 ? (1 - t) / 0.15 : 1) * near;
+        const grow = t < 0.1 ? t / 0.1 : t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
+        const size = Math.min(cap, (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale) * grow;
+        if (size < 2) continue;
+        const alpha = 1;
         quads.sprite(this.puffs[i % 3], pt.x - size / 2, pt.y - size * 0.85, size, size, this.pr[i], this.pg[i], this.pb[i], alpha, this.pz[i], (i & 1) === 1);
       }
     }
@@ -13034,10 +13078,12 @@ class EffectsLayer {
       const cx = p.x * r.w, cy = p.y * r.h;
       if (p.burst) {
         const s = 620 * scale;
-        quads.rotated(this.burst, cx, cy, s, s, p.angle * 2, 0.5, 0.5, 1, 1, 1, alpha * (1 - t * 0.5));
+        const out = t > 0.75 ? 1 - (t - 0.75) / 0.25 : 1;         // leaves by shrinking, never by fading
+        quads.rotated(this.burst, cx, cy, s * out, s * out, p.angle * 2, 0.5, 0.5, 1, 1, 1, 1);
       } else {
         const sp = this.words[p.word];
-        quads.rotated(sp, cx, cy, sp.w * scale, sp.h * scale, p.angle - 0.08, 0.5, 0.5, 1, 1, 1, alpha);
+        const out = t > 0.8 ? 1 - (t - 0.8) / 0.2 : 1;
+        quads.rotated(sp, cx, cy, sp.w * scale * out, sp.h * scale * out, p.angle - 0.08, 0.5, 0.5, 1, 1, 1, 1);
       }
     }
   }

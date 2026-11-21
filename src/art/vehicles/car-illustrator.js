@@ -352,9 +352,16 @@ export function drawCar(ctx, maskCtx, model, cam, options = {}) {
       const scale = k / ((s[2] + s[5]) / 2);
       const w = Math.max(1.3, rod.radius * 2 * scale);
       const tones = colors.get(rod.role);
-      strokeSeg(s[0], s[1], s[3], s[4], w + inkBase * part.ink * 1.5, INK, '#000', 'butt');
-      strokeSeg(s[0], s[1], s[3], s[4], w, tones[1][0], tones[1][1], 'butt');
-      strokeSeg(s[0], s[1] - w * 0.22, s[3], s[4] - w * 0.22, w * 0.3, tones[2][0], tones[2][1], 'butt');
+      const inkW = w + inkBase * part.ink * 1.5;
+      // a rod is drawn in short pieces (for depth sorting): the colour of each piece overlaps its
+      // neighbours a little so that no notch shows between them; the two real ends get a joint
+      const ex = s[3] - s[0], ey = s[4] - s[1], el2 = Math.hypot(ex, ey) || 1, ox = (ex / el2) * 1.5, oy = (ey / el2) * 1.5;
+      const x0 = el.first ? s[0] : s[0] - ox, y0 = el.first ? s[1] : s[1] - oy, x1 = el.last ? s[3] : s[3] + ox, y1 = el.last ? s[4] : s[4] + oy;
+      strokeSeg(s[0], s[1], s[3], s[4], inkW, INK, '#000', 'butt');
+      if (el.first) strokeSeg(s[0], s[1], s[0] + ox * 0.1, s[1] + oy * 0.1, inkW * 1.25, INK, '#000', 'round');
+      if (el.last) strokeSeg(s[3], s[4], s[3] - ox * 0.1, s[4] - oy * 0.1, inkW * 1.25, INK, '#000', 'round');
+      strokeSeg(x0, y0, x1, y1, w, tones[1][0], tones[1][1], 'butt');
+      strokeSeg(x0, y0 - w * 0.22, x1, y1 - w * 0.22, w * 0.3, tones[2][0], tones[2][1], 'butt');
     } else {
       const line = part.lines[el.index], s = el.seg;
       const style = line.hex || (line.color === 'tyreMark' ? '#70737f' : INK);

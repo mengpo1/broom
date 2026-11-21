@@ -343,7 +343,7 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePh
           rim.lines.push({ pts: [[cx + r0 * Math.cos(t), y + sign * 0.004, cz + r0 * Math.sin(t)], [cx + r1 * Math.cos(t + 0.22), y + sign * 0.004, cz + r1 * Math.sin(t + 0.22)]], normal: [0, sign, 0], weight: 0.8, hex: '#59616d' });
         }
       }
-      box(rim, cx - rimR * 0.56, y + sign * 0.03, cz + rimR * 0.1, 0.085, 0.05, 0.19, ROLE.CARBON, 0, 0.1);
+      box(rim, cx - rimR * 0.56, y + sign * 0.025, cz + rimR * 0.1, 0.07, 0.04, 0.16, ROLE.RED, 0, 0.1);        // caliper, painted red
     }
     if (outer) {
       // sidewall marking: a pale ring, as drawn on racing tyres
@@ -559,7 +559,7 @@ export function buildCarModel(options = {}) {
   }, hLat, hLon);
   parts.push(helmet);
   const shoulders = new PartBuilder('driver', { ink: 0.6 });
-  sphere(shoulders, -0.14, 0, 0.585, 0.2, 0.225, 0.085, () => ROLE.SUIT, detail > 0 ? 10 : 6, detail > 0 ? 24 : 14);
+  sphere(shoulders, -0.16, 0, 0.6, 0.23, 0.26, 0.125, () => ROLE.SUIT, detail > 0 ? 10 : 6, detail > 0 ? 24 : 14);     // shoulders rising out of the cockpit opening
   const shoulderSolid = shoulders.solid;
   trimPart(shoulders, tub.solid); trimPart(tub, shoulderSolid);
   parts.push(shoulders);
