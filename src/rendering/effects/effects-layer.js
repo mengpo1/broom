@@ -13,9 +13,10 @@ import { drawText, measureText } from '../../art/styles/lettering.js';
 import { hexToRgb } from '../../art/palettes/palettes.js';
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8;
-const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH'];
+const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR'];
 const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6 };
-const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6'];
+const FLATOUT_WORDS = 3;        // the engine at full cry has several spellings
+const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6', '#ffd42a', '#f58a1f'];
 const FLATOUT_SPEED = 76;       // m/s: the engine at full cry gets its own lettering, now and then
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
@@ -147,7 +148,7 @@ export class EffectsLayer {
     const list = this.pops[viewIndex];
     const p = list[this.popCursor[viewIndex]];
     this.popCursor[viewIndex] = (this.popCursor[viewIndex] + 1) % MAX_POPS;
-    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word === WORD.FLATOUT ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
+    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
     p.angle = (this.random() - 0.5) * 0.3;
   }
 
@@ -205,7 +206,10 @@ export class EffectsLayer {
       const followed = cars[app.views[v].carIndex];
       const flat = !!followed && followed.speed > FLATOUT_SPEED && followed.throttle > 0.8;
       if (flat && !this.wasFlatOut[v] && this.roarClock[v] <= 0 && fx.onomatopoeia && this.popClock[v] > 1) {
-        this.pop(v, WORD.FLATOUT, 0.25, 0.6, 0.85, false);
+        // left or right of the car, clear of the mirrors and instruments whatever the shape of the view
+        const shape = app.views[v], right = this.random() < 0.5;
+        const y = shape.wide ? 0.27 : shape.tall ? 0.5 : 0.62;
+        this.pop(v, WORD.FLATOUT + Math.floor(this.random() * FLATOUT_WORDS) % FLATOUT_WORDS, right ? 0.72 : 0.28, y, shape.wide ? 0.6 : 0.7 + this.random() * 0.25, false);
         this.roarClock[v] = 16;
       }
       this.wasFlatOut[v] = flat;
@@ -301,8 +305,8 @@ export class EffectsLayer {
     for (const p of this.pops[view.index]) {
       if (p.life <= 0) continue;
       const t = p.age / p.life;
-      const popIn = clamp(p.age / 0.07, 0, 1);
-      const scale = (0.55 + 0.45 * popIn + (p.burst ? t * 0.35 : Math.sin(p.age * 38) * 0.02)) * p.size * u;
+      const popIn = clamp(p.age / (p.burst ? 0.07 : 0.18), 0, 1);
+      const scale = ((p.burst ? 0.55 : 0.15) + (p.burst ? 0.45 : 0.85) * popIn + (p.burst ? t * 0.35 : Math.sin(p.age * 38) * 0.02)) * p.size * u;
       const alpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
       const cx = p.x * r.w, cy = p.y * r.h;
       if (p.burst) {

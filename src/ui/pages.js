@@ -165,13 +165,25 @@ export class PagePainter {
     sky.addColorStop(0, P.skyTop); sky.addColorStop(0.55, P.skyMid); sky.addColorStop(1, P.skyLow);
     ctx.fillStyle = sky; ctx.fillRect(0, 0, w, yH + 2);
     ctx.fillStyle = P.farGround; ctx.fillRect(0, yH, w, h - yH);
-    const sw = 2048, sh = 384, strip = makeCanvas(sw, sh), sctx = strip.getContext('2d');
-    const bandH = yH * 1.25 * zoom, k = bandH / sh, stripHorizon = backdropHorizon(sh) * k;
-    for (let layer = 0; layer < 3; layer++) {
-      sctx.clearRect(0, 0, sw, sh);
-      paintBackdropLayer(layer, sctx, sw, sh, P, theme.backdrop, seeded(hashString(`backdrop:${track.id}:${layer}`)), theme);
-      ctx.drawImage(strip, 0, 0, Math.min(sw, w / k), sh, 0, yH - stripHorizon, Math.min(sw, w / k) * k, bandH);
+    // the three panoramas of the race, painted once per circuit at their native size and kept:
+    // everything below their horizon line (haze meant to sink into the ground) is left out
+    const sw = 4096, sh = 768, stripHorizonPx = Math.floor(backdropHorizon(sh));
+    let strip = this.cache.get(`panorama:${track.id}`);
+    if (!strip) {
+      strip = makeCanvas(sw, stripHorizonPx);
+      const layer = makeCanvas(sw, sh), lctx = layer.getContext('2d'), sctx = strip.getContext('2d');
+      for (let index = 0; index < 3; index++) {
+        paintBackdropLayer(index, lctx, sw, sh, P, theme.backdrop, seeded(hashString(`backdrop:${track.id}:${index}`)), theme);
+        sctx.drawImage(layer, 0, 0, sw, stripHorizonPx, 0, 0, sw, stripHorizonPx);
+      }
+      // one circuit at a time: the panoramas and views of the previous one are dropped
+      for (const k of [...this.cache.keys()]) if ((k.startsWith('panorama:') || k.startsWith('vista:')) && !k.includes(`:${track.id}`)) this.cache.delete(k);
+      this.cache.set(`panorama:${track.id}`, strip);
     }
+    const bandH = yH * 1.25 * zoom, k = bandH / sh;
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    // the panorama repeats (it covers a third of a turn): laid side by side to the full width
+    for (let x = 0; x < w; x += sw * k - 1) ctx.drawImage(strip, 0, 0, sw, stripHorizonPx, x, yH - stripHorizonPx * k, sw * k, stripHorizonPx * k);
     this.cache.set(key, canvas);
     return canvas;
   }
@@ -194,10 +206,13 @@ export class PagePainter {
     for (let n = 0; n < 150; n++) {
       const px = x - 40 * S + rnd() * (w + 80 * S), py = y - 20 * S + rnd() * (h + 60 * S), r = (9 + rnd() * 9) * S;
       if (near(px, py, 30 * S + r)) continue;
-      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
-      ctx.fillStyle = P.leafShade; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.2 * S; ctx.stroke();
-      ctx.beginPath(); ctx.arc(px - r * 0.22, py - r * 0.26, r * 0.62, 0, Math.PI * 2); ctx.fillStyle = rnd() < 0.5 ? P.leaf : P.pine; ctx.fill();
-      ctx.beginPath(); ctx.arc(px - r * 0.36, py - r * 0.4, r * 0.28, 0, Math.PI * 2); ctx.fillStyle = P.leafLight; ctx.fill();
+      // a clump seen from above: two or three overlapping flat discs under one contour
+      const dark = rnd() < 0.5;
+      const blobs = [[0, 0, r], [r * (0.5 + rnd() * 0.3), r * (rnd() - 0.5) * 0.8, r * (0.55 + rnd() * 0.25)], [-r * 0.4 * rnd(), r * (0.5 + rnd() * 0.3), r * (0.5 + rnd() * 0.2)]];
+      ctx.beginPath(); for (const [bx, by, br] of blobs) { ctx.moveTo(px + bx + br, py + by); ctx.arc(px + bx, py + by, br, 0, Math.PI * 2); }
+      ctx.strokeStyle = INK; ctx.lineWidth = 4 * S; ctx.stroke();
+      ctx.fillStyle = dark ? P.pine : P.leaf; ctx.fill();
+      ctx.beginPath(); ctx.arc(px + r * 0.2, py + r * 0.25, r * 0.5, 0, Math.PI * 2); ctx.fillStyle = dark ? P.pineShade : P.leafShade; ctx.fill();
     }
     // grandstand on one side of the start line, pit building on the other
     const sx = ox + track.x[0] * k, sy = oz + track.z[0] * k;
@@ -252,8 +267,13 @@ export class PagePainter {
     if (model.track) {
       // an illustrated plan: the circuit laid on its ground, under the skyline of the place
       const tp = getPalette(model.track.theme);
-      ctx.drawImage(this.vista(model.track, leftW + 80 * S, H * 0.68, 0.2), m, m);
-      const mx = m + 70 * S, my = m + H * 0.68 * 0.25, mw = leftW - 200 * S, mh = H * 0.68 * 0.7 - m;
+      // two registers, as on a comic page: a strip showing the site, and below it the plan seen from above
+      const bandH = H * 0.68 * 0.24;
+      ctx.drawImage(this.vista(model.track, leftW + 80 * S, bandH, 0.72), m, m);
+      ctx.fillStyle = tp.farGround; ctx.fillRect(m, m + bandH, leftW + 80 * S, H * 0.68);
+      ctx.fillStyle = PAPER; ctx.fillRect(m, m + bandH - 5 * S, leftW + 80 * S, 10 * S);
+      ctx.fillStyle = INK; ctx.fillRect(m, m + bandH - 7.5 * S, leftW + 80 * S, 3.5 * S); ctx.fillRect(m, m + bandH + 4 * S, leftW + 80 * S, 3.5 * S);
+      const mx = m + 70 * S, my = m + bandH + 30 * S, mw = leftW - 200 * S, mh = H * 0.68 - bandH - m - 50 * S;
       this.mapScenery(model.track, mx, my, mw, mh, tp);
       this.trackMap(model.track, mx, my, mw, mh);
       drawText(ctx, model.track.name, m + 44 * S, m + 104 * S, 62 * S, { style: 'impact', color: '#ffd42a', outline: INK, outlineWidth: 9 * S, shadow: { dx: 6 * S, dy: 7 * S, color: INK }, seed: 2 });

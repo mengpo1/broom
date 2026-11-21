@@ -74,7 +74,7 @@ export class TextPainter {
       for (const ch of set.chars) {
         const code = ch.charCodeAt(0);
         // outlined lettering needs air between the characters, or their contours weld together
-        set.advance[code] = glyphAdvance(ch, set.style) + (key === 'o' && ch !== ' ' ? 0.09 : 0);
+        set.advance[code] = glyphAdvance(ch, set.style) + (ch === ' ' ? 0 : key === 'o' ? 0.09 : ch === 'I' || ch === 'L' || ch === 'T' || ch === '1' ? 0.07 : 0.035);
         if (ch !== ' ') set.sprites[code] = art.sprite(`glyph.${key}.${code}`);
       }
       // lowercase maps to capitals, unknown characters to '?'

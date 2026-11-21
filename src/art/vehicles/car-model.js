@@ -312,7 +312,8 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePh
     const outer = sign === outerSign;
     // outer face: wheel nut, hub and the dish of the rim; inner face: upright, brake disc and the rim edge
     const rings = outer
-      ? [[0, ROLE.METAL], [0.045, ROLE.BLACK], [0.075, ROLE.RIM], [rimR * 0.8, ROLE.RIM], [rimR + 0.004, ROLE.METAL]]
+      ? (spin ? [[0, ROLE.METAL], [0.04, ROLE.BLACK], [0.07, ROLE.METAL], [rimR * 0.5, ROLE.RIM], [rimR * 0.82, ROLE.METAL], [rimR + 0.004, ROLE.METAL]]
+        : [[0, ROLE.METAL], [0.045, ROLE.BLACK], [0.075, ROLE.RIM], [rimR * 0.8, ROLE.RIM], [rimR + 0.004, ROLE.METAL]])
       : [[0, ROLE.BLACK], [0.05, ROLE.CARBON], [0.085, ROLE.METAL], [rimR * 0.76, ROLE.BLACK], [rimR + 0.004, ROLE.RIM]];
     const ridx = [];
     for (let r = 0; r < rings.length; r++) {
@@ -330,7 +331,7 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePh
     }
     if (!outer) {
       // brake: vent slots on the disc (they turn with the wheel) and the caliper gripping its rear edge
-      const slots = 12, turn = spin ? 0 : ((brakePhase || 0) / 3) * ((Math.PI * 2) / slots);
+      const slots = 8, turn = spin ? 0 : ((brakePhase || 0) / 3) * ((Math.PI * 2) / slots);
       if (spin || brakeBlur) {
         for (const [rr, from, to] of [[rimR * 0.34, 0.4, 2.2], [rimR * 0.5, 2.9, 4.9], [rimR * 0.64, 5.2, 7.0]]) {
           const pts = [];
@@ -339,11 +340,11 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePh
         }
       } else {
         for (let k = 0; k < slots; k++) {
-          const t = turn + (k / slots) * Math.PI * 2, r0 = rimR * 0.3, r1 = rimR * 0.7;
+          const t = turn + (k / slots) * Math.PI * 2, r0 = rimR * 0.46, r1 = rimR * 0.7;
           rim.lines.push({ pts: [[cx + r0 * Math.cos(t), y + sign * 0.004, cz + r0 * Math.sin(t)], [cx + r1 * Math.cos(t + 0.22), y + sign * 0.004, cz + r1 * Math.sin(t + 0.22)]], normal: [0, sign, 0], weight: 0.8, hex: '#59616d' });
         }
       }
-      box(rim, cx - rimR * 0.56, y + sign * 0.025, cz + rimR * 0.1, 0.07, 0.04, 0.16, ROLE.RED, 0, 0.1);        // caliper, painted red
+      box(rim, cx - rimR * 0.6, y + sign * 0.02, cz + rimR * 0.05, 0.055, 0.035, 0.13, ROLE.METAL, 0, 0.1);      // caliper: a small casting on the rear edge of the disc
     }
     if (outer) {
       // sidewall marking: a pale ring, as drawn on racing tyres

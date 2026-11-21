@@ -60,6 +60,11 @@ export class RaceView {
     let dir = 1, yawTarget = he * cfg.yawFollow, eye = cfg.eyeHeight, camS = carS + cfg.eyeForward, camD = carD;
 
     if (this.camera === CAMERA.COCKPIT) {
+      // right against a barrier the drawing of the wall would fill the picture, blown up: the
+      // eye stays a little way off it (the car itself goes on touching the wall)
+      const i = Math.floor(mod(carS, track.length) / track.ds) % track.n;
+      const lo = -track.barrierL[i] + cfg.wallClearance, hi = track.barrierR[i] - cfg.wallClearance;
+      if (lo < hi) camD = clamp(camD, lo, hi);
       if (Math.abs(he) > 1.75) { dir = -1; yawTarget = wrapAngle(he - Math.PI) * cfg.yawFollow; }
       else if (Math.abs(he) > 1.0) yawTarget = Math.sign(he) * (1.0 * cfg.yawFollow + (Math.abs(he) - 1.0) * 0.3);
     } else if (this.camera === CAMERA.CHASE) {

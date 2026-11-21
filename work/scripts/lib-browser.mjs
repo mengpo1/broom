@@ -35,7 +35,9 @@ export async function openGame({ width = 1280, height = 720, hash = '', extraArg
   page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   page.on('request', (r) => { if (!r.url().startsWith('file://')) requests.push(r.url()); });
-  await page.goto(`file://${root}/index.html${hash ? '#' + hash : ''}`);
+  // VIRAGE_HTML: another build of the game to open (a long recording made in several runs uses one frozen copy)
+  const file = process.env.VIRAGE_HTML ? resolve(root, process.env.VIRAGE_HTML) : `${root}/index.html`;
+  await page.goto(`file://${file}${hash ? '#' + hash : ''}`);
   await page.waitForFunction(() => window.virage || window.virageFailed, null, { timeout: 120000 });
   const ready = await page.evaluate(() => !!window.virage);
   const close = async () => { await browser.close(); closeDisplay(); };

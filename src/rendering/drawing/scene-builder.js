@@ -68,12 +68,12 @@ export class SceneBuilder {
     for (const strip of layout.strips) {
       strip.sprite = this.art.sprite(strip.id);
       // buildings along the road are volumes: the end of a run shows a gable of this depth (m)
-      strip.gable = /grandstand/.test(strip.id) ? 16 : /pitbuilding|facade/.test(strip.id) ? 12 : /crowdbank/.test(strip.id) ? 9 : 0;
+      strip.gable = /grandstand/.test(strip.id) ? 7 : /pitbuilding|facade/.test(strip.id) ? 10 : /crowdbank/.test(strip.id) ? 5 : 0;
+      strip.gableWindows = /pitbuilding|facade/.test(strip.id);
     }
     this.gableWall = hexToRgb(palette.concrete); this.gableTop = hexToRgb(palette.metalShade); this.gableGlass = hexToRgb(palette.glassShade); this.inkColor = hexToRgb(palette.ink);
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
-      prop.behind = false;
       prop.lights = prop.id === 'gantry.start';
     }
     // order the strips of every sample from the farthest from the road to the nearest
@@ -81,16 +81,16 @@ export class SceneBuilder {
     for (let i = 0; i < track.n; i++) {
       const list = layout.stripsAt[i];
       list.sort((a, b) => dist(layout.strips[b], i) - dist(layout.strips[a], i));
-      // objects standing behind a tall strip are drawn before it
-      let tallL = 1e9, tallR = 1e9;
-      for (const index of list) {
-        const s = layout.strips[index];
-        if (s.height < 4 || s.absolute) continue;
-        if (s.side > 0) tallR = Math.min(tallR, track.barrierR[i] + s.offset); else tallL = Math.min(tallL, track.barrierL[i] + s.offset);
-      }
+      // an object is drawn just before the first strip on its side that stands nearer to the road
+      // than itself (so a bush behind the guard rail stays behind it, a tree behind the stand too)
       for (let q = layout.propStart[i]; q < layout.propStart[i + 1]; q++) {
-        const prop = layout.props[q];
-        prop.behind = prop.d > 0 ? prop.d > tallR : -prop.d > tallL;
+        const prop = layout.props[q], side = prop.d > 0 ? 1 : -1;
+        const beyond = Math.abs(prop.d) - (side > 0 ? track.barrierR[i] : track.barrierL[i]);
+        prop.slot = list.length;
+        for (let k = 0; k < list.length; k++) {
+          const strip = layout.strips[list[k]];
+          if (strip.side === side && dist(strip, i) < beyond) { prop.slot = k; break; }
+        }
       }
     }
     if (this.effects) this.effects.reset(race, track, palette);
@@ -152,11 +152,11 @@ export class SceneBuilder {
       const zNear = p.nodeZ[k], zFar = p.nodeZ[k + 1];
       const sample = p.segSample[k];
       const from = layout.propStart[sample], to = layout.propStart[sample + 1];
-      if (to > from) this.emitProps(quads, p, layout, from, to, true, dir, W, propReach, detail);
       const list = layout.stripsAt[sample];
       if (list.length) {
         const lodStep = dir > 0 ? (zNear > 700 ? 4 : zNear > 320 ? 2 : 1) : 1;
         for (let q = 0; q < list.length; q++) {
+          if (to > from) this.emitProps(quads, p, layout, from, to, q, dir, W, propReach, detail);
           const strip = layout.strips[list[q]];
           let step = lodStep < strip.tile ? lodStep : strip.tile;
           if (step > 1 && (sample % step !== 0 || k === 0)) { if (sample % step !== 0) continue; step = 1; }
@@ -164,7 +164,7 @@ export class SceneBuilder {
           this.emitStrip(quads, p, track, strip, k, Math.min(k + step, nodeCount - 1), sample, W, H);
         }
       }
-      if (to > from) this.emitProps(quads, p, layout, from, to, false, dir, W, propReach, detail);
+      if (to > from) this.emitProps(quads, p, layout, from, to, list.length, dir, W, propReach, detail);
       for (let i = segHead[k]; i >= 0; i = carNext[i]) this.emitCar(quads, p, cars[i], i, yawAngle, W);
       if (this.effects) this.effects.buildSegment(app, view, k, zNear, zFar);
     }
@@ -188,7 +188,7 @@ export class SceneBuilder {
     flat(xa, y - h, line, h, ink, 1); flat(xb - line, y - h, line, h, ink, 1);
     // two rows of windows and a service door, so that the wall reads as a building
     const gw = xb - xa, glass = this.gableGlass;
-    if (gw > 30) {
+    if (gw > 30 && strip.gableWindows) {
       for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) {
         const wx = xa + gw * (0.14 + col * 0.27), wy = y - h * (0.82 - row * 0.22), ww = gw * 0.18, wh = h * 0.12;
         flat(wx - line * 0.5, wy - line * 0.5, ww + line, wh + line, ink, 1);
@@ -208,14 +208,9 @@ export class SceneBuilder {
     const dNear = side * (strip.absolute ? strip.offset : barrier[sampleNear] + strip.offset);
     const dFar = side * (strip.absolute ? strip.offset : barrier[sampleFar] + strip.offset);
     let zN, xN, yNb, yNt;
-    // the part of a strip right against the camera would be blown up far beyond the size it was
-    // inked at: it starts where it is at most three times that size
-    // (low barriers only, and never more than a few metres: a building must not lose its near end)
-    const zCrisp = strip.height <= 3.5 ? Math.min(4, (strip.height * p.focal) / (sp.h * 3)) : 0;
-    if (p.nodeZ[kFar] <= zCrisp) return;
-    const clipped = kNear === 0 || p.nodeZ[kNear] < zCrisp;
+    const clipped = kNear === 0;       // the first segment starts at the near plane, not at a node
     if (clipped) {
-      zN = Math.max(p.near, zCrisp);
+      zN = p.near;
       if (p.nodeZ[kFar] <= zN + 0.05) return;
       if (!projectAtDepth(p, zN, dNear, strip.base, pt)) return;
       xN = pt.x; yNb = pt.y; yNt = pt.y - strip.height * pt.scale;
@@ -248,12 +243,12 @@ export class SceneBuilder {
       sp.u0 + du * uNear, sp.v0, sp.u0 + du * uFar, sp.v1, sp.layer, QUAD_MODE.SPRITE, 1, 1, 1, 1, zN);   // hidden by crests nearer than its near end (testing the middle would nibble its foot)
   }
 
-  emitProps(quads, p, layout, from, to, behind, dir, W, reachLimit, detail) {
+  emitProps(quads, p, layout, from, to, slot, dir, W, reachLimit, detail) {
     // inside a sample objects are stored by increasing s: walk them far to near
     const start = dir > 0 ? to - 1 : from, end = dir > 0 ? from - 1 : to, inc = dir > 0 ? -1 : 1;
     for (let q = start; q !== end; q += inc) {
       const prop = layout.props[q];
-      if (prop.behind !== behind) continue;
+      if (prop.slot !== slot) continue;
       const z = depthOf(p, prop.s);
       const reach = prop.reach < reachLimit ? prop.reach : reachLimit;
       if (z < 1.2 || z > reach * detail) continue;

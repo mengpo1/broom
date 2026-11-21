@@ -55,6 +55,7 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
   let right = d > 0.0;
   let ad = abs(d);
   let kerb = select(aa.x, aa.y, right);
+  let kwEnd = kw * smoothstep(0.0, 1.0, kerb);        // a kerb narrows to a point at its ends instead of stopping square
   let barrier = select(aa.z, aa.w, right);
   let verge = select(b0.x, b0.y, right);
   var sRel = s; if (sRel > len * 0.5) { sRel = sRel - len; }
@@ -106,7 +107,7 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     // edge paint and ink contour
     c = mix(c, col(C_PAINT), aaband(hw - 0.42, hw - 0.2, ad, mpp) * 0.95);
     c = mix(c, ink, (1.0 - aastep(inkW, hw - ad, mpp)) * inkA * 0.9);
-  } else if (kerb > 0.5 && ad <= hw + kw) {
+  } else if (kerb > 0.02 && ad <= hw + kwEnd) {
     // ---------------------------------------------------------------- kerb
     let period = 5.0;
     let ph = fract(s / period);
@@ -138,7 +139,7 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     c = mix(c, ink, (1.0 - aastep(inkW, ad - hw, mpp)) * inkA * 0.9);
   } else if (ad < barrier) {
     // ---------------------------------------------------------------- verge
-    let vEdge = hw + select(0.0, kw, kerb > 0.5);
+    let vEdge = hw + kwEnd;
     let gravel = verge > 0.5 && verge < 1.5 && ad > hw + 3.0;
     if (gravel) {
       c = col(C_GRAVEL_A);

@@ -165,7 +165,7 @@ function paintHand(ctx, c, rimMid, a, S, glove, suit) {
   // ---- forearm: a sleeve that swells toward the elbow, running out of the lower corner of the drawing
   const side = ux < 0 ? -1 : 1;
   const wrist = P(-S * 0.1, S * 0.03);
-  const elbow = [c + side * S * 0.58, c + S * 1.27];
+  const elbow = [c + side * S * 0.35, c + S * 1.3];        // (kept inside the width of the drawing, or its edge would slice the arm)
   const ax = elbow[0] - wrist[0], ay = elbow[1] - wrist[1];
   const al = Math.hypot(ax, ay) || 1;
   const nx = -ay / al, ny = ax / al;                        // across the arm

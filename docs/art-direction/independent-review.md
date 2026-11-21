@@ -61,3 +61,77 @@ scintillement 3,5 ; déformations 2,5 ; arrière-plans 4.
 | 27 | Mineur | Écrans partagés séparés par un simple filet | Gouttière et cadres (voir n° 15) |
 | 28 | Mineur | Seconde case du menu redondante | Non traité |
 | 29 | Mineur | Bandeaux publicitaires en alternance stricte | Non traité |
+
+## Itération 2
+
+Captures : `work/renders/review-2/` (après les corrections de l'itération 1).
+Rapport : `work/reviews/review-2.md` — **2 graves, 15 moyens, 7 mineurs**.
+Notes : dessin 3,5 ; précision mécanique 3 ; encrage 3 ; colorisation 4 ; perspective 3,5 ;
+cohérence 3 ; lisibilité 4 ; vitesse 2,5 ; animation 3,5 ; continuité des formes 2,5 ;
+scintillement 3 ; déformations 3 ; arrière-plans 4.
+
+Ce deuxième critique ne connaissait pas le premier rapport. Il ne relève plus les défauts
+graves 1, 3, 4 et 5 de l'itération 1 ; il confirme le n° 2 (collision) et en trouve un nouveau,
+**introduit par une correction de l'itération 1** (la bande de gomme « effilochée »).
+
+| N° | Gravité | Défaut relevé | Suite donnée |
+|---|---|---|---|
+| 1 | Grave | Traces de gomme en rectangles empilés au centre de l'écran, changeant d'une image à l'autre | Régression de l'itération 1, retirée : bande de gomme au bord sinueux à deux échelles, avec frange plus claire ; plus aucune découpe par voies |
+| 2 | Grave | Collision : premier plan flou, agrandi et translucide, spectateurs fantômes | Plus rien n'est dessiné à demi transparent : un objet trop grossi est omis (et non estompé), le voile blanc de l'impact est réduit à un bref éclaircissement, les barrières basses ne sont plus dessinées au-delà de trois fois leur taille d'encrage contre la caméra |
+| 3 | Moyen | Étoile d'impact floue à côté de l'éclat net | Étincelles plafonnées en taille et jamais contre l'objectif ; éclats opaques qui sortent en rétrécissant |
+| 4 | Moyen | Forme translucide illisible (fumée) sur une voiture | Fumée toujours opaque : elle gonfle, rétrécit, n'est pas dessinée contre la caméra |
+| 5 | Moyen | Deux régimes d'encrage (voiture du joueur fine, autres voitures empâtées) | Trait des voitures en course ramené de 2,1 à 1,7 cm. L'écart de netteté entre le cockpit (dessiné à sa taille) et les voitures proches (dessins agrandis) demeure |
+| 6 | Moyen | Voitures proches : grands aplats vides, aucun numéro ni marquage | **Non traité** : les dessins de voitures sont partagés par toutes les écuries ; les numéros n'apparaissent que sur les illustrations |
+| 7 | Moyen | Cockpit : moyeu en « boîte », triangles sans rotules, entailles sur les tubes | Tubes sans entailles (recouvrement des tronçons), rotules aux extrémités, étrier de frein rouge plus petit |
+| 8 | Moyen | Vue extérieure : bras de suspension non raccordés | Rotules aux extrémités des bras (mêmes dessins) ; raccord à la coque inchangé |
+| 9 | Moyen | Pilote réduit à un casque sur une collerette | Épaules agrandies. Ni bras ni volant sur les vues extérieures |
+| 10 | Moyen | Illustrations de menu en retrait par rapport au jeu | **Non traité** |
+| 11 | Moyen | Onomatopée de moteur petite, sans source, chevauchant un panneau | Plus grande, placée bas à gauche près de la voiture, entrée et sortie par changement de taille. Lettrage identique à chaque fois |
+| 12 | Moyen | Vitesse peu lisible en image fixe | Traits de vitesse au sol plus nombreux et plus proches de la route à haute vitesse. Les décors restent nets (pas de flou de mouvement, par choix de style) |
+| 13 | Moyen | Rétroviseurs sur de longs piquets, reflets sans décor | Supports passés derrière les roues (seul un court tronçon dépasse) ; reflets avec barrières et voitures plus grandes |
+| 14 | Moyen | Buisson qui tranche la glissière | **Non traité** |
+| 15 | Moyen | Masse d'arbres coupée à la verticale, grillage qui se dissout | **Non traité** (fin de bande de forêt sans transition) |
+| 16 | Moyen | Ombres de l'herbe en bandes horizontales | Bandes de tonte désormais parallèles à la piste (elles fuient avec elle) |
+| 17 | Moyen | Volumes gris vides (pignons, panneaux) | Pignons avec fenêtres et porte |
+| 18 | Mineur | Compte-tours : lettrage flou, aiguille sur un chiffre | Non traité |
+| 19 | Mineur | Mur de pneus presque figé d'une image à l'autre | Non traité (motif répété dont le pas est proche de l'avance par image à cette vitesse) |
+| 20 | Mineur | Liserés lointains hachés | Non traité |
+| 21 | Mineur | Écran partagé : compte-tours minuscule | Non traité |
+| 22 | Mineur | Voitures lointaines pixellisées | Non traité |
+| 23 | Mineur | Pouce du gant détaché | Non traité |
+| 24 | Mineur | Désert : arrière-plan clairsemé | Non traité |
+
+## Itération 3
+
+Captures : `work/renders/review-3/` (après les corrections de l'itération 2).
+Rapport : `work/reviews/review-3.md` — **2 graves, 16 moyens, 10 mineurs**.
+Notes : dessin 3,5 ; précision mécanique 2,5 ; encrage 3 ; colorisation 4 ; perspective 3,5 ;
+cohérence 3 ; lisibilité 4 ; vitesse 3 ; animation 4 ; continuité des formes 2,5 ;
+scintillement 3,5 ; déformations 3,5 ; arrière-plans 4.
+
+Ce troisième critique ne relève plus les défauts graves de l'itération 2 (marques au sol,
+translucidités). Ses deux défauts graves sont de nouveau liés à des corrections précédentes :
+la coupe du mur de pneus vient de la règle « ne pas dessiner une barrière trop grossie »
+(itération 2), le bandeau d'horizon vient de la page de circuit illustrée (itération 1).
+
+| N° | Gravité | Défaut relevé | Suite donnée |
+|---|---|---|---|
+| 1 | Grave | Mur de pneus au contact : coupe verticale, pneus étirés et flous | La coupe est supprimée. À la place, l'œil du pilote garde 2,3 m de distance latérale avec une barrière (la voiture, elle, la touche toujours) et les barrières sont dessinées à définition triple |
+| 2 | Grave | Bandeau d'horizon du plan de circuit : rectangle collé, coutures, coupe nette | Panorama peint à sa taille d'origine, juxtaposé sur toute la largeur, sans la brume située sous l'horizon ; la vue du site et le plan sont deux registres séparés par une gouttière |
+| 3 | Moyen | Vibreurs coupés à l'horizontale | Les vibreurs s'effilent en pointe à leurs extrémités. Les bandes restent perpendiculaires à la piste |
+| 4 | Moyen | Poignets tranchés par deux verticales | Avant-bras redessinés à l'intérieur de la largeur du dessin (c'était son bord qui les coupait) |
+| 5 | Moyen | Rétroviseurs sur des tiges derrière les roues, différents de la vue extérieure | **Non traité** : la position des rétroviseurs dans la vue cockpit est une convention de lisibilité, pas la géométrie de la voiture |
+| 6 | Moyen | Étriers en brique rouge, intérieur de roue griffonné | Étrier réduit, en métal ; fentes du disque moins nombreuses et plus courtes |
+| 7 | Moyen | Voiture vedette (vue extérieure, menu) : aspect de maquette 3D filtrée | **Non traité** (casque sphérique, buste sans bras, contour du capot au menu) |
+| 8 | Moyen | Concurrents simplifiés : jantes pleines, aucun marquage | Jantes en rotation avec moyeu, voile et rebord distincts. Toujours **ni numéro ni marquage** sur les voitures en course |
+| 9 | Moyen | Décors proches, voitures à mi-distance et reflets plus mous que le cockpit | **Non traité** : limite de la technique (dessins stockés en images, agrandis ou réduits) |
+| 10 | Moyen | Bords de piste lointains en escalier, changeant d'une image à l'autre | **Non traité** : la route est calculée ligne par ligne, sans lissage vertical |
+| 11 | Moyen | Buisson dessiné par-dessus le rail | Chaque objet est désormais dessiné juste avant la première bande située plus près de la route que lui |
+| 12 | Moyen | Bâtiment frontal collé à une tribune en perspective | Pignons moins profonds, fenêtres réservées aux bâtiments ; ils restent des aplats vus de face |
+| 13 | Moyen | Lettres de l'interface qui se chevauchent | Approches élargies, davantage pour I, L, T et 1 |
+| 14 | Moyen | Onomatopée unique posée comme une étiquette | Trois graphies et couleurs, côté gauche ou droit, placée hors des rétroviseurs selon la forme de la vue, entrée en grossissant |
+| 15 | Moyen | Vitesse peu marquée en image fixe | **Non traité** au-delà des traits au sol (pas de flou des décors, par choix de style) |
+| 16 | Moyen | Cases du menu : fonds vides, même dessin répété | **Non traité** |
+| 17 | Moyen | Plan de circuit : arbres en billes brillantes, plan et élévation mêlés | Bosquets en aplats encrés vus du dessus ; deux registres séparés (voir n° 2) |
+| 18 | Moyen | Forêt et grillage terminés par une verticale | **Non traité** |
+| 19–28 | Mineur | Panneaux au texte inversé, cartouche de vitesse, reflets simplifiés, raccord rail/pneus, zone claire de l'asphalte, rectangle pâle en écran partagé, stries des tubes, apparition de l'onomatopée, spectateurs sans visage, sapin répété | Apparition de l'onomatopée traitée (n° 14) ; le reste non traité |

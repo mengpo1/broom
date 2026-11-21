@@ -32,9 +32,9 @@ export const SCENERY_SPECS = [
   { id: 'building.container', variants: 2, kind: 'prop', w: 416, h: 176, worldW: 13, worldH: 5.5 },
   { id: 'building.warehouse', variants: 1, kind: 'prop', w: 640, h: 216, worldW: 30, worldH: 10 },
   // ---- strips along the road (density: 2 = drawn at twice the pixel size, for what is seen from very close)
-  { id: 'strip.armco', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 2 },
-  { id: 'strip.concrete', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 2 },
-  { id: 'strip.tyres', kind: 'strip', w: 512, h: 120, tile: 2, worldH: 1.15, density: 2 },
+  { id: 'strip.armco', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 3 },
+  { id: 'strip.concrete', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 3 },
+  { id: 'strip.tyres', kind: 'strip', w: 512, h: 120, tile: 2, worldH: 1.15, density: 3 },
   { id: 'strip.fence', kind: 'strip', w: 384, h: 264, tile: 2, worldH: 3.4 },
   { id: 'strip.pitwall', kind: 'strip', w: 640, h: 160, tile: 4, worldH: 2.5, density: 2 },
   { id: 'strip.pitbuilding', kind: 'strip', w: 768, h: 552, tile: 5, worldH: 9 },

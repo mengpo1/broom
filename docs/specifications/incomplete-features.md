@@ -67,9 +67,46 @@ par le rasteriseur logiciel SwiftShader).
   WebGPU crée elle-même quelques objets par image (texture courante, vue, encodeur, passe).
 - **Vidéo de démonstration** : produite image par image (rejeu déterministe, rendu logiciel),
   et non par capture d'écran en temps réel ; la bande-son est rendue hors ligne par le moteur
-  audio du jeu.
+  audio du jeu (voir aussi § 5).
 
-## 4. Revue artistique
+## 4. Revue artistique : objectif non atteint
 
-Voir `docs/art-direction/independent-review.md` pour les défauts relevés par les critiques
-indépendants, ceux qui ont été corrigés et ceux qui subsistent.
+La demande était d'itérer jusqu'à ce qu'aucun défaut ne dépasse le niveau « mineur ». **Ce
+n'est pas le cas.** Trois critiques indépendants successifs (voir
+`docs/art-direction/independent-review.md`) ont relevé :
+
+| Itération | Graves | Moyens | Mineurs |
+|---|---|---|---|
+| 1 | 5 | 15 | 9 |
+| 2 | 2 | 15 | 7 |
+| 3 | 2 | 16 | 10 |
+
+Les défauts graves de chaque itération ont été corrigés avant la suivante, mais chaque
+nouveau critique, qui ne connaît pas les rapports précédents, en a trouvé d'autres — dont deux
+fois des effets de bord de mes propres corrections. Les corrections apportées après le
+troisième rapport (mur au contact, page de circuit, poignets, lettrage, ordre des objets,
+onomatopées) ont été vérifiées par moi sur captures, **pas par un quatrième critique**, sauf
+mention contraire dans le document de revue.
+
+Défauts connus qui subsistent, par ordre d'importance :
+
+- les voitures en course n'ont ni numéro ni marquage, et les voitures vues de près restent des
+  dessins agrandis, moins nets que le cockpit ;
+- la voiture vedette des menus et de la vue extérieure garde un aspect de volume (casque
+  sphérique, pilote sans bras), les fonds de menu sont pauvres ;
+- les bords de piste lointains sont crénelés et leur motif change d'une image à l'autre (la
+  route est calculée ligne par ligne) ;
+- les rétroviseurs de la vue cockpit ne sont pas fixés comme sur la vue extérieure ;
+- les lisières de forêt et les fins de grillage sont des coupes nettes ; les panneaux d'un
+  côté de la piste ont leur texte inversé ;
+- la vitesse repose sur les traits au sol, les stries des pneus et le défilement : en image
+  fixe elle reste peu marquée.
+
+## 5. Vidéo de démonstration
+
+`race-replay.mp4` a été enregistrée image par image (rejeu déterministe, rendu logiciel) sur le
+build du commit `42afaf7`, c'est-à-dire **avant** les corrections qui ont suivi le troisième
+rapport de critique. Ces corrections ne concernent pas une course normale (mur au contact,
+pages de menu, onomatopées variées, avant-bras, lettrage de l'interface) à l'exception de
+l'espacement des lettres de l'interface et des avant-bras du pilote, visibles dans la vidéo
+dans leur état antérieur. La vidéo est réencodée à 5,5 Mbit/s pour tenir dans le dépôt.

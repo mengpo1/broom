@@ -74,6 +74,7 @@ const VIEW_CONFIG = {
   hfovWide: 1.6,             // field of view of a short, very wide view: the cockpit then fits in its height
   cockpitScaleWide: 0.8,     // extra reduction of the cockpit drawing in a short view
   cockpitScaleTall: 0.84,    // and in a narrow view, so that both mirrors stay inside the frame
+  wallClearance: 2.3,        // least lateral distance (m) between the cockpit camera and a barrier
   cockpitDepth: 821,         // how far below the horizon the cockpit drawing reaches in the reference composition (its own units)
   eyeHeight: 0.95,           // driver's eye above the road (same as CAR_DIMENSIONS.eye in the car drawing)
   eyeForward: -0.35,         // eye position along the car, relative to its centre
@@ -333,6 +334,7 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
   let right = d > 0.0;
   let ad = abs(d);
   let kerb = select(aa.x, aa.y, right);
+  let kwEnd = kw * smoothstep(0.0, 1.0, kerb);        // a kerb narrows to a point at its ends instead of stopping square
   let barrier = select(aa.z, aa.w, right);
   let verge = select(b0.x, b0.y, right);
   var sRel = s; if (sRel > len * 0.5) { sRel = sRel - len; }
@@ -384,7 +386,7 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     // edge paint and ink contour
     c = mix(c, col(C_PAINT), aaband(hw - 0.42, hw - 0.2, ad, mpp) * 0.95);
     c = mix(c, ink, (1.0 - aastep(inkW, hw - ad, mpp)) * inkA * 0.9);
-  } else if (kerb > 0.5 && ad <= hw + kw) {
+  } else if (kerb > 0.02 && ad <= hw + kwEnd) {
     // ---------------------------------------------------------------- kerb
     let period = 5.0;
     let ph = fract(s / period);
@@ -416,7 +418,7 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     c = mix(c, ink, (1.0 - aastep(inkW, ad - hw, mpp)) * inkA * 0.9);
   } else if (ad < barrier) {
     // ---------------------------------------------------------------- verge
-    let vEdge = hw + select(0.0, kw, kerb > 0.5);
+    let vEdge = hw + kwEnd;
     let gravel = verge > 0.5 && verge < 1.5 && ad > hw + 3.0;
     if (gravel) {
       c = col(C_GRAVEL_A);
@@ -1425,6 +1427,11 @@ class RaceView {
     let dir = 1, yawTarget = he * cfg.yawFollow, eye = cfg.eyeHeight, camS = carS + cfg.eyeForward, camD = carD;
 
     if (this.camera === CAMERA.COCKPIT) {
+      // right against a barrier the drawing of the wall would fill the picture, blown up: the
+      // eye stays a little way off it (the car itself goes on touching the wall)
+      const i = Math.floor(mod(carS, track.length) / track.ds) % track.n;
+      const lo = -track.barrierL[i] + cfg.wallClearance, hi = track.barrierR[i] - cfg.wallClearance;
+      if (lo < hi) camD = clamp(camD, lo, hi);
       if (Math.abs(he) > 1.75) { dir = -1; yawTarget = wrapAngle(he - Math.PI) * cfg.yawFollow; }
       else if (Math.abs(he) > 1.0) yawTarget = Math.sign(he) * (1.0 * cfg.yawFollow + (Math.abs(he) - 1.0) * 0.3);
     } else if (this.camera === CAMERA.CHASE) {
@@ -6529,12 +6536,12 @@ class SceneBuilder {
     for (const strip of layout.strips) {
       strip.sprite = this.art.sprite(strip.id);
       // buildings along the road are volumes: the end of a run shows a gable of this depth (m)
-      strip.gable = /grandstand/.test(strip.id) ? 16 : /pitbuilding|facade/.test(strip.id) ? 12 : /crowdbank/.test(strip.id) ? 9 : 0;
+      strip.gable = /grandstand/.test(strip.id) ? 7 : /pitbuilding|facade/.test(strip.id) ? 10 : /crowdbank/.test(strip.id) ? 5 : 0;
+      strip.gableWindows = /pitbuilding|facade/.test(strip.id);
     }
     this.gableWall = hexToRgb(palette.concrete); this.gableTop = hexToRgb(palette.metalShade); this.gableGlass = hexToRgb(palette.glassShade); this.inkColor = hexToRgb(palette.ink);
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
-      prop.behind = false;
       prop.lights = prop.id === 'gantry.start';
     }
     // order the strips of every sample from the farthest from the road to the nearest
@@ -6542,16 +6549,16 @@ class SceneBuilder {
     for (let i = 0; i < track.n; i++) {
       const list = layout.stripsAt[i];
       list.sort((a, b) => dist(layout.strips[b], i) - dist(layout.strips[a], i));
-      // objects standing behind a tall strip are drawn before it
-      let tallL = 1e9, tallR = 1e9;
-      for (const index of list) {
-        const s = layout.strips[index];
-        if (s.height < 4 || s.absolute) continue;
-        if (s.side > 0) tallR = Math.min(tallR, track.barrierR[i] + s.offset); else tallL = Math.min(tallL, track.barrierL[i] + s.offset);
-      }
+      // an object is drawn just before the first strip on its side that stands nearer to the road
+      // than itself (so a bush behind the guard rail stays behind it, a tree behind the stand too)
       for (let q = layout.propStart[i]; q < layout.propStart[i + 1]; q++) {
-        const prop = layout.props[q];
-        prop.behind = prop.d > 0 ? prop.d > tallR : -prop.d > tallL;
+        const prop = layout.props[q], side = prop.d > 0 ? 1 : -1;
+        const beyond = Math.abs(prop.d) - (side > 0 ? track.barrierR[i] : track.barrierL[i]);
+        prop.slot = list.length;
+        for (let k = 0; k < list.length; k++) {
+          const strip = layout.strips[list[k]];
+          if (strip.side === side && dist(strip, i) < beyond) { prop.slot = k; break; }
+        }
       }
     }
     if (this.effects) this.effects.reset(race, track, palette);
@@ -6613,11 +6620,11 @@ class SceneBuilder {
       const zNear = p.nodeZ[k], zFar = p.nodeZ[k + 1];
       const sample = p.segSample[k];
       const from = layout.propStart[sample], to = layout.propStart[sample + 1];
-      if (to > from) this.emitProps(quads, p, layout, from, to, true, dir, W, propReach, detail);
       const list = layout.stripsAt[sample];
       if (list.length) {
         const lodStep = dir > 0 ? (zNear > 700 ? 4 : zNear > 320 ? 2 : 1) : 1;
         for (let q = 0; q < list.length; q++) {
+          if (to > from) this.emitProps(quads, p, layout, from, to, q, dir, W, propReach, detail);
           const strip = layout.strips[list[q]];
           let step = lodStep < strip.tile ? lodStep : strip.tile;
           if (step > 1 && (sample % step !== 0 || k === 0)) { if (sample % step !== 0) continue; step = 1; }
@@ -6625,7 +6632,7 @@ class SceneBuilder {
           this.emitStrip(quads, p, track, strip, k, Math.min(k + step, nodeCount - 1), sample, W, H);
         }
       }
-      if (to > from) this.emitProps(quads, p, layout, from, to, false, dir, W, propReach, detail);
+      if (to > from) this.emitProps(quads, p, layout, from, to, list.length, dir, W, propReach, detail);
       for (let i = segHead[k]; i >= 0; i = carNext[i]) this.emitCar(quads, p, cars[i], i, yawAngle, W);
       if (this.effects) this.effects.buildSegment(app, view, k, zNear, zFar);
     }
@@ -6649,7 +6656,7 @@ class SceneBuilder {
     flat(xa, y - h, line, h, ink, 1); flat(xb - line, y - h, line, h, ink, 1);
     // two rows of windows and a service door, so that the wall reads as a building
     const gw = xb - xa, glass = this.gableGlass;
-    if (gw > 30) {
+    if (gw > 30 && strip.gableWindows) {
       for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) {
         const wx = xa + gw * (0.14 + col * 0.27), wy = y - h * (0.82 - row * 0.22), ww = gw * 0.18, wh = h * 0.12;
         flat(wx - line * 0.5, wy - line * 0.5, ww + line, wh + line, ink, 1);
@@ -6669,14 +6676,9 @@ class SceneBuilder {
     const dNear = side * (strip.absolute ? strip.offset : barrier[sampleNear] + strip.offset);
     const dFar = side * (strip.absolute ? strip.offset : barrier[sampleFar] + strip.offset);
     let zN, xN, yNb, yNt;
-    // the part of a strip right against the camera would be blown up far beyond the size it was
-    // inked at: it starts where it is at most three times that size
-    // (low barriers only, and never more than a few metres: a building must not lose its near end)
-    const zCrisp = strip.height <= 3.5 ? Math.min(4, (strip.height * p.focal) / (sp.h * 3)) : 0;
-    if (p.nodeZ[kFar] <= zCrisp) return;
-    const clipped = kNear === 0 || p.nodeZ[kNear] < zCrisp;
+    const clipped = kNear === 0;       // the first segment starts at the near plane, not at a node
     if (clipped) {
-      zN = Math.max(p.near, zCrisp);
+      zN = p.near;
       if (p.nodeZ[kFar] <= zN + 0.05) return;
       if (!projectAtDepth(p, zN, dNear, strip.base, pt)) return;
       xN = pt.x; yNb = pt.y; yNt = pt.y - strip.height * pt.scale;
@@ -6709,12 +6711,12 @@ class SceneBuilder {
       sp.u0 + du * uNear, sp.v0, sp.u0 + du * uFar, sp.v1, sp.layer, QUAD_MODE.SPRITE, 1, 1, 1, 1, zN);   // hidden by crests nearer than its near end (testing the middle would nibble its foot)
   }
 
-  emitProps(quads, p, layout, from, to, behind, dir, W, reachLimit, detail) {
+  emitProps(quads, p, layout, from, to, slot, dir, W, reachLimit, detail) {
     // inside a sample objects are stored by increasing s: walk them far to near
     const start = dir > 0 ? to - 1 : from, end = dir > 0 ? from - 1 : to, inc = dir > 0 ? -1 : 1;
     for (let q = start; q !== end; q += inc) {
       const prop = layout.props[q];
-      if (prop.behind !== behind) continue;
+      if (prop.slot !== slot) continue;
       const z = depthOf(p, prop.s);
       const reach = prop.reach < reachLimit ? prop.reach : reachLimit;
       if (z < 1.2 || z > reach * detail) continue;
@@ -7092,7 +7094,8 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePh
     const outer = sign === outerSign;
     // outer face: wheel nut, hub and the dish of the rim; inner face: upright, brake disc and the rim edge
     const rings = outer
-      ? [[0, ROLE.METAL], [0.045, ROLE.BLACK], [0.075, ROLE.RIM], [rimR * 0.8, ROLE.RIM], [rimR + 0.004, ROLE.METAL]]
+      ? (spin ? [[0, ROLE.METAL], [0.04, ROLE.BLACK], [0.07, ROLE.METAL], [rimR * 0.5, ROLE.RIM], [rimR * 0.82, ROLE.METAL], [rimR + 0.004, ROLE.METAL]]
+        : [[0, ROLE.METAL], [0.045, ROLE.BLACK], [0.075, ROLE.RIM], [rimR * 0.8, ROLE.RIM], [rimR + 0.004, ROLE.METAL]])
       : [[0, ROLE.BLACK], [0.05, ROLE.CARBON], [0.085, ROLE.METAL], [rimR * 0.76, ROLE.BLACK], [rimR + 0.004, ROLE.RIM]];
     const ridx = [];
     for (let r = 0; r < rings.length; r++) {
@@ -7110,7 +7113,7 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePh
     }
     if (!outer) {
       // brake: vent slots on the disc (they turn with the wheel) and the caliper gripping its rear edge
-      const slots = 12, turn = spin ? 0 : ((brakePhase || 0) / 3) * ((Math.PI * 2) / slots);
+      const slots = 8, turn = spin ? 0 : ((brakePhase || 0) / 3) * ((Math.PI * 2) / slots);
       if (spin || brakeBlur) {
         for (const [rr, from, to] of [[rimR * 0.34, 0.4, 2.2], [rimR * 0.5, 2.9, 4.9], [rimR * 0.64, 5.2, 7.0]]) {
           const pts = [];
@@ -7119,11 +7122,11 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePh
         }
       } else {
         for (let k = 0; k < slots; k++) {
-          const t = turn + (k / slots) * Math.PI * 2, r0 = rimR * 0.3, r1 = rimR * 0.7;
+          const t = turn + (k / slots) * Math.PI * 2, r0 = rimR * 0.46, r1 = rimR * 0.7;
           rim.lines.push({ pts: [[cx + r0 * Math.cos(t), y + sign * 0.004, cz + r0 * Math.sin(t)], [cx + r1 * Math.cos(t + 0.22), y + sign * 0.004, cz + r1 * Math.sin(t + 0.22)]], normal: [0, sign, 0], weight: 0.8, hex: '#59616d' });
         }
       }
-      box(rim, cx - rimR * 0.56, y + sign * 0.025, cz + rimR * 0.1, 0.07, 0.04, 0.16, ROLE.RED, 0, 0.1);        // caliper, painted red
+      box(rim, cx - rimR * 0.6, y + sign * 0.02, cz + rimR * 0.05, 0.055, 0.035, 0.13, ROLE.METAL, 0, 0.1);      // caliper: a small casting on the rear edge of the disc
     }
     if (outer) {
       // sidewall marking: a pale ring, as drawn on racing tyres
@@ -7958,9 +7961,9 @@ const SCENERY_SPECS = [
   { id: 'building.container', variants: 2, kind: 'prop', w: 416, h: 176, worldW: 13, worldH: 5.5 },
   { id: 'building.warehouse', variants: 1, kind: 'prop', w: 640, h: 216, worldW: 30, worldH: 10 },
   // ---- strips along the road (density: 2 = drawn at twice the pixel size, for what is seen from very close)
-  { id: 'strip.armco', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 2 },
-  { id: 'strip.concrete', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 2 },
-  { id: 'strip.tyres', kind: 'strip', w: 512, h: 120, tile: 2, worldH: 1.15, density: 2 },
+  { id: 'strip.armco', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 3 },
+  { id: 'strip.concrete', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 3 },
+  { id: 'strip.tyres', kind: 'strip', w: 512, h: 120, tile: 2, worldH: 1.15, density: 3 },
   { id: 'strip.fence', kind: 'strip', w: 384, h: 264, tile: 2, worldH: 3.4 },
   { id: 'strip.pitwall', kind: 'strip', w: 640, h: 160, tile: 4, worldH: 2.5, density: 2 },
   { id: 'strip.pitbuilding', kind: 'strip', w: 768, h: 552, tile: 5, worldH: 9 },
@@ -11722,7 +11725,7 @@ function paintHand(ctx, c, rimMid, a, S, glove, suit) {
   // ---- forearm: a sleeve that swells toward the elbow, running out of the lower corner of the drawing
   const side = ux < 0 ? -1 : 1;
   const wrist = P(-S * 0.1, S * 0.03);
-  const elbow = [c + side * S * 0.58, c + S * 1.27];
+  const elbow = [c + side * S * 0.35, c + S * 1.3];        // (kept inside the width of the drawing, or its edge would slice the arm)
   const ax = elbow[0] - wrist[0], ay = elbow[1] - wrist[1];
   const al = Math.hypot(ax, ay) || 1;
   const nx = -ay / al, ny = ax / al;                        // across the arm
@@ -12235,7 +12238,7 @@ class TextPainter {
       for (const ch of set.chars) {
         const code = ch.charCodeAt(0);
         // outlined lettering needs air between the characters, or their contours weld together
-        set.advance[code] = glyphAdvance(ch, set.style) + (key === 'o' && ch !== ' ' ? 0.09 : 0);
+        set.advance[code] = glyphAdvance(ch, set.style) + (ch === ' ' ? 0 : key === 'o' ? 0.09 : ch === 'I' || ch === 'L' || ch === 'T' || ch === '1' ? 0.07 : 0.035);
         if (ch !== ' ') set.sprites[code] = art.sprite(`glyph.${key}.${code}`);
       }
       // lowercase maps to capitals, unknown characters to '?'
@@ -12784,9 +12787,10 @@ const { drawText, measureText } = __modules["src/art/styles/lettering.js"];
 const { hexToRgb } = __modules["src/art/palettes/palettes.js"];
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8;
-const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH'];
+const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR'];
 const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6 };
-const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6'];
+const FLATOUT_WORDS = 3;        // the engine at full cry has several spellings
+const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6', '#ffd42a', '#f58a1f'];
 const FLATOUT_SPEED = 76;       // m/s: the engine at full cry gets its own lettering, now and then
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
@@ -12918,7 +12922,7 @@ class EffectsLayer {
     const list = this.pops[viewIndex];
     const p = list[this.popCursor[viewIndex]];
     this.popCursor[viewIndex] = (this.popCursor[viewIndex] + 1) % MAX_POPS;
-    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word === WORD.FLATOUT ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
+    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
     p.angle = (this.random() - 0.5) * 0.3;
   }
 
@@ -12976,7 +12980,10 @@ class EffectsLayer {
       const followed = cars[app.views[v].carIndex];
       const flat = !!followed && followed.speed > FLATOUT_SPEED && followed.throttle > 0.8;
       if (flat && !this.wasFlatOut[v] && this.roarClock[v] <= 0 && fx.onomatopoeia && this.popClock[v] > 1) {
-        this.pop(v, WORD.FLATOUT, 0.25, 0.6, 0.85, false);
+        // left or right of the car, clear of the mirrors and instruments whatever the shape of the view
+        const shape = app.views[v], right = this.random() < 0.5;
+        const y = shape.wide ? 0.27 : shape.tall ? 0.5 : 0.62;
+        this.pop(v, WORD.FLATOUT + Math.floor(this.random() * FLATOUT_WORDS) % FLATOUT_WORDS, right ? 0.72 : 0.28, y, shape.wide ? 0.6 : 0.7 + this.random() * 0.25, false);
         this.roarClock[v] = 16;
       }
       this.wasFlatOut[v] = flat;
@@ -13072,8 +13079,8 @@ class EffectsLayer {
     for (const p of this.pops[view.index]) {
       if (p.life <= 0) continue;
       const t = p.age / p.life;
-      const popIn = clamp(p.age / 0.07, 0, 1);
-      const scale = (0.55 + 0.45 * popIn + (p.burst ? t * 0.35 : Math.sin(p.age * 38) * 0.02)) * p.size * u;
+      const popIn = clamp(p.age / (p.burst ? 0.07 : 0.18), 0, 1);
+      const scale = ((p.burst ? 0.55 : 0.15) + (p.burst ? 0.45 : 0.85) * popIn + (p.burst ? t * 0.35 : Math.sin(p.age * 38) * 0.02)) * p.size * u;
       const alpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
       const cx = p.x * r.w, cy = p.y * r.h;
       if (p.burst) {
@@ -15520,13 +15527,25 @@ class PagePainter {
     sky.addColorStop(0, P.skyTop); sky.addColorStop(0.55, P.skyMid); sky.addColorStop(1, P.skyLow);
     ctx.fillStyle = sky; ctx.fillRect(0, 0, w, yH + 2);
     ctx.fillStyle = P.farGround; ctx.fillRect(0, yH, w, h - yH);
-    const sw = 2048, sh = 384, strip = makeCanvas(sw, sh), sctx = strip.getContext('2d');
-    const bandH = yH * 1.25 * zoom, k = bandH / sh, stripHorizon = backdropHorizon(sh) * k;
-    for (let layer = 0; layer < 3; layer++) {
-      sctx.clearRect(0, 0, sw, sh);
-      paintBackdropLayer(layer, sctx, sw, sh, P, theme.backdrop, seeded(hashString(`backdrop:${track.id}:${layer}`)), theme);
-      ctx.drawImage(strip, 0, 0, Math.min(sw, w / k), sh, 0, yH - stripHorizon, Math.min(sw, w / k) * k, bandH);
+    // the three panoramas of the race, painted once per circuit at their native size and kept:
+    // everything below their horizon line (haze meant to sink into the ground) is left out
+    const sw = 4096, sh = 768, stripHorizonPx = Math.floor(backdropHorizon(sh));
+    let strip = this.cache.get(`panorama:${track.id}`);
+    if (!strip) {
+      strip = makeCanvas(sw, stripHorizonPx);
+      const layer = makeCanvas(sw, sh), lctx = layer.getContext('2d'), sctx = strip.getContext('2d');
+      for (let index = 0; index < 3; index++) {
+        paintBackdropLayer(index, lctx, sw, sh, P, theme.backdrop, seeded(hashString(`backdrop:${track.id}:${index}`)), theme);
+        sctx.drawImage(layer, 0, 0, sw, stripHorizonPx, 0, 0, sw, stripHorizonPx);
+      }
+      // one circuit at a time: the panoramas and views of the previous one are dropped
+      for (const k of [...this.cache.keys()]) if ((k.startsWith('panorama:') || k.startsWith('vista:')) && !k.includes(`:${track.id}`)) this.cache.delete(k);
+      this.cache.set(`panorama:${track.id}`, strip);
     }
+    const bandH = yH * 1.25 * zoom, k = bandH / sh;
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    // the panorama repeats (it covers a third of a turn): laid side by side to the full width
+    for (let x = 0; x < w; x += sw * k - 1) ctx.drawImage(strip, 0, 0, sw, stripHorizonPx, x, yH - stripHorizonPx * k, sw * k, stripHorizonPx * k);
     this.cache.set(key, canvas);
     return canvas;
   }
@@ -15549,10 +15568,13 @@ class PagePainter {
     for (let n = 0; n < 150; n++) {
       const px = x - 40 * S + rnd() * (w + 80 * S), py = y - 20 * S + rnd() * (h + 60 * S), r = (9 + rnd() * 9) * S;
       if (near(px, py, 30 * S + r)) continue;
-      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
-      ctx.fillStyle = P.leafShade; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.2 * S; ctx.stroke();
-      ctx.beginPath(); ctx.arc(px - r * 0.22, py - r * 0.26, r * 0.62, 0, Math.PI * 2); ctx.fillStyle = rnd() < 0.5 ? P.leaf : P.pine; ctx.fill();
-      ctx.beginPath(); ctx.arc(px - r * 0.36, py - r * 0.4, r * 0.28, 0, Math.PI * 2); ctx.fillStyle = P.leafLight; ctx.fill();
+      // a clump seen from above: two or three overlapping flat discs under one contour
+      const dark = rnd() < 0.5;
+      const blobs = [[0, 0, r], [r * (0.5 + rnd() * 0.3), r * (rnd() - 0.5) * 0.8, r * (0.55 + rnd() * 0.25)], [-r * 0.4 * rnd(), r * (0.5 + rnd() * 0.3), r * (0.5 + rnd() * 0.2)]];
+      ctx.beginPath(); for (const [bx, by, br] of blobs) { ctx.moveTo(px + bx + br, py + by); ctx.arc(px + bx, py + by, br, 0, Math.PI * 2); }
+      ctx.strokeStyle = INK; ctx.lineWidth = 4 * S; ctx.stroke();
+      ctx.fillStyle = dark ? P.pine : P.leaf; ctx.fill();
+      ctx.beginPath(); ctx.arc(px + r * 0.2, py + r * 0.25, r * 0.5, 0, Math.PI * 2); ctx.fillStyle = dark ? P.pineShade : P.leafShade; ctx.fill();
     }
     // grandstand on one side of the start line, pit building on the other
     const sx = ox + track.x[0] * k, sy = oz + track.z[0] * k;
@@ -15607,8 +15629,13 @@ class PagePainter {
     if (model.track) {
       // an illustrated plan: the circuit laid on its ground, under the skyline of the place
       const tp = getPalette(model.track.theme);
-      ctx.drawImage(this.vista(model.track, leftW + 80 * S, H * 0.68, 0.2), m, m);
-      const mx = m + 70 * S, my = m + H * 0.68 * 0.25, mw = leftW - 200 * S, mh = H * 0.68 * 0.7 - m;
+      // two registers, as on a comic page: a strip showing the site, and below it the plan seen from above
+      const bandH = H * 0.68 * 0.24;
+      ctx.drawImage(this.vista(model.track, leftW + 80 * S, bandH, 0.72), m, m);
+      ctx.fillStyle = tp.farGround; ctx.fillRect(m, m + bandH, leftW + 80 * S, H * 0.68);
+      ctx.fillStyle = PAPER; ctx.fillRect(m, m + bandH - 5 * S, leftW + 80 * S, 10 * S);
+      ctx.fillStyle = INK; ctx.fillRect(m, m + bandH - 7.5 * S, leftW + 80 * S, 3.5 * S); ctx.fillRect(m, m + bandH + 4 * S, leftW + 80 * S, 3.5 * S);
+      const mx = m + 70 * S, my = m + bandH + 30 * S, mw = leftW - 200 * S, mh = H * 0.68 - bandH - m - 50 * S;
       this.mapScenery(model.track, mx, my, mw, mh, tp);
       this.trackMap(model.track, mx, my, mw, mh);
       drawText(ctx, model.track.name, m + 44 * S, m + 104 * S, 62 * S, { style: 'impact', color: '#ffd42a', outline: INK, outlineWidth: 9 * S, shadow: { dx: 6 * S, dy: 7 * S, color: INK }, seed: 2 });

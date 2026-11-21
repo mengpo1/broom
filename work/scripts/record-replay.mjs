@@ -6,7 +6,8 @@
 //
 // node work/scripts/record-replay.mjs [--width 2560] [--height 1440] [--seconds 60] [--from 0] [--to 3600]
 //                                     [--out race-replay.mp4] [--segment work/renders/sequence/seg.mp4] [--audio-only] [--no-audio]
-// Long recordings can be split with --from/--to into segments, then joined with --join a.mp4,b.mp4,...
+// Long recordings can be split with --from/--to into segments, then joined with
+//   --join a.mp4,b.mp4 --audio work/renders/sequence/audio.wav --bitrate 5500k --out race-replay.mp4
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { openGame, root } from './lib-browser.mjs';
@@ -25,8 +26,12 @@ if (arg('join', '')) {
   writeFileSync(list, parts.map((p) => `file '${root}/${p}'`).join('\n'));
   const audio = arg('audio', '');
   const args = ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list];
-  if (audio && existsSync(`${root}/${audio}`)) args.push('-i', `${root}/${audio}`, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest');
-  else args.push('-c', 'copy');
+  // --bitrate 5500k re-encodes the joined picture at that rate (the segments are near-lossless and
+  // far too heavy for a repository); without it the segments are copied as they are
+  const bitrate = arg('bitrate', '');
+  const video = bitrate ? ['-c:v', 'libx264', '-preset', 'slow', '-b:v', bitrate, '-maxrate', `${Math.round(parseFloat(bitrate) * 1.6)}k`, '-bufsize', `${Math.round(parseFloat(bitrate) * 3)}k`, '-pix_fmt', 'yuv420p', '-r', '60'] : ['-c:v', 'copy'];
+  if (audio && existsSync(`${root}/${audio}`)) args.push('-i', `${root}/${audio}`, ...video, '-c:a', 'aac', '-b:a', '192k', '-shortest');
+  else args.push(...video);
   args.push('-movflags', '+faststart', `${root}/${out}`);
   execFileSync('ffmpeg', args, { stdio: 'inherit' });
   console.log('joined', parts.length, 'segments ->', out);
