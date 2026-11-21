@@ -92,13 +92,14 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
           const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
           startAirborne(follower, T.flightTimeCar, T.hardAfterCar, emit, leader.index, side);
           countContact(follower, leader, time, emit, closing);
+          contactDamage(follower, leader, closing, rules);
           return true;
         }
-        rearContact(follower, leader, closing, time, emit);
+        rearContact(follower, leader, closing, rules, time, emit);
         return true;
       }
     } else {
-      sideContact(a, b, nx, nz, time, emit);
+      sideContact(a, b, nx, nz, rules, time, emit);
       return true;
     }
   }
@@ -121,10 +122,7 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
   if (time - a.lastContactTime > 0.4) { a.contacts++; if (emit) emit('contact', a.index, impact, b.index); }
   if (time - b.lastContactTime > 0.4) b.contacts++;
   a.lastContactTime = time; b.lastContactTime = time;
-  if (rules.damage) {
-    const dmg = Math.max(0, impact - 3) * 0.008;
-    a.damage = Math.min(1, a.damage + dmg); b.damage = Math.min(1, b.damage + dmg);
-  }
+  contactDamage(a, b, impact, rules);
   if (rules.crashes !== false) {
     const limit = Math.min(pa.profile.carCrashImpact, pb.profile.carCrashImpact);
     if (impact > limit) {
@@ -136,6 +134,13 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
     }
   }
   return true;
+}
+
+/** Damage rule (competition): both cars are damaged according to the speed at which they met, whatever the kind of contact. */
+function contactDamage(a, b, impact, rules) {
+  if (!rules.damage) return;
+  const dmg = Math.max(0, impact - 3) * 0.008;
+  a.damage = Math.min(1, a.damage + dmg); b.damage = Math.min(1, b.damage + dmg);
 }
 
 function countContact(a, b, time, emit, impact) {
@@ -169,11 +174,12 @@ function penalise(car, losses, ceiling) {
  * Nose-to-tail contact. The follower loses a fixed amount of speed (and never stays faster than
  * the car it hit); the leader is nudged forward. No change of direction for either.
  */
-function rearContact(follower, leader, closing, time, emit) {
+function rearContact(follower, leader, closing, rules, time, emit) {
   const T = COLLISION_TUNING;
   const lost = penalise(follower, 1, Math.max(T.penaltyFloorSpeed, leader.speed - T.leaderMargin));
   if (lost > 0.5 && follower.bumpClock === follower.clock) {
     leader.speed += T.leaderPush;
+    contactDamage(follower, leader, closing, rules);
     if (emit) emit(CONTACT.REAR_BUMP, follower.index, lost, leader.index);
   }
   follower.yawRate *= 0.5;
@@ -184,10 +190,13 @@ function rearContact(follower, leader, closing, time, emit) {
  * Side-by-side contact (wheel against wheel on open-wheel cars). The faster car pays, both are
  * pushed apart sideways, neither is turned.
  */
-function sideContact(a, b, nx, nz, time, emit) {
+function sideContact(a, b, nx, nz, rules, time, emit) {
   const T = COLLISION_TUNING;
+  worldVelocity(a, va); worldVelocity(b, vb);
+  const closing = Math.max(0, -((vb[0] - va[0]) * nx + (vb[1] - va[1]) * nz));       // speed at which the cars came together sideways
   const faster = a.speed >= b.speed ? a : b, other = faster === a ? b : a;
   const lost = penalise(faster, T.sideContactLosses, faster.speed);
+  if (lost > 0.5) contactDamage(a, b, closing, rules);
   // the car that was hit is not made to pay in turn while the two are still side by side
   if (lost > 0.5) other.lastPenaltyClock = other.clock;
   // lateral axis of a car is (-sin h, cos h); the normal (nx, nz) points from a to b

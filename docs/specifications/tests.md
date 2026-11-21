@@ -8,12 +8,12 @@ l'image, pas la vitesse.
 
 ## 0. Dernière exécution complète
 
-Sur le build final (`index.html`, 1 024 712 octets), le 21 novembre 2026, après le travail
+Sur le build final (`index.html`, 1 025 302 octets), le 21 novembre 2026, après le travail
 sur les collisions :
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Simulation et logique | `npm test` | 70 / 70 |
+| Simulation et logique | `npm test` | 71 / 71 |
 | Navigateur (WebGPU) | `node tests/rendering/smoke.browser.mjs` | 13 / 13 |
 | Modes de jeu de bout en bout | `node work/scripts/flow-check.mjs` | réussi (5 parcours) |
 | Pages, pause, caméras, souris | `node work/scripts/pages-check.mjs` | 14 / 14 |
@@ -24,9 +24,9 @@ Le test navigateur a d'abord donné 12 / 13 : son point de contrôle « pneu ava
 route » tombait sur le rétroviseur, déplacé par ce travail. Le point a été replacé sur la
 bande de roulement ; l'image elle-même était correcte.
 
-## 1. Tests de simulation et de logique (Node) — 70 / 70 réussis
+## 1. Tests de simulation et de logique (Node) — 71 / 71 réussis
 
-Dernière exécution : `npm test` → 70 tests, 70 réussis, 0 échec (environ 8 s).
+Dernière exécution : `npm test` → 71 tests, 71 réussis, 0 échec (environ 8 s).
 
 ### Conduite — `tests/unit/physics.test.mjs`
 
@@ -77,6 +77,7 @@ mesures de la vidéo sont approximatives). Détail : `collisions.md`.
 - ✅ E4 rear-end bump at a higher closing speed: the follower is brought down to the speed of the car ahead
 - ✅ repeated bumps: each new contact costs again, but never more often than the cooldown
 - ✅ E2 wheel-to-wheel side contact: about 90 km/h lost by the faster car, no swerve, a spark between the wheels
+- ✅ damage rule (competition): a bump or a launch damages both cars as any contact did; no damage in arcade rules
 - ✅ simple contact: cars crossing at an angle exchange an impulse, without fixed penalty
 - ✅ contact dive of the view: 5 to 8 % of the view height, over in 0.4 s, driven by the car clock
 - ✅ roadside boards: solid objects on the verge, never on the asphalt, the same for the race and the scenery
@@ -217,6 +218,10 @@ identiques avant et après ce travail (`work/benchmarks/driving-report-before.js
 - Séquences enregistrées : l'explosion puis l'étincelle de contact du joueur étaient
   dessinées dans le monde, donc cachées par le cockpit ou hors du champ : elles sont
   maintenant posées sur le dessin du cockpit (roue avant touchée, pointe du nez).
+- Relecture : en mode compétition, la règle des dégâts ne s'appliquait plus aux tamponnages
+  ni aux contacts de décollage (seulement aux contacts simples) : rétablie à la même échelle,
+  test ajouté. Sur trois courses en règles de compétition, le total des dégâts du peloton
+  reste du même ordre qu'avant (0,89 / 2,32 / 1,11 contre 1,12 / 0,88 / 1,11), sans abandon.
 - Roues avant : au-delà de 61 km/h le pneu était un dessin fixe (0 % de pixels changeant
   d'une image à l'autre à 120 km/h) : corrigé, mesure dans `wheels-and-mirrors.md`.
 

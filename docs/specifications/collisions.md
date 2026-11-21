@@ -45,7 +45,12 @@ Règles communes :
   conception ; la vidéo ne montre que le joueur être pénalisé. À 1, tout le monde est traité
   de la même façon ;
 - en vol : la voiture suit sa vitesse, perd 50 km/h par seconde, ne se dirige plus ; elle reste
-  entre les barrières.
+  entre les barrières ;
+- règle des dégâts (mode compétition) : un tamponnage, un contact de roues ou un contact qui
+  fait décoller abîment les deux voitures selon la vitesse à laquelle elles se sont
+  rencontrées, à la même échelle que les contacts simples (`(vitesse − 3 m/s) × 0,008`).
+  L'atterrissage, l'explosion et les panneaux n'ajoutent rien : c'est un choix de conception
+  (la voiture repart intacte, comme dans la référence).
 
 ## 3. Mise en scène
 
@@ -139,6 +144,9 @@ Scénarios rejoués dans la simulation par `node work/scripts/collision-comparis
   se repoussent plus par impulsion ; un tête-à-queue avec remise en piste sur une des trois
   courses ; aucun décollage entre voitures de l'ordinateur. Trois courses ne font pas une
   statistique : c'est un contrôle de non-perturbation, pas une mesure d'équilibrage.
+- **Une voiture accidentée est traversée** par celles qui suivent (elle ne peut pas être
+  heurtée) : visible à la fin de `E3x.mp4`. Vue du cockpit pendant le piqué, la voiture qui
+  repasse apparaît en haut de l'image, dessinée de dos et non de dessus (`E3.mp4`, vers 2,8 s).
 - **Ombre de la voiture en vol** : elle fait partie du dessin de la voiture et monte avec elle.
 - **Voitures vues de l'extérieur pendant un vol** : elles sont soulevées, pas cabrées.
 - **Son** : les nouveaux événements réutilisent les sons d'impact et d'accident existants ;

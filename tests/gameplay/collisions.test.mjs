@@ -72,6 +72,31 @@ test('E2 wheel-to-wheel side contact: about 90 km/h lost by the faster car, no s
   assert.equal(log.events.filter((e) => e.type === 'wheel').length, 1, 'rubbing does not repeat the penalty at once');
 });
 
+test('damage rule (competition): a bump or a launch damages both cars as any contact did; no damage in arcade rules', () => {
+  // same scale as the simple contacts: (closing speed - 3 m/s) x 0.008 for each car
+  const racing = twoCars(track, { gap: 0.8, lateral: 0, speedA: 150 / KMH, speedB: 100 / KMH, rules: RULE_PRESETS.racing });
+  const log = run(racing.race, 0.6, { throttleA: 0.3, throttleB: 0.35 });
+  const bump = log.events.find((e) => e.type === 'bump');
+  assert.ok(bump, 'bump under competition rules');
+  const closing = (log.atEvent(bump).a.speed - log.atEvent(bump).b.speed);
+  const expected = (closing - 3) * 0.008;
+  assert.ok(expected > 0.05, `closing speed ${closing.toFixed(1)} m/s`);
+  assert.ok(Math.abs(racing.a.damage - expected) < 0.02 && Math.abs(racing.b.damage - expected) < 0.02, `damage ${racing.a.damage.toFixed(3)} / ${racing.b.damage.toFixed(3)} for ${expected.toFixed(3)} expected`);
+  // pushing on does not add damage tick after tick: only the contacts that cost speed do
+  const before = racing.a.damage;
+  run(racing.race, 0.5, { throttleA: 1, throttleB: 0.35 });
+  assert.equal(racing.a.damage, before, 'no damage while held behind the car ahead');
+  // wheel over wheel at speed: the launch contact counts too
+  const flight = twoCars(track, { gap: 2, lateral: 0.95, speedA: 262 / KMH, speedB: 188 / KMH, rules: RULE_PRESETS.racing });
+  const flightLog = run(flight.race, 0.5, { throttleA: 0.6, throttleB: 0.6 });
+  assert.ok(flightLog.events.some((e) => e.type === 'launch'), 'launch under competition rules');
+  assert.ok(flight.a.damage > 0.08 && flight.b.damage > 0.08, `launch damage ${flight.a.damage.toFixed(3)} / ${flight.b.damage.toFixed(3)}`);
+  // arcade rules: never any damage
+  const arcade = twoCars(track, { gap: 0.8, lateral: 0, speedA: 150 / KMH, speedB: 100 / KMH });
+  run(arcade.race, 0.6, { throttleA: 0.3, throttleB: 0.35 });
+  assert.equal(arcade.a.damage, 0); assert.equal(arcade.b.damage, 0);
+});
+
 test('simple contact: cars crossing at an angle exchange an impulse, without fixed penalty', () => {
   // car A cuts across toward car B (whichever sign of heading does that on this track)
   let setup = null, log = null;
