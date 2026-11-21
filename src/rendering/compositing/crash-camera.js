@@ -76,6 +76,30 @@ export function crashPitchDuration(hard) {
     : C.groundHoldLight + C.reboundLight + C.dipInLight + C.dipHoldLight + C.recoverLight;
 }
 
+/**
+ * Attitude of a car in an accident, for the cameras that see it from outside: the same script as
+ * the pitch of its driver's view, as angles. `out` receives pitch (radians, positive = nose up),
+ * roll (radians, positive = right side up: the side that rode over the other car lifts) and
+ * squash (1 = none; below 1 the car is flattened for an instant when it hits the ground).
+ */
+export const FLIGHT_ATTITUDE = { pitchPerView: 0.4, roll: 0.2, squashHard: 0.24, squashLight: 0.12, squashTime: 0.16 };
+export function flightAttitude(car, out) {
+  const A = FLIGHT_ATTITUDE;
+  out.pitch = 0; out.roll = 0; out.squash = 1;
+  if (car.state === AIRBORNE) {
+    const u = car.airDuration > 0 ? Math.min(1, car.airTime / car.airDuration) : 1;
+    out.pitch = -crashPitch(car) * A.pitchPerView;
+    out.roll = (car.launchSide || 0) * A.roll * Math.sin(Math.PI * u);
+    return out;
+  }
+  const t = car.clock - car.landClock;
+  if (car.landClock < 0 || t < 0 || t >= A.squashTime) return out;
+  const k = 1 - t / A.squashTime;
+  out.pitch = -CRASH_CAMERA.noseDown * A.pitchPerView * k;          // it lands on its nose, then settles
+  out.squash = 1 - (car.landHard ? A.squashHard : A.squashLight) * k;
+  return out;
+}
+
 /** Vertical trembling of the view while the car slides out of control (fraction of the view height). */
 export function slideTremble(car) {
   if (car.state !== SPIN || Math.abs(car.speed) < 5) return 0;

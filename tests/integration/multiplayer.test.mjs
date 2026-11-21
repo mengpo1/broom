@@ -72,8 +72,8 @@ test('players collide with each other', () => {
   }
   assert.ok(contact, 'contact event between the two players');
   assert.ok(a.contacts > 0 && b.contacts > 0);
-  // arcade contact model: the car that runs into the other pays, the car in front is nudged forward, not shoved
-  assert.ok(leaderAfter > leaderBefore && leaderAfter < leaderBefore + 2, `the car in front was nudged forward (${leaderBefore.toFixed(2)} -> ${leaderAfter.toFixed(2)} m/s)`);
+  // arcade contact model: the car that runs into the other pays, the car in front is not shoved
+  assert.ok(Math.abs(leaderAfter - leaderBefore) < 0.3, `the car in front keeps its speed (${leaderBefore.toFixed(2)} -> ${leaderAfter.toFixed(2)} m/s)`);
   assert.ok(followerAfter < leaderAfter && a.state !== CAR_STATE.RESET, `the car behind was slowed below the one it hit (${followerAfter.toFixed(2)} m/s)`);
 });
 

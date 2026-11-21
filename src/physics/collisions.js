@@ -39,6 +39,7 @@ export function resolveCarContacts(cars, rules, time, emit) {
   const n = cars.length;
   for (let i = 0; i < n; i++) {
     const a = cars[i];
+    if (a.state === CAR_STATE.AIRBORNE && a.launchOther >= 0) holdFlightBehind(a, cars);
     if (!collidable(a)) continue;
     for (let j = i + 1; j < n; j++) {
       const b = cars[j];
@@ -150,8 +151,8 @@ function countContact(a, b, time, emit, impact) {
 }
 
 /**
- * Speed penalty of the car that ran into another: a fixed loss, at most once per cooldown
- * (reduced for computer-driven cars, see computerPenaltyScale).
+ * Speed penalty of a car that ran into another: a fixed loss, at most once per cooldown
+ * (reduced for computer-driven cars, see computerPenaltyScale), and never above `ceiling`.
  * Returns the speed lost (m/s).
  */
 function penalise(car, losses, ceiling) {
@@ -171,19 +172,39 @@ function penalise(car, losses, ceiling) {
 }
 
 /**
- * Nose-to-tail contact. The follower loses a fixed amount of speed (and never stays faster than
- * the car it hit); the leader is nudged forward. No change of direction for either.
+ * Nose-to-tail contact. The follower loses the contact loss and leaves the contact slower than
+ * the car it hit: by a wide margin for a player (the two separate at once, so every bump is a
+ * contact that can be seen: no pushing, no penalty without a new contact), by a narrow one for a
+ * computer-driven car. The car ahead is not disturbed and neither car changes direction.
  */
 function rearContact(follower, leader, closing, rules, time, emit) {
   const T = COLLISION_TUNING;
-  const lost = penalise(follower, 1, Math.max(T.penaltyFloorSpeed, leader.speed - T.leaderMargin));
-  if (lost > 0.5 && follower.bumpClock === follower.clock) {
-    leader.speed += T.leaderPush;
+  const player = follower.isHuman && !follower.autoDrive;
+  const lost = penalise(follower, 1, Math.max(T.penaltyFloorSpeed, leader.speed - (player ? T.bumpSeparation : T.computerBumpSeparation)));
+  // a player's loss of speed is always a signalled bump; a computer car held behind another inside the cooldown is not one
+  if (lost > 0.5 && (player || follower.bumpClock === follower.clock)) {
+    follower.lastPenaltyClock = follower.clock;
+    follower.bumpClock = follower.clock; follower.bumpStrength = 1;
     contactDamage(follower, leader, closing, rules);
     if (emit) emit(CONTACT.REAR_BUMP, follower.index, lost, leader.index);
   }
   follower.yawRate *= 0.5;
   countContact(follower, leader, time, emit, closing);
+}
+
+/**
+ * A car thrown in the air by another one does not fly past it: it is carried behind the car it
+ * rode over and comes down there (its own speed, shown to its driver, goes on falling as in any flight).
+ */
+function holdFlightBehind(car, cars) {
+  const other = cars[car.launchOther];
+  if (!other || other === car || other.removed) return;
+  const v = Math.hypot(car.velX, car.velZ);
+  if (v < 1) return;
+  const ux = car.velX / v, uz = car.velZ / v;
+  const along = (other.x - car.x) * ux + (other.z - car.z) * uz;
+  const gap = car.params.halfLength + other.params.halfLength + COLLISION_TUNING.flightGapBehind;
+  if (along > 0 && along < gap) { car.x -= ux * (gap - along); car.z -= uz * (gap - along); }
 }
 
 /**

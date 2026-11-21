@@ -16,43 +16,67 @@ import { straightStretch, twoCars, run, KMH } from './collision-helpers.mjs';
 
 const track = buildTrack(getCircuit('kestrel-fields'));
 
-test('E4 rear-end bump: the follower loses 48 km/h, keeps its line, the leader is not disturbed', () => {
-  // report: 115 -> 67 km/h and 104 -> 56 km/h, no change of direction, no launch
-  const { race, a, b } = twoCars(track, { gap: 0.8, lateral: 0, speedA: 115 / KMH, speedB: 95 / KMH });
-  const log = run(race, 1.2, { throttleA: 0.3, throttleB: 0.35 });
+test('E4 rear-end bump when following closely: the follower loses about 48 km/h, keeps its line, the car ahead is not disturbed', () => {
+  // report: 115 -> 67 km/h and 104 -> 56 km/h while staying behind a car, no change of direction, no launch
+  const { race, a, b } = twoCars(track, { gap: 0.3, lateral: 0, speedA: 110 / KMH, speedB: 107 / KMH });
+  const log = run(race, 1.2, { throttleA: 0.3, throttleB: 0.3 });
   const bump = log.events.find((e) => e.type === 'bump');
   assert.ok(bump, 'a bump event is emitted');
   assert.equal(bump.car, a.index); assert.equal(bump.other, b.index);
-  assert.ok(Math.abs(bump.value * KMH - 48) < 2, `speed lost at the contact: ${(bump.value * KMH).toFixed(1)} km/h (reference 48)`);
-  const before = log.atEvent(bump).a.speed * KMH, after = log.afterFirst('bump', a).speed * KMH;
-  assert.ok(Math.abs(before - 115) < 6 && Math.abs(before - after - 48) < 2.5, `follower ${before.toFixed(1)} -> ${after.toFixed(1)} km/h (reference 115 -> 67)`);
-  assert.equal(log.events.filter((e) => e.type === 'bump').length, 1, 'one penalty, not a series');
+  const before = log.atEvent(bump).a.speed * KMH, after = log.afterFirst('bump', a).speed * KMH, leader = log.atEvent(bump).b.speed * KMH;
+  assert.ok(Math.abs(before - 115) < 6, `follower at ${before.toFixed(1)} km/h at the contact (reference 115)`);
+  assert.ok(before - after > 46 && before - after < 56, `follower ${before.toFixed(1)} -> ${after.toFixed(1)} km/h (reference 115 -> 67)`);
+  // the rule: it leaves the contact 48 km/h slower than the car it hit, so the two separate
+  assert.ok(Math.abs(leader - after - T.bumpSeparation * KMH) < 1.5, `car ahead at ${leader.toFixed(1)} km/h, follower at ${after.toFixed(1)}`);
+  assert.equal(log.events.filter((e) => e.type === 'bump').length, 1, 'one bump, not a series');
   assert.equal(a.state, CAR_STATE.RACING); assert.equal(b.state, CAR_STATE.RACING);
   assert.ok(Math.abs(a.headingError) < 0.03 && Math.abs(a.d - log.start.a.d) < 0.15, 'the follower keeps its line');
   const leaderGain = log.afterFirst('bump', b).speed - log.atEvent(bump).b.speed;
-  assert.ok(leaderGain > -0.2 && leaderGain < 1.5, `the leader is at most nudged forward (${leaderGain.toFixed(2)} m/s)`);
+  assert.ok(Math.abs(leaderGain) < 0.3, `the car ahead is not disturbed (${leaderGain.toFixed(2)} m/s)`);
   assert.ok(log.events.every((e) => e.type !== 'crash' && e.type !== 'launch'), 'no accident');
 });
 
-test('E4 rear-end bump at a higher closing speed: the follower is brought down to the speed of the car ahead', () => {
-  // report: 145 -> 60 km/h and 146 -> 52 km/h (about twice the unit loss) on the first two contacts
-  const { race, a, b } = twoCars(track, { gap: 3, lateral: 0, speedA: 145 / KMH, speedB: 58 / KMH });
-  const log = run(race, 0.6, { throttleA: 0.5, throttleB: 0.1 });
-  const after = log.afterFirst('bump', a).speed * KMH;
-  assert.ok(after > 50 && after < 66, `follower after the contact: ${after.toFixed(1)} km/h (reference 52 to 60)`);
+test('E4 rear-end bump at a higher closing speed: the loss grows with the closing speed', () => {
+  // report: 145 -> 60 km/h and 146 -> 52 km/h (85 to 94 km/h lost) on the first two contacts
+  const { race, a, b } = twoCars(track, { gap: 2, lateral: 0, speedA: 145 / KMH, speedB: 104 / KMH });
+  const log = run(race, 0.6, { throttleA: 0.3, throttleB: 0.3 });
+  const bump = log.events.find((e) => e.type === 'bump');
+  assert.ok(bump, 'bump');
+  const before = log.atEvent(bump).a.speed * KMH, after = log.afterFirst('bump', a).speed * KMH;
+  assert.ok(after > 50 && after < 62, `follower ${before.toFixed(1)} -> ${after.toFixed(1)} km/h (reference 145 -> 60, 146 -> 52)`);
+  assert.ok(before - after > 80 && before - after < 100, `${(before - after).toFixed(1)} km/h lost (reference 85 to 94)`);
   assert.equal(a.state, CAR_STATE.RACING, 'in line and below the launch speed: no flight');
-  assert.ok(b.speed * KMH < 75, 'the leader is not thrown forward');
+  assert.ok(Math.abs(log.afterFirst('bump', b).speed - log.atEvent(bump).b.speed) < 0.3, 'the car ahead is not thrown forward');
+  // against a much slower car the loss is bounded: a bump never brings a car below the floor speed
+  const slow = twoCars(track, { gap: 3, lateral: 0, speedA: 145 / KMH, speedB: 50 / KMH });
+  const slowLog = run(slow.race, 0.5, { throttleA: 0.5, throttleB: 0.3 });
+  assert.ok(slowLog.events.some((e) => e.type === 'bump'));
+  assert.ok(slowLog.afterFirst('bump', slow.a).speed >= T.penaltyFloorSpeed - 0.01, 'floor speed');
 });
 
-test('repeated bumps: each new contact costs again, but never more often than the cooldown', () => {
-  // the follower keeps the throttle open behind a slower car, as in E4 (six bumps in 12 s)
-  const { race, a } = twoCars(track, { gap: 8, lateral: 0, speedA: 110 / KMH, speedB: 80 / KMH });
-  const log = run(race, 6, { throttleA: 1, throttleB: 0.3 });
+test('repeated bumps: every bump separates the cars; the next one needs a new approach, there is no pushing', () => {
+  // the follower keeps the throttle wide open behind a slower car, as in E4 (six bumps in 12 s, 1.4 to 4.6 s apart)
+  const { race, a, b } = twoCars(track, { gap: 8, lateral: 0, speedA: 110 / KMH, speedB: 80 / KMH });
+  const log = run(race, 8, { throttleA: 1, throttleB: 0.3 });
   const bumps = log.events.filter((e) => e.type === 'bump');
-  assert.ok(bumps.length >= 2, `several bumps while pushing (${bumps.length})`);
-  for (let i = 1; i < bumps.length; i++) assert.ok(bumps[i].time - bumps[i - 1].time >= T.penaltyCooldown - 1e-6, 'cooldown respected');
+  assert.ok(bumps.length >= 3, `several bumps while charging on (${bumps.length})`);
+  for (let i = 1; i < bumps.length; i++) {
+    const interval = bumps[i].time - bumps[i - 1].time;
+    assert.ok(interval > 1.0 && interval < 4.6, `bumps ${interval.toFixed(2)} s apart (reference 1.4 to 4.6)`);
+    // between two bumps the cars really came apart: the gap between them opened by more than half a metre
+    let widest = 0;
+    for (let f = bumps[i - 1].frame; f < bumps[i].frame; f++) widest = Math.max(widest, log.frames[f].b.s - log.frames[f].a.s);
+    const touching = log.frames[bumps[i - 1].frame].b.s - log.frames[bumps[i - 1].frame].a.s;
+    assert.ok(widest - touching > 0.5, `the cars separated by ${(widest - touching).toFixed(2)} m between two bumps`);
+  }
+  // every loss of speed of the follower is a bump that was signalled: no silent contact
+  for (let f = bumps[0].frame + 1; f < log.frames.length; f++) {
+    const drop = log.frames[f - 1].a.speed - log.frames[f].a.speed;
+    if (drop > 0.5) assert.ok(bumps.some((e) => e.frame === f), `speed drop of ${(drop * KMH).toFixed(1)} km/h at ${log.frames[f].time.toFixed(2)} s without a bump`);
+  }
   assert.equal(a.state, CAR_STATE.RACING);
-  assert.ok(a.speed > T.penaltyFloorSpeed - 0.01, 'pushing never stalls the car');
+  assert.ok(a.speed > T.penaltyFloorSpeed - 0.01, 'bumping never stalls the car');
+  for (const e of bumps) assert.ok(Math.abs(log.frames[e.frame].b.speed - log.frames[e.frame - 1].b.speed) < 0.3, 'the car ahead is not disturbed by a bump');
 });
 
 test('E2 wheel-to-wheel side contact: about 90 km/h lost by the faster car, no swerve, a spark between the wheels', () => {

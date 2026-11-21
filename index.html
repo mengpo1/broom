@@ -685,10 +685,14 @@ const COLLISION_TUNING = {
   // ---- contacts on the ground
   contactSpeedLoss: 13.33,       // MEASURED m/s (48 km/h) lost by the car that runs into another (E4: 115 -> 67, 104 -> 56)
   sideContactLosses: 2,          // MEASURED a wheel-to-wheel side contact costs about twice that (E2: ~140 -> ~50 km/h)
-  leaderMargin: 0.5,             // DESIGN m/s: after a rear-end bump the follower is at most this much slower than the car it hit
-  leaderPush: 0.8,               // DESIGN m/s gained by the car that is hit from behind (keeps the two apart)
+  bumpSeparation: 13.33,         // DESIGN m/s: after a rear-end bump a player's car drives at least this much slower than the car
+                                 // it hit (same value as the loss): the two always separate, and the next bump is a new,
+                                 // visible contact. The loss is therefore 48 km/h plus the closing speed (E4: 48 when
+                                 // following closely, 85 to 94 at about 40 km/h of closing speed).
+  computerBumpSeparation: 0.5,   // DESIGN m/s: the same for computer-driven cars, which also brake by themselves behind a car;
+                                 // a larger value makes a pack concertina (measured on full races)
   sideKick: 1.2,                 // DESIGN m/s of lateral velocity pushing two cars apart after a side contact
-  penaltyCooldown: 1.0,          // DESIGN s between two speed penalties for the same car (a car pushing another is held behind it meanwhile)
+  penaltyCooldown: 1.0,          // DESIGN s between two speed penalties of the same car (rubbing sideways, or a computer car pushing)
   computerPenaltyScale: 0.3,     // DESIGN share of the fixed loss applied to computer-driven cars: the field keeps flowing (1 = same as the players)
   penaltyFloorSpeed: 5,          // DESIGN m/s: a penalty never brings a car below this
   alignedCos: 0.8,               // DESIGN cars heading within ~37 degrees of each other count as "same direction"
@@ -711,6 +715,8 @@ const COLLISION_TUNING = {
   flightTimeObstacle: 0.6,       // MEASURED s, by analogy (E5)
   airDecel: 13.9,                // MEASURED m/s^2 (50 km/h per second) while airborne
   airPeakHeight: 1.3,            // DESIGN m, height reached by the car in a 0.85 s flight (scaled with the square of the flight time)
+  flightGapBehind: 0,            // MEASURED (E3: after the flight the cars that were hit are just ahead) m kept between the nose
+                                 // of a car in flight and the tail of the car that launched it: it comes down behind it
   hardAfterCar: true,            // DESIGN a launch over a car ends in a hard landing (E3)
   hardAfterObstacle: false,      // DESIGN a launch over an obstacle ends in a light landing (E5)
 
@@ -768,7 +774,7 @@ function createCarState(index) {
     // collisions and accidents (see collision-tuning.js): `clock` is the car's own simulation time,
     // the other clocks are values of it at the last event, for the animations driven by the state
     clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
-    airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchClock: -10,
+    airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
     landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
   };
 }
@@ -819,7 +825,7 @@ function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
   }
   car.state = CAR_STATE.AIRBORNE;
   car.airTime = 0; car.airDuration = duration; car.airHard = hard; car.airHeight = 0;
-  car.launchSide = side; car.launchClock = car.clock;
+  car.launchSide = side; car.launchClock = car.clock; car.launchOther = other;
   car.pitAuto = false; car.vLat = 0; car.yawRate = 0;
   if (emit) emit('launch', car.index, Math.hypot(car.velX, car.velZ), other);
   return true;
@@ -875,6 +881,7 @@ function stepWrecked(car, track, dt, emit) {
   car.throttle = 0; car.brake = 1; car.steer = 0;
   car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
   car.accelLong = nv > 0 ? -car.wreckDecel : 0; car.accelLat = 0;
+  if (nv === 0) { car.gear = 1; car.reverse = false; }          // stopped: first gear, ready to restart
   car.wreckTimer += dt;
   if (car.wreckTimer < T.hardLandingStopTime + T.wreckHoldTime) return;
   // restart on the spot when the car is on the road and pointing the right way; otherwise it is put back
@@ -992,10 +999,22 @@ function stepSpin(car, dt) {
   car.throttle = 0; car.brake = 1; car.steer = 0;
   car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
   car.accelLong = -decel; car.accelLat = 0;
-  if ((car.spinTimer <= 0 && nv < (car.slideGentle ? 0.3 : 4)) || car.spinTimer < (car.slideGentle ? -6 : -3)) {
+  if (car.slideGentle) {
+    // the slide after a light landing ends where the car stops: its driver takes it back from there
+    // (the usual watch puts it back on the track if it then stays stuck)
+    if ((car.spinTimer <= 0 && nv < 0.3) || car.spinTimer < -6) {
+      car.slideGentle = false;
+      car.velX = 0; car.velZ = 0; car.speed = 0; car.yawRate = 0; car.slip = 0;
+      car.gear = 1; car.reverse = false; car.shiftTimer = 0; car.stuckTimer = 0;
+      car.ghostTimer = COLLISION_TUNING.restartGhostTime;
+      car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING;
+    }
+    return;
+  }
+  if ((car.spinTimer <= 0 && nv < 4) || car.spinTimer < -3) {
     car.state = CAR_STATE.RESET;
     car.resetTimer = 0.7;
-    car.speed = 0; car.slideGentle = false;
+    car.speed = 0;
   }
 }
 
@@ -2644,6 +2663,30 @@ function crashPitchDuration(hard) {
     : C.groundHoldLight + C.reboundLight + C.dipInLight + C.dipHoldLight + C.recoverLight;
 }
 
+/**
+ * Attitude of a car in an accident, for the cameras that see it from outside: the same script as
+ * the pitch of its driver's view, as angles. `out` receives pitch (radians, positive = nose up),
+ * roll (radians, positive = right side up: the side that rode over the other car lifts) and
+ * squash (1 = none; below 1 the car is flattened for an instant when it hits the ground).
+ */
+const FLIGHT_ATTITUDE = { pitchPerView: 0.4, roll: 0.2, squashHard: 0.24, squashLight: 0.12, squashTime: 0.16 };
+function flightAttitude(car, out) {
+  const A = FLIGHT_ATTITUDE;
+  out.pitch = 0; out.roll = 0; out.squash = 1;
+  if (car.state === AIRBORNE) {
+    const u = car.airDuration > 0 ? Math.min(1, car.airTime / car.airDuration) : 1;
+    out.pitch = -crashPitch(car) * A.pitchPerView;
+    out.roll = (car.launchSide || 0) * A.roll * Math.sin(Math.PI * u);
+    return out;
+  }
+  const t = car.clock - car.landClock;
+  if (car.landClock < 0 || t < 0 || t >= A.squashTime) return out;
+  const k = 1 - t / A.squashTime;
+  out.pitch = -CRASH_CAMERA.noseDown * A.pitchPerView * k;          // it lands on its nose, then settles
+  out.squash = 1 - (car.landHard ? A.squashHard : A.squashLight) * k;
+  return out;
+}
+
 /** Vertical trembling of the view while the car slides out of control (fraction of the view height). */
 function slideTremble(car) {
   if (car.state !== SPIN || Math.abs(car.speed) < 5) return 0;
@@ -2651,7 +2694,7 @@ function slideTremble(car) {
   return C.trembleAmplitude * Math.sin(car.clock * C.trembleHz * Math.PI * 2);
 }
 
-__modules["src/rendering/compositing/crash-camera.js"] = { contactDive, CRASH_CAMERA, crashPitch, crashPitchDuration, slideTremble };
+__modules["src/rendering/compositing/crash-camera.js"] = { contactDive, CRASH_CAMERA, crashPitch, crashPitchDuration, FLIGHT_ATTITUDE, flightAttitude, slideTremble };
 })();
 // ---- src/rendering/compositing/race-view.js
 (function () {
@@ -2990,6 +3033,7 @@ function resolveCarContacts(cars, rules, time, emit) {
   const n = cars.length;
   for (let i = 0; i < n; i++) {
     const a = cars[i];
+    if (a.state === CAR_STATE.AIRBORNE && a.launchOther >= 0) holdFlightBehind(a, cars);
     if (!collidable(a)) continue;
     for (let j = i + 1; j < n; j++) {
       const b = cars[j];
@@ -3101,8 +3145,8 @@ function countContact(a, b, time, emit, impact) {
 }
 
 /**
- * Speed penalty of the car that ran into another: a fixed loss, at most once per cooldown
- * (reduced for computer-driven cars, see computerPenaltyScale).
+ * Speed penalty of a car that ran into another: a fixed loss, at most once per cooldown
+ * (reduced for computer-driven cars, see computerPenaltyScale), and never above `ceiling`.
  * Returns the speed lost (m/s).
  */
 function penalise(car, losses, ceiling) {
@@ -3122,19 +3166,39 @@ function penalise(car, losses, ceiling) {
 }
 
 /**
- * Nose-to-tail contact. The follower loses a fixed amount of speed (and never stays faster than
- * the car it hit); the leader is nudged forward. No change of direction for either.
+ * Nose-to-tail contact. The follower loses the contact loss and leaves the contact slower than
+ * the car it hit: by a wide margin for a player (the two separate at once, so every bump is a
+ * contact that can be seen: no pushing, no penalty without a new contact), by a narrow one for a
+ * computer-driven car. The car ahead is not disturbed and neither car changes direction.
  */
 function rearContact(follower, leader, closing, rules, time, emit) {
   const T = COLLISION_TUNING;
-  const lost = penalise(follower, 1, Math.max(T.penaltyFloorSpeed, leader.speed - T.leaderMargin));
-  if (lost > 0.5 && follower.bumpClock === follower.clock) {
-    leader.speed += T.leaderPush;
+  const player = follower.isHuman && !follower.autoDrive;
+  const lost = penalise(follower, 1, Math.max(T.penaltyFloorSpeed, leader.speed - (player ? T.bumpSeparation : T.computerBumpSeparation)));
+  // a player's loss of speed is always a signalled bump; a computer car held behind another inside the cooldown is not one
+  if (lost > 0.5 && (player || follower.bumpClock === follower.clock)) {
+    follower.lastPenaltyClock = follower.clock;
+    follower.bumpClock = follower.clock; follower.bumpStrength = 1;
     contactDamage(follower, leader, closing, rules);
     if (emit) emit(CONTACT.REAR_BUMP, follower.index, lost, leader.index);
   }
   follower.yawRate *= 0.5;
   countContact(follower, leader, time, emit, closing);
+}
+
+/**
+ * A car thrown in the air by another one does not fly past it: it is carried behind the car it
+ * rode over and comes down there (its own speed, shown to its driver, goes on falling as in any flight).
+ */
+function holdFlightBehind(car, cars) {
+  const other = cars[car.launchOther];
+  if (!other || other === car || other.removed) return;
+  const v = Math.hypot(car.velX, car.velZ);
+  if (v < 1) return;
+  const ux = car.velX / v, uz = car.velZ / v;
+  const along = (other.x - car.x) * ux + (other.z - car.z) * uz;
+  const gap = car.params.halfLength + other.params.halfLength + COLLISION_TUNING.flightGapBehind;
+  if (along > 0 && along < gap) { car.x -= ux * (gap - along); car.z -= uz * (gap - along); }
 }
 
 /**
@@ -3663,7 +3727,7 @@ function updateAiController(ai, car, race, dt) {
   const cars = race.cars;
   for (let k = 0; k < cars.length; k++) {
     const o = cars[k];
-    if (o === car || o.removed || o.inPit !== car.inPit || o.state === CAR_STATE.RESET || o.state === CAR_STATE.AIRBORNE || o.state === CAR_STATE.WRECKED) continue;
+    if (o === car || o.removed || o.inPit !== car.inPit || o.state === CAR_STATE.RESET || o.state === CAR_STATE.AIRBORNE) continue;      // a wreck is driven round like any stopped car
     let ds = o.s - car.s;
     if (ds > halfLength) ds -= track.length; else if (ds < -halfLength) ds += track.length;
     if (ds > -5.2 && ds < 5.2) {
@@ -7204,6 +7268,7 @@ const { mod, wrapAngle } = __modules["src/core/math.js"];
 const { MAX_NODES, depthOf, segmentAt, projectAtDepth, projectNode } = __modules["src/rendering/projection/road-projection.js"];
 const { QUAD_MODE } = __modules["src/rendering/drawing/quad-batch.js"];
 const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
+const { flightAttitude } = __modules["src/rendering/compositing/crash-camera.js"];
 const { CAR_STATE } = __modules["src/physics/car-physics.js"];
 const { RACE_PHASE } = __modules["src/gameplay/race.js"];
 const { GANTRY_LIGHTS } = __modules["src/art/environments/trackside.js"];
@@ -7215,6 +7280,8 @@ const MAX_CARS = 32;
 const NEAR_CAR = 1.9;        // a car whose centre is nearer than this (alongside, already out of the picture) is not drawn
 const NEAR_CAR_FADE = 0.5;   // and it fades in over this distance, so that it never pops
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
+const ptGround = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
+const attitude = { pitch: 0, roll: 0, squash: 1 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
 /**
@@ -7246,6 +7313,7 @@ class SceneBuilder {
     this.effects = null;       // optional EffectsLayer: { reset, onEvent, update, buildView }
     this.cockpit = null;       // optional CockpitLayer: { buildFront }
     this.lamps = null;         // [off, red, green] lamp sprites for the start gantry
+    this.shadow = null;        // sprite of the shadow left on the road by a car in flight
     this.gantryLights = GANTRY_LIGHTS || DEFAULT_GANTRY_LIGHTS;
     this.lightsLit = 0; this.lightsGreen = false; this.greenTimer = 99;
   }
@@ -7518,8 +7586,31 @@ class SceneBuilder {
     let ghost = car.ghostTimer > 0 || car.state === CAR_STATE.RESET || (car.state === CAR_STATE.WRECKED && car.speed < 0.5) ? 0.55 : 1;
     if (z < NEAR_CAR + NEAR_CAR_FADE) ghost *= (z - NEAR_CAR) / NEAR_CAR_FADE;
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
+    const clipZ = z > 3.4 ? z - 2.9 : 0.5;                 // clip test at the car's near end: the drawing extends in front of its centre
+    const att = flightAttitude(car, attitude);
+    if (car.airHeight > 0.02 || att.squash !== 1 || att.pitch !== 0) {
+      // a car in an accident: its shadow stays on the road under it, and the drawing takes the attitude
+      // of the flight (nose up then down, the side that was hit lifted, flattened as it lands)
+      if (this.shadow && car.airHeight > 0.02 && projectAtDepth(p, z, this.carD[index], 0, ptGround)) {
+        // a flat shape as wide as the car is seen, shrinking and fading a little as the car rises
+        const sa = Math.abs(Math.sin(alpha)), ca = Math.abs(Math.cos(alpha));
+        const lift = Math.min(1, car.airHeight / 1.3);
+        const sw = (ca * 2.1 + sa * 4.6) * ptGround.scale * (1 - 0.22 * lift), sh = sw * 0.3;
+        quads.sprite(this.shadow, ptGround.x - sw / 2, ptGround.y - sh * 0.55, sw, sh, 0.07, 0.07, 0.1, 0.62 - 0.2 * lift, clipZ, false);
+      }
+      // rotation in the picture: the pitch shows when the car is seen from the side, the roll from behind or ahead;
+      // seen from behind, a pitched car looks taller
+      const phi = att.pitch * Math.sin(alpha) + att.roll * Math.cos(alpha);
+      const tall = att.squash * (1 + 0.45 * Math.abs(att.pitch) * Math.abs(Math.cos(alpha)));
+      const cosP = Math.cos(phi), sinP = Math.sin(phi), ax = pt.x, ay = pt.y;
+      const x0 = left - ax, x1 = left + w - ax, y0 = (top - ay) * tall, y1 = (top + h - ay) * tall;
+      quads.quad(ax + x0 * cosP + y0 * sinP, ay - x0 * sinP + y0 * cosP, 1, ax + x1 * cosP + y0 * sinP, ay - x1 * sinP + y0 * cosP, 1,
+        ax + x0 * cosP + y1 * sinP, ay - x0 * sinP + y1 * cosP, 1, ax + x1 * cosP + y1 * sinP, ay - x1 * sinP + y1 * cosP, 1,
+        u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, clipZ);
+      return;
+    }
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
-      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, z > 3.4 ? z - 2.9 : 0.5);   // clip test at the car's near end: the drawing extends in front of its centre
+      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, clipZ);
   }
 
   /** Cockpit and other per-view foreground drawings. */
@@ -13358,6 +13449,11 @@ function defineEffectsArt(art) {
     }
   });
   fire('fx.fire.0', 71); fire('fx.fire.1', 97);
+  // shadow of a car thrown in the air: a flat inked shape left on the road
+  art.defineStatic('fx.shadow', 160, 64, (ctx, w, h) => {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(w / 2, h / 2, w / 2 - 4, h / 2 - 4, 0, 0, Math.PI * 2); ctx.fill();
+  });
   art.defineStatic('fx.spark', 64, 64, (ctx, w) => {
     const c = w / 2;
     ctx.beginPath();
@@ -13429,7 +13525,7 @@ class EffectsLayer {
     this.popCursor = [0, 0];
     // contact flashes: short stars drawn in the world, at the point where two cars (or a car and a
     // board) touch; attached to a car they travel with it
-    this.flashes = Array.from({ length: MAX_FLASHES }, () => ({ car: -1, other: -1, wheel: false, s: 0, d: 0, h: 0, age: 9, life: 0, size: 1, seg: -1, z: 0 }));
+    this.flashes = Array.from({ length: MAX_FLASHES }, () => ({ car: -1, other: -1, wheel: false, owner: -1, ahead: 0, right: 0, up: 0, s: 0, d: 0, h: 0, age: 9, life: 0, size: 1, seg: -1, z: 0 }));
     this.flashCursor = 0;
     this.typedCar = -1; this.typedClock = 9;
     // explosions after a hard landing: one per car at most, attached to the car, timed on the car's own clock
@@ -13529,7 +13625,20 @@ class EffectsLayer {
   flash(car, s, d, h, size, life, other = -1, wheel = false) {
     const f = this.flashes[this.flashCursor];
     this.flashCursor = (this.flashCursor + 1) % MAX_FLASHES;
-    f.car = car; f.other = other; f.wheel = wheel; f.s = s; f.d = d; f.h = h; f.size = size; f.age = 0; f.life = life;
+    f.car = car; f.other = other; f.wheel = wheel; f.owner = -1; f.s = s; f.d = d; f.h = h; f.size = size; f.age = 0; f.life = life;
+    return f;
+  }
+
+  /**
+   * The driver of car `owner` sees this star on the cockpit drawing, at a point of the car given in
+   * metres from its centre (ahead, to the right, above the ground) and brought back to a place the
+   * driver can see: an impact beside or behind the cockpit shows on the front wheel of that side.
+   */
+  onCockpit(f, owner, ahead, right, up) {
+    const D = CAR_DIMENSIONS, reach = D.frontTrack + D.frontTyre.width * 0.5;
+    f.owner = owner;
+    if (ahead < D.frontAxleX) { f.ahead = D.frontAxleX; f.right = (right >= 0 ? 1 : -1) * reach; f.up = D.frontTyre.radius; }
+    else { f.ahead = Math.min(ahead, 2.4); f.right = clamp(right, -reach, reach); f.up = up; }
   }
 
   /** Rear-end bump or wheel-to-wheel contact: a spark where the cars touch, a few flying sparks, a sound word. */
@@ -13568,6 +13677,12 @@ class EffectsLayer {
       const slot = this.blasts.find((b) => b.car === event.car) || this.blasts.find((b) => b.car < 0) || this.blasts[0];
       slot.car = event.car;
     }
+    // thrown in the air by another car: a star on the front wheel that rode over it
+    if (!landing && event.other >= 0 && car.launchSide && fx.impactFrames) {
+      const D = CAR_DIMENSIONS, side = car.launchSide;
+      const f = this.flash(event.car, D.frontAxleX, side * D.frontTrack, D.frontTyre.radius, 1.6, COLLISION_TUNING.sparkLife);
+      this.onCockpit(f, event.car, D.frontAxleX, side, D.frontTyre.radius);
+    }
     for (let v = 0; v < app.viewCount; v++) {
       const view = app.views[v];
       if (view.carIndex !== event.car) continue;
@@ -13582,7 +13697,14 @@ class EffectsLayer {
     const fx = app.effects, race = app.race;
     const car = race.cars[event.car], o = race.obstacles[event.other];
     if (!o) return;
-    if (fx.impactFrames) this.flash(-1, o.s, o.d, 0.9, 2.6, 0.22);
+    if (fx.impactFrames) {
+      const f = this.flash(-1, o.s, o.d, 0.9, 2.6, 0.22);
+      // where the board is, seen from the car (it may be hit sideways, out of the driver's sight, during a slide)
+      let ds = o.s - car.s;
+      if (ds > this.track.length / 2) ds -= this.track.length; else if (ds < -this.track.length / 2) ds += this.track.length;
+      const dd = o.d - car.d, ch = Math.cos(car.headingError), sh = Math.sin(car.headingError);
+      this.onCockpit(f, event.car, ds * ch + dd * sh, -ds * sh + dd * ch, 0.9);
+    }
     if (fx.dust) {
       for (let k = 0; k < 10; k++) {
         this.spawn(1, o.s, o.d + (this.random() - 0.5) * 1.4, 0.4 + this.random() * 1.2, car.speed * (0.3 + this.random() * 0.5), (this.random() - 0.5) * 9, 3 + this.random() * 5, 0.45 + this.random() * 0.3, 0.3, 0.2, [0.95, 0.94, 0.9], 1);
@@ -13706,7 +13828,7 @@ class EffectsLayer {
     const p = view.projection, quads = app.quads;
     for (const f of this.flashes) {
       if (f.seg !== k) continue;
-      if (f.other >= 0 && view.camera === CAMERA.COCKPIT && (view.carIndex === f.car || view.carIndex === f.other)) continue;   // on the cockpit instead
+      if (view.camera === CAMERA.COCKPIT && (view.carIndex === f.owner || (f.other >= 0 && (view.carIndex === f.car || view.carIndex === f.other)))) continue;   // on the cockpit instead
       const anchor = f.car >= 0 ? app.race.cars[f.car] : null;
       if (!projectAtDepth(p, f.z, anchor ? anchor.d + f.d : f.d, f.h, pt)) continue;
       // the star snaps to full size at once, then shrinks: a drawn flash, not a fade
@@ -13801,13 +13923,16 @@ class EffectsLayer {
     // projecting the point of the car from the driver's eye
     if (view.camera === CAMERA.COCKPIT) {
       for (const f of this.flashes) {
-        if (f.life <= 0 || f.other < 0 || (view.carIndex !== f.car && view.carIndex !== f.other)) continue;
-        const mine = app.race.cars[view.carIndex], theirs = app.race.cars[view.carIndex === f.car ? f.other : f.car];
+        if (f.life <= 0) continue;
         const D = CAR_DIMENSIONS, eye = D.eye;
         let ahead, right, up;
-        if (f.wheel) { ahead = D.frontAxleX; right = (theirs.d > mine.d ? 1 : -1) * (D.frontTrack + D.frontTyre.width * 0.5); up = D.frontTyre.radius; }
-        else if (view.carIndex === f.car) { ahead = mine.params.halfLength; right = clamp((theirs.d - mine.d) * 0.5, -0.6, 0.6); up = 0.42; }
-        else continue;                                             // bumped from behind: nothing to see ahead
+        if (f.owner === view.carIndex) { ahead = f.ahead; right = f.right; up = f.up; }
+        else if (f.other >= 0 && (view.carIndex === f.car || view.carIndex === f.other)) {
+          const mine = app.race.cars[view.carIndex], theirs = app.race.cars[view.carIndex === f.car ? f.other : f.car];
+          if (f.wheel) { ahead = D.frontAxleX; right = (theirs.d > mine.d ? 1 : -1) * (D.frontTrack + D.frontTyre.width * 0.5); up = D.frontTyre.radius; }
+          else if (view.carIndex === f.car) { ahead = mine.params.halfLength; right = clamp((theirs.d - mine.d) * 0.5, -0.6, 0.6); up = 0.42; }
+          else continue;                                           // bumped from behind: nothing to see ahead
+        } else continue;
         const place = cockpitPlacement(view), scale = (COCKPIT_REF_FOCAL / (ahead - eye[0])) * place.k;
         const t = f.age / f.life;
         const size = Math.min(r.h * 0.26, f.size * scale) * (t < 0.25 ? 0.7 + 1.2 * t : 1 - (t - 0.25) * 0.55);
@@ -17496,6 +17621,7 @@ async function boot() {
         appRef.hud = new Hud(appRef, text);
         scene.effects = new EffectsLayer(appRef.art);
         scene.lamps = [appRef.art.sprite('hud.lamp.off'), appRef.art.sprite('hud.lamp.red'), appRef.art.sprite('hud.lamp.green')];
+        scene.shadow = appRef.art.sprite('fx.shadow');
       },
     });
   } catch (error) {

@@ -64,6 +64,7 @@ async function boot() {
         appRef.hud = new Hud(appRef, text);
         scene.effects = new EffectsLayer(appRef.art);
         scene.lamps = [appRef.art.sprite('hud.lamp.off'), appRef.art.sprite('hud.lamp.red'), appRef.art.sprite('hud.lamp.green')];
+        scene.shadow = appRef.art.sprite('fx.shadow');
       },
     });
   } catch (error) {

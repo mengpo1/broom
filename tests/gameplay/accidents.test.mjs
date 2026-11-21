@@ -11,9 +11,9 @@ import { RULE_PRESETS } from '../../src/gameplay/rules.js';
 import { DRIVERS, PLAYER_DRIVERS } from '../../src/vehicles/liveries.js';
 import { placeCar, CAR_STATE } from '../../src/physics/car-physics.js';
 import { COLLISION_TUNING as T } from '../../src/physics/collision-tuning.js';
-import { crashPitch, crashPitchDuration, slideTremble, contactDive, CRASH_CAMERA as C } from '../../src/rendering/compositing/crash-camera.js';
+import { crashPitch, crashPitchDuration, slideTremble, contactDive, flightAttitude, FLIGHT_ATTITUDE, CRASH_CAMERA as C } from '../../src/rendering/compositing/crash-camera.js';
 import { BLAST } from '../../src/rendering/effects/effects-layer.js';
-import { twoCars, run, KMH } from './collision-helpers.mjs';
+import { twoCars, run, straightStretch, KMH } from './collision-helpers.mjs';
 
 const track = buildTrack(getCircuit('kestrel-fields'));
 const stateAt = (log, who, type) => { const e = log.events.find((x) => x.type === type); return e ? { e, frame: log.frames[e.frame][who], before: log.frames[Math.max(0, e.frame - 1)][who] } : null; };
@@ -36,6 +36,26 @@ test('E3 launch: wheel over wheel at a high closing speed throws the follower in
   assert.equal(leader.frame.state, CAR_STATE.RACING);
   assert.ok(Math.abs(leader.frame.speed - leader.before.speed) < 0.5, 'the car ahead is not disturbed');
   assert.ok(log.events.every((e) => e.type !== 'bump' && e.type !== 'wheel'), 'not a bump');
+});
+
+test('E3 flight: the car comes down behind the car it rode over, which drives away ahead', () => {
+  // report: after the flight "the two cars reappear just ahead, seen from close"
+  const { a, b, log } = scenarioE3(1.2);
+  const launch = stateAt(log, 'a', 'launch'), landing = stateAt(log, 'a', 'landing');
+  const length = a.params.halfLength + b.params.halfLength;
+  const ahead = (f) => { let ds = f.b.s - f.a.s; if (ds > track.length / 2) ds -= track.length; else if (ds < -track.length / 2) ds += track.length; return ds; };
+  for (let i = launch.e.frame + 1; i <= landing.e.frame; i++) {
+    const f = log.frames[i];
+    assert.ok(ahead(f) > length - 0.3, `in flight the car stays behind the one it hit (${ahead(f).toFixed(2)} m at ${f.time.toFixed(2)} s)`);
+  }
+  const gapAtLanding = ahead(log.frames[landing.e.frame]);
+  assert.ok(gapAtLanding > length - 0.3 && gapAtLanding < length + 3, `lands just behind it (${gapAtLanding.toFixed(2)} m between centres)`);
+  const later = log.frames.at(-1);
+  assert.ok(ahead(later) > gapAtLanding + 5, 'the car ahead drives away');
+  assert.equal(later.b.state, CAR_STATE.RACING);
+  // its own speed goes on falling as measured (50 km/h per second), whatever the pace of the car ahead
+  const lost = (launch.frame.speed - log.frames[landing.e.frame - 1].a.speed) * KMH / (landing.e.time - launch.e.time);
+  assert.ok(Math.abs(lost - 50) < 4, `${lost.toFixed(1)} km/h per second lost in flight`);
 });
 
 test('E3 flight: 0.85 s, slowing by 50 km/h per second, rising then coming down', () => {
@@ -89,7 +109,31 @@ test('a wrecked or flying car cannot be hit, and the restarting car is protected
   assert.ok(log.events.filter((e) => e.type === 'launch').length === 1);
 });
 
-test('E5 launch on a board: thrown in the air, light landing without loss of speed nor explosion, slide, then back on the track', () => {
+test('a computer driver steers round a wreck instead of driving through it', () => {
+  const entries = [{ driver: PLAYER_DRIVERS[0], human: true, playerIndex: 0 }, { driver: DRIVERS[0] }, { driver: DRIVERS[1] }];
+  const race = new Race({ track, laps: 3, entries, rules: RULE_PRESETS.arcade, difficulty: 'pro', seed: 5 });
+  while (race.phase === RACE_PHASE.COUNTDOWN) { race.step(SIM_DT); race.eventCount = 0; }
+  const wreck = race.playerCars[0], [driver, other] = race.cars.filter((c) => !c.isHuman);
+  const s0 = straightStretch(track, 500) + 30, onLine = (s) => track.line[Math.floor(s / track.ds) % track.n];
+  placeCar(driver, track, s0, onLine(s0)); driver.state = CAR_STATE.RACING; driver.speed = 70; driver.gear = 5; driver.ghostTimer = 0;
+  placeCar(other, track, s0 + track.length / 2, 0); other.state = CAR_STATE.RACING;
+  // the wreck stands on the racing line, 100 m ahead
+  placeCar(wreck, track, s0 + 100, onLine(s0 + 100));
+  wreck.state = CAR_STATE.WRECKED; wreck.speed = 0; wreck.velX = 0; wreck.velZ = 0; wreck.wreckTimer = 1; wreck.wreckDecel = 1;
+  let alongside = Infinity, passed = false;
+  for (let i = 0; i < 4 / SIM_DT; i++) {
+    race.setPlayerInput(0, 0, 0, 0, 0, false, false);
+    race.step(SIM_DT); race.eventCount = 0;
+    const ds = wreck.s - driver.s;
+    if (Math.abs(ds) < driver.params.halfLength + wreck.params.halfLength) alongside = Math.min(alongside, Math.abs(driver.d - wreck.d));
+    if (ds < -6) passed = true;
+  }
+  assert.ok(passed, 'the driver went past the wreck');
+  assert.ok(alongside > driver.params.halfWidth + wreck.params.halfWidth, `the cars did not overlap: ${alongside.toFixed(2)} m between centres when alongside`);
+  assert.equal(driver.state, CAR_STATE.RACING);
+});
+
+test('E5 launch on a board: thrown in the air, light landing without loss of speed nor explosion, slide, restart from where it stopped', () => {
   const tr = buildTrack(getCircuit('hazelbrook'));
   const entries = [{ driver: PLAYER_DRIVERS[0], human: true, playerIndex: 0 }, { driver: DRIVERS[0] }];
   const race = new Race({ track: tr, laps: 2, entries, rules: RULE_PRESETS.arcade, difficulty: 'amateur', seed: 3 });
@@ -126,10 +170,12 @@ test('E5 launch on a board: thrown in the air, light landing without loss of spe
   // it turns slowly while it slides (reference: about 75 degrees in 0.84 s)
   const turned = Math.abs(at(1.0).he - at(0.1).he);
   assert.ok(turned > 0.9 && turned < 1.8, `turned ${(turned * 57.3).toFixed(0)} degrees in 0.9 s`);
-  // and ends back on the track, able to drive
-  const end = frames.at(-1);
-  assert.equal(end.state, CAR_STATE.RACING);
-  assert.ok(Math.abs(end.d) < tr.halfWidth, 'put back on the track');
+  // the car is not moved: it is handed back to its driver where it stopped, off the track, in first gear
+  const handed = frames.find((f) => f.time > stop.time && f.state === CAR_STATE.RACING);
+  assert.ok(handed && handed.time - stop.time < 0.2, 'driving again as soon as the slide is over');
+  assert.ok(Math.abs(handed.d - stop.d) < 0.1 && Math.abs(handed.d) > tr.halfWidth, `not put back on the track (d ${handed.d.toFixed(1)} m)`);
+  assert.ok(mine.every((e) => e.type !== 'reset' || e.time > handed.time + 2.5), 'no automatic repositioning at the end of the slide');
+  assert.equal(car.gear, 1);
 });
 
 test('launch conditions are explicit: no flight below the speed, the closing speed or outside the overlap window', () => {
@@ -198,6 +244,29 @@ test('the staging depends only on the simulated state: same values whatever the 
   // deterministic: the same scenario gives the same events at the same steps
   const again = scenarioE3(1.5).log;
   assert.deepEqual(again.events.map((e) => [e.type, e.car, e.frame]), log.events.map((e) => [e.type, e.car, e.frame]));
+});
+
+test('seen from outside: a car in flight is tilted (nose up then down, the side that was hit lifted) and flattened as it lands', () => {
+  const out = { pitch: 0, roll: 0, squash: 1 };
+  const flying = (u, side = 1) => flightAttitude({ state: CAR_STATE.AIRBORNE, airTime: u * T.flightTimeCar, airDuration: T.flightTimeCar, launchSide: side, clock: 0, landClock: -10 }, out);
+  // nose up at the start of the flight, nose down at the end, the same script as the driver's view
+  assert.ok(flying(0.2).pitch > 0.15, 'nose up'); assert.ok(flying(0.98).pitch < -0.15, 'nose down');
+  let previous = Infinity;
+  for (let u = C.holdFraction; u <= 1; u += 0.05) { const p = flying(u).pitch; assert.ok(p <= previous + 1e-9, 'the nose only goes down once it starts to'); previous = p; }
+  // the side that rode over the other car lifts, most at the top of the flight, and the car is level again at the landing
+  assert.ok(flying(0.5, 1).roll > 0.15 && flying(0.5, -1).roll < -0.15, 'rolls away from the side that was hit');
+  assert.ok(Math.abs(flying(0.5, 1).roll) <= FLIGHT_ATTITUDE.roll + 1e-9 && Math.abs(flying(1, 1).roll) < 0.01 && Math.abs(flying(0, 1).roll) < 0.01);
+  assert.equal(flying(0.5, 0).roll, 0, 'no roll when thrown by a board');
+  assert.equal(flying(0.5).squash, 1, 'no squash in the air');
+  // landing: flattened for an instant, more after a hard landing, then back to its shape
+  const landed = (t, hard) => flightAttitude({ state: hard ? CAR_STATE.WRECKED : CAR_STATE.SPIN, clock: 20 + t, landClock: 20, landHard: hard }, out);
+  assert.ok(Math.abs(landed(0, true).squash - (1 - FLIGHT_ATTITUDE.squashHard)) < 1e-9); assert.ok(Math.abs(landed(0, false).squash - (1 - FLIGHT_ATTITUDE.squashLight)) < 1e-9);
+  assert.ok(landed(FLIGHT_ATTITUDE.squashTime / 2, true).squash > landed(0, true).squash && landed(FLIGHT_ATTITUDE.squashTime / 2, true).squash < 1);
+  const after = landed(FLIGHT_ATTITUDE.squashTime + 0.01, true);
+  assert.equal(after.squash, 1); assert.equal(after.pitch, 0); assert.equal(after.roll, 0);
+  // a car that is simply racing is drawn as usual
+  const racing = flightAttitude({ state: CAR_STATE.RACING, clock: 50, landClock: -10 }, out);
+  assert.equal(racing.pitch, 0); assert.equal(racing.roll, 0); assert.equal(racing.squash, 1);
 });
 
 test('explosion: four phases in order, 1.25 s of fire, plumes until 1.6 s', () => {

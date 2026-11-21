@@ -16,7 +16,9 @@ const SCENARIOS = {
   E2: { title: 'wheel-to-wheel side contact', seconds: 3.2, circuit: 'kestrel-fields', me: { speed: 146, back: 7, side: -3.2 }, other: { speed: 118 }, steerTo: -1.7, steerFrom: 0.45, hold: 146, camera: 'COCKPIT' },
   E3: { title: 'launch over a car, hard landing, explosion, stop, restart', seconds: 9.5, circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, camera: 'COCKPIT' },
   E3x: { title: 'the same launch seen from behind', seconds: 4.2, circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, camera: 'CHASE' },
-  E4: { title: 'repeated rear-end bumps', seconds: 6.5, circuit: 'kestrel-fields', me: { speed: 146, back: 16, side: 0 }, other: { speed: 86 }, steerTo: 0, steerFrom: 0, camera: 'COCKPIT' },
+  // E4: a first contact at about 40 km/h of closing speed (report: 145 -> 60), then the follower comes back gently on the car ahead
+  // (5 km/h faster) and bumps it again, as a driver who stays behind it does (report: 115 -> 67, 104 -> 56)
+  E4: { title: 'repeated rear-end bumps', seconds: 10, circuit: 'kestrel-fields', me: { speed: 146, back: 12, side: 0 }, other: { speed: 105 }, steerTo: 0, steerFrom: 0, hold: 146, afterBump: 5, camera: 'COCKPIT' },
   E5: { title: 'launch on a roadside board, light landing, slide', seconds: 6.5, circuit: 'hazelbrook', board: true, me: { speed: 245, back: 70 }, camera: 'COCKPIT' },
 };
 
@@ -33,11 +35,12 @@ const setup = ([sc, width, height]) => {
   const gearFor = (car, v) => { const tops = car.params.spec.gearTopSpeeds; for (let g = 0; g < tops.length; g++) if (v < tops[g] * 0.93) return g + 1; return tops.length; };
   const put = (car, s, d, speed) => { debug.placeCar(car, track, s, d); car.state = debug.CAR_STATE.RACING; car.ghostTimer = 0; car.speed = kmh(speed); car.gear = gearFor(car, kmh(speed)); };
   const sc0 = window.scenario = { sc, events: [], target: null, board: null };
-  app.on((type, e) => { if (['bump', 'wheel', 'launch', 'landing', 'obstacle', 'crash', 'restart', 'reset', 'contact'].includes(type)) sc0.events.push({ type, car: e.car, value: +(+e.value).toFixed(2) }); });
+  app.on((type, e) => { if (['bump', 'wheel', 'launch', 'landing', 'obstacle', 'crash', 'restart', 'reset', 'contact'].includes(type)) sc0.events.push({ type, car: e.car, value: +(+e.value).toFixed(2) }); if (type === 'bump') sc0.bumped = true; });
   if (sc.board) {
     // a braking board at the end of a straight; the car leaves the road toward it
     const o = race.obstacles.find((b) => { const i = Math.floor(b.s / track.ds) % track.n; return Math.abs(track.kappa[(i - 20 + track.n) % track.n]) < 0.001; }) || race.obstacles[0];
     sc0.board = o;
+    race.obstacles.forEach((b, i) => { if (b !== o) race.obstacleDown[i] = 1; });      // only this board: the reference case is a single obstacle
     put(me, o.s - sc.me.back, Math.sign(o.d) * (track.halfWidth - 1.5), sc.me.speed);
     others.forEach((c, k) => put(c, o.s + track.length / 2 + k * 40, 0, 150));
   } else {
@@ -64,11 +67,18 @@ const setup = ([sc, width, height]) => {
       let steer = 0, throttle = 1, brake = 0;
       if (me.state !== debug.CAR_STATE.RACING) sc0.left = true;          // after the accident: straight on, full throttle
       if (me.state === debug.CAR_STATE.RACING) {
-        if (sc0.board) { const aim = sc0.left ? 0 : sc0.board.d; steer = Math.max(-0.5, Math.min(0.5, (aim - me.d) * 0.22 - me.headingError * 2.4)); throttle = 0.6; }
+        if (sc0.board && !sc0.left) { steer = Math.max(-0.5, Math.min(0.5, (sc0.board.d - me.d) * 0.22 - me.headingError * 2.4)); throttle = 0.6; }
+        else if (sc0.board) {
+          // after the accident the car is handed back where it stopped, across the verge: drive it back to the road gently
+          const want = Math.max(-0.5, Math.min(0.5, (0 - me.d) * 0.05));                 // heading wanted relative to the track
+          steer = Math.max(-1, Math.min(1, (want - me.headingError) * 2.2));
+          throttle = Math.abs(want - me.headingError) > 0.5 ? 0.22 : 0.6;
+        }
         else {
           const lead = sc0.target, side = t < sc.steerFrom ? sc.me.side : sc.steerTo;
           steer = Math.max(-0.4, Math.min(0.4, (lead.d + side - me.d) * 0.3 - me.headingError * 2.2));
-          if (sc.hold && !sc0.left) throttle = Math.max(0, Math.min(1, 0.5 + (sc.hold / 3.6 - me.speed) * 0.4));
+          const hold = sc0.bumped && sc.afterBump ? lead.speed * 3.6 + sc.afterBump : sc.hold;
+          if (hold && !sc0.left) throttle = Math.max(0, Math.min(1, 0.5 + (hold / 3.6 - me.speed) * 0.4));
         }
       }
       race.setPlayerInput(0, steer, throttle, brake, 0, false, false);

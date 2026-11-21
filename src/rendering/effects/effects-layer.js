@@ -65,6 +65,11 @@ export function defineEffectsArt(art) {
     }
   });
   fire('fx.fire.0', 71); fire('fx.fire.1', 97);
+  // shadow of a car thrown in the air: a flat inked shape left on the road
+  art.defineStatic('fx.shadow', 160, 64, (ctx, w, h) => {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(w / 2, h / 2, w / 2 - 4, h / 2 - 4, 0, 0, Math.PI * 2); ctx.fill();
+  });
   art.defineStatic('fx.spark', 64, 64, (ctx, w) => {
     const c = w / 2;
     ctx.beginPath();
@@ -136,7 +141,7 @@ export class EffectsLayer {
     this.popCursor = [0, 0];
     // contact flashes: short stars drawn in the world, at the point where two cars (or a car and a
     // board) touch; attached to a car they travel with it
-    this.flashes = Array.from({ length: MAX_FLASHES }, () => ({ car: -1, other: -1, wheel: false, s: 0, d: 0, h: 0, age: 9, life: 0, size: 1, seg: -1, z: 0 }));
+    this.flashes = Array.from({ length: MAX_FLASHES }, () => ({ car: -1, other: -1, wheel: false, owner: -1, ahead: 0, right: 0, up: 0, s: 0, d: 0, h: 0, age: 9, life: 0, size: 1, seg: -1, z: 0 }));
     this.flashCursor = 0;
     this.typedCar = -1; this.typedClock = 9;
     // explosions after a hard landing: one per car at most, attached to the car, timed on the car's own clock
@@ -236,7 +241,20 @@ export class EffectsLayer {
   flash(car, s, d, h, size, life, other = -1, wheel = false) {
     const f = this.flashes[this.flashCursor];
     this.flashCursor = (this.flashCursor + 1) % MAX_FLASHES;
-    f.car = car; f.other = other; f.wheel = wheel; f.s = s; f.d = d; f.h = h; f.size = size; f.age = 0; f.life = life;
+    f.car = car; f.other = other; f.wheel = wheel; f.owner = -1; f.s = s; f.d = d; f.h = h; f.size = size; f.age = 0; f.life = life;
+    return f;
+  }
+
+  /**
+   * The driver of car `owner` sees this star on the cockpit drawing, at a point of the car given in
+   * metres from its centre (ahead, to the right, above the ground) and brought back to a place the
+   * driver can see: an impact beside or behind the cockpit shows on the front wheel of that side.
+   */
+  onCockpit(f, owner, ahead, right, up) {
+    const D = CAR_DIMENSIONS, reach = D.frontTrack + D.frontTyre.width * 0.5;
+    f.owner = owner;
+    if (ahead < D.frontAxleX) { f.ahead = D.frontAxleX; f.right = (right >= 0 ? 1 : -1) * reach; f.up = D.frontTyre.radius; }
+    else { f.ahead = Math.min(ahead, 2.4); f.right = clamp(right, -reach, reach); f.up = up; }
   }
 
   /** Rear-end bump or wheel-to-wheel contact: a spark where the cars touch, a few flying sparks, a sound word. */
@@ -275,6 +293,12 @@ export class EffectsLayer {
       const slot = this.blasts.find((b) => b.car === event.car) || this.blasts.find((b) => b.car < 0) || this.blasts[0];
       slot.car = event.car;
     }
+    // thrown in the air by another car: a star on the front wheel that rode over it
+    if (!landing && event.other >= 0 && car.launchSide && fx.impactFrames) {
+      const D = CAR_DIMENSIONS, side = car.launchSide;
+      const f = this.flash(event.car, D.frontAxleX, side * D.frontTrack, D.frontTyre.radius, 1.6, COLLISION_TUNING.sparkLife);
+      this.onCockpit(f, event.car, D.frontAxleX, side, D.frontTyre.radius);
+    }
     for (let v = 0; v < app.viewCount; v++) {
       const view = app.views[v];
       if (view.carIndex !== event.car) continue;
@@ -289,7 +313,14 @@ export class EffectsLayer {
     const fx = app.effects, race = app.race;
     const car = race.cars[event.car], o = race.obstacles[event.other];
     if (!o) return;
-    if (fx.impactFrames) this.flash(-1, o.s, o.d, 0.9, 2.6, 0.22);
+    if (fx.impactFrames) {
+      const f = this.flash(-1, o.s, o.d, 0.9, 2.6, 0.22);
+      // where the board is, seen from the car (it may be hit sideways, out of the driver's sight, during a slide)
+      let ds = o.s - car.s;
+      if (ds > this.track.length / 2) ds -= this.track.length; else if (ds < -this.track.length / 2) ds += this.track.length;
+      const dd = o.d - car.d, ch = Math.cos(car.headingError), sh = Math.sin(car.headingError);
+      this.onCockpit(f, event.car, ds * ch + dd * sh, -ds * sh + dd * ch, 0.9);
+    }
     if (fx.dust) {
       for (let k = 0; k < 10; k++) {
         this.spawn(1, o.s, o.d + (this.random() - 0.5) * 1.4, 0.4 + this.random() * 1.2, car.speed * (0.3 + this.random() * 0.5), (this.random() - 0.5) * 9, 3 + this.random() * 5, 0.45 + this.random() * 0.3, 0.3, 0.2, [0.95, 0.94, 0.9], 1);
@@ -413,7 +444,7 @@ export class EffectsLayer {
     const p = view.projection, quads = app.quads;
     for (const f of this.flashes) {
       if (f.seg !== k) continue;
-      if (f.other >= 0 && view.camera === CAMERA.COCKPIT && (view.carIndex === f.car || view.carIndex === f.other)) continue;   // on the cockpit instead
+      if (view.camera === CAMERA.COCKPIT && (view.carIndex === f.owner || (f.other >= 0 && (view.carIndex === f.car || view.carIndex === f.other)))) continue;   // on the cockpit instead
       const anchor = f.car >= 0 ? app.race.cars[f.car] : null;
       if (!projectAtDepth(p, f.z, anchor ? anchor.d + f.d : f.d, f.h, pt)) continue;
       // the star snaps to full size at once, then shrinks: a drawn flash, not a fade
@@ -508,13 +539,16 @@ export class EffectsLayer {
     // projecting the point of the car from the driver's eye
     if (view.camera === CAMERA.COCKPIT) {
       for (const f of this.flashes) {
-        if (f.life <= 0 || f.other < 0 || (view.carIndex !== f.car && view.carIndex !== f.other)) continue;
-        const mine = app.race.cars[view.carIndex], theirs = app.race.cars[view.carIndex === f.car ? f.other : f.car];
+        if (f.life <= 0) continue;
         const D = CAR_DIMENSIONS, eye = D.eye;
         let ahead, right, up;
-        if (f.wheel) { ahead = D.frontAxleX; right = (theirs.d > mine.d ? 1 : -1) * (D.frontTrack + D.frontTyre.width * 0.5); up = D.frontTyre.radius; }
-        else if (view.carIndex === f.car) { ahead = mine.params.halfLength; right = clamp((theirs.d - mine.d) * 0.5, -0.6, 0.6); up = 0.42; }
-        else continue;                                             // bumped from behind: nothing to see ahead
+        if (f.owner === view.carIndex) { ahead = f.ahead; right = f.right; up = f.up; }
+        else if (f.other >= 0 && (view.carIndex === f.car || view.carIndex === f.other)) {
+          const mine = app.race.cars[view.carIndex], theirs = app.race.cars[view.carIndex === f.car ? f.other : f.car];
+          if (f.wheel) { ahead = D.frontAxleX; right = (theirs.d > mine.d ? 1 : -1) * (D.frontTrack + D.frontTyre.width * 0.5); up = D.frontTyre.radius; }
+          else if (view.carIndex === f.car) { ahead = mine.params.halfLength; right = clamp((theirs.d - mine.d) * 0.5, -0.6, 0.6); up = 0.42; }
+          else continue;                                           // bumped from behind: nothing to see ahead
+        } else continue;
         const place = cockpitPlacement(view), scale = (COCKPIT_REF_FOCAL / (ahead - eye[0])) * place.k;
         const t = f.age / f.life;
         const size = Math.min(r.h * 0.26, f.size * scale) * (t < 0.25 ? 0.7 + 1.2 * t : 1 - (t - 0.25) * 0.55);

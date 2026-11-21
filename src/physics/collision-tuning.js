@@ -12,10 +12,14 @@ export const COLLISION_TUNING = {
   // ---- contacts on the ground
   contactSpeedLoss: 13.33,       // MEASURED m/s (48 km/h) lost by the car that runs into another (E4: 115 -> 67, 104 -> 56)
   sideContactLosses: 2,          // MEASURED a wheel-to-wheel side contact costs about twice that (E2: ~140 -> ~50 km/h)
-  leaderMargin: 0.5,             // DESIGN m/s: after a rear-end bump the follower is at most this much slower than the car it hit
-  leaderPush: 0.8,               // DESIGN m/s gained by the car that is hit from behind (keeps the two apart)
+  bumpSeparation: 13.33,         // DESIGN m/s: after a rear-end bump a player's car drives at least this much slower than the car
+                                 // it hit (same value as the loss): the two always separate, and the next bump is a new,
+                                 // visible contact. The loss is therefore 48 km/h plus the closing speed (E4: 48 when
+                                 // following closely, 85 to 94 at about 40 km/h of closing speed).
+  computerBumpSeparation: 0.5,   // DESIGN m/s: the same for computer-driven cars, which also brake by themselves behind a car;
+                                 // a larger value makes a pack concertina (measured on full races)
   sideKick: 1.2,                 // DESIGN m/s of lateral velocity pushing two cars apart after a side contact
-  penaltyCooldown: 1.0,          // DESIGN s between two speed penalties for the same car (a car pushing another is held behind it meanwhile)
+  penaltyCooldown: 1.0,          // DESIGN s between two speed penalties of the same car (rubbing sideways, or a computer car pushing)
   computerPenaltyScale: 0.3,     // DESIGN share of the fixed loss applied to computer-driven cars: the field keeps flowing (1 = same as the players)
   penaltyFloorSpeed: 5,          // DESIGN m/s: a penalty never brings a car below this
   alignedCos: 0.8,               // DESIGN cars heading within ~37 degrees of each other count as "same direction"
@@ -38,6 +42,8 @@ export const COLLISION_TUNING = {
   flightTimeObstacle: 0.6,       // MEASURED s, by analogy (E5)
   airDecel: 13.9,                // MEASURED m/s^2 (50 km/h per second) while airborne
   airPeakHeight: 1.3,            // DESIGN m, height reached by the car in a 0.85 s flight (scaled with the square of the flight time)
+  flightGapBehind: 0,            // MEASURED (E3: after the flight the cars that were hit are just ahead) m kept between the nose
+                                 // of a car in flight and the tail of the car that launched it: it comes down behind it
   hardAfterCar: true,            // DESIGN a launch over a car ends in a hard landing (E3)
   hardAfterObstacle: false,      // DESIGN a launch over an obstacle ends in a light landing (E5)
 

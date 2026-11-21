@@ -36,7 +36,7 @@ export function createCarState(index) {
     // collisions and accidents (see collision-tuning.js): `clock` is the car's own simulation time,
     // the other clocks are values of it at the last event, for the animations driven by the state
     clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
-    airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchClock: -10,
+    airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
     landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
   };
 }
@@ -87,7 +87,7 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
   }
   car.state = CAR_STATE.AIRBORNE;
   car.airTime = 0; car.airDuration = duration; car.airHard = hard; car.airHeight = 0;
-  car.launchSide = side; car.launchClock = car.clock;
+  car.launchSide = side; car.launchClock = car.clock; car.launchOther = other;
   car.pitAuto = false; car.vLat = 0; car.yawRate = 0;
   if (emit) emit('launch', car.index, Math.hypot(car.velX, car.velZ), other);
   return true;
@@ -143,6 +143,7 @@ function stepWrecked(car, track, dt, emit) {
   car.throttle = 0; car.brake = 1; car.steer = 0;
   car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
   car.accelLong = nv > 0 ? -car.wreckDecel : 0; car.accelLat = 0;
+  if (nv === 0) { car.gear = 1; car.reverse = false; }          // stopped: first gear, ready to restart
   car.wreckTimer += dt;
   if (car.wreckTimer < T.hardLandingStopTime + T.wreckHoldTime) return;
   // restart on the spot when the car is on the road and pointing the right way; otherwise it is put back
@@ -260,10 +261,22 @@ function stepSpin(car, dt) {
   car.throttle = 0; car.brake = 1; car.steer = 0;
   car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
   car.accelLong = -decel; car.accelLat = 0;
-  if ((car.spinTimer <= 0 && nv < (car.slideGentle ? 0.3 : 4)) || car.spinTimer < (car.slideGentle ? -6 : -3)) {
+  if (car.slideGentle) {
+    // the slide after a light landing ends where the car stops: its driver takes it back from there
+    // (the usual watch puts it back on the track if it then stays stuck)
+    if ((car.spinTimer <= 0 && nv < 0.3) || car.spinTimer < -6) {
+      car.slideGentle = false;
+      car.velX = 0; car.velZ = 0; car.speed = 0; car.yawRate = 0; car.slip = 0;
+      car.gear = 1; car.reverse = false; car.shiftTimer = 0; car.stuckTimer = 0;
+      car.ghostTimer = COLLISION_TUNING.restartGhostTime;
+      car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING;
+    }
+    return;
+  }
+  if ((car.spinTimer <= 0 && nv < 4) || car.spinTimer < -3) {
     car.state = CAR_STATE.RESET;
     car.resetTimer = 0.7;
-    car.speed = 0; car.slideGentle = false;
+    car.speed = 0;
   }
 }
 

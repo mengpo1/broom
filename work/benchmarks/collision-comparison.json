@@ -1,5 +1,5 @@
 {
- "date": "2026-11-21T20:24:09.530Z",
+ "date": "2026-11-21T22:09:03.071Z",
  "note": "reference values are approximate measurements on 25 fps footage (see the analysis report)",
  "E1": {
   "reference": {
@@ -59,7 +59,8 @@
    "viewNoseUpSeconds": 0.4,
    "viewSettledSecondsAfterLaunch": 2.64,
    "explosionSeconds": 1.25,
-   "plumesSeconds": 0.6
+   "plumesSeconds": 0.6,
+   "afterTheFlight": "the cars that were hit are just ahead, then drive away"
   },
   "game": {
    "launchSpeed": 264.7,
@@ -76,7 +77,9 @@
    "explosionSeconds": 1.24,
    "plumesSeconds": 0.6,
    "peakHeightMetres": 1.3,
-   "carAheadDisturbed": false
+   "carAheadDisturbed": false,
+   "carAheadAtLandingMetres": 4.18,
+   "carAheadTwoSecondsLaterMetres": 125.9
   },
   "comment": "restart acceleration is the normal one of the car (driving untouched): slower than the reference game"
  },
@@ -90,47 +93,61 @@
     "146 -> 52"
    ],
    "bumpsIn12Seconds": 6,
+   "secondsBetweenBumps": [
+    1.4,
+    4.6
+   ],
    "viewDivePercent": [
     5,
     8
    ],
-   "launch": false
+   "launch": false,
+   "carAhead": "not affected (hypothesis)"
   },
   "game": {
-   "from115": {
-    "before": 117.7,
-    "after": 69.9,
-    "lossKmh": 48,
-    "leaderChangeKmh": 3.1,
+   "followingCloselyAt115": {
+    "before": 116.8,
+    "carAhead": 113.6,
+    "after": 65.8,
+    "lossKmh": 51.2,
+    "carAheadChangeKmh": 0.2,
     "state": 1
    },
-   "from104": {
-    "before": 107.9,
-    "after": 60,
-    "lossKmh": 48,
-    "leaderChangeKmh": 2.8,
+   "followingCloselyAt104": {
+    "before": 107.5,
+    "carAhead": 104.7,
+    "after": 56.9,
+    "lossKmh": 50.8,
+    "carAheadChangeKmh": 0.2,
     "state": 1
    },
-   "from145behind60": {
-    "before": 145.3,
-    "after": 58.2,
-    "lossKmh": 87.2,
-    "leaderChangeKmh": 3.3,
+   "closingFastAt145": {
+    "before": 147,
+    "carAhead": 107.5,
+    "after": 59.7,
+    "lossKmh": 87.4,
+    "carAheadChangeKmh": 0.2,
     "state": 1
    },
-   "bumpsIn12SecondsAtFullThrottle": 8,
+   "bumpsIn12SecondsAtFullThrottle": 5,
    "secondsBetweenBumps": [
-    1.08,
-    2.47,
-    1.05,
-    2.11,
-    1.08,
-    1.91,
-    1.06
+    2.99,
+    2.34,
+    2.27,
+    1.91
    ],
+   "lossesAtFullThrottleKmh": [
+    101.1,
+    105.8,
+    97.2,
+    96.5,
+    91.9
+   ],
+   "speedDropsWithoutBump": 0,
    "viewDivePercent": 6.5,
    "launch": false
-  }
+  },
+  "comment": "rule: the follower leaves the contact 48 km/h slower than the car it hit (loss = 48 km/h + closing speed). At full throttle it comes back as fast as it left, hence a larger loss each time."
  },
  "E5": {
   "reference": {
@@ -152,13 +169,16 @@
    "landing": "196.5 -> 196.1 km/h",
    "explosion": false,
    "earlySlideKmhPerSecond": 29.9,
-   "lateSlideKmhPerSecond": 272.8,
-   "stopSecondsAfterLanding": 1.72,
+   "lateSlideKmhPerSecond": 180,
+   "stopSecondsAfterLanding": 1.88,
    "turnDegreesIn084s": 72.3,
    "viewSecondDipPercent": 34,
    "viewSettledSecondsAfterContact": 1.7,
    "trembleHz": 12,
-   "backOnTrackSecondsAfterContact": 3.03
-  }
+   "handedBackSecondsAfterStop": 0.01,
+   "handedBackWhereItStopped": true,
+   "automaticRepositioning": false
+  },
+  "comment": "after the slide the car is handed back to its driver where it stopped (the reference footage fades out there)"
  }
 }

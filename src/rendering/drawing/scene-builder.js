@@ -9,6 +9,7 @@ import { mod, wrapAngle } from '../../core/math.js';
 import { MAX_NODES, depthOf, segmentAt, projectAtDepth, projectNode } from '../projection/road-projection.js';
 import { QUAD_MODE } from './quad-batch.js';
 import { CAMERA } from '../compositing/race-view.js';
+import { flightAttitude } from '../compositing/crash-camera.js';
 import { CAR_STATE } from '../../physics/car-physics.js';
 import { RACE_PHASE } from '../../gameplay/race.js';
 import { GANTRY_LIGHTS } from '../../art/environments/trackside.js';
@@ -20,6 +21,8 @@ const MAX_CARS = 32;
 const NEAR_CAR = 1.9;        // a car whose centre is nearer than this (alongside, already out of the picture) is not drawn
 const NEAR_CAR_FADE = 0.5;   // and it fades in over this distance, so that it never pops
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
+const ptGround = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
+const attitude = { pitch: 0, roll: 0, squash: 1 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
 /**
@@ -51,6 +54,7 @@ export class SceneBuilder {
     this.effects = null;       // optional EffectsLayer: { reset, onEvent, update, buildView }
     this.cockpit = null;       // optional CockpitLayer: { buildFront }
     this.lamps = null;         // [off, red, green] lamp sprites for the start gantry
+    this.shadow = null;        // sprite of the shadow left on the road by a car in flight
     this.gantryLights = GANTRY_LIGHTS || DEFAULT_GANTRY_LIGHTS;
     this.lightsLit = 0; this.lightsGreen = false; this.greenTimer = 99;
   }
@@ -323,8 +327,31 @@ export class SceneBuilder {
     let ghost = car.ghostTimer > 0 || car.state === CAR_STATE.RESET || (car.state === CAR_STATE.WRECKED && car.speed < 0.5) ? 0.55 : 1;
     if (z < NEAR_CAR + NEAR_CAR_FADE) ghost *= (z - NEAR_CAR) / NEAR_CAR_FADE;
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
+    const clipZ = z > 3.4 ? z - 2.9 : 0.5;                 // clip test at the car's near end: the drawing extends in front of its centre
+    const att = flightAttitude(car, attitude);
+    if (car.airHeight > 0.02 || att.squash !== 1 || att.pitch !== 0) {
+      // a car in an accident: its shadow stays on the road under it, and the drawing takes the attitude
+      // of the flight (nose up then down, the side that was hit lifted, flattened as it lands)
+      if (this.shadow && car.airHeight > 0.02 && projectAtDepth(p, z, this.carD[index], 0, ptGround)) {
+        // a flat shape as wide as the car is seen, shrinking and fading a little as the car rises
+        const sa = Math.abs(Math.sin(alpha)), ca = Math.abs(Math.cos(alpha));
+        const lift = Math.min(1, car.airHeight / 1.3);
+        const sw = (ca * 2.1 + sa * 4.6) * ptGround.scale * (1 - 0.22 * lift), sh = sw * 0.3;
+        quads.sprite(this.shadow, ptGround.x - sw / 2, ptGround.y - sh * 0.55, sw, sh, 0.07, 0.07, 0.1, 0.62 - 0.2 * lift, clipZ, false);
+      }
+      // rotation in the picture: the pitch shows when the car is seen from the side, the roll from behind or ahead;
+      // seen from behind, a pitched car looks taller
+      const phi = att.pitch * Math.sin(alpha) + att.roll * Math.cos(alpha);
+      const tall = att.squash * (1 + 0.45 * Math.abs(att.pitch) * Math.abs(Math.cos(alpha)));
+      const cosP = Math.cos(phi), sinP = Math.sin(phi), ax = pt.x, ay = pt.y;
+      const x0 = left - ax, x1 = left + w - ax, y0 = (top - ay) * tall, y1 = (top + h - ay) * tall;
+      quads.quad(ax + x0 * cosP + y0 * sinP, ay - x0 * sinP + y0 * cosP, 1, ax + x1 * cosP + y0 * sinP, ay - x1 * sinP + y0 * cosP, 1,
+        ax + x0 * cosP + y1 * sinP, ay - x0 * sinP + y1 * cosP, 1, ax + x1 * cosP + y1 * sinP, ay - x1 * sinP + y1 * cosP, 1,
+        u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, clipZ);
+      return;
+    }
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
-      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, z > 3.4 ? z - 2.9 : 0.5);   // clip test at the car's near end: the drawing extends in front of its centre
+      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, clipZ);
   }
 
   /** Cockpit and other per-view foreground drawings. */
