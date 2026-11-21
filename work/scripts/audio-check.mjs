@@ -1,6 +1,6 @@
 // Offline verification of the procedural audio module (src/audio/).
 //   node work/scripts/audio-check.mjs [--wav out.wav] [--json]
-// Bundles src/audio/dev-audio-check.js into a throw-away page, renders scripted races through an
+// Bundles work/dev/audio-check.js into a throw-away page, renders scripted races through an
 // OfflineAudioContext in Chromium and checks the result: no NaN, no clipping, no DC offset,
 // engine pitch/brightness against rpm and throttle, every event audible, panning, Doppler,
 // scenes, pause... Exits with a non-zero status when a check or the page fails.
@@ -14,7 +14,7 @@ const wavPath = wavIndex >= 0 ? resolve(args[wavIndex + 1] || 'audio-check.wav')
 const asJson = args.includes('--json');
 
 const t0 = Date.now();
-const { page, logs, close, file } = await openStandalone({ entry: 'src/audio/dev-audio-check.js', width: 640, height: 360 });
+const { page, logs, close, file } = await openStandalone({ entry: 'work/dev/audio-check.js', width: 640, height: 360 });
 let report = null, failure = null;
 try {
   await page.waitForFunction(() => typeof window.runAudioCheck === 'function', null, { timeout: 15000 });

@@ -2,12 +2,12 @@
 // OfflineAudioContext, measures the result and exposes it as window.runAudioCheck().
 // Driven by work/scripts/audio-check.mjs.
 
-import { GameAudio } from './game-audio.js';
-import { PlayerEngineVoice, OpponentEngineVoice, createEngineWave } from './engine-voice.js';
-import { CarNoise } from './car-noise.js';
-import { CrowdAmbience } from './ambience.js';
-import { createNoiseBuffer, createControlBuffer, createPulseBuffer, makeDriveCurve } from './noise.js';
-import { AUDIO_TUNING } from './audio-tuning.js';
+import { GameAudio } from '../../src/audio/game-audio.js';
+import { PlayerEngineVoice, OpponentEngineVoice, createEngineWave } from '../../src/audio/engine-voice.js';
+import { CarNoise } from '../../src/audio/car-noise.js';
+import { CrowdAmbience } from '../../src/audio/ambience.js';
+import { createNoiseBuffer, createControlBuffer, createPulseBuffer, makeDriveCurve } from '../../src/audio/noise.js';
+import { AUDIO_TUNING } from '../../src/audio/audio-tuning.js';
 
 const RATE = 44100;
 const FRAME = 1 / 60;

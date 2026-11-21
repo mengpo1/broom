@@ -38,8 +38,8 @@ const stage = async (name, options) => {
 
 const straightAhead = 'Math.abs(track.kappa[(car.segIndex + 20) % track.n]) < 0.0008 && Math.abs(track.kappa[(car.segIndex + 60) % track.n]) < 0.0008 && Math.abs(track.kappa[car.segIndex]) < 0.0008';
 
-await stage('01-grid', { race: { circuit, opponents: 15, gridPosition: 7, autoDrive: false }, until: 'race.lights >= 3', frames: 30, ticks: 0 });
-await stage('02-straight', { race: { circuit, opponents: 15, gridPosition: 9 }, until: `race.time > 20 && car.speed > 80 && ${straightAhead}`, frames: 24 });
+await stage('01-grid', { race: { circuit, opponents: 15, gridPosition: 7, autoDrive: false }, until: 'race.lights >= 3', frames: 12, ticks: 0 });
+await stage('02-straight', { race: { circuit, opponents: 15, gridPosition: 9 }, until: `race.time > 20 && car.speed > 80 && ${straightAhead}`, frames: 12 });
 await stage('03-corner', { race: { circuit: 'porto-sereno', opponents: 15, gridPosition: 9 }, until: 'race.time > 12 && Math.abs(track.kappa[car.segIndex]) > 1 / 75 && Math.abs(car.steer) > 0.35 && car.speed > 22', frames: 6 });
 await stage('04-overtake', {
   race: { circuit, opponents: 15, gridPosition: 12, difficulty: 'novice' },
@@ -49,12 +49,12 @@ await stage('04-overtake', {
 await stage('05-exterior', {
   race: { circuit, opponents: 15, gridPosition: 3 },
   until: 'race.time > 7.5',
-  before: 'app.views[0].camera = CAMERA.FRONT; app.hud.visible = false;', frames: 40,
+  before: 'app.views[0].camera = CAMERA.FRONT; app.hud.visible = false;', frames: 14,
 });
 await stage('05b-chase', {
   race: { circuit: 'montclair', opponents: 15, gridPosition: 8 },
   until: 'race.time > 16 && car.speed > 50',
-  before: 'app.views[0].camera = CAMERA.CHASE;', frames: 40,
+  before: 'app.views[0].camera = CAMERA.CHASE;', frames: 14,
 });
 // collision: steer the player into the barrier on a straight and capture just after the hit
 {
@@ -71,7 +71,10 @@ await stage('05b-chase', {
     let hit = false;
     app.on((type, e) => { if ((type === 'wall' || type === 'crash') && e.car === me.index && e.value > 5) hit = true; });
     const side = race.track.pit.side;      // toward the side without the pit wall
+    // the approach is advanced without drawing (software rendering is slow); the frames after the hit are drawn
+    app.skipRender = true;
     for (let f = 0; f < 400 && !hit; f++) { race.setPlayerInput(0, -side * 0.5, 1, 0, 0, false, false); app.simulate(); race.setPlayerInput(0, -side * 0.5, 1, 0, 0, false, false); app.simulate(); await app.advanceFrame(0); }
+    app.skipRender = false;
     for (let f = 0; f < 5; f++) await app.advanceFrame(2);
     return { hit, speed: +(me.speed * 3.6).toFixed(0), wallHits: me.wallHits };
   }, [circuit, width, height, straightAhead]);
@@ -79,12 +82,12 @@ await stage('05b-chase', {
   console.log('06-collision', JSON.stringify(info));
   await shot('06-collision');
 }
-await stage('07-split', { race: { circuit: 'kestrel-fields', opponents: 10, players: 2, gridPosition: 6 }, until: 'race.time > 9', frames: 20 });
-await stage('07b-split-vertical', { race: { circuit: 'costa-brisa', opponents: 10, players: 2, gridPosition: 6 }, layout: 'vertical', until: 'race.time > 12', frames: 20 });
+await stage('07-split', { race: { circuit: 'kestrel-fields', opponents: 10, players: 2, gridPosition: 6 }, until: 'race.time > 9', frames: 10 });
+await stage('07b-split-vertical', { race: { circuit: 'costa-brisa', opponents: 10, players: 2, gridPosition: 6 }, layout: 'vertical', until: 'race.time > 12', frames: 10 });
 // extra themes for variety
-await stage('09-desert', { race: { circuit: 'ouarzane', opponents: 15, gridPosition: 8 }, until: 'race.time > 18 && car.speed > 55', frames: 20 });
-await stage('10-dusk', { race: { circuit: 'kagerou-hills', opponents: 15, gridPosition: 8 }, until: 'race.time > 15 && car.speed > 50', frames: 20 });
-await stage('11-docks', { race: { circuit: 'meridian-docks', opponents: 15, gridPosition: 8 }, until: 'race.time > 14 && car.speed > 45', frames: 20 });
+await stage('09-desert', { race: { circuit: 'ouarzane', opponents: 15, gridPosition: 8 }, until: 'race.time > 18 && car.speed > 55', frames: 10 });
+await stage('10-dusk', { race: { circuit: 'kagerou-hills', opponents: 15, gridPosition: 8 }, until: 'race.time > 15 && car.speed > 50', frames: 10 });
+await stage('11-docks', { race: { circuit: 'meridian-docks', opponents: 15, gridPosition: 8 }, until: 'race.time > 14 && car.speed > 45', frames: 10 });
 
 // animation sequence: six consecutive frames (1/60 s apart) of the high-speed straight
 await page.evaluate(async ([circuit, width, height, straightAhead]) => {
@@ -96,7 +99,7 @@ await page.evaluate(async ([circuit, width, height, straightAhead]) => {
   let steps = 0;
   while (steps < 120 * 120 && !(race.time > 20 && me.speed > 75 && straight(me, race.track))) { app.simulate(); steps++; }
   app.present(3, 0);
-  for (let f = 0; f < 20; f++) await app.advanceFrame(2);
+  for (let f = 0; f < 10; f++) await app.advanceFrame(2);
 }, [circuit, width, height, straightAhead]);
 for (let f = 0; f < 6; f++) {
   await page.evaluate(() => window.virage.app.advanceFrame(2));
@@ -105,10 +108,10 @@ for (let f = 0; f < 6; f++) {
 
 // main menu and a results plate
 await page.evaluate(() => { const v = window.virage; v.flow.toMenu(); v.app.hud.visible = false; });
-await page.evaluate(async () => { const { app } = window.virage; for (let i = 0; i < 40; i++) await app.advanceFrame(2); });
+await page.evaluate(async () => { const { app } = window.virage; for (let i = 0; i < 12; i++) await app.advanceFrame(2); });
 await shot('08-menu');
 await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
-await page.evaluate(async () => { const { app } = window.virage; for (let i = 0; i < 40; i++) await app.advanceFrame(2); });
+await page.evaluate(async () => { const { app } = window.virage; for (let i = 0; i < 12; i++) await app.advanceFrame(2); });
 await shot('08b-menu-circuit');
 
 writeFileSync(`${root}/${outDir}/captures.json`, JSON.stringify(log, null, 2));

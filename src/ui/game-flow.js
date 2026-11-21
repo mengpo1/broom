@@ -274,6 +274,7 @@ export class GameFlow {
     if (this.audio) this.audio.setScene('race');
     this.input.updatePointerLock(app.viewCount, true);
     this.input.clearMenuEvents();
+    this.input.clearEdges();
   }
 
   finishRace() {
@@ -353,6 +354,7 @@ export class GameFlow {
     this.app.paused = false; this.state = 'race'; this.dirty = true;
     if (this.audio) this.audio.resume();
     this.input.updatePointerLock(this.app.viewCount, true);
+    this.input.clearEdges();      // the key that closed the pause page must not pause again
   }
 
   // ---- per-frame ---------------------------------------------------------------------------------

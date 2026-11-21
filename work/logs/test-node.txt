@@ -1,0 +1,53 @@
+ok 1 - a lone computer driver laps cleanly: stays on the road, no reset, no wall
+ok 2 - braking: corners are taken much slower than the straights, and the brakes are used
+ok 3 - traffic: overtakes happen, contacts are survived, the whole field finishes
+ok 4 - difficulty levels change the pace
+ok 5 - pit stops: with fast attrition, computer drivers stop for tyres or fuel and rejoin
+ok 6 - every circuit of the three seasons can be raced by the computer
+ok 7 - start: cars wait on the grid during the five lights, then are released together
+ok 8 - a complete race runs automatically: laps, timing, classification and finish are consistent
+ok 9 - progress: live positions always match the distance covered
+ok 10 - same seed, same race; different seed, different race
+ok 11 - attrition rules: tyres wear and fuel burns in racing mode, not in arcade mode
+ok 12 - both players are in the same race with their own cars
+ok 13 - controls are independent: one accelerates and turns, the other brakes
+ok 14 - common classification contains both players and the computer drivers
+ok 15 - players collide with each other
+ok 16 - split screen: two non-overlapping views, top/bottom by default, side by side on request
+ok 17 - each view projects the road from its own car
+ok 18 - duel session produces a two-player race configuration
+ok 19 - car views: turning a car through 360 degrees walks through neighbouring drawings only
+ok 20 - front wheels: rolling marks advance in step with the distance travelled
+ok 21 - front wheels: steering frames are symmetric and monotonic
+ok 22 - speed effects grow with speed and are smooth from frame to frame
+ok 23 - each effect can be switched off on its own
+ok 24 - impacts jolt the view briefly, then the picture settles
+ok 25 - three seasons of six original circuits, each a closed, drivable loop
+ok 26 - scenery layout: deterministic, every object has a drawing, objects stay off the road
+ok 27 - palettes: every theme defines every colour name
+ok 28 - localisation: French and English dictionaries have the same keys; placeholders are filled
+ok 29 - storage: saves and reloads settings, records and championship; survives broken data
+ok 30 - championship: qualifying grid, points for the first six, standings, season end
+ok 31 - game modes: arcade progression and score, championship round, training
+ok 32 - HUD number formatting is exact and allocation-free
+ok 33 - acceleration: 0-100 km/h in 2-4 s, 0-200 km/h in under 8 s, top speed above 300 km/h
+ok 34 - braking: 200 km/h to standstill in a short, plausible distance; brakes alone never push the car backwards
+ok 35 - steering turns the car in the commanded direction and grip limits cornering at speed
+ok 36 - more wing: more cornering grip at speed, lower top speed
+ok 37 - leaving the track: grass slows the car and cuts grip
+ok 38 - barrier contact: the car is kept inside, loses speed and reports the hit
+ok 39 - reset puts a stranded car back on the track, facing forward
+ok 40 - manual gearbox obeys shift requests; the simulation is deterministic
+ok 41 - rows are filled from the bottom of the view up to the horizon without holes
+ok 42 - perspective: depth grows monotonically toward the horizon and scale shrinks
+ok 43 - straight road is centred; a right-hand corner bends the road to the right, a left-hand one to the left
+ok 44 - road centre line is continuous from row to row (no visual breaks) on every circuit sample
+ok 45 - elevation: climbing road rises on screen, crests hide what lies behind them
+ok 46 - projected points agree with the row table and place opponents correctly
+ok 47 - rear view mirrors lateral positions
+ok 48 - resizing the view scales the picture without changing its content
+ok 49 - camera yaw slides the road sideways proportionally to depth
+# tests 49
+# pass 49
+# fail 0
+# duration_ms 5118.859747

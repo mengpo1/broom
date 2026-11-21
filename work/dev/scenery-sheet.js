@@ -1,13 +1,13 @@
 // Development contact sheet for scenery drawings (not part of the game bundle).
 // args: { filter: 'tree' (substring of the id) or ['tree','bush'], theme: 'forest', backdrop: 'mountains' (shows the panoramas instead),
 //         scale: 1, bg: '#...' }
-import { expandScenerySpecs } from './scenery-specs.js';
-import { sceneryPainter, hasSceneryPainter } from './scenery-painters.js';
-import { paintBackdropLayer, backdropHorizon } from './backdrops.js';
-import { getPalette } from '../palettes/palettes.js';
-import { seeded } from '../styles/ink.js';
-import { hashString } from '../../core/random.js';
-import { drawText } from '../styles/lettering.js';
+import { expandScenerySpecs } from '../../src/art/environments/scenery-specs.js';
+import { sceneryPainter, hasSceneryPainter } from '../../src/art/environments/scenery-painters.js';
+import { paintBackdropLayer, backdropHorizon } from '../../src/art/environments/backdrops.js';
+import { getPalette } from '../../src/art/palettes/palettes.js';
+import { seeded } from '../../src/art/styles/ink.js';
+import { hashString } from '../../src/core/random.js';
+import { drawText } from '../../src/art/styles/lettering.js';
 
 window.renderPreview = (canvas, args) => {
   const ctx = canvas.getContext('2d');

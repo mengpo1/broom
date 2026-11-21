@@ -1,4 +1,4 @@
-// Renders the lettering specimen (src/art/styles/dev-lettering-specimen.js) to work/renders/.
+// Renders the lettering specimen (work/dev/lettering-specimen.js) to work/renders/.
 //   node work/scripts/lettering-specimen.mjs
 //     -> lettering-specimen.png (main sheet), lettering-specimen-charset-a.png and -charset-b.png
 //        (full charset at 160 px cap height), lettering-specimen-styles.png (bold and impact)
@@ -19,7 +19,7 @@ const jobs = sheet
     { sheet: 'styles', out: 'work/renders/lettering-specimen-styles.png' },
   ];
 
-const { page, logs, close, file } = await openStandalone({ entry: 'src/art/styles/dev-lettering-specimen.js', width: WIDTH, height: HEIGHT });
+const { page, logs, close, file } = await openStandalone({ entry: 'work/dev/lettering-specimen.js', width: WIDTH, height: HEIGHT });
 try {
   await page.waitForFunction(() => window.letteringSpecimen, null, { timeout: 15000 });
   for (const job of jobs) {

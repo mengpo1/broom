@@ -11,7 +11,7 @@ import { buildCarModel } from '../art/vehicles/car-model.js';
 import { drawCar, drawCarFitted } from '../art/vehicles/car-illustrator.js';
 import { liveryColors } from '../art/art-library.js';
 import { rgbToHex, getPalette } from '../art/palettes/palettes.js';
-import { ALL_TEAMS } from '../vehicles/liveries.js';
+import { ALL_TEAMS, DRIVERS, PLAYER_DRIVERS } from '../vehicles/liveries.js';
 
 const INK = '#16161f', PAPER = '#f4efe2', PAPER_SHADE = '#e4dcc8', CAPTION = '#f6e27a', RED = '#d5302a', BLUE = '#2f5fa8';
 
@@ -19,6 +19,12 @@ export function formatTime(seconds) {
   if (!(seconds > 0) || !Number.isFinite(seconds)) return '-:--.---';
   const ms = Math.round(seconds * 1000);
   return `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}`;
+}
+
+/** Race number of the first driver of a team (for illustrations). */
+export function teamNumber(teamIndex) {
+  const driver = [...PLAYER_DRIVERS, ...DRIVERS].find((d) => d.team === teamIndex);
+  return driver ? driver.number : '';
 }
 
 export function teamHex(teamIndex) {
@@ -96,7 +102,7 @@ export class PagePainter {
     if (!canvas) {
       if (!this.heroModel) this.heroModel = buildCarModel({ detail: 1 });
       canvas = makeCanvas(Math.ceil(w), Math.ceil(h));
-      drawCarFitted(canvas.getContext('2d'), null, this.heroModel, canvas.width, canvas.height, view, { livery, inkWorld: 0.0085, margin: 12 * this.S });
+      drawCarFitted(canvas.getContext('2d'), null, this.heroModel, canvas.width, canvas.height, view, { livery, inkWorld: 0.0085, margin: 12 * this.S, number: livery.number });
       this.cache.set(id, canvas);
     }
     return canvas;
@@ -110,7 +116,7 @@ export class PagePainter {
       if (!this.heroModel) this.heroModel = buildCarModel({ detail: 1 });
       canvas = makeCanvas(Math.ceil(w), Math.ceil(h));
       const scale = h / 1.15;
-      drawCar(canvas.getContext('2d'), null, this.heroModel, { yaw: 2.2, pitch: 0.2, distance: 5, target: [0.15, 0, 0.62], scale, cx: w * 0.52, cy: h * 0.5 }, { livery, ink: 5 * this.S, shadow: false });
+      drawCar(canvas.getContext('2d'), null, this.heroModel, { yaw: 2.2, pitch: 0.2, distance: 5, target: [0.15, 0, 0.62], scale, cx: w * 0.52, cy: h * 0.5 }, { livery, ink: 5 * this.S, shadow: false, number: livery.number });
       this.cache.set(id, canvas);
     }
     return canvas;
@@ -181,7 +187,7 @@ export class PagePainter {
       this.speedBackdrop(m, m, leftW + 80 * S, H * 0.68, palette, 7);
       const hero = model.hero || { team: 9, yaw: 2.5 };
       const cw = leftW - 60 * S, ch = H * 0.62 - m;
-      const car = this.car(`hero:${hero.team}:${hero.yaw}`, cw, ch, { yaw: hero.yaw, pitch: 0.13, distance: 6.2 }, { colors: teamHex(hero.team) });
+      const car = this.car(`hero:${hero.team}:${hero.yaw}`, cw, ch, { yaw: hero.yaw, pitch: 0.13, distance: 6.2 }, { colors: teamHex(hero.team), number: hero.number ?? teamNumber(hero.team) });
       ctx.drawImage(car, m + 10 * S, m + 40 * S);
     }
     this.endPanel(p1);
@@ -229,11 +235,22 @@ export class PagePainter {
     const p3 = [[m, cy], [leftW - 24 * S, cy], [leftW - 74 * S, H - m], [m, H - m]];
     this.beginPanel(p3);
     ctx.fillStyle = '#fbf8ee'; ctx.fillRect(m, cy, leftW, H - cy);
+    if (!model.track) {
+      // third panel of the plate: a close-up on the driver, with the caption box laid over it
+      const hero = model.hero || { team: 9, yaw: 2.5 };
+      const cw = leftW * 0.6, chh = H - m - cy + 60 * S;
+      ctx.fillStyle = palette.asphalt; ctx.fillRect(m + leftW * 0.36, cy, leftW, H - cy);
+      ctx.fillStyle = palette.asphaltGroove; ctx.fillRect(m + leftW * 0.36, cy, leftW, (H - cy) * 0.34);
+      ctx.drawImage(this.carCloseUp(String(hero.team), cw, chh, { colors: teamHex(hero.team), number: hero.number ?? teamNumber(hero.team) }), m + leftW * 0.36, cy - 30 * S);
+      ctx.fillStyle = '#fbf8ee';
+      ctx.beginPath(); ctx.moveTo(m, cy); ctx.lineTo(m + leftW * 0.42, cy); ctx.lineTo(m + leftW * 0.34, H - m); ctx.lineTo(m, H - m); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 5 * S; ctx.beginPath(); ctx.moveTo(m + leftW * 0.42, cy); ctx.lineTo(m + leftW * 0.34, H - m); ctx.stroke();
+    }
     this.endPanel(p3);
     let ty = cy + 34 * S;
     if (model.info) for (const line of model.info) { drawText(ctx, line, m + 36 * S, ty + 30 * S, 30 * S, { style: 'bold', color: INK, jitter: 0 }); ty += 46 * S; }
-    if (item && item.desc) this.caption(item.desc, m + 34 * S, ty + 6 * S, leftW - 190 * S, 27 * S);
-    drawText(ctx, t('menu.hint'), m + 36 * S, H - m - 26 * S, 19 * S, { style: 'caption', color: '#6b6d78', jitter: 0 });
+    if (item && item.desc) this.caption(item.desc, m + 34 * S, ty + 6 * S, model.track ? leftW - 190 * S : leftW * 0.5, 27 * S);
+    drawText(ctx, t('menu.hint'), W - m - 10 * S, H - m - 8 * S, 19 * S, { style: 'caption', color: '#6b6d78', align: 'right', jitter: 0 });
   }
 
   /** Pause overlay: translucent veil and a small panel. model: { heading, items, selected } */
@@ -271,7 +288,7 @@ export class PagePainter {
     const p1 = [[m, m], [leftW + 50 * S, m], [leftW - 30 * S, H * 0.62], [m, H * 0.62]];
     this.beginPanel(p1);
     this.speedBackdrop(m, m, leftW + 60 * S, H * 0.62, palette, 13, 0.6);
-    const car = this.car(`result:${model.heroTeam}`, leftW - 60 * S, H * 0.56 - m, { yaw: 0.62, pitch: 0.12, distance: 6.5 }, { colors: teamHex(model.heroTeam) });
+    const car = this.car(`result:${model.heroTeam}:${model.heroNumber || ''}`, leftW - 60 * S, H * 0.56 - m, { yaw: 0.62, pitch: 0.12, distance: 6.5 }, { colors: teamHex(model.heroTeam), number: model.heroNumber ?? teamNumber(model.heroTeam) });
     ctx.drawImage(car, m + 10 * S, m + 60 * S);
     this.endPanel(p1);
     drawText(ctx, model.headline, m + 30 * S, H * 0.62 + 150 * S, 104 * S, { style: 'impact', color: '#ffd42a', outline: INK, outlineWidth: 12 * S, shadow: { dx: 8 * S, dy: 9 * S, color: INK }, bounce: 0.08, seed: 5 });
@@ -317,7 +334,7 @@ export class PagePainter {
     this.paperBackground();
     const m = 44 * S, g = 28 * S;
     const palette = getPalette(model.theme || 'forest');
-    const livery = { colors: teamHex(model.team) };
+    const livery = { colors: teamHex(model.team), number: model.number ?? teamNumber(model.team) };
     const appear = (index) => Math.max(0, Math.min(1, (time - index * 0.85) / 0.28));
     // panel 1: the circuit
     const a1 = appear(0);

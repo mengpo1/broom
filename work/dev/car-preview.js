@@ -1,6 +1,6 @@
 // Development sheet for the car illustrator (not part of the game bundle).
-import { buildCarModel } from './car-model.js';
-import { drawCar, drawCarFitted } from './car-illustrator.js';
+import { buildCarModel } from '../../src/art/vehicles/car-model.js';
+import { drawCar, drawCarFitted } from '../../src/art/vehicles/car-illustrator.js';
 
 window.renderPreview = (canvas, args) => {
   const ctx = canvas.getContext('2d');
@@ -12,7 +12,7 @@ window.renderPreview = (canvas, args) => {
   let faces = 0;
   for (const p of model.parts) faces += p.faces.length;
   if (args.hero) {
-    const meta = drawCarFitted(ctx, null, model, canvas.width, canvas.height, { yaw: args.yaw ?? 2.5, pitch: args.pitch ?? 0.16, distance: args.distance ?? 7 }, { livery, inkWorld: 0.008 });
+    const meta = drawCarFitted(ctx, null, model, canvas.width, canvas.height, { yaw: args.yaw ?? 2.5, pitch: args.pitch ?? 0.16, distance: args.distance ?? 7 }, { livery, inkWorld: 0.008, number: args.number });
     return { build: t1 - t0, draw: performance.now() - t1, faces, meta };
   }
   const cols = 4, rows = 3, cw = canvas.width / cols, ch = canvas.height / rows;

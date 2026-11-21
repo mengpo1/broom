@@ -121,6 +121,11 @@ export class InputManager {
   nextMenuEvent() { return this.menuQueue.length ? this.menuQueue.shift() : null; }
   clearMenuEvents() { this.menuQueue.length = 0; }
 
+  /** Forget the edge-triggered actions latched so far (keys pressed in the menus must not act on the race that starts). */
+  clearEdges() {
+    for (const e of this.edges) { e.shift = 0; e.reset = false; e.camera = false; e.pause = false; }
+  }
+
   /** Take (and clear) an edge-triggered action of a player: 'camera' or 'pause'. */
   take(player, name) {
     const e = this.edges[player];

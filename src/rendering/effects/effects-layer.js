@@ -25,7 +25,7 @@ export function defineEffectsArt(art) {
     const rnd = seeded(seed), c = w / 2;
     const shape = blobPoints(c, c, 62, 58, lobes, 0.2, rnd);
     ctx.lineJoin = 'round';
-    ctx.beginPath(); closedCurve(ctx, shape); ctx.strokeStyle = 'rgba(22,22,31,0.85)'; ctx.lineWidth = 7; ctx.stroke();
+    ctx.beginPath(); closedCurve(ctx, shape); ctx.strokeStyle = 'rgba(22,22,31,0.9)'; ctx.lineWidth = 4.5; ctx.stroke();
     ctx.fillStyle = '#c9c9c9'; ctx.fill();                                  // shade tone (tinted at draw time)
     ctx.save(); ctx.clip();
     ctx.fillStyle = '#ffffff';
@@ -33,7 +33,7 @@ export function defineEffectsArt(art) {
     ctx.restore();
     for (let i = 0; i < 3; i++) {                                           // curl marks
       const a = 0.4 + i * 0.9, rr = 30 + i * 6;
-      brushStroke(ctx, [[c + Math.cos(a) * rr, c + Math.sin(a) * rr], [c + Math.cos(a + 0.35) * (rr + 5), c + Math.sin(a + 0.35) * (rr + 5)], [c + Math.cos(a + 0.7) * rr, c + Math.sin(a + 0.7) * rr]], 3.4, { color: 'rgba(22,22,31,0.7)', taper: 0.4 });
+      brushStroke(ctx, [[c + Math.cos(a) * rr, c + Math.sin(a) * rr], [c + Math.cos(a + 0.35) * (rr + 5), c + Math.sin(a + 0.35) * (rr + 5)], [c + Math.cos(a + 0.7) * rr, c + Math.sin(a + 0.7) * rr]], 2.6, { color: 'rgba(22,22,31,0.55)', taper: 0.4 });
     }
   });
   puff('fx.puff.0', 11, 6); puff('fx.puff.1', 29, 7); puff('fx.puff.2', 47, 5);
@@ -203,14 +203,14 @@ export class EffectsLayer {
       const loose = car.surface === SURFACE.GRASS || car.surface === SURFACE.GRAVEL;
       const sliding = car.slip > 0.55 || car.wheelspin > 0.35 || car.state === CAR_STATE.SPIN;
       if (fx.dust && ((loose && v > 7) || (sliding && v > 4))) {
-        this.emitTimer[i] -= dt * (loose ? 6 + v * 0.35 : 14);
+        this.emitTimer[i] -= dt * (loose ? 5 + v * 0.25 : 9);
         while (this.emitTimer[i] < 0) {
           this.emitTimer[i] += 1;
           const side = this.random() < 0.5 ? -0.75 : 0.75;
           const color = loose ? (car.surface === SURFACE.GRAVEL ? this.dust : this.dirt) : this.smoke;
           this.spawn(0, car.s - 1.5 + this.random() * 0.6, car.d + side + (this.random() - 0.5) * 0.4, 0.25,
-            car.speed * (loose ? 0.25 : 0.12), (this.random() - 0.5) * 1.5, 1.2 + this.random() * 1.2, 0.75 + this.random() * 0.5,
-            loose ? 1.1 : 0.8, loose ? 3.4 : 2.6, color, loose ? 0.95 : 0.8);
+            car.speed * (loose ? 0.25 : 0.12), (this.random() - 0.5) * 1.5, 1.0 + this.random() * 1.0, 0.6 + this.random() * 0.4,
+            loose ? 0.9 : 0.6, loose ? 2.2 : 1.5, color, 1);
         }
       }
       const locked = car.brake > 0.92 && v > 24 && car.surface === SURFACE.ASPHALT && car.accelLong < -24;
@@ -264,8 +264,9 @@ export class EffectsLayer {
         const s = this.psize[i] * pt.scale * (1 - t * 0.5);
         quads.sprite(this.spark, pt.x - s / 2, pt.y - s / 2, s, s, this.pr[i], this.pg[i], this.pb[i], 1 - t * t, this.pz[i], false);
       } else {
-        const size = (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale;
-        const alpha = this.pa[i] * (t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / 0.88);
+        // drawn smoke stays opaque (no ghosting of contours), swells, then shrinks away at the end of its life
+        const size = (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1);
+        const alpha = t < 0.08 ? t / 0.08 : t > 0.85 ? (1 - t) / 0.15 : 1;
         quads.sprite(this.puffs[i % 3], pt.x - size / 2, pt.y - size * 0.85, size, size, this.pr[i], this.pg[i], this.pb[i], alpha, this.pz[i], (i & 1) === 1);
       }
     }

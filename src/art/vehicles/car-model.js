@@ -122,7 +122,74 @@ function loft(part, keys, options) {
   };
   cap(0, options.capStart, sections[0].x > sections[rings - 1].x ? 1 : -1);
   cap(rings - 1, options.capEnd, sections[0].x > sections[rings - 1].x ? -1 : 1);
+  // implicit description of the same volume (negative inside), used to trim parts that run into each other
+  const descending = sections[0].x > sections[rings - 1].x;
+  part.solid = (x, y, z) => {
+    const first = sections[0].x, last = sections[rings - 1].x;
+    if (descending ? (x > first || x < last) : (x < first || x > last)) return 1;
+    let lo = 0, hi = rings - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if ((sections[mid].x >= x) === descending) lo = mid; else hi = mid; }
+    const a = sections[lo], b = sections[hi];
+    const t = b.x === a.x ? 0 : (x - a.x) / (b.x - a.x);
+    const mix = (f) => a[f] + (b[f] - a[f]) * t;
+    const zm = mix('zm'), up = z >= zm;
+    const h = up ? mix('zt') - zm : zm - mix('zb');
+    const n = up ? mix('nt') : mix('nb');
+    return Math.pow(Math.abs(y - mix('y')) / mix('w'), n) + Math.pow(Math.abs(z - zm) / Math.max(h, 1e-4), n) - 1;
+  };
   return part;
+}
+
+/**
+ * Trim a part where it runs into another volume: faces inside `solid` (an implicit function,
+ * negative inside) are removed and the faces crossing its surface are cut along it, so that two
+ * interpenetrating volumes meet on one clean line instead of fighting for the same pixels.
+ * The cut edges are flagged so that the illustrator inks them as a light junction line.
+ */
+function trimPart(part, solid) {
+  const count = part.pos.length / 3;
+  const f = new Float64Array(count);
+  for (let i = 0; i < count; i++) f[i] = solid(part.pos[i * 3], part.pos[i * 3 + 1], part.pos[i * 3 + 2]);
+  const cache = new Map();
+  const cutVertex = (inner, outer) => {
+    const key = inner * 1000003 + outer;
+    let v = cache.get(key);
+    if (v !== undefined) return v;
+    const a = inner * 3, b = outer * 3;
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 16; k++) {
+      const t = (lo + hi) / 2;
+      if (solid(part.pos[a] + (part.pos[b] - part.pos[a]) * t, part.pos[a + 1] + (part.pos[b + 1] - part.pos[a + 1]) * t, part.pos[a + 2] + (part.pos[b + 2] - part.pos[a + 2]) * t) <= 0) lo = t; else hi = t;
+    }
+    const t = hi, m = 1 - t;
+    v = part.vertex(
+      part.pos[a] * m + part.pos[b] * t, part.pos[a + 1] * m + part.pos[b + 1] * t, part.pos[a + 2] * m + part.pos[b + 2] * t,
+      part.nor[a] * m + part.nor[b] * t, part.nor[a + 1] * m + part.nor[b + 1] * t, part.nor[a + 2] * m + part.nor[b + 2] * t,
+    );
+    cache.set(key, v);
+    return v;
+  };
+  const kept = [];
+  for (const face of part.faces) {
+    const idx = face.idx, n = idx.length;
+    let inside = 0;
+    for (let k = 0; k < n; k++) if (f[idx[k]] <= 0) inside++;
+    if (inside === 0) { kept.push(face); continue; }
+    if (inside === n) continue;
+    const out = [], cut = [];
+    for (let k = 0; k < n; k++) {
+      const p = idx[k], q = idx[(k + 1) % n];
+      const pin = f[p] <= 0, qin = f[q] <= 0;
+      if (!pin) { out.push(p); cut.push(face.cut ? face.cut[k] : false); }
+      if (pin !== qin) {
+        // leaving the kept side: the next edge runs along the cut; entering it: back on an original edge
+        if (qin) { out.push(cutVertex(q, p)); cut.push(true); }
+        else { out.push(cutVertex(p, q)); cut.push(face.cut ? face.cut[k] : false); }
+      }
+    }
+    if (out.length >= 3) kept.push({ idx: out, role: face.role, cut });
+  }
+  part.faces = kept;
 }
 
 /** Flat quad subdivided into cells no larger than `cell`, one shared normal. corners: a,b,c,d in order. */
@@ -287,6 +354,7 @@ function sphere(part, cx, cy, cz, rx, ry, rz, roleAt, lat = 12, lon = 22) {
     else if (i === lat - 1) part.face([idx[i][j], idx[i][j1], idx[i + 1][j]], role);
     else part.face([idx[i][j], idx[i][j1], idx[i + 1][j1], idx[i + 1][j]], role);
   }
+  part.solid = (x, y, z) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 - 1;
 }
 
 function mirrorPart(src, name) {
@@ -295,7 +363,16 @@ function mirrorPart(src, name) {
     p.pos.push(src.pos[i], -src.pos[i + 1], src.pos[i + 2]);
     p.nor.push(src.nor[i], -src.nor[i + 1], src.nor[i + 2]);
   }
-  for (const f of src.faces) p.face(f.idx.slice().reverse(), f.role);
+  for (const f of src.faces) {
+    p.face(f.idx.slice().reverse(), f.role);
+    if (f.cut) {
+      // edge k of the reversed polygon is edge n-2-k of the source
+      const n = f.idx.length, cut = new Array(n);
+      for (let k = 0; k < n; k++) cut[k] = f.cut[(2 * n - 2 - k) % n];
+      p.faces[p.faces.length - 1].cut = cut;
+    }
+  }
+  if (src.solid) p.solid = (x, y, z) => src.solid(x, -y, z);
   for (const r of src.rods) p.rods.push({ ...r, a: [r.a[0], -r.a[1], r.a[2]], b: [r.b[0], -r.b[1], r.b[2]] });
   for (const l of src.lines) p.lines.push({ ...l, pts: l.pts.map((q) => [q[0], -q[1], q[2]]), normal: [l.normal[0], -l.normal[1], l.normal[2]] });
   return p;
@@ -388,6 +465,15 @@ export function buildCarModel(options = {}) {
     role: (x, y, z, u, j, i, n) => (u > 0.56 && u < 0.94 ? ROLE.CARBON : j === Math.round(n * 0.08) || j === Math.round(n * 0.08) + 1 ? ROLE.WING : ROLE.SIDE),
     capStart: ROLE.BLACK, capEnd: ROLE.CARBON,
   });
+  // where the volumes run into each other they are trimmed so that they meet on a clean line
+  const podRight = (x, y, z) => pod.solid(x, -y, z);
+  const podSolid = pod.solid;
+  const tubSolid = tub.solid, coverSolid0 = cover.solid;
+  trimPart(cover, tubSolid);                 // the front of the engine cover is tucked inside the tub
+  trimPart(pod, (x, y, z) => Math.min(tubSolid(x, y, z), coverSolid0(x, y, z)));     // the central body as one volume
+  for (const body of [tub, cover]) { trimPart(body, podSolid); trimPart(body, podRight); }
+  const coverSolid = cover.solid;
+  trimPart(cover, spine.solid); trimPart(spine, coverSolid);
   parts.push(pod, mirrorPart(pod, 'sidepod.right'));
 
   // ---- floor
@@ -442,7 +528,9 @@ export function buildCarModel(options = {}) {
   }, hLat, hLon);
   parts.push(helmet);
   const shoulders = new PartBuilder('driver', { ink: 0.6 });
-  sphere(shoulders, -0.14, 0, 0.585, 0.2, 0.225, 0.085, () => ROLE.SUIT, 6, 14);
+  sphere(shoulders, -0.14, 0, 0.585, 0.2, 0.225, 0.085, () => ROLE.SUIT, detail > 0 ? 10 : 6, detail > 0 ? 24 : 14);
+  const shoulderSolid = shoulders.solid;
+  trimPart(shoulders, tub.solid); trimPart(tub, shoulderSolid);
   parts.push(shoulders);
   const screen = new PartBuilder('windscreen', { ink: 0.6 });
   box(screen, 0.5, 0, 0.615, 0.01, 0.34, 0.05, ROLE.GLASS, -0.55);

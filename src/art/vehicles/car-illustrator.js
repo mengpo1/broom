@@ -7,6 +7,7 @@
 
 import { ROLE } from './car-model.js';
 import { mixHex } from '../palettes/palettes.js';
+import { drawText, measureText } from '../styles/lettering.js';
 
 const LIGHT = (() => { const v = [0.12, 0, 1]; const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })();
 const TONE_SHADE = 0.4, TONE_LIGHT = 0.8, TONE_GLOSS = 0.972;
@@ -311,7 +312,8 @@ export function drawCar(ctx, maskCtx, model, cam, options = {}) {
         const adj = part.edges[e];
         let kind = 2;         // 2 silhouette, 1 crease, 0 smooth interior
         let pending = false;
-        for (let j = 0; j < adj.length; j++) {
+        if (face.cut && face.cut[q]) kind = 1;       // junction with another volume: a light line
+        else for (let j = 0; j < adj.length; j++) {
           const o = adj[j];
           if (o === el.index || !pr.visible[o]) continue;
           const dot = nx * pr.normals[o * 3] + ny * pr.normals[o * 3 + 1] + nz * pr.normals[o * 3 + 2];
@@ -339,7 +341,39 @@ export function drawCar(ctx, maskCtx, model, cam, options = {}) {
       strokeSeg(s[0], s[1], s[3], s[4], inkBase * 0.4 * (line.weight || 1), style, '#000');
     }
   }
+  if (options.number) drawNumberDecals(ctx, camera, String(options.number), options.numberColors || ['#16161f', '#f1efe6']);
   return bounds;
+}
+
+/** Race number lettered on flat panels of the car (large illustrations only): rear wing end plates and nose. */
+const NUMBER_PANELS = [
+  { origin: [-1.8, 0.5165, 0.8], u: [-0.4, 0, 0], v: [0, 0, -0.27], normal: [0, 1, 0] },         // left end plate, read from the left
+  { origin: [-2.2, -0.5165, 0.8], u: [0.4, 0, 0], v: [0, 0, -0.27], normal: [0, -1, 0] },        // right end plate
+  { origin: [1.2, -0.11, 0.474], u: [0, 0.22, 0], v: [0.3, 0, -0.022], normal: [0.07, 0, 1] },   // top of the nose, read from the front
+];
+function drawNumberDecals(ctx, camera, text, colors) {
+  const { pos: cp, f, r, u, k, cx, cy } = camera;
+  const project = (p) => {
+    const x = p[0] - cp[0], y = p[1] - cp[1], z = p[2] - cp[2];
+    const d = x * f[0] + y * f[1] + z * f[2];
+    return d > 0.1 ? [cx + ((x * r[0] + y * r[1] + z * r[2]) / d) * k, cy - ((x * u[0] + y * u[1] + z * u[2]) / d) * k] : null;
+  };
+  for (const panel of NUMBER_PANELS) {
+    const o = panel.origin, n = panel.normal;
+    if (n[0] * (cp[0] - o[0]) + n[1] * (cp[1] - o[1]) + n[2] * (cp[2] - o[2]) <= 0.4) continue;   // facing away or seen edge-on
+    const p0 = project(o), p1 = project([o[0] + panel.u[0], o[1] + panel.u[1], o[2] + panel.u[2]]), p2 = project([o[0] + panel.v[0], o[1] + panel.v[1], o[2] + panel.v[2]]);
+    if (!p0 || !p1 || !p2) continue;
+    // affine frame of the panel: unit square (0..1, 0..1) -> screen
+    ctx.save();
+    ctx.transform(p1[0] - p0[0], p1[1] - p0[1], p2[0] - p0[0], p2[1] - p0[1], p0[0], p0[1]);
+    ctx.scale(1 / 100, 1 / 100);                       // work in a 100 x 100 box
+    const size = 56, w = measureText(text, size, { style: 'bold' });
+    ctx.fillStyle = colors[1];
+    ctx.beginPath(); ctx.ellipse(50, 50, Math.max(32, w * 0.5 + 10), 42, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#16161f'; ctx.lineWidth = 3; ctx.stroke();
+    drawText(ctx, text, 50, 50 + size * 0.5, size, { style: 'bold', color: colors[0], align: 'center', jitter: 0, slant: 0 });
+    ctx.restore();
+  }
 }
 
 /**

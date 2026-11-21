@@ -1,6 +1,6 @@
 // Development specimen of the procedural lettering (see work/scripts/lettering-specimen.mjs).
 // Draws on <canvas id="c">; the sheet is chosen by the URL hash or window.letteringSpecimen.draw(name).
-import { drawText, drawTextBox, measureText, glyphAdvance, LETTERING_CHARSET } from './lettering.js';
+import { drawText, drawTextBox, measureText, glyphAdvance, LETTERING_CHARSET } from '../../src/art/styles/lettering.js';
 
 const WIDTH = 2000, HEIGHT = 1500, MARGIN = 50;
 const INK = '#16161f', PAPER = '#f4efe2', RED = '#e0312b', YELLOW = '#ffd42a', ORANGE = '#f58a1f', CAPTION = '#f6e27a';

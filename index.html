@@ -6775,7 +6775,74 @@ function loft(part, keys, options) {
   };
   cap(0, options.capStart, sections[0].x > sections[rings - 1].x ? 1 : -1);
   cap(rings - 1, options.capEnd, sections[0].x > sections[rings - 1].x ? -1 : 1);
+  // implicit description of the same volume (negative inside), used to trim parts that run into each other
+  const descending = sections[0].x > sections[rings - 1].x;
+  part.solid = (x, y, z) => {
+    const first = sections[0].x, last = sections[rings - 1].x;
+    if (descending ? (x > first || x < last) : (x < first || x > last)) return 1;
+    let lo = 0, hi = rings - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if ((sections[mid].x >= x) === descending) lo = mid; else hi = mid; }
+    const a = sections[lo], b = sections[hi];
+    const t = b.x === a.x ? 0 : (x - a.x) / (b.x - a.x);
+    const mix = (f) => a[f] + (b[f] - a[f]) * t;
+    const zm = mix('zm'), up = z >= zm;
+    const h = up ? mix('zt') - zm : zm - mix('zb');
+    const n = up ? mix('nt') : mix('nb');
+    return Math.pow(Math.abs(y - mix('y')) / mix('w'), n) + Math.pow(Math.abs(z - zm) / Math.max(h, 1e-4), n) - 1;
+  };
   return part;
+}
+
+/**
+ * Trim a part where it runs into another volume: faces inside `solid` (an implicit function,
+ * negative inside) are removed and the faces crossing its surface are cut along it, so that two
+ * interpenetrating volumes meet on one clean line instead of fighting for the same pixels.
+ * The cut edges are flagged so that the illustrator inks them as a light junction line.
+ */
+function trimPart(part, solid) {
+  const count = part.pos.length / 3;
+  const f = new Float64Array(count);
+  for (let i = 0; i < count; i++) f[i] = solid(part.pos[i * 3], part.pos[i * 3 + 1], part.pos[i * 3 + 2]);
+  const cache = new Map();
+  const cutVertex = (inner, outer) => {
+    const key = inner * 1000003 + outer;
+    let v = cache.get(key);
+    if (v !== undefined) return v;
+    const a = inner * 3, b = outer * 3;
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 16; k++) {
+      const t = (lo + hi) / 2;
+      if (solid(part.pos[a] + (part.pos[b] - part.pos[a]) * t, part.pos[a + 1] + (part.pos[b + 1] - part.pos[a + 1]) * t, part.pos[a + 2] + (part.pos[b + 2] - part.pos[a + 2]) * t) <= 0) lo = t; else hi = t;
+    }
+    const t = hi, m = 1 - t;
+    v = part.vertex(
+      part.pos[a] * m + part.pos[b] * t, part.pos[a + 1] * m + part.pos[b + 1] * t, part.pos[a + 2] * m + part.pos[b + 2] * t,
+      part.nor[a] * m + part.nor[b] * t, part.nor[a + 1] * m + part.nor[b + 1] * t, part.nor[a + 2] * m + part.nor[b + 2] * t,
+    );
+    cache.set(key, v);
+    return v;
+  };
+  const kept = [];
+  for (const face of part.faces) {
+    const idx = face.idx, n = idx.length;
+    let inside = 0;
+    for (let k = 0; k < n; k++) if (f[idx[k]] <= 0) inside++;
+    if (inside === 0) { kept.push(face); continue; }
+    if (inside === n) continue;
+    const out = [], cut = [];
+    for (let k = 0; k < n; k++) {
+      const p = idx[k], q = idx[(k + 1) % n];
+      const pin = f[p] <= 0, qin = f[q] <= 0;
+      if (!pin) { out.push(p); cut.push(face.cut ? face.cut[k] : false); }
+      if (pin !== qin) {
+        // leaving the kept side: the next edge runs along the cut; entering it: back on an original edge
+        if (qin) { out.push(cutVertex(q, p)); cut.push(true); }
+        else { out.push(cutVertex(p, q)); cut.push(face.cut ? face.cut[k] : false); }
+      }
+    }
+    if (out.length >= 3) kept.push({ idx: out, role: face.role, cut });
+  }
+  part.faces = kept;
 }
 
 /** Flat quad subdivided into cells no larger than `cell`, one shared normal. corners: a,b,c,d in order. */
@@ -6850,7 +6917,7 @@ function plate(part, outline, y0, y1, roleOut, roleIn, roleEdge) {
       const z0 = minZ + ((maxZ - minZ) * iz) / nzCells, z1 = minZ + ((maxZ - minZ) * (iz + 1)) / nzCells;
       const poly = clipCell([[x0, z0], [x1, z0], [x1, z1], [x0, z1]]);
       if (poly.length < 3) continue;
-      part.face(poly.map((q) => part.vertex(q[0], y, q[1], 0, ny, 0)), role);
+      part.face(poly.map((q) => part.vertex(q[0], y, q[1], 0, ny, 0)), typeof role === 'function' ? role((x0 + x1) / 2, (z0 + z1) / 2) : role);
     }
   };
   side(hi, 1, y1 > y0 ? roleOut : roleIn);
@@ -6940,6 +7007,7 @@ function sphere(part, cx, cy, cz, rx, ry, rz, roleAt, lat = 12, lon = 22) {
     else if (i === lat - 1) part.face([idx[i][j], idx[i][j1], idx[i + 1][j]], role);
     else part.face([idx[i][j], idx[i][j1], idx[i + 1][j1], idx[i + 1][j]], role);
   }
+  part.solid = (x, y, z) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 - 1;
 }
 
 function mirrorPart(src, name) {
@@ -6948,7 +7016,16 @@ function mirrorPart(src, name) {
     p.pos.push(src.pos[i], -src.pos[i + 1], src.pos[i + 2]);
     p.nor.push(src.nor[i], -src.nor[i + 1], src.nor[i + 2]);
   }
-  for (const f of src.faces) p.face(f.idx.slice().reverse(), f.role);
+  for (const f of src.faces) {
+    p.face(f.idx.slice().reverse(), f.role);
+    if (f.cut) {
+      // edge k of the reversed polygon is edge n-2-k of the source
+      const n = f.idx.length, cut = new Array(n);
+      for (let k = 0; k < n; k++) cut[k] = f.cut[(2 * n - 2 - k) % n];
+      p.faces[p.faces.length - 1].cut = cut;
+    }
+  }
+  if (src.solid) p.solid = (x, y, z) => src.solid(x, -y, z);
   for (const r of src.rods) p.rods.push({ ...r, a: [r.a[0], -r.a[1], r.a[2]], b: [r.b[0], -r.b[1], r.b[2]] });
   for (const l of src.lines) p.lines.push({ ...l, pts: l.pts.map((q) => [q[0], -q[1], q[2]]), normal: [l.normal[0], -l.normal[1], l.normal[2]] });
   return p;
@@ -7009,7 +7086,7 @@ function buildCarModel(options = {}) {
     { x: -1.2, zb: 0.09, zt: 0.52, w: 0.25, nt: 2.8, nb: 4.5 },
     { x: -1.6, zb: 0.12, zt: 0.42, w: 0.17, nt: 2.6, nb: 4 },
     { x: -1.93, zb: 0.16, zt: 0.36, w: 0.11, nt: 2.4, nb: 3 },
-  ], { around, spacing, role: (x, y, z) => (z < 0.2 ? ROLE.CARBON : ROLE.BODY), capStart: null, capEnd: ROLE.CARBON });
+  ], { around, spacing, role: (x, y, z, u, j, i, n) => (u > 0.56 && u < 0.94 ? ROLE.CARBON : (j === 0 || j === Math.round(n / 2) - 1) ? ROLE.SIDE : ROLE.BODY), capStart: null, capEnd: ROLE.CARBON });
   parts.push(cover);
   const spine = new PartBuilder('airbox', { ink: 1, gloss: true });
   loft(spine, [
@@ -7038,9 +7115,18 @@ function buildCarModel(options = {}) {
     { x: -1.5, y: 0.32, zb: 0.11, zt: 0.22, w: 0.05, nt: 2.6, nb: 3 },
   ], {
     around, spacing,
-    role: (x, y, z, u) => (u > 0.56 && u < 0.94 ? ROLE.CARBON : ROLE.SIDE),
+    role: (x, y, z, u, j, i, n) => (u > 0.56 && u < 0.94 ? ROLE.CARBON : j === Math.round(n * 0.08) || j === Math.round(n * 0.08) + 1 ? ROLE.WING : ROLE.SIDE),
     capStart: ROLE.BLACK, capEnd: ROLE.CARBON,
   });
+  // where the volumes run into each other they are trimmed so that they meet on a clean line
+  const podRight = (x, y, z) => pod.solid(x, -y, z);
+  const podSolid = pod.solid;
+  const tubSolid = tub.solid, coverSolid0 = cover.solid;
+  trimPart(cover, tubSolid);                 // the front of the engine cover is tucked inside the tub
+  trimPart(pod, (x, y, z) => Math.min(tubSolid(x, y, z), coverSolid0(x, y, z)));     // the central body as one volume
+  for (const body of [tub, cover]) { trimPart(body, podSolid); trimPart(body, podRight); }
+  const coverSolid = cover.solid;
+  trimPart(cover, spine.solid); trimPart(spine, coverSolid);
   parts.push(pod, mirrorPart(pod, 'sidepod.right'));
 
   // ---- floor
@@ -7056,7 +7142,7 @@ function buildCarModel(options = {}) {
   box(flap, 1.96, 0.405, 0.175, 0.2, 0.585, 0.02, { top: ROLE.BODY, bottom: ROLE.BODY, front: ROLE.BODY, rear: ROLE.BODY, right: ROLE.BODY }, 0.42, 0.11);
   parts.push(flap, mirrorPart(flap, 'frontwing.flap.right'));
   const fep = new PartBuilder('frontwing.endplate.left', { ink: 0.9, outward: [0, 1, 0] });
-  plate(fep, [[1.84, 0.05], [2.31, 0.05], [2.31, 0.19], [2.12, 0.3], [1.84, 0.3]], 0.7, 0.715, ROLE.SIDE, ROLE.SIDE, ROLE.SIDE);
+  plate(fep, [[1.84, 0.05], [2.31, 0.05], [2.31, 0.19], [2.12, 0.3], [1.84, 0.3]], 0.7, 0.715, (x, z) => (z < 0.13 ? ROLE.WING : ROLE.SIDE), ROLE.SIDE, ROLE.SIDE);
   parts.push(fep, mirrorPart(fep, 'frontwing.endplate.right'));
   const pyl = new PartBuilder('frontwing.pylons', { ink: 0.6 });
   box(pyl, 2.07, 0.07, 0.155, 0.1, 0.02, 0.09, ROLE.CARBON);
@@ -7065,7 +7151,7 @@ function buildCarModel(options = {}) {
 
   // ---- rear wing
   const rep = new PartBuilder('rearwing.endplate.left', { ink: 1, outward: [0, 1, 0] });
-  plate(rep, [[-1.72, 0.3], [-2.27, 0.3], [-2.27, 0.97], [-1.82, 0.97], [-1.72, 0.8]], 0.5, 0.515, ROLE.SIDE, ROLE.SIDE, ROLE.SIDE);
+  plate(rep, [[-1.72, 0.3], [-2.27, 0.3], [-2.27, 0.97], [-1.82, 0.97], [-1.72, 0.8]], 0.5, 0.515, (x, z) => (z > 0.84 ? ROLE.WING : z < 0.45 ? ROLE.BODY : ROLE.SIDE), ROLE.SIDE, ROLE.SIDE);
   parts.push(rep, mirrorPart(rep, 'rearwing.endplate.right'));
   const rw = new PartBuilder('rearwing.main', { ink: 0.9 });
   box(rw, -2.06, 0, 0.8, 0.33, 0.996, 0.035, { top: ROLE.WING, bottom: ROLE.WING, front: ROLE.WING, rear: ROLE.WING }, -0.16, 0.12);
@@ -7095,7 +7181,9 @@ function buildCarModel(options = {}) {
   }, hLat, hLon);
   parts.push(helmet);
   const shoulders = new PartBuilder('driver', { ink: 0.6 });
-  sphere(shoulders, -0.14, 0, 0.585, 0.2, 0.225, 0.085, () => ROLE.SUIT, 6, 14);
+  sphere(shoulders, -0.14, 0, 0.585, 0.2, 0.225, 0.085, () => ROLE.SUIT, detail > 0 ? 10 : 6, detail > 0 ? 24 : 14);
+  const shoulderSolid = shoulders.solid;
+  trimPart(shoulders, tub.solid); trimPart(tub, shoulderSolid);
   parts.push(shoulders);
   const screen = new PartBuilder('windscreen', { ink: 0.6 });
   box(screen, 0.5, 0, 0.615, 0.01, 0.34, 0.05, ROLE.GLASS, -0.55);
@@ -7248,6 +7336,7 @@ __modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, buildCarMod
 
 const { ROLE } = __modules["src/art/vehicles/car-model.js"];
 const { mixHex } = __modules["src/art/palettes/palettes.js"];
+const { drawText, measureText } = __modules["src/art/styles/lettering.js"];
 
 const LIGHT = (() => { const v = [0.12, 0, 1]; const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })();
 const TONE_SHADE = 0.4, TONE_LIGHT = 0.8, TONE_GLOSS = 0.972;
@@ -7270,7 +7359,7 @@ const SHADOW_OUTLINE = (() => {
 })();
 const SHADE_INK = '#1b1b3a';
 /** Blend factors of the four tones relative to the base colour (shared with the mask encoding). */
-const TONE_MIX = { shade: 0.46, mid: 0.15, gloss: 0.72 };
+const TONE_MIX = { shade: 0.46, mid: 0.15, gloss: 0.9 };
 
 /** Fixed materials: [shade, base, light] */
 const FIXED = {
@@ -7552,7 +7641,8 @@ function drawCar(ctx, maskCtx, model, cam, options = {}) {
         const adj = part.edges[e];
         let kind = 2;         // 2 silhouette, 1 crease, 0 smooth interior
         let pending = false;
-        for (let j = 0; j < adj.length; j++) {
+        if (face.cut && face.cut[q]) kind = 1;       // junction with another volume: a light line
+        else for (let j = 0; j < adj.length; j++) {
           const o = adj[j];
           if (o === el.index || !pr.visible[o]) continue;
           const dot = nx * pr.normals[o * 3] + ny * pr.normals[o * 3 + 1] + nz * pr.normals[o * 3 + 2];
@@ -7580,7 +7670,39 @@ function drawCar(ctx, maskCtx, model, cam, options = {}) {
       strokeSeg(s[0], s[1], s[3], s[4], inkBase * 0.4 * (line.weight || 1), style, '#000');
     }
   }
+  if (options.number) drawNumberDecals(ctx, camera, String(options.number), options.numberColors || ['#16161f', '#f1efe6']);
   return bounds;
+}
+
+/** Race number lettered on flat panels of the car (large illustrations only): rear wing end plates and nose. */
+const NUMBER_PANELS = [
+  { origin: [-1.8, 0.5165, 0.8], u: [-0.4, 0, 0], v: [0, 0, -0.27], normal: [0, 1, 0] },         // left end plate, read from the left
+  { origin: [-2.2, -0.5165, 0.8], u: [0.4, 0, 0], v: [0, 0, -0.27], normal: [0, -1, 0] },        // right end plate
+  { origin: [1.2, -0.11, 0.474], u: [0, 0.22, 0], v: [0.3, 0, -0.022], normal: [0.07, 0, 1] },   // top of the nose, read from the front
+];
+function drawNumberDecals(ctx, camera, text, colors) {
+  const { pos: cp, f, r, u, k, cx, cy } = camera;
+  const project = (p) => {
+    const x = p[0] - cp[0], y = p[1] - cp[1], z = p[2] - cp[2];
+    const d = x * f[0] + y * f[1] + z * f[2];
+    return d > 0.1 ? [cx + ((x * r[0] + y * r[1] + z * r[2]) / d) * k, cy - ((x * u[0] + y * u[1] + z * u[2]) / d) * k] : null;
+  };
+  for (const panel of NUMBER_PANELS) {
+    const o = panel.origin, n = panel.normal;
+    if (n[0] * (cp[0] - o[0]) + n[1] * (cp[1] - o[1]) + n[2] * (cp[2] - o[2]) <= 0.4) continue;   // facing away or seen edge-on
+    const p0 = project(o), p1 = project([o[0] + panel.u[0], o[1] + panel.u[1], o[2] + panel.u[2]]), p2 = project([o[0] + panel.v[0], o[1] + panel.v[1], o[2] + panel.v[2]]);
+    if (!p0 || !p1 || !p2) continue;
+    // affine frame of the panel: unit square (0..1, 0..1) -> screen
+    ctx.save();
+    ctx.transform(p1[0] - p0[0], p1[1] - p0[1], p2[0] - p0[0], p2[1] - p0[1], p0[0], p0[1]);
+    ctx.scale(1 / 100, 1 / 100);                       // work in a 100 x 100 box
+    const size = 56, w = measureText(text, size, { style: 'bold' });
+    ctx.fillStyle = colors[1];
+    ctx.beginPath(); ctx.ellipse(50, 50, Math.max(32, w * 0.5 + 10), 42, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#16161f'; ctx.lineWidth = 3; ctx.stroke();
+    drawText(ctx, text, 50, 50 + size * 0.5, size, { style: 'bold', color: colors[0], align: 'center', jitter: 0, slant: 0 });
+    ctx.restore();
+  }
 }
 
 /**
@@ -12256,7 +12378,7 @@ function defineEffectsArt(art) {
     const rnd = seeded(seed), c = w / 2;
     const shape = blobPoints(c, c, 62, 58, lobes, 0.2, rnd);
     ctx.lineJoin = 'round';
-    ctx.beginPath(); closedCurve(ctx, shape); ctx.strokeStyle = 'rgba(22,22,31,0.85)'; ctx.lineWidth = 7; ctx.stroke();
+    ctx.beginPath(); closedCurve(ctx, shape); ctx.strokeStyle = 'rgba(22,22,31,0.9)'; ctx.lineWidth = 4.5; ctx.stroke();
     ctx.fillStyle = '#c9c9c9'; ctx.fill();                                  // shade tone (tinted at draw time)
     ctx.save(); ctx.clip();
     ctx.fillStyle = '#ffffff';
@@ -12264,7 +12386,7 @@ function defineEffectsArt(art) {
     ctx.restore();
     for (let i = 0; i < 3; i++) {                                           // curl marks
       const a = 0.4 + i * 0.9, rr = 30 + i * 6;
-      brushStroke(ctx, [[c + Math.cos(a) * rr, c + Math.sin(a) * rr], [c + Math.cos(a + 0.35) * (rr + 5), c + Math.sin(a + 0.35) * (rr + 5)], [c + Math.cos(a + 0.7) * rr, c + Math.sin(a + 0.7) * rr]], 3.4, { color: 'rgba(22,22,31,0.7)', taper: 0.4 });
+      brushStroke(ctx, [[c + Math.cos(a) * rr, c + Math.sin(a) * rr], [c + Math.cos(a + 0.35) * (rr + 5), c + Math.sin(a + 0.35) * (rr + 5)], [c + Math.cos(a + 0.7) * rr, c + Math.sin(a + 0.7) * rr]], 2.6, { color: 'rgba(22,22,31,0.55)', taper: 0.4 });
     }
   });
   puff('fx.puff.0', 11, 6); puff('fx.puff.1', 29, 7); puff('fx.puff.2', 47, 5);
@@ -12434,14 +12556,14 @@ class EffectsLayer {
       const loose = car.surface === SURFACE.GRASS || car.surface === SURFACE.GRAVEL;
       const sliding = car.slip > 0.55 || car.wheelspin > 0.35 || car.state === CAR_STATE.SPIN;
       if (fx.dust && ((loose && v > 7) || (sliding && v > 4))) {
-        this.emitTimer[i] -= dt * (loose ? 6 + v * 0.35 : 14);
+        this.emitTimer[i] -= dt * (loose ? 5 + v * 0.25 : 9);
         while (this.emitTimer[i] < 0) {
           this.emitTimer[i] += 1;
           const side = this.random() < 0.5 ? -0.75 : 0.75;
           const color = loose ? (car.surface === SURFACE.GRAVEL ? this.dust : this.dirt) : this.smoke;
           this.spawn(0, car.s - 1.5 + this.random() * 0.6, car.d + side + (this.random() - 0.5) * 0.4, 0.25,
-            car.speed * (loose ? 0.25 : 0.12), (this.random() - 0.5) * 1.5, 1.2 + this.random() * 1.2, 0.75 + this.random() * 0.5,
-            loose ? 1.1 : 0.8, loose ? 3.4 : 2.6, color, loose ? 0.95 : 0.8);
+            car.speed * (loose ? 0.25 : 0.12), (this.random() - 0.5) * 1.5, 1.0 + this.random() * 1.0, 0.6 + this.random() * 0.4,
+            loose ? 0.9 : 0.6, loose ? 2.2 : 1.5, color, 1);
         }
       }
       const locked = car.brake > 0.92 && v > 24 && car.surface === SURFACE.ASPHALT && car.accelLong < -24;
@@ -12495,8 +12617,9 @@ class EffectsLayer {
         const s = this.psize[i] * pt.scale * (1 - t * 0.5);
         quads.sprite(this.spark, pt.x - s / 2, pt.y - s / 2, s, s, this.pr[i], this.pg[i], this.pb[i], 1 - t * t, this.pz[i], false);
       } else {
-        const size = (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale;
-        const alpha = this.pa[i] * (t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / 0.88);
+        // drawn smoke stays opaque (no ghosting of contours), swells, then shrinks away at the end of its life
+        const size = (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1);
+        const alpha = t < 0.08 ? t / 0.08 : t > 0.85 ? (1 - t) / 0.15 : 1;
         quads.sprite(this.puffs[i % 3], pt.x - size / 2, pt.y - size * 0.85, size, size, this.pr[i], this.pg[i], this.pb[i], alpha, this.pz[i], (i & 1) === 1);
       }
     }
@@ -12776,6 +12899,11 @@ class InputManager {
   /** Next menu event ('up', 'down', 'left', 'right', 'accept', 'back') or null. */
   nextMenuEvent() { return this.menuQueue.length ? this.menuQueue.shift() : null; }
   clearMenuEvents() { this.menuQueue.length = 0; }
+
+  /** Forget the edge-triggered actions latched so far (keys pressed in the menus must not act on the race that starts). */
+  clearEdges() {
+    for (const e of this.edges) { e.shift = 0; e.reset = false; e.camera = false; e.pause = false; }
+  }
 
   /** Take (and clear) an edge-triggered action of a player: 'camera' or 'pause'. */
   take(player, name) {
@@ -14797,7 +14925,7 @@ const { buildCarModel } = __modules["src/art/vehicles/car-model.js"];
 const { drawCar, drawCarFitted } = __modules["src/art/vehicles/car-illustrator.js"];
 const { liveryColors } = __modules["src/art/art-library.js"];
 const { rgbToHex, getPalette } = __modules["src/art/palettes/palettes.js"];
-const { ALL_TEAMS } = __modules["src/vehicles/liveries.js"];
+const { ALL_TEAMS, DRIVERS, PLAYER_DRIVERS } = __modules["src/vehicles/liveries.js"];
 
 const INK = '#16161f', PAPER = '#f4efe2', PAPER_SHADE = '#e4dcc8', CAPTION = '#f6e27a', RED = '#d5302a', BLUE = '#2f5fa8';
 
@@ -14805,6 +14933,12 @@ function formatTime(seconds) {
   if (!(seconds > 0) || !Number.isFinite(seconds)) return '-:--.---';
   const ms = Math.round(seconds * 1000);
   return `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}`;
+}
+
+/** Race number of the first driver of a team (for illustrations). */
+function teamNumber(teamIndex) {
+  const driver = [...PLAYER_DRIVERS, ...DRIVERS].find((d) => d.team === teamIndex);
+  return driver ? driver.number : '';
 }
 
 function teamHex(teamIndex) {
@@ -14882,7 +15016,7 @@ class PagePainter {
     if (!canvas) {
       if (!this.heroModel) this.heroModel = buildCarModel({ detail: 1 });
       canvas = makeCanvas(Math.ceil(w), Math.ceil(h));
-      drawCarFitted(canvas.getContext('2d'), null, this.heroModel, canvas.width, canvas.height, view, { livery, inkWorld: 0.0085, margin: 12 * this.S });
+      drawCarFitted(canvas.getContext('2d'), null, this.heroModel, canvas.width, canvas.height, view, { livery, inkWorld: 0.0085, margin: 12 * this.S, number: livery.number });
       this.cache.set(id, canvas);
     }
     return canvas;
@@ -14896,7 +15030,7 @@ class PagePainter {
       if (!this.heroModel) this.heroModel = buildCarModel({ detail: 1 });
       canvas = makeCanvas(Math.ceil(w), Math.ceil(h));
       const scale = h / 1.15;
-      drawCar(canvas.getContext('2d'), null, this.heroModel, { yaw: 2.2, pitch: 0.2, distance: 5, target: [0.15, 0, 0.62], scale, cx: w * 0.52, cy: h * 0.5 }, { livery, ink: 5 * this.S, shadow: false });
+      drawCar(canvas.getContext('2d'), null, this.heroModel, { yaw: 2.2, pitch: 0.2, distance: 5, target: [0.15, 0, 0.62], scale, cx: w * 0.52, cy: h * 0.5 }, { livery, ink: 5 * this.S, shadow: false, number: livery.number });
       this.cache.set(id, canvas);
     }
     return canvas;
@@ -14967,7 +15101,7 @@ class PagePainter {
       this.speedBackdrop(m, m, leftW + 80 * S, H * 0.68, palette, 7);
       const hero = model.hero || { team: 9, yaw: 2.5 };
       const cw = leftW - 60 * S, ch = H * 0.62 - m;
-      const car = this.car(`hero:${hero.team}:${hero.yaw}`, cw, ch, { yaw: hero.yaw, pitch: 0.13, distance: 6.2 }, { colors: teamHex(hero.team) });
+      const car = this.car(`hero:${hero.team}:${hero.yaw}`, cw, ch, { yaw: hero.yaw, pitch: 0.13, distance: 6.2 }, { colors: teamHex(hero.team), number: hero.number ?? teamNumber(hero.team) });
       ctx.drawImage(car, m + 10 * S, m + 40 * S);
     }
     this.endPanel(p1);
@@ -15015,11 +15149,22 @@ class PagePainter {
     const p3 = [[m, cy], [leftW - 24 * S, cy], [leftW - 74 * S, H - m], [m, H - m]];
     this.beginPanel(p3);
     ctx.fillStyle = '#fbf8ee'; ctx.fillRect(m, cy, leftW, H - cy);
+    if (!model.track) {
+      // third panel of the plate: a close-up on the driver, with the caption box laid over it
+      const hero = model.hero || { team: 9, yaw: 2.5 };
+      const cw = leftW * 0.6, chh = H - m - cy + 60 * S;
+      ctx.fillStyle = palette.asphalt; ctx.fillRect(m + leftW * 0.36, cy, leftW, H - cy);
+      ctx.fillStyle = palette.asphaltGroove; ctx.fillRect(m + leftW * 0.36, cy, leftW, (H - cy) * 0.34);
+      ctx.drawImage(this.carCloseUp(String(hero.team), cw, chh, { colors: teamHex(hero.team), number: hero.number ?? teamNumber(hero.team) }), m + leftW * 0.36, cy - 30 * S);
+      ctx.fillStyle = '#fbf8ee';
+      ctx.beginPath(); ctx.moveTo(m, cy); ctx.lineTo(m + leftW * 0.42, cy); ctx.lineTo(m + leftW * 0.34, H - m); ctx.lineTo(m, H - m); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 5 * S; ctx.beginPath(); ctx.moveTo(m + leftW * 0.42, cy); ctx.lineTo(m + leftW * 0.34, H - m); ctx.stroke();
+    }
     this.endPanel(p3);
     let ty = cy + 34 * S;
     if (model.info) for (const line of model.info) { drawText(ctx, line, m + 36 * S, ty + 30 * S, 30 * S, { style: 'bold', color: INK, jitter: 0 }); ty += 46 * S; }
-    if (item && item.desc) this.caption(item.desc, m + 34 * S, ty + 6 * S, leftW - 190 * S, 27 * S);
-    drawText(ctx, t('menu.hint'), m + 36 * S, H - m - 26 * S, 19 * S, { style: 'caption', color: '#6b6d78', jitter: 0 });
+    if (item && item.desc) this.caption(item.desc, m + 34 * S, ty + 6 * S, model.track ? leftW - 190 * S : leftW * 0.5, 27 * S);
+    drawText(ctx, t('menu.hint'), W - m - 10 * S, H - m - 8 * S, 19 * S, { style: 'caption', color: '#6b6d78', align: 'right', jitter: 0 });
   }
 
   /** Pause overlay: translucent veil and a small panel. model: { heading, items, selected } */
@@ -15057,7 +15202,7 @@ class PagePainter {
     const p1 = [[m, m], [leftW + 50 * S, m], [leftW - 30 * S, H * 0.62], [m, H * 0.62]];
     this.beginPanel(p1);
     this.speedBackdrop(m, m, leftW + 60 * S, H * 0.62, palette, 13, 0.6);
-    const car = this.car(`result:${model.heroTeam}`, leftW - 60 * S, H * 0.56 - m, { yaw: 0.62, pitch: 0.12, distance: 6.5 }, { colors: teamHex(model.heroTeam) });
+    const car = this.car(`result:${model.heroTeam}:${model.heroNumber || ''}`, leftW - 60 * S, H * 0.56 - m, { yaw: 0.62, pitch: 0.12, distance: 6.5 }, { colors: teamHex(model.heroTeam), number: model.heroNumber ?? teamNumber(model.heroTeam) });
     ctx.drawImage(car, m + 10 * S, m + 60 * S);
     this.endPanel(p1);
     drawText(ctx, model.headline, m + 30 * S, H * 0.62 + 150 * S, 104 * S, { style: 'impact', color: '#ffd42a', outline: INK, outlineWidth: 12 * S, shadow: { dx: 8 * S, dy: 9 * S, color: INK }, bounce: 0.08, seed: 5 });
@@ -15103,7 +15248,7 @@ class PagePainter {
     this.paperBackground();
     const m = 44 * S, g = 28 * S;
     const palette = getPalette(model.theme || 'forest');
-    const livery = { colors: teamHex(model.team) };
+    const livery = { colors: teamHex(model.team), number: model.number ?? teamNumber(model.team) };
     const appear = (index) => Math.max(0, Math.min(1, (time - index * 0.85) / 0.28));
     // panel 1: the circuit
     const a1 = appear(0);
@@ -15169,7 +15314,7 @@ class PagePainter {
   }
 }
 
-__modules["src/ui/pages.js"] = { formatTime, teamHex, PagePainter };
+__modules["src/ui/pages.js"] = { formatTime, teamNumber, teamHex, PagePainter };
 })();
 // ---- src/gameplay/championship.js
 (function () {
@@ -15682,6 +15827,7 @@ class GameFlow {
     if (this.audio) this.audio.setScene('race');
     this.input.updatePointerLock(app.viewCount, true);
     this.input.clearMenuEvents();
+    this.input.clearEdges();
   }
 
   finishRace() {
@@ -15761,6 +15907,7 @@ class GameFlow {
     this.app.paused = false; this.state = 'race'; this.dirty = true;
     if (this.audio) this.audio.resume();
     this.input.updatePointerLock(this.app.viewCount, true);
+    this.input.clearEdges();      // the key that closed the pause page must not pause again
   }
 
   // ---- per-frame ---------------------------------------------------------------------------------
