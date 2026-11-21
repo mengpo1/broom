@@ -193,6 +193,7 @@ marqué ; les rétroviseurs, déplacés ; l'animation des roues avant (ces deux 
 | `work/renders/collisions/E2.mp4`, `E3.mp4`, `E3x.mp4`, `E4.mp4`, `E5.mp4` | Les scénarios rejoués dans le vrai jeu, 60 images par seconde (deux pas de simulation par image), 960×540. `E3x` : le décollage vu de derrière |
 | `work/renders/collisions/*-sheet.jpg` | Planches des étapes du mouvement (une image toutes les 0,07 à 0,1 s) |
 | `work/renders/collisions/*.json` | Télémétrie de chaque image : vitesse, état, tangage de la vue, événements |
+| `work/renders/collisions/stills/` | 24 images extraites des vidéos aux moments clés (avant le contact, étincelle, cabré, piqué, explosion, panaches, arrêt, redémarrage, panneau, vol, glissade), 960×540 |
 
 Reproduire : `node work/scripts/collision-sequences.mjs all --width 960 --height 540`.
 
