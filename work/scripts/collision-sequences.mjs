@@ -13,7 +13,7 @@ mkdirSync(`${root}/${outDir}`, { recursive: true });
 
 /** Scenario descriptions. Speeds in km/h, distances in metres; the car ahead is scripted (constant speed). */
 const SCENARIOS = {
-  E2: { title: 'wheel-to-wheel side contact', seconds: 3.2, circuit: 'kestrel-fields', me: { speed: 146, back: 3, side: -3.2 }, other: { speed: 118 }, steerTo: -1.7, steerFrom: 0.55, hold: 146, camera: 'COCKPIT' },
+  E2: { title: 'wheel-to-wheel side contact', seconds: 3.2, circuit: 'kestrel-fields', me: { speed: 146, back: 7, side: -3.2 }, other: { speed: 118 }, steerTo: -1.7, steerFrom: 0.45, hold: 146, camera: 'COCKPIT' },
   E3: { title: 'launch over a car, hard landing, explosion, stop, restart', seconds: 9.5, circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, camera: 'COCKPIT' },
   E3x: { title: 'the same launch seen from behind', seconds: 4.2, circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, camera: 'CHASE' },
   E4: { title: 'repeated rear-end bumps', seconds: 6.5, circuit: 'kestrel-fields', me: { speed: 146, back: 16, side: 0 }, other: { speed: 86 }, steerTo: 0, steerFrom: 0, camera: 'COCKPIT' },

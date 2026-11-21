@@ -13,7 +13,7 @@ Aucune bibliothèque externe, aucun moteur de jeu, aucun moteur 3D ou physique t
 | Coordonnées de monde cohérentes | chaque circuit est une boucle fermée en mètres (x, z, altitude) ; voitures en position monde, repérées aussi en coordonnées piste (s, d) |
 | Rendu 2D sans caméra 3D | projection par table de lignes (`rendering/projection`), sprites et bandes triés du fond vers l'avant, pas de tampon de profondeur |
 | Graphismes remplaçables | le jeu ne manipule que des **identifiants logiques** (`strip.armco`, `tree.pine.0`, `cockpit.near.0`…) résolus par `art/art-library.js` |
-| Paramètres externalisés | `core/config.js` (vue, effets, qualité), `vehicles/car-spec.js` (conduite), `gameplay/rules.js` (règles), `tracks/themes.js`, `art/palettes/palettes.js`, `audio/audio-tuning.js`, `localization/*.js` |
+| Paramètres externalisés | `core/config.js` (vue, effets, qualité), `vehicles/car-spec.js` (conduite), `physics/collision-tuning.js` (collisions et accidents), `gameplay/rules.js` (règles), `tracks/themes.js`, `art/palettes/palettes.js`, `audio/audio-tuning.js`, `localization/*.js` |
 | Pas d'allocation par image | tampons pré-alloués (`QuadBatch`, tables de lignes, particules, tampon de texte) ; voir § 7 |
 
 ## 2. Modules
@@ -23,7 +23,8 @@ src/
   core/           boucle (game-app), maths, aléa, configuration, benchmark
   tracks/         définition des 18 circuits, construction (courbure, relief, stands), trajectoire idéale,
                   thèmes logiques, disposition logique des décors (scenery-layout)
-  physics/        dynamique arcade d'une monoplace, contacts voiture-voiture
+  physics/        dynamique arcade d'une monoplace ; contacts voiture-voiture classés (tamponnage, roue contre roue,
+                  décollage), panneaux solides, vol et accident ; réglages des collisions (collision-tuning)
   vehicles/       paramètres de la voiture (car-spec), écuries et pilotes fictifs (liveries)
   ai/             pilote ordinateur (mêmes commandes et même physique que le joueur), profil de vitesse
   gameplay/       course (départ, tours, classement, stands), règles, championnat, sessions (modes de jeu)
@@ -31,9 +32,9 @@ src/
   rendering/
     projection/   projection de route 2D (nœuds, table de lignes, projection de points)
     drawing/      lot de quadrilatères, atlas en mémoire, constructeur de scène, attributs de piste
-    compositing/  compositeur WebGPU, vue de course (caméras), cockpit, uniformes
+    compositing/  compositeur WebGPU, vue de course (caméras), cockpit, mouvements de vue d'un accident (crash-camera), uniformes
     shaders/      WGSL : sol, ciel, quadrilatères, traits de vitesse, page d'interface
-    effects/      poussière, fumée, étincelles, traces, éclats, onomatopées
+    effects/      poussière, fumée, étincelles, traces, éclats, onomatopées, étincelle de contact, explosion
   art/
     styles/       outils d'encrage (ink), lettrage BD (lettering)
     palettes/     gammes de couleurs par thème
@@ -59,6 +60,11 @@ interfaces (`input.apply(race)`, `audio.update(app, dt)`, `ui.update(app, dt)`�
 
 1. `GameApp.onFrame` accumule le temps et exécute 0..n pas de simulation de 1/120 s
    (`input.apply` → `race.step` → diffusion des événements).
+   Dans `race.step` : conduite de chaque voiture, puis contacts entre voitures
+   (`resolveCarContacts`), puis panneaux de bord de piste (`collideObstacles`). Un contact ne
+   fait qu'écrire l'état de la voiture (vitesse, état `AIRBORNE` / `WRECKED` / glissade, instants
+   des événements sur l'horloge de la voiture) et émettre un événement typé ; la vue, le cockpit
+   et les effets lisent cet état (`docs/specifications/collisions.md`).
 2. `GameFlow.update` (menus, pause, fin de course) peut démarrer ou arrêter une course.
 3. Pour chaque vue (1 ou 2) :
    - `RaceView.update` : caméra (cockpit, poursuite, face, bord de piste), lacet, tangage,
@@ -100,7 +106,7 @@ l'écran), le lacet de la vue est borné (au-delà de 100° la vue se retourne).
 
 - **Dessins** : fonctions `(ctx, w, h, palette, rnd)` en chemins vectoriels Canvas 2D, exécutées
   au chargement (dessins communs) ou au chargement d'un circuit (décors du thème, panoramas).
-- **Atlas** : `AtlasBuilder` range les dessins dans des couches 2048² (6 couches communes,
+- **Atlas** : `AtlasBuilder` range les dessins dans des couches 2048² (8 couches communes,
   4 par thème) avec marges et débord horizontal pour les bandes répétées ; mipmaps générés.
 - **Monoplace** : `car-model.js` décrit la voiture en volumes (comme un crayonné de
   construction) ; les volumes qui se pénètrent (pontons, capot, prise d'air, épaules du pilote)

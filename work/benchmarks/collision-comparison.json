@@ -1,0 +1,164 @@
+{
+ "date": "2026-11-21T19:57:43.930Z",
+ "note": "reference values are approximate measurements on 25 fps footage (see the analysis report)",
+ "E1": {
+  "reference": {
+   "brakingKmhPerSecond": 150,
+   "viewDivePercent": [
+    3.4,
+    5
+   ]
+  },
+  "game": {
+   "brakingKmhPerSecond": 103.4,
+   "viewDivePercentAtFullBraking": 4.5
+  },
+  "comment": "braking strength deliberately unchanged (C9 not authorised); only the dive of the view was raised"
+ },
+ "E2": {
+  "reference": {
+   "speedBefore": "140-149",
+   "speedAfter": "50-59",
+   "lossKmh": 90,
+   "sparkSeconds": 0.16,
+   "viewDivePercent": [
+    5.5,
+    7
+   ],
+   "viewDiveSeconds": 0.44,
+   "swerve": "none"
+  },
+  "game": {
+   "speedBefore": 145.4,
+   "speedAfter": 49.4,
+   "lossKmh": 96,
+   "otherCarChangeKmh": 0.3,
+   "sparkSeconds": 0.16,
+   "viewDivePercent": 6.5,
+   "viewDiveSeconds": 0.4,
+   "headingChangeDegrees": 0.1,
+   "events": [
+    "wheel",
+    "contact",
+    "shift",
+    "shift",
+    "shift"
+   ]
+  }
+ },
+ "E3": {
+  "reference": {
+   "launchSpeed": 262,
+   "flightSeconds": 0.85,
+   "airLossKmhPerSecond": 50,
+   "landing": "228 -> 35 km/h",
+   "stopSecondsAfterLanding": 0.84,
+   "standstillSeconds": 3.2,
+   "launchToRestartSeconds": 4.9,
+   "restart": "0-100 km/h in 1.0 s",
+   "viewNoseUpSeconds": 0.4,
+   "viewSettledSecondsAfterLaunch": 2.64,
+   "explosionSeconds": 1.25,
+   "plumesSeconds": 0.6
+  },
+  "game": {
+   "launchSpeed": 264.7,
+   "flightSeconds": 0.86,
+   "airLossKmhPerSecond": 49.6,
+   "landing": "222.4 -> 33.3 km/h",
+   "stopSecondsAfterLanding": 0.85,
+   "standstillSeconds": 3.2,
+   "launchToRestartSeconds": 4.92,
+   "speedOneSecondAfterRestart": 54.6,
+   "speedTwoSecondsAfterRestart": 106.5,
+   "viewNoseUpSeconds": 0.4,
+   "viewSettledSecondsAfterLaunch": 2.65,
+   "explosionSeconds": 1.24,
+   "plumesSeconds": 0.6,
+   "peakHeightMetres": 1.3,
+   "carAheadDisturbed": false
+  },
+  "comment": "restart acceleration is the normal one of the car (driving untouched): slower than the reference game"
+ },
+ "E4": {
+  "reference": {
+   "unitLossKmh": 48,
+   "examples": [
+    "115 -> 67",
+    "104 -> 56",
+    "145 -> 60",
+    "146 -> 52"
+   ],
+   "bumpsIn12Seconds": 6,
+   "viewDivePercent": [
+    5,
+    8
+   ],
+   "launch": false
+  },
+  "game": {
+   "from115": {
+    "before": 117.7,
+    "after": 69.9,
+    "lossKmh": 48,
+    "leaderChangeKmh": 3.1,
+    "state": 1
+   },
+   "from104": {
+    "before": 107.9,
+    "after": 60,
+    "lossKmh": 48,
+    "leaderChangeKmh": 2.8,
+    "state": 1
+   },
+   "from145behind60": {
+    "before": 145.3,
+    "after": 58.2,
+    "lossKmh": 87.2,
+    "leaderChangeKmh": 3.3,
+    "state": 1
+   },
+   "bumpsIn12SecondsAtFullThrottle": 8,
+   "secondsBetweenBumps": [
+    1.08,
+    2.47,
+    1.05,
+    2.11,
+    1.08,
+    1.91,
+    1.06
+   ],
+   "viewDivePercent": 6.5,
+   "launch": false
+  }
+ },
+ "E5": {
+  "reference": {
+   "hitSpeed": 240,
+   "flightSeconds": 0.6,
+   "landing": "227 -> 224 km/h",
+   "explosion": false,
+   "earlySlideKmhPerSecond": 30,
+   "lateSlideKmhPerSecond": 180,
+   "stopSecondsAfterLanding": 2.1,
+   "turnDegreesIn084s": 75,
+   "viewSecondDipPercent": 34,
+   "viewSettledSecondsAfterContact": 1.7,
+   "trembleHz": 12.5
+  },
+  "game": {
+   "hitSpeed": 226.4,
+   "flightSeconds": 0.6,
+   "landing": "196.5 -> 196.1 km/h",
+   "explosion": false,
+   "earlySlideKmhPerSecond": 29.9,
+   "lateSlideKmhPerSecond": 272.8,
+   "stopSecondsAfterLanding": 1.72,
+   "turnDegreesIn084s": 72.3,
+   "viewSecondDipPercent": 34,
+   "viewSettledSecondsAfterContact": 1.7,
+   "trembleHz": 12,
+   "backOnTrackSecondsAfterContact": 3.03
+  }
+ }
+}

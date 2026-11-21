@@ -188,10 +188,16 @@ function sideContact(a, b, nx, nz, time, emit) {
   const T = COLLISION_TUNING;
   const faster = a.speed >= b.speed ? a : b, other = faster === a ? b : a;
   const lost = penalise(faster, T.sideContactLosses, faster.speed);
+  // the car that was hit is not made to pay in turn while the two are still side by side
+  if (lost > 0.5) other.lastPenaltyClock = other.clock;
   // lateral axis of a car is (-sin h, cos h); the normal (nx, nz) points from a to b
   const la = -nx * Math.sin(a.heading) + nz * Math.cos(a.heading), lb = -nx * Math.sin(b.heading) + nz * Math.cos(b.heading);
-  a.vLat = -(la >= 0 ? 1 : -1) * T.sideKick;
-  b.vLat = (lb >= 0 ? 1 : -1) * T.sideKick;
+  const awayA = la >= 0 ? -1 : 1, awayB = lb >= 0 ? 1 : -1;
+  if (lost > 0.5) { a.vLat = awayA * T.sideKick; b.vLat = awayB * T.sideKick; }      // pushed apart once, at the contact that costs
+  else {                                                                             // then only kept from leaning on each other
+    if (a.vLat * awayA < 0) a.vLat = 0;
+    if (b.vLat * awayB < 0) b.vLat = 0;
+  }
   a.yawRate *= 0.5; b.yawRate *= 0.5;
   if (lost > 0.5 && emit) emit(CONTACT.WHEEL, faster.index, lost, other.index);
   countContact(faster, other, time, emit, Math.abs(a.speed - b.speed) + 2);

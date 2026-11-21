@@ -40,6 +40,13 @@ Aucune source consultée ne donne de valeur chiffrée du comportement routier de
 - Sortie de piste : herbe et gravier ralentissent et réduisent l'adhérence ; un mur renvoie
   la voiture et lui fait perdre de la vitesse ; un choc violent provoque un tête-à-queue puis une
   remise en piste automatique ; touche de remise en piste manuelle **[choix]**.
+- **Collisions et accidents** (détail et comparaison chiffrée : `collisions.md`) : un
+  tamponnage coûte 48 km/h à la voiture qui percute, un contact roue contre roue environ
+  96 km/h à la plus rapide, sans changement de cap ; roue sur roue à grande vitesse, la voiture
+  de derrière décolle, retombe, explose et repart après 3,2 s d'arrêt ; un panneau de freinage
+  heurté à grande vitesse fait décoller la voiture, qui retombe sans exploser et glisse hors de
+  contrôle. Pertes de vitesse et durées **[mesuré sur une vidéo de gameplay, approximatif]** ;
+  seuils de déclenchement **[choix]**.
 
 ## 3. Réglages
 

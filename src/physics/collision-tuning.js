@@ -15,7 +15,7 @@ export const COLLISION_TUNING = {
   leaderMargin: 0.5,             // DESIGN m/s: after a rear-end bump the follower is at most this much slower than the car it hit
   leaderPush: 0.8,               // DESIGN m/s gained by the car that is hit from behind (keeps the two apart)
   sideKick: 1.2,                 // DESIGN m/s of lateral velocity pushing two cars apart after a side contact
-  penaltyCooldown: 0.4,          // DESIGN s between two speed penalties for the same car (cars rubbing do not stall)
+  penaltyCooldown: 1.0,          // DESIGN s between two speed penalties for the same car (a car pushing another is held behind it meanwhile)
   computerPenaltyScale: 0.3,     // DESIGN share of the fixed loss applied to computer-driven cars: the field keeps flowing (1 = same as the players)
   penaltyFloorSpeed: 5,          // DESIGN m/s: a penalty never brings a car below this
   alignedCos: 0.8,               // DESIGN cars heading within ~37 degrees of each other count as "same direction"

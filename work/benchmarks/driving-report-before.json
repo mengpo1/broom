@@ -1,0 +1,250 @@
+{
+  "date": "2026-11-21T01:30:44.620Z",
+  "profiles": {
+    "arcade": {
+      "zeroTo100": 1.89,
+      "zeroTo200": 3.85,
+      "zeroTo300": 8.97,
+      "quarterMile": 7.98,
+      "topSpeedKmh": 322,
+      "brake100": {
+        "distance": 17.4,
+        "time": 1.3
+      },
+      "brake200": {
+        "distance": 56.5,
+        "time": 2.26
+      },
+      "brake300": {
+        "distance": 101.1,
+        "time": 2.91
+      },
+      "lateralG": {
+        "at100": 2.14,
+        "at200": 3,
+        "at300": 4.44
+      }
+    },
+    "racing": {
+      "zeroTo100": 2.04,
+      "zeroTo200": 4.08,
+      "zeroTo300": 9.21,
+      "quarterMile": 8.15,
+      "topSpeedKmh": 321,
+      "brake100": {
+        "distance": 18.9,
+        "time": 1.42
+      },
+      "brake200": {
+        "distance": 61.4,
+        "time": 2.46
+      },
+      "brake300": {
+        "distance": 109.6,
+        "time": 3.17
+      },
+      "lateralG": {
+        "at100": 1.99,
+        "at200": 2.78,
+        "at300": 4.11
+      }
+    },
+    "turbo": {
+      "zeroTo100": 1.97,
+      "zeroTo200": 3.81,
+      "zeroTo300": 7.26,
+      "quarterMile": 7.84,
+      "topSpeedKmh": 335,
+      "brake100": {
+        "distance": 18.1,
+        "time": 1.36
+      },
+      "brake200": {
+        "distance": 58.9,
+        "time": 2.36
+      },
+      "brake300": {
+        "distance": 105.2,
+        "time": 3.03
+      },
+      "lateralG": {
+        "at100": 2.06,
+        "at200": 2.89,
+        "at300": 4.27
+      }
+    }
+  },
+  "wings": [
+    {
+      "wing": 0,
+      "topSpeedKmh": 332,
+      "lateralGAt250": 2.88
+    },
+    {
+      "wing": 1,
+      "topSpeedKmh": 327,
+      "lateralGAt250": 3.13
+    },
+    {
+      "wing": 2,
+      "topSpeedKmh": 321,
+      "lateralGAt250": 3.38
+    },
+    {
+      "wing": 3,
+      "topSpeedKmh": 316,
+      "lateralGAt250": 3.63
+    },
+    {
+      "wing": 4,
+      "topSpeedKmh": 311,
+      "lateralGAt250": 3.87
+    }
+  ],
+  "laps": [
+    {
+      "circuit": "hazelbrook",
+      "name": "Hazelbrook",
+      "lengthM": 3572,
+      "bestLap": 51.393,
+      "averageKmh": 250,
+      "topKmh": 323
+    },
+    {
+      "circuit": "porto-sereno",
+      "name": "Porto Sereno",
+      "lengthM": 3415,
+      "bestLap": 57.941,
+      "averageKmh": 212,
+      "topKmh": 322
+    },
+    {
+      "circuit": "montclair",
+      "name": "Montclair",
+      "lengthM": 3480,
+      "bestLap": 58.044,
+      "averageKmh": 216,
+      "topKmh": 323
+    },
+    {
+      "circuit": "sablon",
+      "name": "Sablon Raceway",
+      "lengthM": 4095,
+      "bestLap": 54.066,
+      "averageKmh": 273,
+      "topKmh": 326
+    },
+    {
+      "circuit": "kestrel-fields",
+      "name": "Kestrel Fields",
+      "lengthM": 4303,
+      "bestLap": 74.629,
+      "averageKmh": 208,
+      "topKmh": 325
+    },
+    {
+      "circuit": "aurelia-parc",
+      "name": "Aurelia Parc",
+      "lengthM": 3598,
+      "bestLap": 64.807,
+      "averageKmh": 200,
+      "topKmh": 321
+    },
+    {
+      "circuit": "lindqvist",
+      "name": "Lindqvist Skog",
+      "lengthM": 3727,
+      "bestLap": 57.714,
+      "averageKmh": 233,
+      "topKmh": 325
+    },
+    {
+      "circuit": "baia-dourada",
+      "name": "Baia Dourada",
+      "lengthM": 4509,
+      "bestLap": 70.741,
+      "averageKmh": 229,
+      "topKmh": 326
+    },
+    {
+      "circuit": "roca-alta",
+      "name": "Roca Alta",
+      "lengthM": 4265,
+      "bestLap": 73.374,
+      "averageKmh": 209,
+      "topKmh": 323
+    },
+    {
+      "circuit": "tannenring",
+      "name": "Tannenring",
+      "lengthM": 4064,
+      "bestLap": 60.044,
+      "averageKmh": 244,
+      "topKmh": 325
+    },
+    {
+      "circuit": "meridian-docks",
+      "name": "Meridian Docks",
+      "lengthM": 4043,
+      "bestLap": 73.569,
+      "averageKmh": 198,
+      "topKmh": 324
+    },
+    {
+      "circuit": "kagerou-hills",
+      "name": "Kagerou Hills",
+      "lengthM": 4111,
+      "bestLap": 67.63,
+      "averageKmh": 219,
+      "topKmh": 325
+    },
+    {
+      "circuit": "silverlake",
+      "name": "Silverlake",
+      "lengthM": 3952,
+      "bestLap": 61.039,
+      "averageKmh": 233,
+      "topKmh": 322
+    },
+    {
+      "circuit": "costa-brisa",
+      "name": "Costa Brisa",
+      "lengthM": 4918,
+      "bestLap": 74.806,
+      "averageKmh": 237,
+      "topKmh": 326
+    },
+    {
+      "circuit": "ouarzane",
+      "name": "Ouarzane",
+      "lengthM": 4757,
+      "bestLap": 75.938,
+      "averageKmh": 226,
+      "topKmh": 326
+    },
+    {
+      "circuit": "glenmoor",
+      "name": "Glenmoor",
+      "lengthM": 4328,
+      "bestLap": 67.112,
+      "averageKmh": 232,
+      "topKmh": 325
+    },
+    {
+      "circuit": "nova-belvedere",
+      "name": "Nova Belvedere",
+      "lengthM": 3791,
+      "bestLap": 72.432,
+      "averageKmh": 188,
+      "topKmh": 318
+    },
+    {
+      "circuit": "grand-zenith",
+      "name": "Grand Zenith",
+      "lengthM": 6541,
+      "bestLap": 96.197,
+      "averageKmh": 245,
+      "topKmh": 326
+    }
+  ]
+}

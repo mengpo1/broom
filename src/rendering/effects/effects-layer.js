@@ -14,6 +14,8 @@ import { hexToRgb } from '../../art/palettes/palettes.js';
 import { COLLISION_TUNING } from '../../physics/collision-tuning.js';
 import { CAMERA } from '../compositing/race-view.js';
 import { cockpitPlacement } from '../compositing/cockpit-layer.js';
+import { COCKPIT_REF_FOCAL } from '../../art/cockpits/cockpit-art.js';
+import { CAR_DIMENSIONS } from '../../art/vehicles/car-model.js';
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8, MAX_FLASHES = 6;
 const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR'];
@@ -134,7 +136,7 @@ export class EffectsLayer {
     this.popCursor = [0, 0];
     // contact flashes: short stars drawn in the world, at the point where two cars (or a car and a
     // board) touch; attached to a car they travel with it
-    this.flashes = Array.from({ length: MAX_FLASHES }, () => ({ car: -1, s: 0, d: 0, h: 0, age: 9, life: 0, size: 1, seg: -1, z: 0 }));
+    this.flashes = Array.from({ length: MAX_FLASHES }, () => ({ car: -1, other: -1, wheel: false, s: 0, d: 0, h: 0, age: 9, life: 0, size: 1, seg: -1, z: 0 }));
     this.flashCursor = 0;
     this.typedCar = -1; this.typedClock = 9;
     // explosions after a hard landing: one per car at most, attached to the car, timed on the car's own clock
@@ -226,11 +228,15 @@ export class EffectsLayer {
     }
   }
 
-  /** Star at a point of the world. `car` >= 0 attaches it to that car: (s, d) are then offsets from the car. */
-  flash(car, s, d, h, size, life) {
+  /**
+   * Star at a point of the world. `car` >= 0 attaches it to that car: (s, d) are then offsets from the car.
+   * `other` >= 0 names the second car of a contact (`wheel`: side by side): their drivers see the star on
+   * their own cockpit drawing instead (see buildFront), where the world point is hidden or out of view.
+   */
+  flash(car, s, d, h, size, life, other = -1, wheel = false) {
     const f = this.flashes[this.flashCursor];
     this.flashCursor = (this.flashCursor + 1) % MAX_FLASHES;
-    f.car = car; f.s = s; f.d = d; f.h = h; f.size = size; f.age = 0; f.life = life;
+    f.car = car; f.other = other; f.wheel = wheel; f.s = s; f.d = d; f.h = h; f.size = size; f.age = 0; f.life = life;
   }
 
   /** Rear-end bump or wheel-to-wheel contact: a spark where the cars touch, a few flying sparks, a sound word. */
@@ -241,7 +247,7 @@ export class EffectsLayer {
     if (ds > track.length / 2) ds -= track.length; else if (ds < -track.length / 2) ds += track.length;
     const wheel = event.type === 'wheel';
     this.typedCar = event.car; this.typedClock = 0;
-    if (fx.impactFrames) this.flash(event.car, ds * 0.5, (other.d - car.d) * 0.5, wheel ? 0.36 : 0.42, wheel ? 1.5 : 1.2, COLLISION_TUNING.sparkLife);
+    if (fx.impactFrames) this.flash(event.car, ds * 0.5, (other.d - car.d) * 0.5, wheel ? 0.36 : 0.42, wheel ? 1.5 : 1.2, COLLISION_TUNING.sparkLife, event.other, wheel);
     if (fx.dust) {
       for (let k = 0; k < 5; k++) {
         this.spawn(1, car.s + ds * 0.5, car.d + (other.d - car.d) * 0.5, 0.35, car.speed * 0.8 + (this.random() - 0.5) * 6, (this.random() - 0.5) * 7, 1.5 + this.random() * 3, 0.25 + this.random() * 0.2, 0.22, 0.2, [1, 0.85, 0.3], 1);
@@ -407,6 +413,7 @@ export class EffectsLayer {
     const p = view.projection, quads = app.quads;
     for (const f of this.flashes) {
       if (f.seg !== k) continue;
+      if (f.other >= 0 && view.camera === CAMERA.COCKPIT && (view.carIndex === f.car || view.carIndex === f.other)) continue;   // on the cockpit instead
       const anchor = f.car >= 0 ? app.race.cars[f.car] : null;
       if (!projectAtDepth(p, f.z, anchor ? anchor.d + f.d : f.d, f.h, pt)) continue;
       // the star snaps to full size at once, then shrinks: a drawn flash, not a fade
@@ -494,6 +501,24 @@ export class EffectsLayer {
           const t = (age - BLAST.plumeStart) / (BLAST.end - BLAST.plumeStart);
           for (let w = -1; w <= 1; w += 2) this.blastPlume(quads, t, cx + w * 820 * k, place.oy + (330 - 260 * t) * k, 200 * k, w);
         }
+      }
+    }
+    // contact spark of the followed car, seen from its cockpit: on the front wheel that touched (side by
+    // side) or at the tip of the nose (bump from behind), placed like the cockpit drawing itself, by
+    // projecting the point of the car from the driver's eye
+    if (view.camera === CAMERA.COCKPIT) {
+      for (const f of this.flashes) {
+        if (f.life <= 0 || f.other < 0 || (view.carIndex !== f.car && view.carIndex !== f.other)) continue;
+        const mine = app.race.cars[view.carIndex], theirs = app.race.cars[view.carIndex === f.car ? f.other : f.car];
+        const D = CAR_DIMENSIONS, eye = D.eye;
+        let ahead, right, up;
+        if (f.wheel) { ahead = D.frontAxleX; right = (theirs.d > mine.d ? 1 : -1) * (D.frontTrack + D.frontTyre.width * 0.5); up = D.frontTyre.radius; }
+        else if (view.carIndex === f.car) { ahead = mine.params.halfLength; right = clamp((theirs.d - mine.d) * 0.5, -0.6, 0.6); up = 0.42; }
+        else continue;                                             // bumped from behind: nothing to see ahead
+        const place = cockpitPlacement(view), scale = (COCKPIT_REF_FOCAL / (ahead - eye[0])) * place.k;
+        const t = f.age / f.life;
+        const size = Math.min(r.h * 0.26, f.size * scale) * (t < 0.25 ? 0.7 + 1.2 * t : 1 - (t - 0.25) * 0.55);
+        quads.rotated(this.burst, r.w / 2 + right * scale, place.oy + (eye[2] - up) * scale, size, size, f.s * 7, 0.5, 0.5, 1, 1, 1, 1);
       }
     }
     const u = Math.min(r.w / 2560, (r.h / 1440) * (view.wide ? 1.6 : 1));

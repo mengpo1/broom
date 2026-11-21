@@ -8,19 +8,25 @@ l'image, pas la vitesse.
 
 ## 0. Dernière exécution complète
 
-Sur le build final (`index.html`, 982 054 octets), le 21 novembre 2026 :
+Sur le build final (`index.html`, 1 024 712 octets), le 21 novembre 2026, après le travail
+sur les collisions :
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Simulation et logique | `npm test` | 49 / 49 |
-| Navigateur (WebGPU) | `npm run test:browser` | 13 / 13 |
+| Simulation et logique | `npm test` | 70 / 70 |
+| Navigateur (WebGPU) | `node tests/rendering/smoke.browser.mjs` | 13 / 13 |
 | Modes de jeu de bout en bout | `node work/scripts/flow-check.mjs` | réussi (5 parcours) |
 | Pages, pause, caméras, souris | `node work/scripts/pages-check.mjs` | 14 / 14 |
 | Audio | `node work/scripts/audio-check.mjs` | 80 / 80 |
+| Conduite (non-régression) | `node work/scripts/driving-report.mjs` | 165 valeurs identiques à l'état précédent |
 
-## 1. Tests de simulation et de logique (Node) — 49 / 49 réussis
+Le test navigateur a d'abord donné 12 / 13 : son point de contrôle « pneu avant par-dessus la
+route » tombait sur le rétroviseur, déplacé par ce travail. Le point a été replacé sur la
+bande de roulement ; l'image elle-même était correcte.
 
-Dernière exécution : `npm test` → 49 tests, 49 réussis, 0 échec (environ 5 s).
+## 1. Tests de simulation et de logique (Node) — 70 / 70 réussis
+
+Dernière exécution : `npm test` → 70 tests, 70 réussis, 0 échec (environ 8 s).
 
 ### Conduite — `tests/unit/physics.test.mjs`
 
@@ -62,12 +68,43 @@ Dernière exécution : `npm test` → 49 tests, 49 réussis, 0 échec (environ 5
 - ✅ pit stops: with fast attrition, computer drivers stop for tyres or fuel and rejoin
 - ✅ every circuit of the three seasons can be raced by the computer
 
+### Collisions au sol — `tests/gameplay/collisions.test.mjs`
+
+Scénarios E2 et E4 du rapport d'analyse rejoués dans la simulation, avec des tolérances (les
+mesures de la vidéo sont approximatives). Détail : `collisions.md`.
+
+- ✅ E4 rear-end bump: the follower loses 48 km/h, keeps its line, the leader is not disturbed
+- ✅ E4 rear-end bump at a higher closing speed: the follower is brought down to the speed of the car ahead
+- ✅ repeated bumps: each new contact costs again, but never more often than the cooldown
+- ✅ E2 wheel-to-wheel side contact: about 90 km/h lost by the faster car, no swerve, a spark between the wheels
+- ✅ simple contact: cars crossing at an angle exchange an impulse, without fixed penalty
+- ✅ contact dive of the view: 5 to 8 % of the view height, over in 0.4 s, driven by the car clock
+- ✅ roadside boards: solid objects on the verge, never on the asphalt, the same for the race and the scenery
+- ✅ hitting a board below the launch speed: knocked down once, speed cut, the car drives on
+- ✅ straight stretch helper finds a flat straight on the test track
+
+### Décollages et accidents — `tests/gameplay/accidents.test.mjs`
+
+Scénarios E3 et E5 du rapport.
+
+- ✅ E3 launch: wheel over wheel at a high closing speed throws the follower in the air; the car ahead drives on
+- ✅ E3 flight: 0.85 s, slowing by 50 km/h per second, rising then coming down
+- ✅ E3 hard landing: speed cut to about 15 %, standstill within a second, 3.2 s stopped, restart on the spot in first gear
+- ✅ a wrecked or flying car cannot be hit, and the restarting car is protected for a moment
+- ✅ E5 launch on a board: thrown in the air, light landing without loss of speed nor explosion, slide, then back on the track
+- ✅ launch conditions are explicit: no flight below the speed, the closing speed or outside the overlap window
+- ✅ pitch of the view (E3, hard): nose up and held, steady swing, ground held, rebound, second dip, level again
+- ✅ pitch of the view (E5, light): same script, shorter, second dip partial; trembling only while sliding
+- ✅ the staging depends only on the simulated state: same values whatever the display rate, nothing for the other player
+- ✅ explosion: four phases in order, 1.25 s of fire, plumes until 1.6 s
+
 ### Multijoueur — `tests/integration/multiplayer.test.mjs`
 
 - ✅ both players are in the same race with their own cars
 - ✅ controls are independent: one accelerates and turns, the other brakes
 - ✅ common classification contains both players and the computer drivers
-- ✅ players collide with each other
+- ✅ players collide with each other (deux assertions adaptées au nouveau modèle : la voiture
+  qui percute perd de la vitesse au lieu de pousser, celle de devant est à peine poussée)
 - ✅ split screen: two non-overlapping views, top/bottom by default, side by side on request
 - ✅ each view projects the road from its own car
 - ✅ duel session produces a two-player race configuration
@@ -76,6 +113,8 @@ Dernière exécution : `npm test` → 49 tests, 49 réussis, 0 échec (environ 5
 
 - ✅ car views: turning a car through 360 degrees walks through neighbouring drawings only
 - ✅ front wheels: rolling marks advance in step with the distance travelled
+- ✅ front wheels at speed: the streaks cycle forward with the distance travelled, faster with speed, the same at any display rate
+- ✅ mirrors: the cockpit shows the mirrors of the car model where the driver would see them
 - ✅ front wheels: steering frames are symmetric and monotonic
 - ✅ speed effects grow with speed and are smooth from frame to frame
 - ✅ each effect can be switched off on its own
@@ -147,6 +186,18 @@ d'écrêtage et de NaN, centroïde spectral croissant avec le régime, différen
 ouvert/fermé, creux de passage de rapport, effet Doppler et panoramique d'un concurrent,
 chaque événement audible isolément, silence en pause et hors course.
 
+## 5 bis. Scénarios de collision dans le vrai jeu — `work/scripts/collision-sequences.mjs`
+
+Les scénarios E2, E3 (cockpit et vue arrière), E4 et E5 sont joués dans `index.html`, deux pas
+de simulation par image, et enregistrés à 60 images par seconde avec la télémétrie de chaque
+image (`work/renders/collisions/`). Ce n'est pas un test à assertions : les événements
+attendus sont relevés dans le journal, les images sont à regarder. Les valeurs chiffrées sont
+comparées au rapport par `work/scripts/collision-comparison.mjs` (tableau dans
+`collisions.md`).
+
+Non-régression de la conduite : `work/scripts/driving-report.mjs` donne des valeurs
+identiques avant et après ce travail (`work/benchmarks/driving-report-before.json`).
+
 ## 6. Ce que les tests ont trouvé
 
 - Les pilotes ordinateur n'effectuaient jamais leur arrêt au stand (ils ralentissaient à
@@ -159,6 +210,15 @@ chaque événement audible isolément, silence en pause et hors course.
 - La caméra de bord de piste ne cadrait pas la voiture quand la route tournait entre la
   caméra et elle : corrigé (visée calculée sur la position projetée de la voiture).
 - Les noms de touches de la page Commandes n'étaient pas traduits : corrigé (dictionnaires).
+- Collisions : avec la pénalité de vitesse complète, les voitures de l'ordinateur perdaient
+  2 à 5 % sur une course et se touchaient en série : pénalité réduite pour elles
+  (`computerPenaltyScale`), délai d'une seconde entre deux pénalités, et la voiture qui subit
+  un contact latéral ne paie pas à son tour.
+- Séquences enregistrées : l'explosion puis l'étincelle de contact du joueur étaient
+  dessinées dans le monde, donc cachées par le cockpit ou hors du champ : elles sont
+  maintenant posées sur le dessin du cockpit (roue avant touchée, pointe du nez).
+- Roues avant : au-delà de 61 km/h le pneu était un dessin fixe (0 % de pixels changeant
+  d'une image à l'autre à 120 km/h) : corrigé, mesure dans `wheels-and-mirrors.md`.
 
 ## 7. Non couvert par des tests automatiques
 

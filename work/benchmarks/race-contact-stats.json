@@ -1,0 +1,13 @@
+{
+"hazelbrook:legacy": {"circuit":"hazelbrook","laps":3,"finished":true,"raceTime":162.78,"winnerTime":155.27,"bestLap":50.58,"finishers":15,"resets":0,"contact":63,"bump":0,"wheel":0,"obstacle":0,"launch":0,"crash":0,"wall":0}
+,
+"hazelbrook:new": {"circuit":"hazelbrook","laps":3,"finished":true,"raceTime":167.08,"winnerTime":155.27,"bestLap":50.102,"finishers":16,"resets":0,"contact":25,"bump":7,"wheel":27,"obstacle":0,"launch":0,"crash":0,"wall":7}
+,
+"porto-sereno:legacy": {"circuit":"porto-sereno","laps":3,"finished":true,"raceTime":183.16,"winnerTime":175.12,"bestLap":57.171,"finishers":12,"resets":0,"contact":108,"bump":0,"wheel":0,"obstacle":0,"launch":0,"crash":0,"wall":0}
+,
+"porto-sereno:new": {"circuit":"porto-sereno","laps":3,"finished":true,"raceTime":190.92,"winnerTime":175.12,"bestLap":57.171,"finishers":15,"resets":0,"contact":51,"bump":6,"wheel":62,"obstacle":0,"launch":0,"crash":0,"wall":18}
+,
+"meridian-docks:legacy": {"circuit":"meridian-docks","laps":3,"finished":true,"raceTime":229.9,"winnerTime":221.93,"bestLap":72.753,"finishers":8,"resets":0,"contact":133,"bump":0,"wheel":0,"obstacle":0,"launch":0,"crash":0,"wall":0}
+,
+"meridian-docks:new": {"circuit":"meridian-docks","laps":3,"finished":true,"raceTime":229.71,"winnerTime":221.93,"bestLap":72.533,"finishers":7,"resets":1,"contact":58,"bump":18,"wheel":51,"obstacle":0,"launch":0,"crash":1,"wall":12}
+}
