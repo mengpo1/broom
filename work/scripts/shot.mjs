@@ -1,22 +1,25 @@
 // Quick development screenshot: node work/scripts/shot.mjs <out.png> [json options]
+// options: { width, height, race: {...quickRace options}, simSeconds, frames, layout, eval }
 import { openGame, root } from './lib-browser.mjs';
 const out = process.argv[2] || 'work/renders/dev.png';
 const opt = JSON.parse(process.argv[3] || '{}');
-const { browser, page, logs, close } = await openGame({ width: opt.width || 1280, height: opt.height || 720, hash: `quality=${opt.quality || 'high'}` });
+const { page, logs, close } = await openGame({ width: opt.width || 1280, height: opt.height || 720, hash: `manual=1&quality=${opt.quality || 'medium'}${opt.lang ? `&lang=${opt.lang}` : ''}` });
 const t0 = Date.now();
 const info = await page.evaluate(async (opt) => {
-  const { app, quickRace, CAMERA_MODE } = window.virage;
+  const { app, quickRace } = window.virage;
   app.setCanvasSize(opt.width || 1280, opt.height || 720);
+  if (opt.layout) app.splitLayout = opt.layout;
   const race = quickRace(opt.race || {});
-  for (const rig of app.rigs) rig.mode = CAMERA_MODE[opt.camera || 'COCKPIT'];
-  if (opt.free) { Object.assign(app.rigs[0].free, opt.free); }
-  if (opt.layout) { app.splitLayout = opt.layout; app.resize(true); }
+  if (opt.effects) Object.assign(app.effects, opt.effects);
   const warm = opt.simSeconds ?? 8;
-  // fast-forward the simulation without rendering, then render a few frames for TAA
   for (let i = 0; i < warm * 120; i++) app.simulate();
+  app.present(warm > 3 ? 3 : 0.01, 0);   // let presentation timers (messages, pops) catch up with the fast-forward
+  if (opt.eval) new Function('app', 'race', opt.eval)(app, race);
   const t = performance.now();
-  for (let f = 0; f < (opt.frames ?? 6); f++) await app.advanceFrame(2);
-  return { ms: (performance.now() - t) / (opt.frames ?? 6), gpu: app.gpu.info, draws: app.renderer.stats.draws, world: app.world.stats, speed: race.cars[app.viewTargets[0]].speed * 3.6 };
+  const frames = opt.frames ?? 4;
+  for (let f = 0; f < frames; f++) await app.advanceFrame(2);
+  const car = race.cars[app.viewTargets[0]];
+  return { ms: (performance.now() - t) / frames, gpu: app.gpu.info, stats: app.renderer.stats, build: app.stats.buildMs, speed: car.speed * 3.6, s: car.s, pos: car.position };
 }, opt).catch((e) => ({ error: e.message }));
 await page.screenshot({ path: `${root}/${out}` });
 console.log(JSON.stringify(info), `total ${(Date.now() - t0)} ms`);

@@ -1,7 +1,8 @@
 // Screen layouts for one or two local players. Rectangles are in canvas pixels.
 
 export const SPLIT_LAYOUTS = ['horizontal', 'vertical'];
-const GAP = 4;
+/** Width of the gutter between the two panels, like the white gap between the panels of a comic page. */
+export function gutterWidth(width, height) { return Math.max(4, Math.round(Math.min(width, height) * 0.011)); }
 
 /**
  * @param layout 'horizontal' stacks the views (top / bottom, the classic wide-view presentation),
@@ -9,6 +10,7 @@ const GAP = 4;
  */
 export function computeViewRects(width, height, playerCount, layout = 'horizontal') {
   if (playerCount <= 1) return [{ x: 0, y: 0, w: width, h: height }];
+  const GAP = gutterWidth(width, height);
   if (layout === 'vertical') {
     const w = Math.floor((width - GAP) / 2);
     return [{ x: 0, y: 0, w, h: height }, { x: width - w, y: 0, w, h: height }];

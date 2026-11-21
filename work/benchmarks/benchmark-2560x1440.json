@@ -1,0 +1,205 @@
+{
+  "environment": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "platform": "Linux x86_64",
+    "cores": 4,
+    "deviceMemoryGB": 16,
+    "screen": {
+      "width": 2560,
+      "height": 1440,
+      "pixelRatio": 1,
+      "colorDepth": 24
+    },
+    "webgpu": true,
+    "adapter": {
+      "vendor": "google",
+      "architecture": "swiftshader",
+      "device": "",
+      "description": "",
+      "isFallback": true
+    },
+    "features": [
+      "depth32float-stencil8",
+      "rg11b10ufloat-renderable",
+      "bgra8unorm-storage",
+      "texture-compression-bc",
+      "core-features-and-limits",
+      "chromium-experimental-sampling-resource-table",
+      "chromium-experimental-timestamp-query-inside-passes",
+      "float32-filterable",
+      "indirect-first-instance",
+      "texture-compression-astc-sliced-3d",
+      "float32-blendable",
+      "subgroup-size-control",
+      "texture-compression-unaligned",
+      "texture-compression-astc",
+      "texture-compression-etc2",
+      "depth-clip-control",
+      "texture-compression-bc-sliced-3d",
+      "timestamp-query",
+      "clip-distances",
+      "texture-component-swizzle",
+      "subgroups"
+    ],
+    "limits": {
+      "maxTextureDimension2D": 8192,
+      "maxTextureArrayLayers": 256,
+      "maxBufferSize": 1073741824
+    },
+    "canvasFormat": "rgba8unorm",
+    "language": "en-US"
+  },
+  "refreshRateHz": 59.88023952095548,
+  "runs": [
+    {
+      "scenario": "solo",
+      "label": "solo race (player alone)",
+      "seconds": 60.31279999999996,
+      "frames": 33,
+      "width": 2560,
+      "height": 1440,
+      "fps": 0.547147537504477,
+      "frameInterval": {
+        "mean": 1853.460604580966,
+        "p50": 1799.9000244140625,
+        "p99": 3666.5,
+        "max": 3666.5,
+        "min": 1633.199951171875,
+        "count": 33
+      },
+      "framesOver16_7ms": 33,
+      "cpuFrame": {
+        "mean": 1.5393939325303743,
+        "p50": 1.2999999523162842,
+        "p99": 3.700000047683716,
+        "max": 3.700000047683716,
+        "min": 0.699999988079071,
+        "count": 33
+      },
+      "gpuPass": {
+        "mean": 1772.848262902462,
+        "p50": 1768.07568359375,
+        "p99": 2206.385986328125,
+        "max": 2206.385986328125,
+        "min": 1617.8414306640625,
+        "count": 33
+      },
+      "gpuSamplesOver16_7ms": 33,
+      "gpuTimestampQueries": true,
+      "meanQuads": 1490.878787878788,
+      "jsHeapMB": 15.871245384216309,
+      "jsHeapGrowthKB": -6561.7705078125,
+      "adapter": {
+        "vendor": "google",
+        "architecture": "swiftshader",
+        "device": "",
+        "description": "",
+        "isFallback": true
+      },
+      "softwareAdapter": true,
+      "sampleCount": 4
+    },
+    {
+      "scenario": "grid",
+      "label": "race with the full field (16 opponents)",
+      "seconds": 60.2475,
+      "frames": 37,
+      "width": 2560,
+      "height": 1440,
+      "fps": 0.6141333665297315,
+      "frameInterval": {
+        "mean": 1659.8432386243664,
+        "p50": 1633.300048828125,
+        "p99": 1916.5999755859375,
+        "max": 1916.5999755859375,
+        "min": 1533.300048828125,
+        "count": 37
+      },
+      "framesOver16_7ms": 37,
+      "cpuFrame": {
+        "mean": 1.2027026962589573,
+        "p50": 1,
+        "p99": 3.799999952316284,
+        "max": 3.799999952316284,
+        "min": 0.699999988079071,
+        "count": 37
+      },
+      "gpuPass": {
+        "mean": 1626.7295812658363,
+        "p50": 1607.279296875,
+        "p99": 1877.651611328125,
+        "max": 1877.651611328125,
+        "min": 1499.7978515625,
+        "count": 37
+      },
+      "gpuSamplesOver16_7ms": 37,
+      "gpuTimestampQueries": true,
+      "meanQuads": 1623.1081081081081,
+      "jsHeapMB": 16.476149559020996,
+      "jsHeapGrowthKB": -126.1640625,
+      "adapter": {
+        "vendor": "google",
+        "architecture": "swiftshader",
+        "device": "",
+        "description": "",
+        "isFallback": true
+      },
+      "softwareAdapter": true,
+      "sampleCount": 4
+    },
+    {
+      "scenario": "split",
+      "label": "split screen (2 players + 14 opponents)",
+      "seconds": 60.86409999999999,
+      "frames": 36,
+      "width": 2560,
+      "height": 1440,
+      "fps": 0.5914816780335207,
+      "frameInterval": {
+        "mean": 1726.7833353678386,
+        "p50": 1716.699951171875,
+        "p99": 1899.9000244140625,
+        "max": 1899.9000244140625,
+        "min": 1616.699951171875,
+        "count": 36
+      },
+      "framesOver16_7ms": 36,
+      "cpuFrame": {
+        "mean": 2.1388889021343656,
+        "p50": 1.899999976158142,
+        "p99": 6.300000190734863,
+        "max": 6.300000190734863,
+        "min": 1.100000023841858,
+        "count": 36
+      },
+      "gpuPass": {
+        "mean": 1692.4515279134114,
+        "p50": 1684.0589599609375,
+        "p99": 1850.3436279296875,
+        "max": 1850.3436279296875,
+        "min": 1582.519287109375,
+        "count": 36
+      },
+      "gpuSamplesOver16_7ms": 36,
+      "gpuTimestampQueries": true,
+      "meanQuads": 3365.1111111111113,
+      "jsHeapMB": 17.0604887008667,
+      "jsHeapGrowthKB": 39.8203125,
+      "adapter": {
+        "vendor": "google",
+        "architecture": "swiftshader",
+        "device": "",
+        "description": "",
+        "isFallback": true
+      },
+      "softwareAdapter": true,
+      "sampleCount": 4
+    }
+  ],
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "quality": "high",
+  "date": "2026-11-21T17:42:01.442Z"
+}

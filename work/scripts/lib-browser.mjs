@@ -35,9 +35,36 @@ export async function openGame({ width = 1280, height = 720, hash = '', extraArg
   page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   page.on('request', (r) => { if (!r.url().startsWith('file://')) requests.push(r.url()); });
-  await page.goto(`file://${root}/index.html${hash ? '#' + hash : ''}`);
-  await page.waitForFunction(() => window.virage || document.querySelector('#ui h1'), null, { timeout: 60000 });
+  // VIRAGE_HTML: another build of the game to open (a long recording made in several runs uses one frozen copy)
+  const file = process.env.VIRAGE_HTML ? resolve(root, process.env.VIRAGE_HTML) : `${root}/index.html`;
+  await page.goto(`file://${file}${hash ? '#' + hash : ''}`);
+  await page.waitForFunction(() => window.virage || window.virageFailed, null, { timeout: 120000 });
   const ready = await page.evaluate(() => !!window.virage);
   const close = async () => { await browser.close(); closeDisplay(); };
   return { browser, page, logs, requests, ready, close };
+}
+
+/**
+ * Bundle an ES module entry into a throw-away standalone page and open it (development harnesses:
+ * art previews, audio checks...). The page gets a <canvas id="c">. Returns { page, logs, close }.
+ */
+export async function openStandalone({ entry, width = 1280, height = 720, body, outFile } = {}) {
+  const { standalonePage } = await import('./build.mjs');
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  await ensureDisplay();
+  const html = standalonePage(resolve(root, entry), body);
+  const file = outFile || resolve(root, `work/logs/standalone-${process.pid}.html`);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, html);
+  const browser = await chromium.launch({
+    headless: false, channel: 'chromium',
+    args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', `--window-size=${width + 16},${height + 120}`],
+  });
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const logs = [];
+  page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
+  page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+  await page.goto(`file://${file}`);
+  const close = async () => { await browser.close(); closeDisplay(); };
+  return { browser, page, logs, close, file };
 }

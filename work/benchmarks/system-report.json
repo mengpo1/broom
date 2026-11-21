@@ -1,0 +1,76 @@
+{
+  "date": "2026-11-21T17:46:06.817Z",
+  "system": {
+    "distribution": "Ubuntu 24.04.5 LTS",
+    "kernel": "6.18.44-fc-v726",
+    "architecture": "x86_64",
+    "cpu": {
+      "model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+      "logicalCores": 4
+    },
+    "memoryGB": 15.7,
+    "displayServer": "none (a virtual X server, Xvfb, is started for the tests)",
+    "sessionType": "",
+    "gpuDevices": "no PCI display device reported",
+    "glRenderer": "",
+    "vulkan": "",
+    "kernelDrivers": [],
+    "xrandr": ""
+  },
+  "browser": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "platform": "Linux x86_64",
+    "cores": 4,
+    "deviceMemoryGB": 16,
+    "screen": {
+      "width": 1280,
+      "height": 720,
+      "pixelRatio": 1,
+      "colorDepth": 24
+    },
+    "webgpu": true,
+    "adapter": {
+      "vendor": "google",
+      "architecture": "swiftshader",
+      "device": "",
+      "description": "",
+      "isFallback": true
+    },
+    "features": [
+      "depth32float-stencil8",
+      "rg11b10ufloat-renderable",
+      "bgra8unorm-storage",
+      "texture-compression-bc",
+      "core-features-and-limits",
+      "chromium-experimental-sampling-resource-table",
+      "chromium-experimental-timestamp-query-inside-passes",
+      "float32-filterable",
+      "indirect-first-instance",
+      "texture-compression-astc-sliced-3d",
+      "float32-blendable",
+      "subgroup-size-control",
+      "texture-compression-unaligned",
+      "texture-compression-astc",
+      "texture-compression-etc2",
+      "depth-clip-control",
+      "texture-compression-bc-sliced-3d",
+      "timestamp-query",
+      "clip-distances",
+      "texture-component-swizzle",
+      "subgroups"
+    ],
+    "limits": {
+      "maxTextureDimension2D": 8192,
+      "maxTextureArrayLayers": 256,
+      "maxBufferSize": 1073741824
+    },
+    "canvasFormat": "rgba8unorm",
+    "language": "en-US",
+    "refreshRateHz": 59.88023952095548,
+    "artTimings": {
+      "cars": 19340.100000000093,
+      "static": 1811.8999999999069
+    },
+    "browserVersion": "153.0.8010.12"
+  }
+}
