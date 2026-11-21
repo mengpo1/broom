@@ -33,6 +33,8 @@ export const BASE_PALETTE = {
   roof: '#b5483a', roofShade: '#7d3030', glass: '#7fb3d4', glassShade: '#4a7da6', glassLight: '#d2ecf7',
   wallLight: '#f1e6cf', wall: '#d9c8a7', wallShade: '#a8977f',
   tyre: '#2b2c34', tyreLight: '#4a4c57',
+  brickLight: '#cf8f6c', brick: '#ad664c', brickShade: '#77433f', shutter: '#3d7a86', shutterShade: '#2a5566',
+  lampOff: '#571b22', lampOffLight: '#8c2f36',
   banners: ['#d5302a', '#f0c330', '#2f6fbe', '#f1efe6', '#2f9a5a', '#e9792b', '#7a4fa8', '#16161f'],
   crowd: ['#d5302a', '#f0c330', '#2f6fbe', '#f1efe6', '#2f9a5a', '#e9792b', '#e58aa6', '#7a4fa8', '#3a3d4d', '#8fc6e8'],
   skin: ['#f1c9a5', '#d9a57c', '#a8704a', '#7a4a32'],

@@ -61,69 +61,72 @@ function forest(ctx, w, h, P, rnd) {
   const firs = { ink: softInk, shade: P.pineShade, base: P.pine, light: mixHex(P.pine, P.pineLight, 0.6) };
   const top = h * 0.035;
 
-  // 1. skyline: far crowns and a few conifer tops
+  // 1. skyline: conifer tops standing above the far crowns
   const slots = 7;
-  const spires = [0, 3, 5].map((s) => ({ x: ((s + 0.5 + jit(rnd, 0.25)) / slots) * w, top: top + (2 + rnd() * 26) * k, hw: (40 + rnd() * 14) * k, seed: newSeed(rnd) }));
-  for (const s of spires) wrapped(ctx, w, s.x - s.hw * 1.3, s.x + s.hw * 1.3, () => spire(ctx, s.x, s.top, 250 * k, s.hw, 6, firs, k, seeded(s.seed)));
+  for (const s of [0, 2, 3, 5]) {
+    const x = ((s + 0.5 + jit(rnd, 0.3)) / slots) * w, yTop = top + (2 + rnd() * 34) * k, hw = (46 + rnd() * 16) * k, seed = newSeed(rnd);
+    wrapped(ctx, w, x - hw * 1.3, x + hw * 1.3, () => spire(ctx, x, yTop, 290 * k, hw, 7, firs, k, seeded(seed)));
+  }
   for (let i = 0; i < slots; i++) {
-    const r = (70 + rnd() * 26) * k, x = ((i + 0.5 + jit(rnd, 0.2)) / slots) * w, y = top + r * 0.86 + (24 + rnd() * 44) * k, seed = newSeed(rnd);
-    const clumps = [{ x: x + r * 0.45, y: y + r * 0.2, r: r * 0.7, dark: true }, { x: x - r * 0.4, y: y + r * 0.1, r: r * 0.72 }, { x, y: y - r * 0.12, r: r * 0.8 }];
-    wrapped(ctx, w, x - r * 1.5, x + r * 1.5, () => foliageMass(ctx, clumps, far, k, seeded(seed), { inkWidth: LINE.form, marks: 1 }));
+    const r = (64 + rnd() * 30) * k, x = ((i + 0.5 + jit(rnd, 0.2)) / slots) * w, y = top + r * 0.86 + (44 + rnd() * 70) * k, seed = newSeed(rnd);
+    const clumps = [{ x: x + r * 0.5, y: y + r * 0.25, r: r * 0.7, dark: true }, { x: x - r * 0.45, y: y + r * 0.1, r: r * 0.72 }, { x: x + jit(rnd, r * 0.2), y: y - r * 0.15, r: r * 0.8 }];
+    wrapped(ctx, w, x - r * 1.6, x + r * 1.6, () => foliageMass(ctx, clumps, far, k, seeded(seed), { inkWidth: LINE.form, marks: 1 }));
   }
   // 2. darkness inside the wood, deeper hollows
-  ctx.fillStyle = P.leafDeep; ctx.fillRect(0, top + 150 * k, w, h);
+  ctx.fillStyle = P.leafDeep; ctx.fillRect(0, top + 190 * k, w, h);
   for (let i = 0; i < 6; i++) {
-    const x = ((i + rnd()) / 6) * w, y = (330 + rnd() * 130) * k, pts = ringPoints(x, y, (60 + rnd() * 50) * k, (50 + rnd() * 40) * k, 8, 0.12, rnd);
+    const x = ((i + rnd()) / 6) * w, y = (350 + rnd() * 130) * k, pts = ringPoints(x, y, (60 + rnd() * 50) * k, (50 + rnd() * 40) * k, 8, 0.12, rnd);
     wrapped(ctx, w, x - 130 * k, x + 130 * k, () => { ctx.beginPath(); traceScallops(ctx, pts, 0.25); ctx.fillStyle = abyss; ctx.fill(); });
   }
   // 3. thin trunks deep in the wood
   const dusky = mixHex(P.trunkShade, P.leafDeep, 0.45), duskyLight = mixHex(P.trunk, P.leafDeep, 0.4);
-  for (let i = 0; i < 7; i++) {
-    const x = ((i + 0.2 + rnd() * 0.6) / 7) * w, tw = (9 + rnd() * 8) * k, lean = jit(rnd, 14 * k);
+  for (let i = 0; i < 8; i++) {
+    const x = ((i + 0.2 + rnd() * 0.6) / 8) * w, tw = (8 + rnd() * 9) * k, lean = jit(rnd, 16 * k);
     wrapped(ctx, w, x - 40 * k, x + 40 * k, () => {
-      const poly = [[x - tw * 0.7, h], [x - tw * 0.4 + lean, 300 * k], [x + tw * 0.4 + lean, 300 * k], [x + tw * 0.7, h]];
-      ctx.beginPath(); tracePolygon(ctx, poly); ctx.fillStyle = dusky; ctx.fill();
+      ctx.beginPath(); tracePolygon(ctx, [[x - tw * 0.7, h], [x - tw * 0.4 + lean, 300 * k], [x + tw * 0.4 + lean, 300 * k], [x + tw * 0.7, h]]); ctx.fillStyle = dusky; ctx.fill();
       ctx.beginPath(); tracePolygon(ctx, [[x - tw * 0.7, h], [x - tw * 0.4 + lean, 300 * k], [x - tw * 0.05 + lean, 300 * k], [x - tw * 0.2, h]]); ctx.fillStyle = duskyLight; ctx.fill();
     });
   }
-  // 4. middle crowns
-  const mids = 5;
+  // 4. middle canopy: big crowns of uneven size, mostly in half shade
+  const mids = 4;
   for (let i = 0; i < mids; i++) {
-    const x = ((i + 0.5 + jit(rnd, 0.22)) / mids) * w, radius = (104 + rnd() * 26) * k, y = (196 + rnd() * 50) * k, seed = newSeed(rnd);
-    const clumps = crownClumps(x, y, radius, radius * 0.78, rnd);
-    wrapped(ctx, w, x - radius * 1.4, x + radius * 1.4, () => foliageMass(ctx, clumps, i % 2 ? lit : dim, k, seeded(seed), { inkWidth: LINE.form * 1.1 }));
+    const x = ((i + 0.5 + jit(rnd, 0.25)) / mids) * w, radius = (112 + rnd() * 44) * k, y = (190 + rnd() * 70) * k + radius * 0.2, seed = newSeed(rnd);
+    const clumps = crownClumps(x, y, radius, radius * (0.66 + rnd() * 0.16), rnd);
+    wrapped(ctx, w, x - radius * 1.4, x + radius * 1.4, () => foliageMass(ctx, clumps, i === 1 ? lit : dim, k, seeded(seed), { inkWidth: LINE.form * 1.1 }));
   }
-  // 5. trunks of the front row, then their low boughs
+  // 5. front row: trunks, then wide low boughs of uneven height that hide their forks
   const fronts = 4, trees = [];
   for (let i = 0; i < fronts; i++) {
-    trees.push({ x: ((i + 0.5 + jit(rnd, 0.2)) / fronts) * w, radius: (86 + rnd() * 26) * k, y: (338 + rnd() * 44) * k, tw: (24 + rnd() * 12) * k, lean: jit(rnd, 12 * k), seedA: newSeed(rnd), seedB: newSeed(rnd) });
+    const big = i % 2 === 0;
+    trees.push({ x: ((i + 0.5 + jit(rnd, 0.24)) / fronts) * w, radius: (big ? 124 + rnd() * 24 : 84 + rnd() * 18) * k, y: (big ? 300 + rnd() * 30 : 372 + rnd() * 30) * k,
+      tw: (big ? 32 + rnd() * 8 : 22 + rnd() * 6) * k, lean: jit(rnd, 14 * k), offset: jit(rnd, 26 * k), seedA: newSeed(rnd), seedB: newSeed(rnd) });
   }
   for (const t of trees) {
-    wrapped(ctx, w, t.x - 80 * k, t.x + 80 * k, () => {
+    const tx = t.x + t.offset;
+    wrapped(ctx, w, tx - 90 * k, tx + 90 * k, () => {
       const r = seeded(t.seedA);
       for (const side of [-1, 1]) {
-        const bough = [[t.x + t.lean, t.y + 60 * k], [t.x + t.lean + side * 40 * k, t.y + 20 * k], [t.x + side * 78 * k, t.y - 16 * k]];
+        const bough = [[tx + t.lean, t.y + 70 * k], [tx + t.lean + side * 44 * k, t.y + 30 * k], [tx + side * 84 * k, t.y - 10 * k]];
         brushCurve(ctx, bough, 14 * k, { color: P.ink, taperStart: 0, taperEnd: 0.5, swell: 0.05 });
         brushCurve(ctx, bough, 9 * k, { color: P.trunkShade, taperStart: 0, taperEnd: 0.5, swell: 0.05 });
       }
-      trunk(ctx, t.x, h + 4 * k, t.y, t.tw, t.tw * 0.62, P, k, r, t.lean);
+      trunk(ctx, tx, h + 4 * k, t.y, t.tw, t.tw * 0.62, P, k, r, t.lean);
     });
   }
   for (const t of trees) {
-    const clumps = crownClumps(t.x, t.y, t.radius, t.radius * 0.62, rnd, 1);
+    const clumps = crownClumps(t.x, t.y, t.radius, t.radius * 0.56, rnd, 1);
     wrapped(ctx, w, t.x - t.radius * 1.4, t.x + t.radius * 1.4, () => foliageMass(ctx, clumps, lit, k, seeded(t.seedB), { inkWidth: LINE.silhouette * 0.85 }));
   }
-  // 6. undergrowth along the ground line
-  const shrubs = 8;
+  // 6. undergrowth along the ground line: shrubs of uneven size with gaps, grass in front
+  const shrubs = 6;
   for (let i = 0; i < shrubs; i++) {
-    const x = ((i + 0.5 + jit(rnd, 0.3)) / shrubs) * w, r = (30 + rnd() * 18) * k, y = h - r * (0.5 + rnd() * 0.5), seed = newSeed(rnd);
-    const clumps = [{ x: x + r * 0.7, y: y + r * 0.25, r: r * 0.8, dark: true }, { x: x - r * 0.7, y: y + r * 0.2, r: r * 0.85, dark: i % 3 === 0 }, { x, y: y - r * 0.1, r, dark: i % 4 === 1 }];
-    wrapped(ctx, w, x - r * 2.2, x + r * 2.2, () => {
-      const r2 = seeded(seed);
-      foliageMass(ctx, clumps, lit, k, r2, { inkWidth: LINE.form, marks: 1, density: 1.2 });
-      grassTuft(ctx, x - r * 1.2, h - 2 * k, (14 + r2() * 8) * k, P.ink, k, r2, P.grassDark);
-      grassTuft(ctx, x + r * 1.5, h - 2 * k, (12 + r2() * 8) * k, P.ink, k, r2, P.grassDark);
-    });
+    const x = ((i + 0.5 + jit(rnd, 0.4)) / shrubs) * w, r = (24 + rnd() * rnd() * 44) * k, y = h - r * (0.45 + rnd() * 0.4), seed = newSeed(rnd);
+    const clumps = [{ x: x + r * 0.8, y: y + r * 0.25, r: r * 0.8, dark: true }, { x: x - r * 0.8, y: y + r * 0.2, r: r * 0.85, dark: i % 3 === 0 }, { x, y: y - r * 0.1, r, dark: i % 4 === 1 }];
+    wrapped(ctx, w, x - r * 2.4, x + r * 2.4, () => foliageMass(ctx, clumps, i % 3 === 2 ? dim : lit, k, seeded(seed), { inkWidth: LINE.form, marks: 1, density: 1.2 }));
+  }
+  for (let i = 0; i < 9; i++) {
+    const x = ((i + rnd()) / 9) * w, seed = newSeed(rnd);
+    wrapped(ctx, w, x - 30 * k, x + 30 * k, () => grassTuft(ctx, x, h - 2 * k, (14 + (seed % 12)) * k, P.ink, k, seeded(seed), i % 2 ? P.grassDark : P.leafShade));
   }
   ctx.fillStyle = 'rgba(22,22,36,0.35)';
   ctx.fillRect(0, h - 7 * k, w, 7 * k);
@@ -149,123 +152,129 @@ function ledgeBush(ctx, x, y, r, P, k, rnd) {
 }
 
 function cliff(ctx, w, h, P, rnd) {
-  const k = h / 576;
-  const wobble = (m, phase, amp) => (x) => amp * k * Math.sin((x / w) * TAU * m + phase);
-  // bed boundaries (periodic): cap rock | soft bed | hard bed | soft bed | scree
-  const y1 = ((f) => (x) => 168 * k + f(x))(wobble(2, rnd() * 6, 7));
-  const y2 = ((f) => (x) => 292 * k + f(x))(wobble(1, rnd() * 6, 9));
-  const y3 = ((f) => (x) => 404 * k + f(x))(wobble(3, rnd() * 6, 6));
-  const y4 = ((f, g) => (x) => 506 * k + f(x) + g(x))(wobble(2, rnd() * 6, 12), wobble(5, rnd() * 6, 5));
-  const top = h * 0.035;
+  const k = h / 576, top = h * 0.035;
+  const wobble = (base, m, amp, m2 = m * 2 + 1) => {
+    const p1 = rnd() * 6, p2 = rnd() * 6;
+    return (x) => (base + amp * Math.sin((x / w) * TAU * m + p1) + amp * 0.4 * Math.sin((x / w) * TAU * m2 + p2)) * k;
+  };
+  const capFoot = wobble(268, 1, 10), screeTop = wobble(512, 2, 10, 5);
 
   // ---- geometry
-  const cap = splitColumns(w, 7, rnd).map((c) => {
-    const yTop = top + (4 + rnd() * rnd() * 74) * k, tilt = jit(rnd, 9 * k), gap = (2 + rnd() * rnd() * 16) * k, cham = (5 + rnd() * 9) * k;
-    const xm = (c.x0 + c.x1) / 2, foot = y1(xm) + jit(rnd, 9 * k);
-    const pts = [[c.x0, foot], [c.x0 + gap * 0.2, yTop + 60 * k], [c.x0 + gap, yTop + cham + 4 * k], [c.x0 + gap + cham, yTop], [c.x1 - gap - cham * 1.4, yTop + tilt], [c.x1 - gap, yTop + tilt + cham * 1.5], [c.x1 - gap * 0.2, yTop + 70 * k], [c.x1, foot]];
-    return { ...c, pts, yTop, foot, depth: 0.4 + rnd() * 0.6, seed: newSeed(rnd) };
+  // cap rock: buttresses of uneven width and height separated by clefts
+  const cap = splitColumns(w, 6, rnd, 0.36).map((c) => {
+    const cw = c.x1 - c.x0, xm = (c.x0 + c.x1) / 2, yTop = top + (4 + Math.pow(rnd(), 1.4) * 104) * k, tilt = jit(rnd, 16 * k);
+    const gapL = (2 + rnd() * rnd() * 14) * k, gapR = (2 + rnd() * rnd() * 14) * k, foot = capFoot(xm) + jit(rnd, 10 * k);
+    const pts = [[c.x0, foot], [c.x0 + 1, yTop + 120 * k], [c.x0 + gapL * 0.5, yTop + (50 + rnd() * 30) * k], [c.x0 + gapL, yTop + (14 + rnd() * 22) * k],
+      [c.x0 + gapL + cw * (0.06 + rnd() * 0.08), yTop + jit(rnd, 4 * k)], [c.x0 + cw * (0.4 + rnd() * 0.2), yTop + tilt * 0.4 - rnd() * 6 * k], [c.x1 - gapR - cw * (0.1 + rnd() * 0.1), yTop + tilt],
+      [c.x1 - gapR, yTop + tilt + (12 + rnd() * 26) * k], [c.x1 - gapR * 0.5, yTop + (60 + rnd() * 40) * k], [c.x1 - 1, yTop + 130 * k], [c.x1, foot]];
+    return { ...c, pts, yTop, foot, depth: 0.4 + rnd() * 0.6, stains: 3, cracks: 3, seed: newSeed(rnd) };
   });
-  const mid = splitColumns(w, 8, rnd).map((c) => {
-    const xm = (c.x0 + c.x1) / 2, head = y2(xm) + jit(rnd, 8 * k), foot = y3(xm) + jit(rnd, 10 * k), cham = (4 + rnd() * 6) * k;
-    const pts = [[c.x0, foot], [c.x0, head + cham], [c.x0 + cham, head], [c.x1 - cham, head + jit(rnd, 3 * k)], [c.x1, head + cham * 1.3], [c.x1, foot]];
-    return { ...c, pts, yTop: head, foot, depth: 0.4 + rnd() * 0.6, seed: newSeed(rnd) };
+  // three ledges of long slabs stepping out toward the foot of the wall
+  const ledges = [[322, 30, 3], [392, 40, 2], [458, 30, 3]].map(([base, thick, count]) => {
+    const head = wobble(base, 2, 7, 3);
+    return splitColumns(w, count, rnd, 0.3).map((c) => {
+      const xm = (c.x0 + c.x1) / 2, y = head(xm) + jit(rnd, 6 * k), t = thick * (0.7 + rnd() * 0.6) * k, gap = rnd() < 0.35 ? (4 + rnd() * 14) * k : 0, cham = (4 + rnd() * 6) * k;
+      const pts = [[c.x0 + gap, y + t], [c.x0 + gap, y + cham], [c.x0 + gap + cham, y], [xm + jit(rnd, 20 * k), y + jit(rnd, 4 * k)], [c.x1 - gap - cham, y + jit(rnd, 3 * k)], [c.x1 - gap, y + cham * 1.4], [c.x1 - gap, y + t + jit(rnd, 4 * k)], [xm, y + t + jit(rnd, 4 * k)]];
+      return { ...c, pts, yTop: y, foot: y + t, depth: 0.3 + rnd() * 0.7, stains: 2, cracks: 1, seed: newSeed(rnd) };
+    });
   });
 
-  /** Front of a protruding hard bed: sunlit face, shaded right flank, stains, joints and cracks. */
-  const paintColumn = (c) => {
+  /** Front of a block standing proud of the face: sunlit, shaded right flank, stains, cracks. */
+  const paintBlock = (c) => {
     const r = seeded(c.seed), trace = (g) => tracePolygon(g, c.pts), cw = c.x1 - c.x0, ch = c.foot - c.yTop;
     ctx.beginPath(); trace(ctx); ctx.fillStyle = P.rockLight; ctx.fill();
     clipped(ctx, trace, () => {
       // right flank turned away from the light, with a broken edge
-      const flank = cw * (0.1 + 0.16 * c.depth), edge = [[c.x1 + 4, c.yTop - 4]];
-      for (let i = 0; i <= 6; i++) edge.push([c.x1 - flank * (0.7 + r() * 0.6) - (i % 2 ? flank * 0.35 : 0), c.yTop + (ch * i) / 6]);
+      const flank = Math.min(cw * 0.3, (10 + 22 * c.depth) * k), edge = [[c.x1 + 4, c.yTop - 4]];
+      for (let i = 0; i <= 6; i++) edge.push([c.x1 - flank * (0.7 + r() * 0.6) - (i % 2 ? flank * 0.4 : 0), c.yTop + (ch * i) / 6]);
       edge.push([c.x1 + 4, c.foot + 4]);
       ctx.beginPath(); tracePolygon(ctx, edge); ctx.fillStyle = P.rock; ctx.fill();
-      ctx.beginPath(); tracePolygon(ctx, edge.map(([x, y], i) => [i === 0 || i === edge.length - 1 ? x : x + flank * 0.5, y])); ctx.fillStyle = P.rockShade; ctx.fill();
+      ctx.beginPath(); tracePolygon(ctx, edge.map(([x, y], i) => [i === 0 || i === edge.length - 1 ? x : x + flank * 0.55, y])); ctx.fillStyle = P.rockShade; ctx.fill();
       // weathering stains running down from the rim
-      for (let i = 0; i < 3; i++) {
-        const x = c.x0 + cw * (0.12 + r() * 0.6), len = ch * (0.25 + r() * 0.5), sw = (5 + r() * 9) * k;
-        ctx.beginPath(); ctx.moveTo(x - sw, c.yTop - 2); ctx.lineTo(x + sw, c.yTop - 2); ctx.lineTo(x + sw * 0.6, c.yTop + len * 0.6); ctx.lineTo(x + sw * 0.1, c.yTop + len); ctx.lineTo(x - sw * 0.5, c.yTop + len * 0.5); ctx.closePath();
+      for (let i = 0; i < c.stains; i++) {
+        const x = c.x0 + cw * (0.1 + r() * 0.62), len = Math.min(ch * (0.3 + r() * 0.55), 190 * k), sw = Math.min(cw * 0.12, (5 + r() * 10) * k);
+        ctx.beginPath(); ctx.moveTo(x - sw, c.yTop - 12 * k); ctx.lineTo(x + sw, c.yTop - 12 * k); ctx.lineTo(x + sw * 0.7, c.yTop + len * 0.55); ctx.lineTo(x + sw * 0.1, c.yTop + len); ctx.lineTo(x - sw * 0.5, c.yTop + len * 0.45); ctx.closePath();
         ctx.fillStyle = P.rock; ctx.fill();
       }
-      // bedding lines and vertical cracks
-      for (let i = 0; i < 3; i++) {
-        const y = c.yTop + ch * (0.2 + r() * 0.7), xa = c.x0 + cw * r() * 0.5, xb = xa + cw * (0.2 + r() * 0.4);
-        brushStroke(ctx, [[xa, y], [(xa + xb) / 2, y + jit(r, 2 * k)], [xb, y + jit(r, 2 * k)]], LINE.hair * k * 1.5, { color: P.rockShade, taper: 0.4, swell: 0 });
+      // bedding joints (pale pen lines) and cracks
+      for (let i = 0; i < 2 + c.cracks; i++) {
+        const y = c.yTop + ch * (0.15 + r() * 0.75), xa = c.x0 + cw * r() * 0.5, xb = xa + cw * (0.2 + r() * 0.45);
+        brushStroke(ctx, [[xa, y], [(xa + xb) / 2, y + jit(r, 2 * k)], [xb, y + jit(r, 2 * k)]], LINE.hair * k * 1.6, { color: P.rockShade, taper: 0.4, swell: 0 });
       }
-      for (let i = 0; i < 2; i++) {
-        const x = c.x0 + cw * (0.2 + r() * 0.55), ya = c.yTop + ch * r() * 0.4, len = ch * (0.25 + r() * 0.4);
-        brushStroke(ctx, [[x, ya], [x + jit(r, 4 * k), ya + len * 0.35], [x + jit(r, 5 * k), ya + len * 0.7], [x + jit(r, 5 * k), ya + len]], LINE.detail * k * 1.2, { color: P.ink, taperStart: 0.15, taperEnd: 0.6, swell: 0.2, seed: i });
+      for (let i = 0; i < c.cracks; i++) {
+        const x = c.x0 + cw * (0.15 + r() * 0.6), ya = c.yTop + ch * r() * 0.5, len = Math.min(ch * (0.25 + r() * 0.4), 120 * k);
+        brushStroke(ctx, [[x, ya], [x + jit(r, 4 * k), ya + len * 0.35], [x + jit(r, 6 * k), ya + len * 0.7], [x + jit(r, 6 * k), ya + len]], LINE.detail * k * 1.2, { color: P.ink, taperStart: 0.15, taperEnd: 0.6, swell: 0.2, seed: i });
       }
-      // joint with the next column: heavier toward the foot
-      brushStroke(ctx, [[c.x1 - 1.5 * k, c.yTop + ch * 0.1], [c.x1 - 1.5 * k + jit(r, 2 * k), c.yTop + ch * 0.5], [c.x1 - 1.5 * k, c.foot]], LINE.form * k * 1.6, { color: P.ink, taperStart: 0.5, taperEnd: 0.02, swell: 0.15 });
     });
   };
-  /** Flat shadow thrown by an overhanging column on the recessed bed below it. */
-  const paintOverhang = (c, color, reach) => {
-    const r = seeded(c.seed + 7), d = reach * (0.5 + c.depth) * k;
-    const pts = [[c.x0 - 1, c.foot - 14 * k], [c.x1 + 1, c.foot - 14 * k], [c.x1 + d * 0.55, c.foot + d * 0.8]];
-    const teeth = 4;
-    for (let i = 1; i <= teeth; i++) { const x = c.x1 + d * 0.55 - ((c.x1 - c.x0) * i) / teeth; pts.push([x + (c.x1 - c.x0) / teeth * 0.5, c.foot + d * (0.75 + r() * 0.5)], [x, c.foot + d * (0.5 + r() * 0.4)]); }
-    ctx.beginPath(); tracePolygon(ctx, pts); ctx.fillStyle = color; ctx.fill();
+  /** Cleft between two buttresses: a wedge of shadow that closes downward, inked on its lit side. */
+  const paintCleft = (c) => {
+    const r = seeded(c.seed + 3), len = (110 + r() * 150) * k * c.depth, y0 = c.yTop + 50 * k, x = c.x1, half = (5 + r() * 7) * k;
+    ctx.beginPath(); tracePolygon(ctx, [[x - half, y0], [x + half * 0.6, y0 - 20 * k], [x + half * 0.3, y0 + len * 0.6], [x + jit(r, 3 * k), y0 + len]]); ctx.fillStyle = P.rockDeep; ctx.fill();
+    brushStroke(ctx, [[x + half * 0.5, y0 - 16 * k], [x + half * 0.3 + jit(r, 2 * k), y0 + len * 0.5], [x + jit(r, 3 * k), y0 + len * 1.15]], LINE.form * k * 1.5, { color: P.ink, taperStart: 0.1, taperEnd: 0.6, swell: 0.2 });
   };
-  const softBed = (ya, yb, seed) => {
-    // recessed bed: fine strata drawn with broken pen lines, a few shaded niches
+  /** Flat shadow thrown by an overhanging block on the recessed slope below it. */
+  const paintOverhang = (c, reach) => {
+    const r = seeded(c.seed + 7), d = reach * (0.5 + c.depth) * k, cw = c.x1 - c.x0, teeth = Math.max(3, Math.round(cw / (34 * k)));
+    const pts = [[c.x0 - 1, c.foot - 12 * k], [c.x1 + 1, c.foot - 12 * k], [c.x1 + d * 0.55, c.foot + d * 0.8]];
+    for (let i = 1; i <= teeth; i++) { const x = c.x1 + d * 0.55 - (cw * i) / teeth; pts.push([x + (cw / teeth) * 0.5, c.foot + d * (0.75 + r() * 0.5)], [x, c.foot + d * (0.45 + r() * 0.4)]); }
+    ctx.beginPath(); tracePolygon(ctx, pts); ctx.fillStyle = P.rockShade; ctx.fill();
+  };
+  /** Recessed slope between two levels: fine strata drawn with broken pen lines. */
+  const strata = (ya, yb, lines, seed) => {
     const r = seeded(seed);
-    for (let i = 0; i < 4; i++) {
-      const x = r() * w, y = ya(x) + (yb(x) - ya(x)) * (0.45 + r() * 0.4), rx = (22 + r() * 30) * k, ry = (9 + r() * 10) * k;
-      wrapped(ctx, w, x - rx * 1.3, x + rx * 1.3, () => {
-        ctx.beginPath(); ctx.moveTo(x - rx, y + ry); ctx.quadraticCurveTo(x - rx * 0.8, y - ry * 1.4, x + rx * 0.2, y - ry); ctx.quadraticCurveTo(x + rx, y - ry * 0.6, x + rx * 1.1, y + ry); ctx.closePath();
-        ctx.fillStyle = P.rockShade; ctx.fill();
-        ctx.beginPath(); ctx.moveTo(x - rx * 0.5, y + ry); ctx.quadraticCurveTo(x - rx * 0.3, y - ry * 0.5, x + rx * 0.3, y - ry * 0.4); ctx.quadraticCurveTo(x + rx * 0.8, y - ry * 0.1, x + rx * 0.9, y + ry); ctx.closePath();
-        ctx.fillStyle = P.rockDeep; ctx.fill();
-      });
-    }
-    for (let line = 0; line < 5; line++) {
-      const f = (line + 0.5 + jit(r, 0.3)) / 5;
+    for (let line = 0; line < lines; line++) {
+      const f = (line + 0.5 + jit(r, 0.3)) / lines;
       let x = r() * 60 * k;
       while (x < w) {
-        const len = (50 + r() * 150) * k, xa = x, xb = Math.min(x + len, w + 40 * k), width = LINE.hair * k * (1.2 + r() * 1.3), tone = r() < 0.3 ? P.ink : P.rockShade;
+        const len = (40 + r() * 170) * k, xa = x, xb = Math.min(x + len, w + 40 * k), width = LINE.hair * k * (1.2 + r() * 1.4), tone = r() < 0.25 ? P.ink : P.rockShade;
         const pts = [];
-        for (let q = 0; q <= 6; q++) { const xx = xa + ((xb - xa) * q) / 6; pts.push([xx, ya(xx) + (yb(xx) - ya(xx)) * f + ((q * 7 + line * 3) % 5 - 2) * 0.7 * k]); }
+        for (let q = 0; q <= 6; q++) { const xx = xa + ((xb - xa) * q) / 6; pts.push([xx, ya(xx) + (yb(xx) - ya(xx)) * f + (((q * 7 + line * 3) % 5) - 2) * 0.8 * k]); }
         wrapped(ctx, w, xa, xb, () => brushStroke(ctx, pts, width, { color: tone, taper: 0.3, swell: 0.2 }));
-        x = xb + (14 + r() * 60) * k;
+        x = xb + (14 + r() * 70) * k;
       }
     }
   };
+  const underline = (c, weight) => brushStroke(ctx, [[c.x0, c.foot], [(c.x0 + c.x1) / 2, c.foot + 1.5 * k], [c.x1, c.foot]], LINE.form * k * weight, { color: P.ink, taper: 0.12, swell: 0.3, seed: c.seed % 17 });
 
   // ---- painting, top to bottom
   // silhouette of the cap rock: contour first, heavier on the flanks turned away from the light
   for (const c of cap) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 8 * k, () => inkUnion(ctx, (g) => tracePolygon(g, c.pts), P.ink, LINE.silhouette, k, 1));
-  ctx.fillStyle = P.rock; ctx.fillRect(0, 150 * k, w, h);
-  for (const c of cap) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 8 * k, () => paintColumn(c));
-  for (const c of cap) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 60 * k, () => paintOverhang(c, P.rockShade, 30));
-  softBed(y1, y2, newSeed(rnd));
-  for (const c of cap) {
-    // pen line under the overhang
-    wrapped(ctx, w, c.x0, c.x1, () => brushStroke(ctx, [[c.x0, c.foot], [(c.x0 + c.x1) / 2, c.foot + 1.5 * k], [c.x1, c.foot]], LINE.form * k * 1.5, { color: P.ink, taper: 0.12, swell: 0.3, seed: c.seed % 17 }));
+  ctx.fillStyle = P.rock; ctx.fillRect(0, 170 * k, w, h);
+  for (const c of cap) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 8 * k, () => paintBlock(c));
+  for (const c of cap) wrapped(ctx, w, c.x1 - 30 * k, c.x1 + 30 * k, () => paintCleft(c));
+  for (const c of cap) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 60 * k, () => paintOverhang(c, 26));
+  strata(capFoot, screeTop, 9, newSeed(rnd));
+  for (const c of cap) wrapped(ctx, w, c.x0, c.x1, () => underline(c, 1.6));
+  // long shaded alcoves weathered out along the bedding
+  for (let i = 0; i < 3; i++) {
+    const x = ((i + rnd()) / 3) * w, y = capFoot(x) + (22 + rnd() * 30) * k, rx = (34 + rnd() * 40) * k, ry = (7 + rnd() * 6) * k, seed = newSeed(rnd);
+    wrapped(ctx, w, x - rx * 1.4, x + rx * 1.4, () => {
+      const r = seeded(seed), pts = ringPoints(x, y, rx, ry, 7, 0.2, r);
+      ctx.beginPath(); tracePolygon(ctx, pts); ctx.fillStyle = P.rockShade; ctx.fill();
+      ctx.beginPath(); tracePolygon(ctx, pts.map(([px, py]) => [x + (px - x) * 0.7 + rx * 0.12, y + (py - y) * 0.55 - ry * 0.25])); ctx.fillStyle = P.rockDeep; ctx.fill();
+    });
   }
-  // hard bed standing proud of the face: lit rim on top, contour underneath
-  for (const c of mid) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 8 * k, () => inkUnion(ctx, (g) => tracePolygon(g, c.pts), P.ink, LINE.form, k, 1));
-  for (const c of mid) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 8 * k, () => paintColumn(c));
-  for (const c of mid) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 60 * k, () => paintOverhang(c, P.rockShade, 24));
-  softBed(y3, y4, newSeed(rnd));
-  for (const c of mid) wrapped(ctx, w, c.x0, c.x1, () => brushStroke(ctx, [[c.x0, c.foot], [(c.x0 + c.x1) / 2, c.foot + 1.5 * k], [c.x1, c.foot]], LINE.form * k * 1.4, { color: P.ink, taper: 0.12, swell: 0.3, seed: c.seed % 13 }));
+  for (const slabs of ledges) {
+    for (const c of slabs) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 8 * k, () => inkUnion(ctx, (g) => tracePolygon(g, c.pts), P.ink, LINE.form * 0.9, k, 1));
+    for (const c of slabs) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 60 * k, () => paintOverhang(c, 16));
+    for (const c of slabs) wrapped(ctx, w, c.x0 - 8 * k, c.x1 + 8 * k, () => paintBlock(c));
+  }
 
   // scree at the foot of the wall
-  const screeTop = [];
-  for (let x = -w; x <= 2 * w; x += 16 * k) screeTop.push([x, y4(x)]);
-  const traceScree = (g) => { g.moveTo(-w, h + 10); for (const p of screeTop) g.lineTo(p[0], p[1]); g.lineTo(2 * w, h + 10); g.closePath(); };
+  const screeLine = [];
+  for (let x = -w; x <= 2 * w; x += 16 * k) screeLine.push([x, screeTop(x)]);
+  const traceScree = (g) => { g.moveTo(-w, h + 10); for (const p of screeLine) g.lineTo(p[0], p[1]); g.lineTo(2 * w, h + 10); g.closePath(); };
   inkUnion(ctx, traceScree, P.ink, LINE.form, k, 0);
   ctx.beginPath(); traceScree(ctx); ctx.fillStyle = P.rockLight; ctx.fill();
   clipped(ctx, traceScree, () => {
     for (let i = 0; i < 7; i++) {
-      const x = ((i + rnd()) / 7) * w, y = y4(x) + (20 + rnd() * 40) * k, pts = ringPoints(x, y, (40 + rnd() * 40) * k, (10 + rnd() * 10) * k, 7, 0.2, rnd);
-      wrapped(ctx, w, x - 100 * k, x + 100 * k, () => { ctx.beginPath(); tracePolygon(ctx, pts); ctx.fillStyle = P.rock; ctx.fill(); });
+      const x = ((i + rnd()) / 7) * w, y = screeTop(x) + (16 + rnd() * 40) * k, pts = ringPoints(x, y, (40 + rnd() * 50) * k, (7 + rnd() * 9) * k, 7, 0.2, rnd);
+      wrapped(ctx, w, x - 110 * k, x + 110 * k, () => { ctx.beginPath(); tracePolygon(ctx, pts); ctx.fillStyle = P.rock; ctx.fill(); });
     }
   });
   for (let i = 0; i < 6; i++) {
-    const x = ((i + rnd()) / 6) * w, y = y4(x) + (18 + rnd() * 44) * k, r = (7 + rnd() * 12) * k, pts = ringPoints(x, y, r, r * 0.7, 6, 0.18, rnd);
+    const x = ((i + rnd()) / 6) * w, y = screeTop(x) + (16 + rnd() * 40) * k, r = (6 + rnd() * rnd() * 20) * k, pts = ringPoints(x, y, r, r * 0.7, 6, 0.18, rnd);
     wrapped(ctx, w, x - r * 2, x + r * 2, () => {
       inkUnion(ctx, (g) => tracePolygon(g, pts), P.ink, LINE.form, k, 0.7);
       ctx.beginPath(); tracePolygon(ctx, pts); ctx.fillStyle = P.rock; ctx.fill();
@@ -275,10 +284,10 @@ function cliff(ctx, w, h, P, rnd) {
       });
     });
   }
-  // dry bushes on the ledges, on the rim and in the scree
+  // dry bushes on the ledges and in the scree
   const bushes = [];
-  for (const c of mid) if (bushes.length < 3 && rnd() < 0.5) bushes.push([c.x0 + (c.x1 - c.x0) * (0.3 + rnd() * 0.4), c.yTop + 2 * k, (13 + rnd() * 7) * k]);
-  for (let i = 0; i < 3; i++) { const x = ((i + rnd()) / 3) * w; bushes.push([x, y4(x) + (8 + rnd() * 30) * k, (14 + rnd() * 9) * k]); }
+  for (const slabs of ledges) { const c = slabs[Math.floor(rnd() * slabs.length)]; bushes.push([c.x0 + (c.x1 - c.x0) * (0.25 + rnd() * 0.5), c.yTop + 3 * k, (11 + rnd() * 8) * k]); }
+  for (let i = 0; i < 2; i++) { const x = ((i + rnd()) / 2) * w; bushes.push([x, screeTop(x) + (10 + rnd() * 30) * k, (15 + rnd() * 10) * k]); }
   for (const [x, y, r] of bushes) { const seed = newSeed(rnd); wrapped(ctx, w, x - r * 3, x + r * 3, () => ledgeBush(ctx, x, y, r, P, k, seeded(seed))); }
   for (let i = 0; i < 5; i++) {
     const x = ((i + rnd()) / 5) * w, seed = newSeed(rnd);

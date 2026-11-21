@@ -38,6 +38,7 @@ export class ArtLibrary {
     this.cars = [];
     this.specs = new Map(expandScenerySpecs().map((s) => [s.id, s]));
     this.themeKey = null;
+    this.themeExtras = null;     // optional hook: (atlas, track, palette) => define circuit-specific drawings (map...)
     this.timings = {};
   }
 
@@ -100,6 +101,7 @@ export class ArtLibrary {
       this.themeAtlas.define(id, spec.w, spec.h, (ctx, w, h) => paint(ctx, w, h, palette, seeded(seed), spec.variant, spec),
         { kind: spec.kind, worldW: spec.worldW || 0, worldH: spec.worldH, tile: spec.tile || 0, wrapX: spec.kind === 'strip' });
     }
+    if (this.themeExtras) this.themeExtras(this.themeAtlas, track, palette);
     const canvases = this.themeAtlas.build();
     for (let i = 0; i < canvases.length; i++) this.renderer.uploadLayer('atlas', STATIC_LAYERS + i, canvases[i]);
     const backdrop = makeCanvas(BACKDROP_WIDTH, BACKDROP_HEIGHT), bctx = backdrop.getContext('2d');

@@ -49,6 +49,8 @@ export class GameApp {
     this.input = null;
     this.audio = null;
     this.ui = null;
+    this.hud = null;
+    this.session = null;         // current game mode controller (gameplay/modes), may be null in automation
     this.forcedSize = null;
     this.frameHook = null;
     this.stats = { fps: 0, frameMs: 0, simMs: 0, buildMs: 0, renderMs: 0 };
@@ -115,10 +117,11 @@ export class GameApp {
       view.configure(track, colors, this.race.rules.flyingStart ? 0 : this.race.cars.length);
       view.yaw = 0; view.pitch = 0; view.impact = 0; view.flash = 0; view.speedLines = 0;
     }
-    this.scene.reset(this.race, track, layout);
+    this.scene.reset(this.race, track, layout, this.palette);
     this.accumulator = 0;
     this.paused = false;
     this.resize(true);
+    if (this.hud) this.hud.onRaceStart(this);
     this.emit('raceStart', this.race);
     return this.race;
   }
@@ -186,6 +189,7 @@ export class GameApp {
   dispatch(event) {
     if (this.scene) this.scene.onEvent(event, this);
     if (this.audio) this.audio.onEvent(event, this);
+    if (this.hud) this.hud.onRaceEvent(event, this);
     if (this.ui) this.ui.onRaceEvent(event, this);
     this.emit(event.type, event);
   }
@@ -199,6 +203,7 @@ export class GameApp {
     const simDt = this.paused ? 0 : dt;
     this.time += dt;
     quads.reset();
+    if (this.hud) this.hud.update(this, simDt);
     if (this.ui) this.ui.update(this, dt);
     frame.viewCount = race ? this.viewCount : 0;
     if (race) {
@@ -215,6 +220,7 @@ export class GameApp {
         fv.overlay = view.speedLines > 0.004 || view.flash > 0.004;
         fv.frontStart = quads.count;
         if (this.scene) this.scene.buildFront(this, view);
+        if (this.hud) this.hud.drawFront(this, view);
         if (this.ui) this.ui.drawFront(this, view);
         fv.frontCount = quads.count - fv.frontStart;
       }

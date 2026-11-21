@@ -12,6 +12,13 @@ import { rgbToHex } from './art/palettes/palettes.js';
 import { defineCockpitArt } from './art/cockpits/cockpit-art.js';
 import { CockpitLayer } from './rendering/compositing/cockpit-layer.js';
 import { TextPainter } from './ui/text-painter.js';
+import { Hud, defineHudArt, trackMapSprite } from './ui/hud.js';
+import { EffectsLayer, defineEffectsArt } from './rendering/effects/effects-layer.js';
+import { Storage } from './persistence/storage.js';
+import { InputManager } from './input/input-manager.js';
+import { GameAudio } from './audio/game-audio.js';
+import { GameFlow } from './ui/game-flow.js';
+import { t, setLanguage } from './localization/i18n.js';
 
 function parseParams() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -25,11 +32,16 @@ async function boot() {
   const canvas = document.getElementById('scene');
   const app = new GameApp(canvas);
   const notice = document.getElementById('notice');
+  const storage = new Storage();
+  setLanguage(params.lang || storage.data.settings.language);
+  notice.hidden = false;
+  notice.textContent = `${t('game.title')} — ${t('game.loading')}`;
+  await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
   try {
     const text = new TextPainter();
     let cockpitLayout = null;
     await app.init({
-      quality: params.quality || 'high',
+      quality: params.quality || storage.data.settings.quality,
       registerArt: (art) => {
         const players = PLAYER_TEAMS.map((team) => {
           const colors = liveryColors(team).map((c) => rgbToHex(c[0], c[1], c[2]));
@@ -37,20 +49,36 @@ async function boot() {
         });
         cockpitLayout = defineCockpitArt(art, players);
         text.define(art);
+        defineHudArt(art);
+        defineEffectsArt(art);
+        art.themeExtras = (atlas, track) => { const map = trackMapSprite(track); atlas.define('map.track', 256, 256, map.paint, map.meta); };
       },
       attachLayers: (scene, appRef) => {
         text.resolve(appRef.art);
         appRef.text = text;
         scene.cockpit = new CockpitLayer(appRef.art, cockpitLayout, text);
+        appRef.hud = new Hud(appRef, text);
+        scene.effects = new EffectsLayer(appRef.art);
+        scene.lamps = [appRef.art.sprite('hud.lamp.off'), appRef.art.sprite('hud.lamp.red'), appRef.art.sprite('hud.lamp.green')];
       },
     });
   } catch (error) {
-    const message = error instanceof GpuUnavailableError ? error.message : `Initialisation failed: ${error.message}`;
+    const message = error instanceof GpuUnavailableError ? t('error.webgpu') : `Initialisation failed: ${error.message}`;
     notice.hidden = false;
-    notice.textContent = `Virage GP — ${message} WebGPU est requis (Chrome / Chromium récent avec accélération matérielle).`;
+    notice.textContent = `${t('game.title')} — ${message}`;
     console.error(error);
+    window.virageFailed = true;
     return;
   }
+  notice.hidden = true;
+  const input = new InputManager(canvas, storage.data.settings.controls);
+  const audio = new GameAudio(storage.data.settings.audio);
+  input.onGesture = () => { audio.resume(); };
+  app.input = input;
+  app.audio = audio;
+  const flow = new GameFlow(app, storage, input, audio);
+  app.ui = flow;
+  audio.setScene('menu');
   /** Quick race used by automation: AI field with an optionally computer-driven player. */
   const quickRace = (options = {}) => {
     const count = options.opponents ?? 15;
@@ -60,6 +88,7 @@ async function boot() {
     for (let p = 0; p < players; p++) humans.push({ driver: PLAYER_DRIVERS[p], human: true, playerIndex: p, autoDrive: options.autoDrive !== false, setup: options.setup });
     const position = Math.min(entries.length, options.gridPosition ?? entries.length);
     entries.splice(position, 0, ...humans);
+    flow.state = 'race'; app.hud.visible = options.hud !== false; app.session = null;
     return app.startRace({
       circuitId: options.circuit || 'hazelbrook', laps: options.laps ?? 3, entries,
       rules: { ...RULE_PRESETS[options.rules || 'racing'], ...(options.rulesOverride || {}) },
@@ -67,11 +96,9 @@ async function boot() {
       views: humans.map((h) => entries.indexOf(h)), cameras: options.cameras,
     });
   };
-  window.virage = { app, quickRace, CAMERA, params };
-  if (params.auto) {
-    quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
-    app.start();
-  }
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio };
+  if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
+  if (!params.manual) app.start();
   window.dispatchEvent(new Event('virage-ready'));
 }
 

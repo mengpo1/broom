@@ -10,6 +10,10 @@ import { MAX_NODES, depthOf, segmentAt, projectAtDepth, projectNode } from '../p
 import { QUAD_MODE } from './quad-batch.js';
 import { CAMERA } from '../compositing/race-view.js';
 import { CAR_STATE } from '../../physics/car-physics.js';
+import { RACE_PHASE } from '../../gameplay/race.js';
+import { GANTRY_LIGHTS } from '../../art/environments/trackside.js';
+
+const DEFAULT_GANTRY_LIGHTS = [0.42, 0.46, 0.5, 0.54, 0.58].map((fx) => ({ fx, fy: 0.3, fr: 0.014 }));
 
 const MAX_CARS = 32;
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
@@ -27,15 +31,20 @@ export class SceneBuilder {
     this.carAngleStep = Math.PI / (art.cars.length - 1 || 1);
     this.effects = null;       // optional EffectsLayer: { reset, onEvent, update, buildView }
     this.cockpit = null;       // optional CockpitLayer: { buildFront }
+    this.lamps = null;         // [off, red, green] lamp sprites for the start gantry
+    this.gantryLights = GANTRY_LIGHTS || DEFAULT_GANTRY_LIGHTS;
+    this.lightsLit = 0; this.lightsGreen = false; this.greenTimer = 99;
   }
 
   /** Bind a race: resolve the drawings named by the circuit layout. */
-  reset(race, track, layout) {
+  reset(race, track, layout, palette) {
     this.track = track; this.layout = layout;
+    this.greenTimer = 99;
     for (const strip of layout.strips) strip.sprite = this.art.sprite(strip.id);
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
       prop.behind = false;
+      prop.lights = prop.id === 'gantry.start';
     }
     // order the strips of every sample from the farthest from the road to the nearest
     const dist = (s, i) => (s.absolute ? s.offset - (s.side > 0 ? track.barrierR[i] : track.barrierL[i]) : s.offset);
@@ -54,7 +63,7 @@ export class SceneBuilder {
         prop.behind = prop.d > 0 ? prop.d > tallR : -prop.d > tallL;
       }
     }
-    if (this.effects) this.effects.reset(race, track);
+    if (this.effects) this.effects.reset(race, track, palette);
   }
 
   onEvent(event, app) {
@@ -65,6 +74,7 @@ export class SceneBuilder {
         if (view.carIndex === event.car || view.carIndex === event.other) view.addImpact(strength);
       }
     }
+    if (event.type === 'green') this.greenTimer = 0;
     if (this.effects) this.effects.onEvent(event, app);
   }
 
@@ -79,6 +89,9 @@ export class SceneBuilder {
       this.carS[i] = car.s + (moving ? (car.speed * c - car.vLat * s) * ahead : 0);
       this.carD[i] = car.d + (moving ? (car.speed * s + car.vLat * c) * ahead : 0);
     }
+    this.greenTimer += dt;
+    this.lightsGreen = app.race.phase !== RACE_PHASE.COUNTDOWN && this.greenTimer < 2.5;
+    this.lightsLit = app.race.phase === RACE_PHASE.COUNTDOWN ? app.race.lights : 0;
     if (this.effects) this.effects.update(app, dt);
   }
 
@@ -104,6 +117,7 @@ export class SceneBuilder {
       if (prev < 0) segHead[k] = i; else carNext[prev] = i;
     }
     const yawAngle = Math.atan(p.yawTan);
+    if (this.effects) this.effects.beginView(app, view);
     for (let k = nodeCount - 2; k >= 0; k--) {
       const zNear = p.nodeZ[k], zFar = p.nodeZ[k + 1];
       const sample = p.segSample[k];
@@ -183,6 +197,16 @@ export class SceneBuilder {
       // fade in at the limit of the draw distance instead of popping
       const fade = z > reach * detail - 60 ? (reach * detail - z) / 60 : 1;
       quads.sprite(sp, pt.x - w * 0.5, pt.y - h, w, h, 1, 1, 1, fade, z, prop.flip);
+      if (prop.lights && this.lamps && z < 400) {
+        const left = pt.x - w * 0.5, top = pt.y - h;
+        for (let i = 0; i < this.gantryLights.length; i++) {
+          const l = this.gantryLights[i];
+          const lamp = this.lightsGreen ? this.lamps[2] : i < this.lightsLit ? this.lamps[1] : null;
+          if (!lamp) continue;
+          const s = l.fr * w * 2.5;
+          quads.sprite(lamp, left + l.fx * w - s / 2, top + l.fy * h - s / 2, s, s, 1, 1, 1, 1, z, false);
+        }
+      }
     }
   }
 
@@ -210,5 +234,6 @@ export class SceneBuilder {
   /** Cockpit and other per-view foreground drawings. */
   buildFront(app, view) {
     if (this.cockpit) this.cockpit.buildFront(app, view);
+    if (this.effects) this.effects.buildFront(app, view);
   }
 }

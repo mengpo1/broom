@@ -3,7 +3,7 @@
 import { openGame, root } from './lib-browser.mjs';
 const out = process.argv[2] || 'work/renders/dev.png';
 const opt = JSON.parse(process.argv[3] || '{}');
-const { page, logs, close } = await openGame({ width: opt.width || 1280, height: opt.height || 720, hash: `quality=${opt.quality || 'medium'}` });
+const { page, logs, close } = await openGame({ width: opt.width || 1280, height: opt.height || 720, hash: `manual=1&quality=${opt.quality || 'medium'}${opt.lang ? `&lang=${opt.lang}` : ''}` });
 const t0 = Date.now();
 const info = await page.evaluate(async (opt) => {
   const { app, quickRace } = window.virage;
