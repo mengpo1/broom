@@ -12,6 +12,7 @@ import { CAMERA } from '../compositing/race-view.js';
 import { CAR_STATE } from '../../physics/car-physics.js';
 import { RACE_PHASE } from '../../gameplay/race.js';
 import { GANTRY_LIGHTS } from '../../art/environments/trackside.js';
+import { hexToRgb } from '../../art/palettes/palettes.js';
 
 const DEFAULT_GANTRY_LIGHTS = [0.42, 0.46, 0.5, 0.54, 0.58].map((fx) => ({ fx, fy: 0.3, fr: 0.014 }));
 
@@ -36,6 +37,8 @@ export function carViewFrame(alpha, count) {
 
 export class SceneBuilder {
   constructor(art) {
+    this.ambient = [1, 1, 1];
+    this.mirror = { sky: [0.8, 0.9, 0.95], relief: [0.6, 0.7, 0.8], verge: [0.4, 0.65, 0.3], road: [0.42, 0.43, 0.47], line: [0.95, 0.94, 0.9] };
     this.art = art;
     this.layout = null;
     this.track = null;
@@ -54,6 +57,12 @@ export class SceneBuilder {
   /** Bind a race: resolve the drawings named by the circuit layout. */
   reset(race, track, layout, palette) {
     this.track = track; this.layout = layout;
+    // light of the place over the cars and the cockpit; colours of the rear view in the mirrors
+    this.ambient = hexToRgb(palette.ambient);
+    this.mirror = {
+      sky: hexToRgb(palette.skyLow), relief: hexToRgb(palette.farRelief), verge: hexToRgb(palette.grassA),
+      road: hexToRgb(palette.asphalt), line: hexToRgb(palette.paint),
+    };
     this.greenTimer = 99;
     for (const strip of layout.strips) strip.sprite = this.art.sprite(strip.id);
     for (const prop of layout.props) {
@@ -209,8 +218,11 @@ export class SceneBuilder {
       const sp = prop.sprite;
       const w = sp.worldW * prop.scale * pt.scale, h = sp.worldH * prop.scale * pt.scale;
       if (h < 3 || pt.x + w * 0.5 < 0 || pt.x - w * 0.5 > W) continue;
-      // fade in at the limit of the draw distance instead of popping
-      const fade = z > reach * detail - 60 ? (reach * detail - z) / 60 : 1;
+      // fade in at the limit of the draw distance instead of popping; an object the camera is right
+      // against would be drawn far above the size it was inked at, so it thins out instead
+      const magnified = h / (sp.h || h);
+      if (magnified > 3) continue;
+      const fade = (z > reach * detail - 60 ? (reach * detail - z) / 60 : 1) * (magnified > 2.2 ? (3 - magnified) / 0.8 : 1);
       quads.sprite(sp, pt.x - w * 0.5, pt.y - h, w, h, 1, 1, 1, fade, z, prop.flip);
       if (prop.lights && this.lamps && z < 400) {
         const left = pt.x - w * 0.5, top = pt.y - h;
@@ -242,12 +254,19 @@ export class SceneBuilder {
     if (z < NEAR_CAR + 1) ghost *= z - NEAR_CAR;
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
-      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, 1, 1, 1, ghost, z > 3.4 ? z - 2.9 : 0.5);   // clip test at the car's near end: the drawing extends in front of its centre
+      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, z > 3.4 ? z - 2.9 : 0.5);   // clip test at the car's near end: the drawing extends in front of its centre
   }
 
   /** Cockpit and other per-view foreground drawings. */
   buildFront(app, view) {
     if (this.cockpit) this.cockpit.buildFront(app, view);
     if (this.effects) this.effects.buildFront(app, view);
+    if (app.viewCount > 1) {
+      // split screen: each view is a panel of the page, with its inked frame
+      const r = view.rect, w = Math.max(2, Math.round(Math.min(app.canvas.width, app.canvas.height) * 0.0035));
+      const q = app.quads, i = 0.086, j = 0.086, b = 0.122;
+      q.rect(0, 0, r.w, w, i, j, b, 1); q.rect(0, r.h - w, r.w, w, i, j, b, 1);
+      q.rect(0, 0, w, r.h, i, j, b, 1); q.rect(r.w - w, 0, w, r.h, i, j, b, 1);
+    }
   }
 }

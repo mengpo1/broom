@@ -24,7 +24,7 @@ export class RaceView {
     this.speedLines = 0; this.heading = 0; this.focusX = 0;
     this.tracksideS = 0; this.tracksideD = 0; this.tracksideTimer = 0; this.tracksideAim = 0; this.tracksideGap = 120; this.tracksideFresh = true;
     this.time = 0;
-    this.wide = false;
+    this.wide = false; this.tall = false; this.horizonRatio = VIEW_CONFIG.horizonRatio;
     this.baseFocal = 1;      // focal at rest: cockpit art is scaled against it
     this.sceneStart = 0; this.sceneCount = 0; this.frontStart = 0; this.frontCount = 0;
     this.extrapolation = 0;
@@ -34,6 +34,7 @@ export class RaceView {
     const r = this.rect;
     r.x = x; r.y = y; r.w = w; r.h = h;
     this.wide = w / h > 2.4;
+    this.tall = w < h * 1.1;
   }
 
   /** Register an impact (0..1) seen from this view: jolt, flash, brief burst of speed lines. */
@@ -100,10 +101,10 @@ export class RaceView {
     this.dive = damp(this.dive, diveTarget, 7, dt);
     const stretchTarget = effects.perspectiveStretch ? speedRatio * speedRatio * cfg.hfovSpeedGain - Math.max(0, this.dive) * cfg.hfovBrakeLoss + (car.boosting ? 0.05 : 0) : 0;
     this.stretch = damp(this.stretch, stretchTarget, 3.5, dt);
-    const tall = r.w < r.h * 1.1;
+    const tall = this.tall;
     // the trackside camera zooms out as the car comes closer, like a television operator
     const tvFov = cfg.tv.hfovFar + (cfg.tv.hfovNear - cfg.tv.hfovFar) * clamp(1 - (this.tracksideGap - 8) / (cfg.tv.ahead - 8), 0, 1) ** 1.6;
-    const restFov = this.camera === CAMERA.COCKPIT ? (tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : tvFov;
+    const restFov = this.camera === CAMERA.COCKPIT ? (this.wide ? cfg.hfovWide : tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : tvFov;
     const hfov = restFov + (this.camera === CAMERA.COCKPIT ? this.stretch : this.stretch * 0.3);
     const focal = focalForFov(r.w, hfov);
     this.baseFocal = focalForFov(r.w, restFov);
@@ -125,7 +126,8 @@ export class RaceView {
     // horizon: road grade and dive
     const pitchTarget = car.pitch * dir * cfg.pitchFollow;
     this.pitch = damp(this.pitch, pitchTarget, 6, dt);
-    const ratio = this.wide ? cfg.horizonRatioWide : cfg.horizonRatio;
+    const ratio = this.wide ? cfg.horizonRatioWide : tall ? cfg.horizonRatioTall : cfg.horizonRatio;
+    this.horizonRatio = ratio;
     const diveShift = this.camera === CAMERA.COCKPIT ? this.dive * 0.012 * r.h : 0;
     cam.s = camS; cam.d = camD; cam.eyeHeight = eye; cam.yaw = this.yaw; cam.dir = dir;
     cam.width = r.w; cam.height = r.h; cam.focal = focal;

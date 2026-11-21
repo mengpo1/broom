@@ -6,7 +6,12 @@ export const VIEW_CONFIG = {
   hfovSpeedGain: 0.16,       // extra field of view at top speed ("perspective stretch")
   hfovBrakeLoss: 0.05,       // field of view removed under hard braking ("compression")
   horizonRatio: 0.43,        // horizon height as a fraction of the view height (full-height view)
-  horizonRatioWide: 0.4,     // same for the short views of the horizontal split screen
+  horizonRatioWide: 0.36,    // same for the short views of the horizontal split screen
+  horizonRatioTall: 0.36,    // same for the narrow views of the vertical split screen (more road, less sky)
+  hfovWide: 1.6,             // field of view of a short, very wide view: the cockpit then fits in its height
+  cockpitScaleWide: 0.8,     // extra reduction of the cockpit drawing in a short view
+  cockpitScaleTall: 0.84,    // and in a narrow view, so that both mirrors stay inside the frame
+  cockpitDepth: 821,         // how far below the horizon the cockpit drawing reaches in the reference composition (its own units)
   eyeHeight: 0.95,           // driver's eye above the road (same as CAR_DIMENSIONS.eye in the car drawing)
   eyeForward: -0.35,         // eye position along the car, relative to its centre
   drawDistance: 1300,

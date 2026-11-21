@@ -279,7 +279,7 @@ function plate(part, outline, y0, y1, roleOut, roleIn, roleEdge) {
 }
 
 /** Wheel: tyre as a surface of revolution about the lateral axis, rim discs on both sides. */
-function wheel(name, cx, cy, cz, radius, width, outerSign) {
+function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false) {
   const tyre = new PartBuilder(`${name}.tyre`, { ink: 1 });
   const hw = width / 2, rimR = radius * 0.6, shoulder = 0.055;
   // profile from the inner bead across the tread to the outer bead: [lateral, radius]
@@ -322,7 +322,7 @@ function wheel(name, cx, cy, cz, radius, width, outerSign) {
     }
     for (let r = 0; r < rings.length - 1; r++) for (let s = 0; s < seg; s++) {
       const s1 = (s + 1) % seg;
-      const spoke = r === 2 && outer && s % 8 < 2;     // five dark spoke windows on the visible face
+      const spoke = !spin && r === 2 && outer && s % 8 < 2;     // five dark spoke windows on the visible face (at rest)
       rim.face([ridx[r][s], ridx[r][s1], ridx[r + 1][s1], ridx[r + 1][s]], spoke ? ROLE.CARBON : rings[r + 1][1]);
     }
     if (outer) {
@@ -330,6 +330,15 @@ function wheel(name, cx, cy, cz, radius, width, outerSign) {
       const mark = [];
       for (let s = 0; s <= seg; s++) { const t = (s / seg) * Math.PI * 2; mark.push([cx + (radius - 0.085) * Math.cos(t), cy + sign * hw, cz + (radius - 0.085) * Math.sin(t)]); }
       tyre.lines.push({ pts: mark, normal: [0, sign, 0], weight: 0.9, color: 'tyreMark' });
+      if (spin) {
+        // a turning wheel: the spokes melt into a disc, drawn as a few concentric pen arcs
+        const arcs = [[rimR * 0.42, 0.3, 2.0], [rimR * 0.62, 2.6, 4.6], [rimR * 0.8, 4.9, 6.6], [rimR * 0.5, 3.6, 4.7]];
+        for (const [rr, from, to] of arcs) {
+          const pts = [];
+          for (let k = 0; k <= 12; k++) { const t = from + ((to - from) * k) / 12; pts.push([cx + rr * Math.cos(t), y + sign * 0.004, cz + rr * Math.sin(t)]); }
+          rim.lines.push({ pts, normal: [0, sign, 0], weight: 0.8, hex: '#6b7480' });
+        }
+      }
     }
   }
   return [tyre, rim];
@@ -379,7 +388,8 @@ function mirrorPart(src, name) {
 }
 
 /**
- * Build the car. options: { detail: 0 (sprites) | 1 (large illustrations), steer: front wheel
+ * Build the car. options: { spin: true to draw the wheels as turning discs (cars seen in the race),
+ * detail: 0 (sprites) | 1 (large illustrations), steer: front wheel
  * angle in radians (+ left), cockpit: true to add what only the driver sees (dash, wheel rim) }.
  * Returns { parts, bounds }.
  */
@@ -478,7 +488,8 @@ export function buildCarModel(options = {}) {
 
   // ---- floor
   const floor = new PartBuilder('floor', { ink: 0.8 });
-  box(floor, -0.62, 0, 0.07, 2.25, 1.44, 0.04, ROLE.CARBON, 0, 0.14);
+  box(floor, -0.2, 0, 0.07, 1.41, 1.44, 0.04, ROLE.CARBON, 0, 0.14);        // full width between the axles
+  box(floor, -1.3, 0, 0.07, 0.8, 0.92, 0.04, ROLE.CARBON, 0, 0.14);         // narrow tail between the rear wheels
   parts.push(floor);
 
   // ---- front wing
@@ -562,18 +573,19 @@ export function buildCarModel(options = {}) {
   parts.push(exhaust);
 
   // ---- wheels (front wheels may be steered about their vertical axis)
-  parts.push(...placeWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, steer));
-  parts.push(...placeWheel('wheel.fr', D.frontAxleX, -D.frontTrack, D.frontTyre, steer));
-  parts.push(...placeWheel('wheel.rl', D.rearAxleX, D.rearTrack, D.rearTyre, 0));
-  parts.push(...placeWheel('wheel.rr', D.rearAxleX, -D.rearTrack, D.rearTyre, 0));
+  const spin = !!options.spin;
+  parts.push(...placeWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, steer, null, spin));
+  parts.push(...placeWheel('wheel.fr', D.frontAxleX, -D.frontTrack, D.frontTyre, steer, null, spin));
+  parts.push(...placeWheel('wheel.rl', D.rearAxleX, D.rearTrack, D.rearTyre, 0, null, spin));
+  parts.push(...placeWheel('wheel.rr', D.rearAxleX, -D.rearTrack, D.rearTyre, 0, null, spin));
 
   return { parts: parts.map(finishPart), dimensions: D };
 }
 
 
 /** Build a wheel at its place on the car, steered by `steerAngle` about the vertical axis. */
-function placeWheel(name, x, y, tyre, steerAngle, tread = null) {
-  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y));
+function placeWheel(name, x, y, tyre, steerAngle, tread = null, spin = false) {
+  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin);
   if (tread) addTreadMarks(t, tyre, tread);
   t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
   const c = Math.cos(steerAngle), s = Math.sin(steerAngle);

@@ -39,6 +39,15 @@ struct VOut {
   return o;
 }
 
+// A drawing shown larger than it was inked keeps a firm outline: the soft edge that bilinear
+// filtering gives a magnified sprite is tightened around its middle (premultiplied colour in and out).
+fn crisp(c: vec4f, texelsPerPixel: f32) -> vec4f {
+  let k = clamp(1.0 / max(texelsPerPixel, 1e-3), 1.0, 5.0);
+  if (k <= 1.0 || c.a <= 0.0) { return c; }
+  let a = clamp((c.a - 0.5) * k + 0.5, 0.0, 1.0);
+  return c * (a / c.a);
+}
+
 @fragment fn fs(i: VOut) -> @location(0) vec4f {
   let zTest = i.info.w;
   let gx = dpdx(i.uv); let gy = dpdy(i.uv);
@@ -51,6 +60,8 @@ struct VOut {
   let mode = i.info.y;
   if (mode < 0.5) {
     c = textureSampleGrad(atlas, spriteSampler, i.uv, i32(i.info.x), gx, gy);
+    let atlasSize = vec2f(textureDimensions(atlas));
+    c = crisp(c, max(length(gx * atlasSize), length(gy * atlasSize)));
     c = vec4f(c.rgb * i.tint.rgb, c.a) * i.tint.a;
   } else if (mode < 1.5) {
     let layer = i32(i.info.x);
@@ -58,7 +69,9 @@ struct VOut {
     let mask = textureSampleGrad(cars, spriteSampler, i.uv, layer + 1, gx, gy);
     let p = i32(i.info.z) * 3;
     let rgb = fixedC.rgb + mask.r * palette.colors[p].rgb + mask.g * palette.colors[p + 1].rgb + mask.b * palette.colors[p + 2].rgb;
-    c = vec4f(rgb * i.tint.rgb, fixedC.a) * i.tint.a;
+    let carSize = vec2f(textureDimensions(cars));
+    c = crisp(vec4f(rgb, fixedC.a), max(length(gx * carSize), length(gy * carSize)));
+    c = vec4f(c.rgb * i.tint.rgb, c.a) * i.tint.a;
   } else {
     c = vec4f(i.tint.rgb * i.tint.a, i.tint.a);
   }

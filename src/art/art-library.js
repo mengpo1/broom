@@ -17,6 +17,8 @@ import { sceneryPainter } from './environments/scenery-painters.js';
 import { paintBackdropLayer } from './environments/backdrops.js';
 
 export const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degrees (front) every 7.5 degrees; the other side is mirrored
+/** Silhouette pen width of the cars in the race, in metres at the car: the same weight as the cockpit's own outlines. */
+export const CAR_INK_WORLD = 0.021;
 export const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
 const STATIC_LAYERS = 6;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;
@@ -68,7 +70,7 @@ export class ArtLibrary {
    */
   async buildCars(onProgress = null) {
     const t0 = performance.now();
-    const model = buildCarModel({ detail: 1 });
+    const model = buildCarModel({ detail: 1, spin: true });
     const fixed = makeCanvas(CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT), mask = makeCanvas(CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
     const ctx = fixed.getContext('2d'), mctx = mask.getContext('2d');
     this.cars.length = 0;
@@ -76,7 +78,7 @@ export class ArtLibrary {
       ctx.clearRect(0, 0, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
       mctx.clearRect(0, 0, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
       const yaw = (i / (CAR_ANGLES - 1)) * Math.PI;
-      const meta = drawCarFitted(ctx, mctx, model, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT, { yaw, pitch: CAR_VIEW_PITCH, distance: 16 }, { margin: 14 });
+      const meta = drawCarFitted(ctx, mctx, model, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT, { yaw, pitch: CAR_VIEW_PITCH, distance: 16 }, { margin: 16, inkWorld: CAR_INK_WORLD });
       this.renderer.uploadLayer('cars', i * 2, fixed);
       this.renderer.uploadLayer('cars', i * 2 + 1, mask);
       this.cars.push({ layer: i * 2, ppm: meta.ppm, ax: meta.ax, ay: meta.ay, w: CAR_LAYER_WIDTH, h: CAR_LAYER_HEIGHT });
@@ -113,7 +115,8 @@ export class ArtLibrary {
       if (!spec) throw new Error(`No scenery spec for ${id}`);
       const paint = sceneryPainter(spec.family);
       const seed = hashString(`${id}:${track.theme}`);
-      this.themeAtlas.define(id, spec.w, spec.h, (ctx, w, h) => paint(ctx, w, h, palette, seeded(seed), spec.variant, spec),
+      const density = spec.density || 1;
+      this.themeAtlas.define(id, spec.w * density, spec.h * density, (ctx) => { ctx.scale(density, density); paint(ctx, spec.w, spec.h, palette, seeded(seed), spec.variant, spec); },
         { kind: spec.kind, worldW: spec.worldW || 0, worldH: spec.worldH, tile: spec.tile || 0, wrapX: spec.kind === 'strip' });
     }
     if (this.themeExtras) this.themeExtras(this.themeAtlas, track, palette);

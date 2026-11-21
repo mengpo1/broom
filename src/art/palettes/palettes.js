@@ -41,6 +41,8 @@ export const BASE_PALETTE = {
   // effects
   speedLight: '#ffffff', speedDark: '#16161f', dust: '#d9c9a4', dustShade: '#b29f78', smoke: '#eceae4', smokeShade: '#b9bcc4',
   impactYellow: '#ffd42a', impactRed: '#e0312b', impactOrange: '#f58a1f',
+  // light of the place, multiplied over what is not painted per theme (cars, cockpit)
+  ambient: '#ffffff',
   // interface
   caption: '#f6e27a', captionShade: '#d9bf46', panel: '#f4efe2', panelShade: '#d7cfbc', uiRed: '#d5302a', uiBlue: '#2f5fa8', uiDark: '#22232e',
 };
@@ -110,6 +112,7 @@ const OVERRIDES = {
     farReliefLight: '#b4c0cc', farRelief: '#9aa8b8', farReliefShade: '#7f8fa2', nearReliefLight: '#9aa3ad', nearRelief: '#7b8794', nearReliefShade: '#5d6a78',
   },
   dusk: {
+    ambient: '#f7cfb9',
     skyTop: '#3b4f95', skyMid: '#c9789a', skyLow: '#fbc77a', cloudLight: '#ffe2b0', cloudShade: '#e0879a', cloudDeep: '#8f5f9a', haze: '#f3c08e',
     ink: '#191527', asphalt: '#6a6474', asphaltGroove: '#4f4a5b', asphaltLight: '#857c88', paint: '#f6e6cf', kerbB: '#f6e6cf',
     grassA: '#7d9443', grassB: '#70883d', grassDark: '#4a6736', mown: '#8da44f', beyondA: '#66803c', beyondB: '#587236', farGround: '#8a8f58',

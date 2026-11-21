@@ -159,7 +159,7 @@ export class PagePainter {
   title(x, y, size) {
     const ctx = this.ctx, S = this.S;
     drawText(ctx, t('game.title'), x, y, size, { style: 'impact', color: RED, outline: INK, outlineWidth: size * 0.13, shadow: { dx: 9 * S, dy: 10 * S, color: INK }, bounce: 0.05, seed: 4 });
-    drawText(ctx, t('game.subtitle'), x + 6 * S, y + size * 0.52, size * 0.24, { style: 'bold', color: INK });
+    drawText(ctx, t('game.subtitle'), x + 6 * S, y + size * 0.64, size * 0.22, { style: 'bold', color: INK });      // clear of the title's drop shadow
   }
 
   // ---- pages -----------------------------------------------------------------------------------
@@ -195,9 +195,9 @@ export class PagePainter {
     const titleRoom = W - m - (leftW + 110 * S) - 20 * S;
     const titleSize = Math.min(150 * S, (150 * S * titleRoom) / measureText(t('game.title'), 150 * S, { style: 'impact' }));
     this.title(leftW + 110 * S, m + 40 * S + titleSize, titleSize);
-    if (model.heading) drawText(ctx, model.heading, leftW + 116 * S, m + 318 * S, 50 * S, { style: 'bold', color: BLUE });
+    if (model.heading) drawText(ctx, model.heading, leftW + 116 * S, m + 346 * S, 48 * S, { style: 'bold', color: BLUE });
     // ---- panel 2: list
-    const lx = leftW + 70 * S, ly = m + 360 * S, lw = W - m - lx;
+    const lx = leftW + 70 * S, ly = m + 382 * S, lw = W - m - lx;
     const rowH = Math.min(92 * S, (H - ly - m - 30 * S) / Math.max(1, model.items.length));
     const size = Math.min(40 * S, rowH * 0.46);
     model.items.forEach((item, i) => {

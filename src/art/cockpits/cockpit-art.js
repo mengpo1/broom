@@ -22,7 +22,7 @@ export const MAX_DRAWN_STEER = 0.26;           // radians at the first / last fr
 export const WHEEL_VARIANTS = TREAD_PHASES + 1; // rolling phases, then the streaked "at speed" drawing
 export const DIAL = { x: 0, y: 700, r: 92, minAngle: -2.2, maxAngle: 2.2, maxRpm: 14000 };
 export const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };   // extra: canvas height added below the wheel for the sleeves
-export const MIRROR = { x: -1010, y: 188, w: 300, h: 138 };   // left mirror (centre and size); the right one is its reflection
+export const MIRROR = { x: -1010, y: 188, w: 300, h: 138, glassInset: 16 };   // left mirror (centre and size); the right one is its reflection
 const INK = '#16161f';
 const COCKPIT_INK = 4.2;
 const BOTTOM_LIMIT = 900;                      // nothing is needed further below the horizon than this
@@ -72,18 +72,14 @@ function paintMirror(ctx, ox, oy, colors) {
   ctx.restore();
   trace(housing); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 1.15; ctx.lineJoin = 'round'; ctx.stroke();
   // glass
-  const g = 16;
+  const g = MIRROR.glassInset;
   const glass = [[cx - hw + g, cy - hh + g + 6], [cx - hw + g + 10, cy - hh + g], [cx + hw - g - 6, cy - hh + g], [cx + hw - g, cy - hh + g + 12], [cx + hw - g - 4, cy + hh - g], [cx - hw + g + 6, cy + hh - g]];
-  trace(glass); ctx.fillStyle = '#9fc9e6'; ctx.fill();
-  ctx.save(); ctx.clip();
-  ctx.fillStyle = '#d2ecf7'; ctx.fillRect(cx - hw, cy - hh, MIRROR.w, hh * 0.75);
-  ctx.fillStyle = '#6f9a5c'; ctx.fillRect(cx - hw, cy - 2, MIRROR.w, hh);                        // verge
-  ctx.fillStyle = '#6c6e77';                                                                      // road running away behind
-  ctx.beginPath(); ctx.moveTo(cx + hw * 0.1, cy - 2); ctx.lineTo(cx + hw * 0.34, cy - 2); ctx.lineTo(cx + hw, cy + hh * 0.75); ctx.lineTo(cx + hw, cy + hh); ctx.lineTo(cx - hw * 0.55, cy + hh); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#f1efe6';
-  ctx.beginPath(); ctx.moveTo(cx + hw * 0.1, cy - 2); ctx.lineTo(cx + hw * 0.13, cy - 2); ctx.lineTo(cx - hw * 0.44, cy + hh); ctx.lineTo(cx - hw * 0.55, cy + hh); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';                                                       // glare
-  ctx.beginPath(); ctx.moveTo(cx - hw * 0.5, cy - hh); ctx.lineTo(cx - hw * 0.28, cy - hh); ctx.lineTo(cx - hw * 0.62, cy + hh); ctx.lineTo(cx - hw * 0.84, cy + hh); ctx.closePath(); ctx.fill();
+  // the glass itself is left open: the compositor draws the rear view behind this layer
+  ctx.save(); ctx.globalCompositeOperation = 'destination-out'; trace(glass); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+  ctx.save(); trace(glass); ctx.clip();
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';                                                        // glare
+  ctx.beginPath(); ctx.moveTo(cx - hw * 0.5, cy - hh); ctx.lineTo(cx - hw * 0.3, cy - hh); ctx.lineTo(cx - hw * 0.64, cy + hh); ctx.lineTo(cx - hw * 0.84, cy + hh); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx - hw * 0.2, cy - hh); ctx.lineTo(cx - hw * 0.14, cy - hh); ctx.lineTo(cx - hw * 0.48, cy + hh); ctx.lineTo(cx - hw * 0.54, cy + hh); ctx.closePath(); ctx.fill();
   ctx.restore();
   trace(glass); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 0.7; ctx.stroke();
 }

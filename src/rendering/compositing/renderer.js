@@ -162,7 +162,7 @@ export class Renderer {
     }
     this.timingEnabled = false;
     this.passDescriptor = {
-      colorAttachments: [{ view: null, resolveTarget: undefined, clearValue: { r: 0.06, g: 0.06, b: 0.08, a: 1 }, loadOp: 'clear', storeOp: 'store' }],
+      colorAttachments: [{ view: null, resolveTarget: undefined, clearValue: { r: 0.957, g: 0.937, b: 0.886, a: 1 }, loadOp: 'clear', storeOp: 'store' }],
     };
     this.timestampWrites = this.querySet ? { querySet: this.querySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } : null;
     this.mipCanvases = new Map();

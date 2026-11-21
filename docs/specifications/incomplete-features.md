@@ -33,8 +33,9 @@ par le rasteriseur logiciel SwiftShader).
 - **Rétroviseurs** : reflet dessiné fixe (route et ciel stylisés) ; ils ne montrent pas les
   concurrents qui suivent.
 - **Monoplaces** : un seul modèle de carrosserie pour toutes les écuries (les livrées changent
-  par trois couleurs et cinq schémas) ; pas de numéros de course ni de lettrages sur les
-  voitures en course ; pilotes sans visage.
+  par trois couleurs et cinq schémas) ; les numéros de course n'apparaissent que sur les
+  grandes illustrations (menus, planches d'introduction et de résultats), pas sur les voitures
+  en course ; pas de lettrages de commanditaires sur les carrosseries ; pilotes sans visage.
 - **Vues de voitures** : 25 dessins entre 0° et 180° (pas de 7,5°), miroir pour l'autre côté ;
   l'éclairage est donc symétrique (zénithal). Une seule élévation de point de vue.
 - **Animations narratives** : planche d'introduction en trois cases et planche de résultats ;
@@ -53,8 +54,11 @@ par le rasteriseur logiciel SwiftShader).
 - **Météo, nuit, dégâts visibles sur les voitures** : absents.
 - **Mémoire vidéo** : environ 390 Mo de textures (atlas 10 × 2048², 50 couches de voitures
   1024×512, 3 panoramas 4096×768, mipmaps).
-- **Temps de chargement** : tous les dessins sont produits au lancement (plusieurs secondes ;
-  beaucoup plus sur un rasteriseur logiciel), puis environ une seconde par changement de circuit.
+- **Temps de chargement** : tous les dessins sont produits au lancement, avec un pourcentage
+  d'avancement. Mesuré dans le conteneur (4 cœurs virtuels, tout en logiciel) : environ 25 s,
+  dont 22 s pour tracer les 50 calques de voitures (0,43 s par calque, temps de tracé du
+  canvas 2D, pas d'envoi au GPU) ; le temps sur une machine de bureau n'a **pas** été mesuré.
+  Ensuite environ une seconde par changement de circuit.
 - **Allocations par image** : le code du jeu n'alloue pas dans la boucle de rendu, mais l'API
   WebGPU crée elle-même quelques objets par image (texture courante, vue, encodeur, passe).
 - **Vidéo de démonstration** : produite image par image (rejeu déterministe, rendu logiciel),

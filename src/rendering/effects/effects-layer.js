@@ -21,8 +21,9 @@ const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
 /** Register effect drawings in the static atlas. */
 export function defineEffectsArt(art) {
-  const puff = (id, seed, lobes) => art.defineStatic(id, 160, 160, (ctx, w) => {
-    const rnd = seeded(seed), c = w / 2;
+  const puff = (id, seed, lobes) => art.defineStatic(id, 256, 256, (ctx, w) => {
+    const rnd = seeded(seed), c = 80;
+    ctx.scale(w / 160, w / 160);                                           // drawn on a 160 unit grid
     const shape = blobPoints(c, c, 62, 58, lobes, 0.2, rnd);
     ctx.lineJoin = 'round';
     ctx.beginPath(); closedCurve(ctx, shape); ctx.strokeStyle = 'rgba(22,22,31,0.9)'; ctx.lineWidth = 4.5; ctx.stroke();
@@ -202,15 +203,16 @@ export class EffectsLayer {
       const v = Math.abs(car.speed);
       const loose = car.surface === SURFACE.GRASS || car.surface === SURFACE.GRAVEL;
       const sliding = car.slip > 0.55 || car.wheelspin > 0.35 || car.state === CAR_STATE.SPIN;
-      if (fx.dust && ((loose && v > 7) || (sliding && v > 4))) {
-        this.emitTimer[i] -= dt * (loose ? 5 + v * 0.25 : 9);
+      const smoking = car.slip > 0.85 || car.wheelspin > 0.6 || car.state === CAR_STATE.SPIN;       // tyre smoke needs a real slide
+      if (fx.dust && ((loose && v > 7) || (smoking && v > 4))) {
+        this.emitTimer[i] -= dt * (loose ? 5 + v * 0.25 : 6);
         while (this.emitTimer[i] < 0) {
           this.emitTimer[i] += 1;
           const side = this.random() < 0.5 ? -0.75 : 0.75;
           const color = loose ? (car.surface === SURFACE.GRAVEL ? this.dust : this.dirt) : this.smoke;
           this.spawn(0, car.s - 1.5 + this.random() * 0.6, car.d + side + (this.random() - 0.5) * 0.4, 0.25,
             car.speed * (loose ? 0.25 : 0.12), (this.random() - 0.5) * 1.5, 1.0 + this.random() * 1.0, 0.6 + this.random() * 0.4,
-            loose ? 0.9 : 0.6, loose ? 2.2 : 1.5, color, 1);
+            loose ? 0.8 : 0.5, loose ? 1.7 : 1.0, color, 1);
         }
       }
       const locked = car.brake > 0.92 && v > 24 && car.surface === SURFACE.ASPHALT && car.accelLong < -24;
@@ -265,8 +267,12 @@ export class EffectsLayer {
         quads.sprite(this.spark, pt.x - s / 2, pt.y - s / 2, s, s, this.pr[i], this.pg[i], this.pb[i], 1 - t * t, this.pz[i], false);
       } else {
         // drawn smoke stays opaque (no ghosting of contours), swells, then shrinks away at the end of its life
-        const size = (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1);
-        const alpha = t < 0.08 ? t / 0.08 : t > 0.85 ? (1 - t) / 0.15 : 1;
+        // (a puff never fills the picture: its drawn size is capped, and right in front of the camera it thins out)
+        const cap = view.rect.h * 0.2;
+        const size = Math.min(cap, (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1));
+        const near = clamp((this.pz[i] - 3.5) / 5, 0, 1);
+        if (near <= 0) continue;
+        const alpha = (t < 0.08 ? t / 0.08 : t > 0.85 ? (1 - t) / 0.15 : 1) * near;
         quads.sprite(this.puffs[i % 3], pt.x - size / 2, pt.y - size * 0.85, size, size, this.pr[i], this.pg[i], this.pb[i], alpha, this.pz[i], (i & 1) === 1);
       }
     }

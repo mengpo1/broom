@@ -108,10 +108,11 @@ for (let f = 0; f < 6; f++) {
 
 // main menu and a results plate
 await page.evaluate(() => { const v = window.virage; v.flow.toMenu(); v.app.hud.visible = false; });
-await page.evaluate(async () => { const { app } = window.virage; for (let i = 0; i < 12; i++) await app.advanceFrame(2); });
+// the page transition (a diagonal ink wipe) lasts about 0.3 s: wait until it is over
+await page.evaluate(async () => { const { app } = window.virage; for (let i = 0; i < 40; i++) await app.advanceFrame(2); });
 await shot('08-menu');
 await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
-await page.evaluate(async () => { const { app } = window.virage; for (let i = 0; i < 12; i++) await app.advanceFrame(2); });
+await page.evaluate(async () => { const { app } = window.virage; for (let i = 0; i < 40; i++) await app.advanceFrame(2); });
 await shot('08b-menu-circuit');
 
 writeFileSync(`${root}/${outDir}/captures.json`, JSON.stringify(log, null, 2));

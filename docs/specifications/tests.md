@@ -111,21 +111,44 @@ Pilotage du vrai jeu par le clavier simulé, le joueur étant conduit par l'ordi
 Une course complète s'exécute donc automatiquement de bout en bout, en simulation pure
 (`race.test.mjs`, `ai.test.mjs` : les 18 circuits) comme dans le navigateur.
 
-## 4. Audio — `work/scripts/audio-check.mjs` — 80 contrôles réussis
+## 4. Pages secondaires, caméras, souris — `work/scripts/pages-check.mjs` — 14 / 14 réussis
+
+Pilotage du vrai jeu par le clavier et la souris simulés, avec une capture de chaque page
+(`work/renders/pages-*.png`) :
+
+- ✅ ouverture de la page Options, changement de langue français → anglais → français (la
+  page est repeinte dans la langue choisie)
+- ✅ pages Effets graphiques et Commandes, retour par Échap jusqu'au menu principal
+- ✅ clic de souris sur une entrée de menu (ouvre la page visée)
+- ✅ une course lancée après avoir utilisé Échap dans les menus démarre normalement
+- ✅ Échap met en pause, Échap ou « Reprendre » relance la course
+- ✅ la touche de caméra parcourt les quatre vues (cockpit, poursuite, face, bord de piste)
+
+`work/scripts/trackside-check.mjs` enregistre une suite d'images de la caméra de bord de
+piste (`work/renders/trackside-*.png`) : vérification visuelle que la voiture suivie reste
+cadrée pendant son approche et que la caméra se replace après son passage.
+
+## 5. Audio — `work/scripts/audio-check.mjs` — 80 contrôles réussis
 
 Rendu hors ligne du moteur audio sur un scénario scripté : niveaux par seconde, absence
 d'écrêtage et de NaN, centroïde spectral croissant avec le régime, différence accélérateur
 ouvert/fermé, creux de passage de rapport, effet Doppler et panoramique d'un concurrent,
 chaque événement audible isolément, silence en pause et hors course.
 
-## 5. Ce que les tests ont trouvé
+## 6. Ce que les tests ont trouvé
 
 - Les pilotes ordinateur n'effectuaient jamais leur arrêt au stand (ils ralentissaient à
   1,5 m/s sans s'immobiliser) : corrigé (`ai/driver-ai.js`), test « pit stops » ajouté.
 - Quitter une course depuis la pause laissait une image se dessiner sans course : corrigé
   (ordre de mise à jour dans `GameApp.present`).
+- Un appui sur Échap dans les menus restait mémorisé et mettait la course suivante en pause
+  dès son départ ; Échap ne permettait pas non plus de quitter la pause : corrigé
+  (`InputManager.clearEdges`), contrôles ajoutés dans `pages-check.mjs`.
+- La caméra de bord de piste ne cadrait pas la voiture quand la route tournait entre la
+  caméra et elle : corrigé (visée calculée sur la position projetée de la voiture).
+- Les noms de touches de la page Commandes n'étaient pas traduits : corrigé (dictionnaires).
 
-## 6. Non couvert par des tests automatiques
+## 7. Non couvert par des tests automatiques
 
 Manettes et souris réelles, écoute du son, jugement des sensations de pilotage, navigateurs
 autres que Chromium, performances sur carte graphique (voir `incomplete-features.md`).

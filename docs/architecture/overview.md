@@ -103,9 +103,11 @@ l'écran), le lacet de la vue est borné (au-delà de 100° la vue se retourne).
 - **Atlas** : `AtlasBuilder` range les dessins dans des couches 2048² (6 couches communes,
   4 par thème) avec marges et débord horizontal pour les bandes répétées ; mipmaps générés.
 - **Monoplace** : `car-model.js` décrit la voiture en volumes (comme un crayonné de
-  construction) ; `car-illustrator.js` la projette et l'encre : aplats par ton découpés le long
-  des frontières d'ombre, contours trouvés sur le volume (silhouette lourde, arêtes légères,
-  trait plus épais dessous). 25 vues de 0° à 180° en deux couches (couleurs fixes + masque de
+  construction) ; les volumes qui se pénètrent (pontons, capot, prise d'air, épaules du pilote)
+  sont rognés l'un par l'autre le long de leur surface (`trimPart`) pour se rejoindre sur une
+  ligne nette ; `car-illustrator.js` projette et encre le tout : aplats par ton découpés le long
+  des frontières d'ombre, contours trouvés sur le volume (silhouette lourde, arêtes et jonctions
+  légères, trait plus épais dessous). Les grandes illustrations portent le numéro de course. 25 vues de 0° à 180° en deux couches (couleurs fixes + masque de
   livrée) ; la livrée est appliquée par le shader (3 couleurs par écurie).
 - **Cockpit** : mêmes outils, depuis l'œil du pilote avec la focale du jeu ; calques séparés
   (aileron, roue par angle de braquage et phase de roulement, coque + suspension + rétroviseur,

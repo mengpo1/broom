@@ -69,7 +69,12 @@ const VIEW_CONFIG = {
   hfovSpeedGain: 0.16,       // extra field of view at top speed ("perspective stretch")
   hfovBrakeLoss: 0.05,       // field of view removed under hard braking ("compression")
   horizonRatio: 0.43,        // horizon height as a fraction of the view height (full-height view)
-  horizonRatioWide: 0.4,     // same for the short views of the horizontal split screen
+  horizonRatioWide: 0.36,    // same for the short views of the horizontal split screen
+  horizonRatioTall: 0.36,    // same for the narrow views of the vertical split screen (more road, less sky)
+  hfovWide: 1.6,             // field of view of a short, very wide view: the cockpit then fits in its height
+  cockpitScaleWide: 0.8,     // extra reduction of the cockpit drawing in a short view
+  cockpitScaleTall: 0.84,    // and in a narrow view, so that both mirrors stay inside the frame
+  cockpitDepth: 821,         // how far below the horizon the cockpit drawing reaches in the reference composition (its own units)
   eyeHeight: 0.95,           // driver's eye above the road (same as CAR_DIMENSIONS.eye in the car drawing)
   eyeForward: -0.35,         // eye position along the car, relative to its centre
   drawDistance: 1300,
@@ -499,6 +504,15 @@ struct VOut {
   return o;
 }
 
+// A drawing shown larger than it was inked keeps a firm outline: the soft edge that bilinear
+// filtering gives a magnified sprite is tightened around its middle (premultiplied colour in and out).
+fn crisp(c: vec4f, texelsPerPixel: f32) -> vec4f {
+  let k = clamp(1.0 / max(texelsPerPixel, 1e-3), 1.0, 5.0);
+  if (k <= 1.0 || c.a <= 0.0) { return c; }
+  let a = clamp((c.a - 0.5) * k + 0.5, 0.0, 1.0);
+  return c * (a / c.a);
+}
+
 @fragment fn fs(i: VOut) -> @location(0) vec4f {
   let zTest = i.info.w;
   let gx = dpdx(i.uv); let gy = dpdy(i.uv);
@@ -511,6 +525,8 @@ struct VOut {
   let mode = i.info.y;
   if (mode < 0.5) {
     c = textureSampleGrad(atlas, spriteSampler, i.uv, i32(i.info.x), gx, gy);
+    let atlasSize = vec2f(textureDimensions(atlas));
+    c = crisp(c, max(length(gx * atlasSize), length(gy * atlasSize)));
     c = vec4f(c.rgb * i.tint.rgb, c.a) * i.tint.a;
   } else if (mode < 1.5) {
     let layer = i32(i.info.x);
@@ -518,7 +534,9 @@ struct VOut {
     let mask = textureSampleGrad(cars, spriteSampler, i.uv, layer + 1, gx, gy);
     let p = i32(i.info.z) * 3;
     let rgb = fixedC.rgb + mask.r * palette.colors[p].rgb + mask.g * palette.colors[p + 1].rgb + mask.b * palette.colors[p + 2].rgb;
-    c = vec4f(rgb * i.tint.rgb, fixedC.a) * i.tint.a;
+    let carSize = vec2f(textureDimensions(cars));
+    c = crisp(vec4f(rgb, fixedC.a), max(length(gx * carSize), length(gy * carSize)));
+    c = vec4f(c.rgb * i.tint.rgb, c.a) * i.tint.a;
   } else {
     c = vec4f(i.tint.rgb * i.tint.a, i.tint.a);
   }
@@ -1179,7 +1197,7 @@ class Renderer {
     }
     this.timingEnabled = false;
     this.passDescriptor = {
-      colorAttachments: [{ view: null, resolveTarget: undefined, clearValue: { r: 0.06, g: 0.06, b: 0.08, a: 1 }, loadOp: 'clear', storeOp: 'store' }],
+      colorAttachments: [{ view: null, resolveTarget: undefined, clearValue: { r: 0.957, g: 0.937, b: 0.886, a: 1 }, loadOp: 'clear', storeOp: 'store' }],
     };
     this.timestampWrites = this.querySet ? { querySet: this.querySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } : null;
     this.mipCanvases = new Map();
@@ -1357,7 +1375,7 @@ class RaceView {
     this.speedLines = 0; this.heading = 0; this.focusX = 0;
     this.tracksideS = 0; this.tracksideD = 0; this.tracksideTimer = 0; this.tracksideAim = 0; this.tracksideGap = 120; this.tracksideFresh = true;
     this.time = 0;
-    this.wide = false;
+    this.wide = false; this.tall = false; this.horizonRatio = VIEW_CONFIG.horizonRatio;
     this.baseFocal = 1;      // focal at rest: cockpit art is scaled against it
     this.sceneStart = 0; this.sceneCount = 0; this.frontStart = 0; this.frontCount = 0;
     this.extrapolation = 0;
@@ -1367,6 +1385,7 @@ class RaceView {
     const r = this.rect;
     r.x = x; r.y = y; r.w = w; r.h = h;
     this.wide = w / h > 2.4;
+    this.tall = w < h * 1.1;
   }
 
   /** Register an impact (0..1) seen from this view: jolt, flash, brief burst of speed lines. */
@@ -1433,10 +1452,10 @@ class RaceView {
     this.dive = damp(this.dive, diveTarget, 7, dt);
     const stretchTarget = effects.perspectiveStretch ? speedRatio * speedRatio * cfg.hfovSpeedGain - Math.max(0, this.dive) * cfg.hfovBrakeLoss + (car.boosting ? 0.05 : 0) : 0;
     this.stretch = damp(this.stretch, stretchTarget, 3.5, dt);
-    const tall = r.w < r.h * 1.1;
+    const tall = this.tall;
     // the trackside camera zooms out as the car comes closer, like a television operator
     const tvFov = cfg.tv.hfovFar + (cfg.tv.hfovNear - cfg.tv.hfovFar) * clamp(1 - (this.tracksideGap - 8) / (cfg.tv.ahead - 8), 0, 1) ** 1.6;
-    const restFov = this.camera === CAMERA.COCKPIT ? (tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : tvFov;
+    const restFov = this.camera === CAMERA.COCKPIT ? (this.wide ? cfg.hfovWide : tall ? cfg.hfovTall : cfg.hfov) : this.camera === CAMERA.CHASE ? cfg.chase.hfov : this.camera === CAMERA.FRONT ? cfg.front.hfov : tvFov;
     const hfov = restFov + (this.camera === CAMERA.COCKPIT ? this.stretch : this.stretch * 0.3);
     const focal = focalForFov(r.w, hfov);
     this.baseFocal = focalForFov(r.w, restFov);
@@ -1458,7 +1477,8 @@ class RaceView {
     // horizon: road grade and dive
     const pitchTarget = car.pitch * dir * cfg.pitchFollow;
     this.pitch = damp(this.pitch, pitchTarget, 6, dt);
-    const ratio = this.wide ? cfg.horizonRatioWide : cfg.horizonRatio;
+    const ratio = this.wide ? cfg.horizonRatioWide : tall ? cfg.horizonRatioTall : cfg.horizonRatio;
+    this.horizonRatio = ratio;
     const diveShift = this.camera === CAMERA.COCKPIT ? this.dive * 0.012 * r.h : 0;
     cam.s = camS; cam.d = camD; cam.eyeHeight = eye; cam.yaw = this.yaw; cam.dir = dir;
     cam.width = r.w; cam.height = r.h; cam.focal = focal;
@@ -4233,6 +4253,8 @@ const BASE_PALETTE = {
   // effects
   speedLight: '#ffffff', speedDark: '#16161f', dust: '#d9c9a4', dustShade: '#b29f78', smoke: '#eceae4', smokeShade: '#b9bcc4',
   impactYellow: '#ffd42a', impactRed: '#e0312b', impactOrange: '#f58a1f',
+  // light of the place, multiplied over what is not painted per theme (cars, cockpit)
+  ambient: '#ffffff',
   // interface
   caption: '#f6e27a', captionShade: '#d9bf46', panel: '#f4efe2', panelShade: '#d7cfbc', uiRed: '#d5302a', uiBlue: '#2f5fa8', uiDark: '#22232e',
 };
@@ -4302,6 +4324,7 @@ const OVERRIDES = {
     farReliefLight: '#b4c0cc', farRelief: '#9aa8b8', farReliefShade: '#7f8fa2', nearReliefLight: '#9aa3ad', nearRelief: '#7b8794', nearReliefShade: '#5d6a78',
   },
   dusk: {
+    ambient: '#f7cfb9',
     skyTop: '#3b4f95', skyMid: '#c9789a', skyLow: '#fbc77a', cloudLight: '#ffe2b0', cloudShade: '#e0879a', cloudDeep: '#8f5f9a', haze: '#f3c08e',
     ink: '#191527', asphalt: '#6a6474', asphaltGroove: '#4f4a5b', asphaltLight: '#857c88', paint: '#f6e6cf', kerbB: '#f6e6cf',
     grassA: '#7d9443', grassB: '#70883d', grassDark: '#4a6736', mown: '#8da44f', beyondA: '#66803c', beyondB: '#587236', farGround: '#8a8f58',
@@ -6434,6 +6457,7 @@ const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
 const { CAR_STATE } = __modules["src/physics/car-physics.js"];
 const { RACE_PHASE } = __modules["src/gameplay/race.js"];
 const { GANTRY_LIGHTS } = __modules["src/art/environments/trackside.js"];
+const { hexToRgb } = __modules["src/art/palettes/palettes.js"];
 
 const DEFAULT_GANTRY_LIGHTS = [0.42, 0.46, 0.5, 0.54, 0.58].map((fx) => ({ fx, fy: 0.3, fr: 0.014 }));
 
@@ -6458,6 +6482,8 @@ function carViewFrame(alpha, count) {
 
 class SceneBuilder {
   constructor(art) {
+    this.ambient = [1, 1, 1];
+    this.mirror = { sky: [0.8, 0.9, 0.95], relief: [0.6, 0.7, 0.8], verge: [0.4, 0.65, 0.3], road: [0.42, 0.43, 0.47], line: [0.95, 0.94, 0.9] };
     this.art = art;
     this.layout = null;
     this.track = null;
@@ -6476,6 +6502,12 @@ class SceneBuilder {
   /** Bind a race: resolve the drawings named by the circuit layout. */
   reset(race, track, layout, palette) {
     this.track = track; this.layout = layout;
+    // light of the place over the cars and the cockpit; colours of the rear view in the mirrors
+    this.ambient = hexToRgb(palette.ambient);
+    this.mirror = {
+      sky: hexToRgb(palette.skyLow), relief: hexToRgb(palette.farRelief), verge: hexToRgb(palette.grassA),
+      road: hexToRgb(palette.asphalt), line: hexToRgb(palette.paint),
+    };
     this.greenTimer = 99;
     for (const strip of layout.strips) strip.sprite = this.art.sprite(strip.id);
     for (const prop of layout.props) {
@@ -6631,8 +6663,11 @@ class SceneBuilder {
       const sp = prop.sprite;
       const w = sp.worldW * prop.scale * pt.scale, h = sp.worldH * prop.scale * pt.scale;
       if (h < 3 || pt.x + w * 0.5 < 0 || pt.x - w * 0.5 > W) continue;
-      // fade in at the limit of the draw distance instead of popping
-      const fade = z > reach * detail - 60 ? (reach * detail - z) / 60 : 1;
+      // fade in at the limit of the draw distance instead of popping; an object the camera is right
+      // against would be drawn far above the size it was inked at, so it thins out instead
+      const magnified = h / (sp.h || h);
+      if (magnified > 3) continue;
+      const fade = (z > reach * detail - 60 ? (reach * detail - z) / 60 : 1) * (magnified > 2.2 ? (3 - magnified) / 0.8 : 1);
       quads.sprite(sp, pt.x - w * 0.5, pt.y - h, w, h, 1, 1, 1, fade, z, prop.flip);
       if (prop.lights && this.lamps && z < 400) {
         const left = pt.x - w * 0.5, top = pt.y - h;
@@ -6664,13 +6699,20 @@ class SceneBuilder {
     if (z < NEAR_CAR + 1) ghost *= z - NEAR_CAR;
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
-      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, 1, 1, 1, ghost, z > 3.4 ? z - 2.9 : 0.5);   // clip test at the car's near end: the drawing extends in front of its centre
+      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, z > 3.4 ? z - 2.9 : 0.5);   // clip test at the car's near end: the drawing extends in front of its centre
   }
 
   /** Cockpit and other per-view foreground drawings. */
   buildFront(app, view) {
     if (this.cockpit) this.cockpit.buildFront(app, view);
     if (this.effects) this.effects.buildFront(app, view);
+    if (app.viewCount > 1) {
+      // split screen: each view is a panel of the page, with its inked frame
+      const r = view.rect, w = Math.max(2, Math.round(Math.min(app.canvas.width, app.canvas.height) * 0.0035));
+      const q = app.quads, i = 0.086, j = 0.086, b = 0.122;
+      q.rect(0, 0, r.w, w, i, j, b, 1); q.rect(0, r.h - w, r.w, w, i, j, b, 1);
+      q.rect(0, 0, w, r.h, i, j, b, 1); q.rect(r.w - w, 0, w, r.h, i, j, b, 1);
+    }
   }
 }
 
@@ -6959,7 +7001,7 @@ function plate(part, outline, y0, y1, roleOut, roleIn, roleEdge) {
 }
 
 /** Wheel: tyre as a surface of revolution about the lateral axis, rim discs on both sides. */
-function wheel(name, cx, cy, cz, radius, width, outerSign) {
+function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false) {
   const tyre = new PartBuilder(`${name}.tyre`, { ink: 1 });
   const hw = width / 2, rimR = radius * 0.6, shoulder = 0.055;
   // profile from the inner bead across the tread to the outer bead: [lateral, radius]
@@ -7002,7 +7044,7 @@ function wheel(name, cx, cy, cz, radius, width, outerSign) {
     }
     for (let r = 0; r < rings.length - 1; r++) for (let s = 0; s < seg; s++) {
       const s1 = (s + 1) % seg;
-      const spoke = r === 2 && outer && s % 8 < 2;     // five dark spoke windows on the visible face
+      const spoke = !spin && r === 2 && outer && s % 8 < 2;     // five dark spoke windows on the visible face (at rest)
       rim.face([ridx[r][s], ridx[r][s1], ridx[r + 1][s1], ridx[r + 1][s]], spoke ? ROLE.CARBON : rings[r + 1][1]);
     }
     if (outer) {
@@ -7010,6 +7052,15 @@ function wheel(name, cx, cy, cz, radius, width, outerSign) {
       const mark = [];
       for (let s = 0; s <= seg; s++) { const t = (s / seg) * Math.PI * 2; mark.push([cx + (radius - 0.085) * Math.cos(t), cy + sign * hw, cz + (radius - 0.085) * Math.sin(t)]); }
       tyre.lines.push({ pts: mark, normal: [0, sign, 0], weight: 0.9, color: 'tyreMark' });
+      if (spin) {
+        // a turning wheel: the spokes melt into a disc, drawn as a few concentric pen arcs
+        const arcs = [[rimR * 0.42, 0.3, 2.0], [rimR * 0.62, 2.6, 4.6], [rimR * 0.8, 4.9, 6.6], [rimR * 0.5, 3.6, 4.7]];
+        for (const [rr, from, to] of arcs) {
+          const pts = [];
+          for (let k = 0; k <= 12; k++) { const t = from + ((to - from) * k) / 12; pts.push([cx + rr * Math.cos(t), y + sign * 0.004, cz + rr * Math.sin(t)]); }
+          rim.lines.push({ pts, normal: [0, sign, 0], weight: 0.8, hex: '#6b7480' });
+        }
+      }
     }
   }
   return [tyre, rim];
@@ -7059,7 +7110,8 @@ function mirrorPart(src, name) {
 }
 
 /**
- * Build the car. options: { detail: 0 (sprites) | 1 (large illustrations), steer: front wheel
+ * Build the car. options: { spin: true to draw the wheels as turning discs (cars seen in the race),
+ * detail: 0 (sprites) | 1 (large illustrations), steer: front wheel
  * angle in radians (+ left), cockpit: true to add what only the driver sees (dash, wheel rim) }.
  * Returns { parts, bounds }.
  */
@@ -7158,7 +7210,8 @@ function buildCarModel(options = {}) {
 
   // ---- floor
   const floor = new PartBuilder('floor', { ink: 0.8 });
-  box(floor, -0.62, 0, 0.07, 2.25, 1.44, 0.04, ROLE.CARBON, 0, 0.14);
+  box(floor, -0.2, 0, 0.07, 1.41, 1.44, 0.04, ROLE.CARBON, 0, 0.14);        // full width between the axles
+  box(floor, -1.3, 0, 0.07, 0.8, 0.92, 0.04, ROLE.CARBON, 0, 0.14);         // narrow tail between the rear wheels
   parts.push(floor);
 
   // ---- front wing
@@ -7242,18 +7295,19 @@ function buildCarModel(options = {}) {
   parts.push(exhaust);
 
   // ---- wheels (front wheels may be steered about their vertical axis)
-  parts.push(...placeWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, steer));
-  parts.push(...placeWheel('wheel.fr', D.frontAxleX, -D.frontTrack, D.frontTyre, steer));
-  parts.push(...placeWheel('wheel.rl', D.rearAxleX, D.rearTrack, D.rearTyre, 0));
-  parts.push(...placeWheel('wheel.rr', D.rearAxleX, -D.rearTrack, D.rearTyre, 0));
+  const spin = !!options.spin;
+  parts.push(...placeWheel('wheel.fl', D.frontAxleX, D.frontTrack, D.frontTyre, steer, null, spin));
+  parts.push(...placeWheel('wheel.fr', D.frontAxleX, -D.frontTrack, D.frontTyre, steer, null, spin));
+  parts.push(...placeWheel('wheel.rl', D.rearAxleX, D.rearTrack, D.rearTyre, 0, null, spin));
+  parts.push(...placeWheel('wheel.rr', D.rearAxleX, -D.rearTrack, D.rearTyre, 0, null, spin));
 
   return { parts: parts.map(finishPart), dimensions: D };
 }
 
 
 /** Build a wheel at its place on the car, steered by `steerAngle` about the vertical axis. */
-function placeWheel(name, x, y, tyre, steerAngle, tread = null) {
-  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y));
+function placeWheel(name, x, y, tyre, steerAngle, tread = null, spin = false) {
+  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin);
   if (tread) addTreadMarks(t, tyre, tread);
   t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
   const c = Math.cos(steerAngle), s = Math.sin(steerAngle);
@@ -7817,16 +7871,16 @@ const SCENERY_SPECS = [
   { id: 'building.crane', variants: 1, kind: 'prop', w: 320, h: 544, worldW: 20, worldH: 34 },
   { id: 'building.container', variants: 2, kind: 'prop', w: 416, h: 176, worldW: 13, worldH: 5.5 },
   { id: 'building.warehouse', variants: 1, kind: 'prop', w: 640, h: 216, worldW: 30, worldH: 10 },
-  // ---- strips along the road
-  { id: 'strip.armco', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0 },
-  { id: 'strip.concrete', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0 },
-  { id: 'strip.tyres', kind: 'strip', w: 512, h: 120, tile: 2, worldH: 1.15 },
+  // ---- strips along the road (density: 2 = drawn at twice the pixel size, for what is seen from very close)
+  { id: 'strip.armco', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 2 },
+  { id: 'strip.concrete', kind: 'strip', w: 512, h: 104, tile: 2, worldH: 1.0, density: 2 },
+  { id: 'strip.tyres', kind: 'strip', w: 512, h: 120, tile: 2, worldH: 1.15, density: 2 },
   { id: 'strip.fence', kind: 'strip', w: 384, h: 264, tile: 2, worldH: 3.4 },
-  { id: 'strip.pitwall', kind: 'strip', w: 640, h: 160, tile: 4, worldH: 2.5 },
+  { id: 'strip.pitwall', kind: 'strip', w: 640, h: 160, tile: 4, worldH: 2.5, density: 2 },
   { id: 'strip.pitbuilding', kind: 'strip', w: 768, h: 552, tile: 5, worldH: 9 },
   { id: 'strip.grandstand', kind: 'strip', w: 1024, h: 564, tile: 8, worldH: 11 },
   { id: 'strip.crowdbank', kind: 'strip', w: 1024, h: 216, tile: 8, worldH: 4.2 },
-  { id: 'strip.hoarding', variants: 4, kind: 'strip', w: 768, h: 96, tile: 4, worldH: 1.25 },
+  { id: 'strip.hoarding', variants: 4, kind: 'strip', w: 768, h: 96, tile: 4, worldH: 1.25, density: 2 },
   { id: 'strip.forest', kind: 'strip', w: 768, h: 576, tile: 8, worldH: 15 },
   { id: 'strip.cliff', kind: 'strip', w: 640, h: 576, tile: 8, worldH: 18 },
   { id: 'strip.facade', kind: 'strip', w: 768, h: 576, tile: 8, worldH: 15 },
@@ -10557,6 +10611,8 @@ const { sceneryPainter } = __modules["src/art/environments/scenery-painters.js"]
 const { paintBackdropLayer } = __modules["src/art/environments/backdrops.js"];
 
 const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degrees (front) every 7.5 degrees; the other side is mirrored
+/** Silhouette pen width of the cars in the race, in metres at the car: the same weight as the cockpit's own outlines. */
+const CAR_INK_WORLD = 0.021;
 const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
 const STATIC_LAYERS = 6;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;
@@ -10608,7 +10664,7 @@ class ArtLibrary {
    */
   async buildCars(onProgress = null) {
     const t0 = performance.now();
-    const model = buildCarModel({ detail: 1 });
+    const model = buildCarModel({ detail: 1, spin: true });
     const fixed = makeCanvas(CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT), mask = makeCanvas(CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
     const ctx = fixed.getContext('2d'), mctx = mask.getContext('2d');
     this.cars.length = 0;
@@ -10616,7 +10672,7 @@ class ArtLibrary {
       ctx.clearRect(0, 0, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
       mctx.clearRect(0, 0, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
       const yaw = (i / (CAR_ANGLES - 1)) * Math.PI;
-      const meta = drawCarFitted(ctx, mctx, model, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT, { yaw, pitch: CAR_VIEW_PITCH, distance: 16 }, { margin: 14 });
+      const meta = drawCarFitted(ctx, mctx, model, CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT, { yaw, pitch: CAR_VIEW_PITCH, distance: 16 }, { margin: 16, inkWorld: CAR_INK_WORLD });
       this.renderer.uploadLayer('cars', i * 2, fixed);
       this.renderer.uploadLayer('cars', i * 2 + 1, mask);
       this.cars.push({ layer: i * 2, ppm: meta.ppm, ax: meta.ax, ay: meta.ay, w: CAR_LAYER_WIDTH, h: CAR_LAYER_HEIGHT });
@@ -10653,7 +10709,8 @@ class ArtLibrary {
       if (!spec) throw new Error(`No scenery spec for ${id}`);
       const paint = sceneryPainter(spec.family);
       const seed = hashString(`${id}:${track.theme}`);
-      this.themeAtlas.define(id, spec.w, spec.h, (ctx, w, h) => paint(ctx, w, h, palette, seeded(seed), spec.variant, spec),
+      const density = spec.density || 1;
+      this.themeAtlas.define(id, spec.w * density, spec.h * density, (ctx) => { ctx.scale(density, density); paint(ctx, spec.w, spec.h, palette, seeded(seed), spec.variant, spec); },
         { kind: spec.kind, worldW: spec.worldW || 0, worldH: spec.worldH, tile: spec.tile || 0, wrapX: spec.kind === 'strip' });
     }
     if (this.themeExtras) this.themeExtras(this.themeAtlas, track, palette);
@@ -10675,7 +10732,7 @@ class ArtLibrary {
   has(id) { return this.themeAtlas.has(id) || this.staticAtlas.has(id); }
 }
 
-__modules["src/art/art-library.js"] = { CAR_ANGLES, CAR_VIEW_PITCH, liveryColors, ArtLibrary };
+__modules["src/art/art-library.js"] = { CAR_ANGLES, CAR_INK_WORLD, CAR_VIEW_PITCH, liveryColors, ArtLibrary };
 })();
 // ---- src/vehicles/liveries.js
 (function () {
@@ -11136,7 +11193,8 @@ __modules["src/tracks/track-catalog.js"] = { SEASONS, CIRCUITS, getCircuit, seas
 // Screen layouts for one or two local players. Rectangles are in canvas pixels.
 
 const SPLIT_LAYOUTS = ['horizontal', 'vertical'];
-const GAP = 4;
+/** Width of the gutter between the two panels, like the white gap between the panels of a comic page. */
+function gutterWidth(width, height) { return Math.max(4, Math.round(Math.min(width, height) * 0.011)); }
 
 /**
  * @param layout 'horizontal' stacks the views (top / bottom, the classic wide-view presentation),
@@ -11144,6 +11202,7 @@ const GAP = 4;
  */
 function computeViewRects(width, height, playerCount, layout = 'horizontal') {
   if (playerCount <= 1) return [{ x: 0, y: 0, w: width, h: height }];
+  const GAP = gutterWidth(width, height);
   if (layout === 'vertical') {
     const w = Math.floor((width - GAP) / 2);
     return [{ x: 0, y: 0, w, h: height }, { x: width - w, y: 0, w, h: height }];
@@ -11152,7 +11211,7 @@ function computeViewRects(width, height, playerCount, layout = 'horizontal') {
   return [{ x: 0, y: 0, w: width, h }, { x: 0, y: height - h, w: width, h }];
 }
 
-__modules["src/multiplayer/split-screen.js"] = { SPLIT_LAYOUTS, computeViewRects };
+__modules["src/multiplayer/split-screen.js"] = { SPLIT_LAYOUTS, gutterWidth, computeViewRects };
 })();
 // ---- src/core/game-app.js
 (function () {
@@ -11433,7 +11492,7 @@ const MAX_DRAWN_STEER = 0.26;           // radians at the first / last frame
 const WHEEL_VARIANTS = TREAD_PHASES + 1; // rolling phases, then the streaked "at speed" drawing
 const DIAL = { x: 0, y: 700, r: 92, minAngle: -2.2, maxAngle: 2.2, maxRpm: 14000 };
 const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };   // extra: canvas height added below the wheel for the sleeves
-const MIRROR = { x: -1010, y: 188, w: 300, h: 138 };   // left mirror (centre and size); the right one is its reflection
+const MIRROR = { x: -1010, y: 188, w: 300, h: 138, glassInset: 16 };   // left mirror (centre and size); the right one is its reflection
 const INK = '#16161f';
 const COCKPIT_INK = 4.2;
 const BOTTOM_LIMIT = 900;                      // nothing is needed further below the horizon than this
@@ -11483,18 +11542,14 @@ function paintMirror(ctx, ox, oy, colors) {
   ctx.restore();
   trace(housing); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 1.15; ctx.lineJoin = 'round'; ctx.stroke();
   // glass
-  const g = 16;
+  const g = MIRROR.glassInset;
   const glass = [[cx - hw + g, cy - hh + g + 6], [cx - hw + g + 10, cy - hh + g], [cx + hw - g - 6, cy - hh + g], [cx + hw - g, cy - hh + g + 12], [cx + hw - g - 4, cy + hh - g], [cx - hw + g + 6, cy + hh - g]];
-  trace(glass); ctx.fillStyle = '#9fc9e6'; ctx.fill();
-  ctx.save(); ctx.clip();
-  ctx.fillStyle = '#d2ecf7'; ctx.fillRect(cx - hw, cy - hh, MIRROR.w, hh * 0.75);
-  ctx.fillStyle = '#6f9a5c'; ctx.fillRect(cx - hw, cy - 2, MIRROR.w, hh);                        // verge
-  ctx.fillStyle = '#6c6e77';                                                                      // road running away behind
-  ctx.beginPath(); ctx.moveTo(cx + hw * 0.1, cy - 2); ctx.lineTo(cx + hw * 0.34, cy - 2); ctx.lineTo(cx + hw, cy + hh * 0.75); ctx.lineTo(cx + hw, cy + hh); ctx.lineTo(cx - hw * 0.55, cy + hh); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#f1efe6';
-  ctx.beginPath(); ctx.moveTo(cx + hw * 0.1, cy - 2); ctx.lineTo(cx + hw * 0.13, cy - 2); ctx.lineTo(cx - hw * 0.44, cy + hh); ctx.lineTo(cx - hw * 0.55, cy + hh); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';                                                       // glare
-  ctx.beginPath(); ctx.moveTo(cx - hw * 0.5, cy - hh); ctx.lineTo(cx - hw * 0.28, cy - hh); ctx.lineTo(cx - hw * 0.62, cy + hh); ctx.lineTo(cx - hw * 0.84, cy + hh); ctx.closePath(); ctx.fill();
+  // the glass itself is left open: the compositor draws the rear view behind this layer
+  ctx.save(); ctx.globalCompositeOperation = 'destination-out'; trace(glass); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+  ctx.save(); trace(glass); ctx.clip();
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';                                                        // glare
+  ctx.beginPath(); ctx.moveTo(cx - hw * 0.5, cy - hh); ctx.lineTo(cx - hw * 0.3, cy - hh); ctx.lineTo(cx - hw * 0.64, cy + hh); ctx.lineTo(cx - hw * 0.84, cy + hh); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx - hw * 0.2, cy - hh); ctx.lineTo(cx - hw * 0.14, cy - hh); ctx.lineTo(cx - hw * 0.48, cy + hh); ctx.lineTo(cx - hw * 0.54, cy + hh); ctx.closePath(); ctx.fill();
   ctx.restore();
   trace(glass); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 0.7; ctx.stroke();
 }
@@ -11750,7 +11805,7 @@ __modules["src/art/cockpits/cockpit-art.js"] = { COCKPIT_REF_WIDTH, COCKPIT_REF_
 const { VIEW_CONFIG } = __modules["src/core/config.js"];
 const { clamp, mod } = __modules["src/core/math.js"];
 const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
-const { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING } = __modules["src/art/cockpits/cockpit-art.js"];
+const { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING, MIRROR } = __modules["src/art/cockpits/cockpit-art.js"];
 const { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES } = __modules["src/art/vehicles/car-model.js"];
 const { BASE_CAR_SPEC } = __modules["src/vehicles/car-spec.js"];
 const { QUAD_MODE } = __modules["src/rendering/drawing/quad-batch.js"];
@@ -11775,9 +11830,59 @@ function steerFrame(steer, lock) {
   return Math.round(mid + (angle / MAX_DRAWN_STEER) * mid);
 }
 
+// rear view of a mirror: a small perspective of its own (pixels per metre at one metre, eye height, reach)
+const MIRROR_FOCAL = 640, MIRROR_EYE = 0.75, MIRROR_REACH = 120;
+const MIRROR_DEPTHS = [0, 13, 22, 38, 65, 120];        // road drawn in bands between these distances behind (0 = bottom of the glass)
+const polyA = new Float32Array(48), polyB = new Float32Array(48);
+const behindOrder = new Int16Array(40), behindGap = new Float32Array(40);
+
+/** Clip the convex polygon in `src` (n points, x/y pairs) against one side of an axis-aligned box. Returns the new count. */
+function clipSide(src, n, dst, axis, bound, keepGreater) {
+  let m = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const a = src[i * 2 + axis], b = src[j * 2 + axis];
+    const ain = keepGreater ? a >= bound : a <= bound, bin = keepGreater ? b >= bound : b <= bound;
+    if (ain) { dst[m * 2] = src[i * 2]; dst[m * 2 + 1] = src[i * 2 + 1]; m++; }
+    if (ain !== bin) {
+      const t = (bound - a) / (b - a);
+      dst[m * 2] = src[i * 2] + (src[j * 2] - src[i * 2]) * t; dst[m * 2 + 1] = src[i * 2 + 1] + (src[j * 2 + 1] - src[i * 2 + 1]) * t; m++;
+    }
+  }
+  return m;
+}
+
+/** Flat-coloured convex quadrilateral (points in polyA, in order) clipped to a box. */
+function flatClipped(quads, x0, y0, x1, y1, r, g, b) {
+  let n = clipSide(polyA, 4, polyB, 0, x0, true);
+  n = clipSide(polyB, n, polyA, 0, x1, false);
+  n = clipSide(polyA, n, polyB, 1, y0, true);
+  n = clipSide(polyB, n, polyA, 1, y1, false);
+  for (let i = 1; i + 1 < n; i += 2) {
+    const c = i + 2 < n ? i + 2 : i + 1;
+    quads.quad(polyA[0], polyA[1], 1, polyA[i * 2], polyA[i * 2 + 1], 1, polyA[c * 2], polyA[c * 2 + 1], 1, polyA[(i + 1) * 2], polyA[(i + 1) * 2 + 1], 1,
+      0, 0, 0, 0, 0, QUAD_MODE.FLAT, r, g, b, 1, 0);
+  }
+}
+
+const placement = { k: 1, oy: 0 };
+/**
+ * Scale and vertical origin of the cockpit drawing in a view. It hangs from the horizon; in the
+ * split-screen formats it is reduced so that the whole driving position fits, and in a narrow
+ * view it sits on the bottom edge instead (never a gap under the drawing).
+ */
+function place(view) {
+  const cfg = VIEW_CONFIG;
+  const k = (view.baseFocal / COCKPIT_REF_FOCAL) * (view.wide ? cfg.cockpitScaleWide : view.tall ? cfg.cockpitScaleTall : 1);
+  placement.k = k;
+  placement.oy = Math.max(view.rect.h * view.horizonRatio, view.rect.h - cfg.cockpitDepth * k);
+  return placement;
+}
+
 class CockpitLayer {
   constructor(art, layout, text) {
     this.text = text;
+    this.art = art;
     this.near = layout.near.map((id) => art.sprite(id));
     this.far = layout.far.map((id) => art.sprite(id));
     this.steering = layout.steering.map((id) => art.sprite(id));
@@ -11790,15 +11895,73 @@ class CockpitLayer {
 
   /** True when the dash dial is visible in this view (otherwise the HUD shows a rev bar). */
   dialVisible(view) {
-    const k = view.baseFocal / COCKPIT_REF_FOCAL;
-    const ratio = view.wide ? VIEW_CONFIG.horizonRatioWide : VIEW_CONFIG.horizonRatio;
-    return view.camera === CAMERA.COCKPIT && view.rect.h * ratio + (DIAL.y + DIAL.r * 0.6) * k < view.rect.h;
+    const { k, oy } = place(view);
+    return view.camera === CAMERA.COCKPIT && oy + (DIAL.y + DIAL.r * 0.6) * k < view.rect.h;
   }
 
-  half(quads, sp, ox, oy, k) {
+  half(quads, sp, ox, oy, k, am) {
     const w = sp.w * k, h = sp.h * k, y = oy + sp.oy * k;
-    quads.sprite(sp, ox + sp.ox * k, y, w, h, 1, 1, 1, 1, 0, false);
-    quads.sprite(sp, ox - (sp.ox + sp.w) * k, y, w, h, 1, 1, 1, 1, 0, true);
+    quads.sprite(sp, ox + sp.ox * k, y, w, h, am[0], am[1], am[2], 1, 0, false);
+    quads.sprite(sp, ox - (sp.ox + sp.w) * k, y, w, h, am[0], am[1], am[2], 1, 0, true);
+  }
+
+  /**
+   * Rear view in one mirror (side -1 = left, +1 = right), drawn behind the mirror housing: sky,
+   * distant relief, verge, the road running away behind the car and the cars that follow.
+   */
+  mirror(app, view, car, side, ox, oy, k, am) {
+    const quads = app.quads, race = app.race, track = race.track, colors = app.scene.mirror;
+    const cxm = ox - side * MIRROR.x * k, cym = oy + MIRROR.y * k;
+    const gw = (MIRROR.w / 2 - MIRROR.glassInset) * k, gh = (MIRROR.h / 2 - MIRROR.glassInset) * k;
+    const x0 = cxm - gw, x1 = cxm + gw, y0 = cym - gh, y1 = cym + gh;
+    const yh = y0 + gh * 0.8;                                  // horizon in the glass
+    const f = MIRROR_FOCAL * k;
+    const xv = cxm - side * gw * 0.45;                         // straight behind lies toward the inner side of each mirror
+    quads.rect(x0, y0, gw * 2, yh - y0, colors.sky[0] * am[0], colors.sky[1] * am[1], colors.sky[2] * am[2], 1);
+    quads.rect(x0, yh - gh * 0.22, gw * 2, gh * 0.22, colors.relief[0], colors.relief[1], colors.relief[2], 1);
+    quads.rect(x0, yh, gw * 2, y1 - yh, colors.verge[0], colors.verge[1], colors.verge[2], 1);
+    // the road behind: displaced sideways by the bend the car has just come through
+    const sample = Math.floor(mod(car.s - 25, track.length) / track.ds) % track.n;
+    const bend = track.kappa[sample] * 0.5;
+    const half = track.halfWidth, zBottom = (MIRROR_EYE * f) / (y1 - yh);
+    for (let band = MIRROR_DEPTHS.length - 2; band >= 0; band--) {
+      const zn = band === 0 ? zBottom : MIRROR_DEPTHS[band], zf = MIRROR_DEPTHS[band + 1];
+      if (zf <= zn) continue;
+      const cn = (bend * zn * zn - car.d) * (f / zn), cf = (bend * zf * zf - car.d) * (f / zf);
+      const wn = half * (f / zn), wf = half * (f / zf);
+      const yn = yh + (MIRROR_EYE * f) / zn, yf = yh + (MIRROR_EYE * f) / zf;
+      polyA[0] = xv + cf - wf; polyA[1] = yf; polyA[2] = xv + cf + wf; polyA[3] = yf;
+      polyA[4] = xv + cn + wn; polyA[5] = yn; polyA[6] = xv + cn - wn; polyA[7] = yn;
+      flatClipped(quads, x0, y0, x1, y1, colors.road[0], colors.road[1], colors.road[2]);
+      for (let e = -1; e <= 1; e += 2) {                       // edge lines
+        const ln = 0.22 * (f / zn), lf = 0.22 * (f / zf);
+        polyA[0] = xv + cf + e * wf - lf; polyA[1] = yf; polyA[2] = xv + cf + e * wf + lf; polyA[3] = yf;
+        polyA[4] = xv + cn + e * wn + ln; polyA[5] = yn; polyA[6] = xv + cn + e * wn - ln; polyA[7] = yn;
+        flatClipped(quads, x0, y0, x1, y1, colors.line[0], colors.line[1], colors.line[2]);
+      }
+    }
+    // cars behind, the farthest first
+    let count = 0;
+    const cars = race.cars;
+    for (let i = 0; i < cars.length && count < behindOrder.length; i++) {
+      const other = cars[i];
+      if (other === car || other.removed) continue;
+      const gap = mod(car.s - other.s, track.length);
+      if (gap < 2.5 || gap > MIRROR_REACH) continue;
+      let q = count++;
+      while (q > 0 && behindGap[q - 1] < gap) { behindGap[q] = behindGap[q - 1]; behindOrder[q] = behindOrder[q - 1]; q--; }
+      behindGap[q] = gap; behindOrder[q] = i;
+    }
+    const front = this.art.cars[this.art.cars.length - 1];     // the drawing seen from straight ahead
+    for (let q = 0; q < count; q++) {
+      const other = cars[behindOrder[q]], z = behindGap[q], scale = f / z, kk = scale / front.ppm;
+      const gx = xv + (other.d - car.d + bend * z * z) * scale, gy = yh + MIRROR_EYE * scale;
+      const left = gx - front.ax * kk, top = gy - front.ay * kk, w = front.w * kk, h = front.h * kk;
+      const cl = Math.max(left, x0), cr = Math.min(left + w, x1), ct = Math.max(top, y0), cb = Math.min(top + h, y1);
+      if (cl >= cr || ct >= cb) continue;
+      quads.quad(cl, ct, 1, cr, ct, 1, cl, cb, 1, cr, cb, 1, (cl - left) / w, (ct - top) / h, (cr - left) / w, (cb - top) / h,
+        front.layer, QUAD_MODE.CAR + other.teamIndex, am[0], am[1], am[2], 1, 0);
+    }
   }
 
   buildFront(app, view) {
@@ -11806,10 +11969,10 @@ class CockpitLayer {
     const quads = app.quads, r = view.rect;
     const car = app.race.cars[view.carIndex];
     const p = clamp(car.playerIndex, 0, this.near.length - 1);
-    const k = view.baseFocal / COCKPIT_REF_FOCAL;
-    const ratio = view.wide ? VIEW_CONFIG.horizonRatioWide : VIEW_CONFIG.horizonRatio;
-    const ox = r.w * 0.5 + view.shakeX, oy = r.h * ratio + view.shakeY + Math.max(0, view.dive) * 6 * k;
-    this.half(quads, this.far[p], ox, oy, k);
+    const k = place(view).k;
+    const ox = r.w * 0.5 + view.shakeX, oy = placement.oy + view.shakeY + Math.max(0, view.dive) * 6 * k;
+    const am = app.scene.ambient;
+    this.half(quads, this.far[p], ox, oy, k, am);
 
     // front wheels: steering frame and rolling variant
     const lock = BASE_CAR_SPEC.steerLock * (0.45 + 0.55 / (1 + Math.abs(car.speed) / 28));
@@ -11818,15 +11981,17 @@ class CockpitLayer {
     const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
     const jolt = view.shakeAmp * 0.5 * k;
     const wy = oy + left.oy * k + Math.sin(view.time * 61) * jolt;
-    quads.sprite(left, ox + left.ox * k, wy, left.w * k, left.h * k, 1, 1, 1, 1, 0, false);
-    quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k - Math.sin(view.time * 53) * jolt, right.w * k, right.h * k, 1, 1, 1, 1, 0, true);
+    quads.sprite(left, ox + left.ox * k, wy, left.w * k, left.h * k, am[0], am[1], am[2], 1, 0, false);
+    quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k - Math.sin(view.time * 53) * jolt, right.w * k, right.h * k, am[0], am[1], am[2], 1, 0, true);
 
-    this.half(quads, this.near[p], ox, oy, k);
+    this.mirror(app, view, car, -1, ox, oy, k, am);
+    this.mirror(app, view, car, 1, ox, oy, k, am);
+    this.half(quads, this.near[p], ox, oy, k, am);
 
     if (this.dialVisible(view)) {
       const dx = ox + DIAL.x * k, dy = oy + DIAL.y * k;
       const ds = this.dial.w * k;
-      quads.sprite(this.dial, dx - ds / 2, dy - ds / 2, ds, ds, 1, 1, 1, 1, 0, false);
+      quads.sprite(this.dial, dx - ds / 2, dy - ds / 2, ds, ds, am[0], am[1], am[2], 1, 0, false);
       const rpm = clamp(car.rpm, 0, DIAL.maxRpm);
       const target = DIAL.minAngle + ((DIAL.maxAngle - DIAL.minAngle) * rpm) / DIAL.maxRpm;
       const vi = view.index;
@@ -11849,7 +12014,7 @@ class CockpitLayer {
     quads.quad(
       cx + (-s * co + s * si), cy + (-s * si - s * co) * q, 1, cx + (s * co + s * si), cy + (s * si - s * co) * q, 1,
       cx + (-s * co - yb * si), cy + (-s * si + yb * co) * q, 1, cx + (s * co - yb * si), cy + (s * si + yb * co) * q, 1,
-      sp.u0, sp.v0, sp.u1, sp.v1, sp.layer, QUAD_MODE.SPRITE, 1, 1, 1, 1, 0);
+      sp.u0, sp.v0, sp.u1, sp.v1, sp.layer, QUAD_MODE.SPRITE, am[0], am[1], am[2], 1, 0);
   }
 }
 
@@ -12489,8 +12654,9 @@ const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
 /** Register effect drawings in the static atlas. */
 function defineEffectsArt(art) {
-  const puff = (id, seed, lobes) => art.defineStatic(id, 160, 160, (ctx, w) => {
-    const rnd = seeded(seed), c = w / 2;
+  const puff = (id, seed, lobes) => art.defineStatic(id, 256, 256, (ctx, w) => {
+    const rnd = seeded(seed), c = 80;
+    ctx.scale(w / 160, w / 160);                                           // drawn on a 160 unit grid
     const shape = blobPoints(c, c, 62, 58, lobes, 0.2, rnd);
     ctx.lineJoin = 'round';
     ctx.beginPath(); closedCurve(ctx, shape); ctx.strokeStyle = 'rgba(22,22,31,0.9)'; ctx.lineWidth = 4.5; ctx.stroke();
@@ -12670,15 +12836,16 @@ class EffectsLayer {
       const v = Math.abs(car.speed);
       const loose = car.surface === SURFACE.GRASS || car.surface === SURFACE.GRAVEL;
       const sliding = car.slip > 0.55 || car.wheelspin > 0.35 || car.state === CAR_STATE.SPIN;
-      if (fx.dust && ((loose && v > 7) || (sliding && v > 4))) {
-        this.emitTimer[i] -= dt * (loose ? 5 + v * 0.25 : 9);
+      const smoking = car.slip > 0.85 || car.wheelspin > 0.6 || car.state === CAR_STATE.SPIN;       // tyre smoke needs a real slide
+      if (fx.dust && ((loose && v > 7) || (smoking && v > 4))) {
+        this.emitTimer[i] -= dt * (loose ? 5 + v * 0.25 : 6);
         while (this.emitTimer[i] < 0) {
           this.emitTimer[i] += 1;
           const side = this.random() < 0.5 ? -0.75 : 0.75;
           const color = loose ? (car.surface === SURFACE.GRAVEL ? this.dust : this.dirt) : this.smoke;
           this.spawn(0, car.s - 1.5 + this.random() * 0.6, car.d + side + (this.random() - 0.5) * 0.4, 0.25,
             car.speed * (loose ? 0.25 : 0.12), (this.random() - 0.5) * 1.5, 1.0 + this.random() * 1.0, 0.6 + this.random() * 0.4,
-            loose ? 0.9 : 0.6, loose ? 2.2 : 1.5, color, 1);
+            loose ? 0.8 : 0.5, loose ? 1.7 : 1.0, color, 1);
         }
       }
       const locked = car.brake > 0.92 && v > 24 && car.surface === SURFACE.ASPHALT && car.accelLong < -24;
@@ -12733,8 +12900,12 @@ class EffectsLayer {
         quads.sprite(this.spark, pt.x - s / 2, pt.y - s / 2, s, s, this.pr[i], this.pg[i], this.pb[i], 1 - t * t, this.pz[i], false);
       } else {
         // drawn smoke stays opaque (no ghosting of contours), swells, then shrinks away at the end of its life
-        const size = (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1);
-        const alpha = t < 0.08 ? t / 0.08 : t > 0.85 ? (1 - t) / 0.15 : 1;
+        // (a puff never fills the picture: its drawn size is capped, and right in front of the camera it thins out)
+        const cap = view.rect.h * 0.2;
+        const size = Math.min(cap, (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1));
+        const near = clamp((this.pz[i] - 3.5) / 5, 0, 1);
+        if (near <= 0) continue;
+        const alpha = (t < 0.08 ? t / 0.08 : t > 0.85 ? (1 - t) / 0.15 : 1) * near;
         quads.sprite(this.puffs[i % 3], pt.x - size / 2, pt.y - size * 0.85, size, size, this.pr[i], this.pg[i], this.pb[i], alpha, this.pz[i], (i & 1) === 1);
       }
     }
@@ -15187,7 +15358,7 @@ class PagePainter {
   title(x, y, size) {
     const ctx = this.ctx, S = this.S;
     drawText(ctx, t('game.title'), x, y, size, { style: 'impact', color: RED, outline: INK, outlineWidth: size * 0.13, shadow: { dx: 9 * S, dy: 10 * S, color: INK }, bounce: 0.05, seed: 4 });
-    drawText(ctx, t('game.subtitle'), x + 6 * S, y + size * 0.52, size * 0.24, { style: 'bold', color: INK });
+    drawText(ctx, t('game.subtitle'), x + 6 * S, y + size * 0.64, size * 0.22, { style: 'bold', color: INK });      // clear of the title's drop shadow
   }
 
   // ---- pages -----------------------------------------------------------------------------------
@@ -15223,9 +15394,9 @@ class PagePainter {
     const titleRoom = W - m - (leftW + 110 * S) - 20 * S;
     const titleSize = Math.min(150 * S, (150 * S * titleRoom) / measureText(t('game.title'), 150 * S, { style: 'impact' }));
     this.title(leftW + 110 * S, m + 40 * S + titleSize, titleSize);
-    if (model.heading) drawText(ctx, model.heading, leftW + 116 * S, m + 318 * S, 50 * S, { style: 'bold', color: BLUE });
+    if (model.heading) drawText(ctx, model.heading, leftW + 116 * S, m + 346 * S, 48 * S, { style: 'bold', color: BLUE });
     // ---- panel 2: list
-    const lx = leftW + 70 * S, ly = m + 360 * S, lw = W - m - lx;
+    const lx = leftW + 70 * S, ly = m + 382 * S, lw = W - m - lx;
     const rowH = Math.min(92 * S, (H - ly - m - 30 * S) / Math.max(1, model.items.length));
     const size = Math.min(40 * S, rowH * 0.46);
     model.items.forEach((item, i) => {
