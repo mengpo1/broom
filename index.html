@@ -59,6 +59,1205 @@ function halton(index, base) {
 
 __modules["src/core/math.js"] = { TAU, DEG, clamp, saturate, lerp, smoothstep, damp, moveToward, wrapAngle, angleDiff, mod, halton };
 })();
+// ---- src/vehicles/car-spec.js
+(function () {
+// Vehicle parameters. Everything that shapes the handling lives here as plain data so it can be
+// tuned or modded without touching the simulation code. Units: metres, seconds, radians.
+
+const GRAVITY = 9.81;
+
+/** Base single-seater. All values are design choices for an arcade feel, not measurements. */
+const BASE_CAR_SPEC = {
+  length: 4.4,
+  width: 1.9,
+  wheelbase: 2.9,
+  collisionHalfLength: 2.1,
+  collisionHalfWidth: 0.93,
+  powerPerMass: 900,                 // W/kg at peak
+  minPowerSpeed: 12,                 // m/s, avoids infinite force at standstill
+  gearTopSpeeds: [27, 39, 51, 64, 78, 93], // m/s reached at rpmMax in each gear
+  rpmIdle: 3500,
+  rpmMax: 13500,
+  shiftTime: 0.09,
+  autoUpshiftAt: 0.965,              // fraction of rpmMax
+  autoDownshiftAt: 0.86,             // fraction of the lower gear's top speed
+  powerCurve: [[0, 0.22], [0.25, 0.32], [0.4, 0.5], [0.6, 0.76], [0.8, 0.94], [0.92, 1], [1, 0.94]],
+  dragCoefficient: 0.00112,          // 1/m (acceleration = c * v^2)
+  rollingResistance: 0.3,            // m/s^2
+  engineBraking: 2.6,                // m/s^2 at full revs, throttle closed
+  gripBase: 1.72,                    // tyre friction coefficient on asphalt
+  downforceCoefficient: 0.0002,      // extra grip factor = c * v^2
+  tractionFraction: 0.84,            // share of grip usable for acceleration
+  brakeDecel: 17,                    // m/s^2 before downforce
+  steerLock: 0.34,                   // rad at low speed
+  steerRate: 4.6,                    // 1/s toward the requested steering
+  steerReturnRate: 7.5,              // 1/s back to centre
+  yawResponse: 16,                   // 1/s, how quickly yaw rate follows the steering
+  overSteerAllowance: 1.22,          // full lock asks for this multiple of the available grip
+  slipScrub: 7,                      // m/s^2 lost per unit of slip
+  lateralRecovery: 5,                // 1/s decay of lateral slide velocity
+  reverseSpeed: 7,
+  fuelCapacity: 100,
+  fuelMassPenalty: 0.07,             // acceleration loss with a full tank
+};
+
+/**
+ * Driving profiles. ARCADE is forgiving (full steering aid, softer contacts, no attrition),
+ * RACING adds attrition and a stricter limit, TURBO raises power and enables boost.
+ */
+const DRIVING_PROFILES = {
+  arcade: {
+    id: 'arcade', steerAssist: 1, gripScale: 1.08, powerScale: 1, brakeScale: 1.1,
+    wallSpeedLoss: 0.022, crashImpact: 14, carCrashImpact: 19, contactRestitution: 0.35,
+    offroadGrip: 0.62, offroadDrag: 0.75, boost: false,
+  },
+  racing: {
+    id: 'racing', steerAssist: 0.78, gripScale: 1, powerScale: 1, brakeScale: 1,
+    wallSpeedLoss: 0.032, crashImpact: 11, carCrashImpact: 15, contactRestitution: 0.25,
+    offroadGrip: 0.5, offroadDrag: 1, boost: false,
+  },
+  turbo: {
+    id: 'turbo', steerAssist: 0.9, gripScale: 1.04, powerScale: 1.22, brakeScale: 1.05,
+    wallSpeedLoss: 0.026, crashImpact: 12.5, carCrashImpact: 17, contactRestitution: 0.3,
+    offroadGrip: 0.55, offroadDrag: 0.9, boost: true,
+    boostPower: 1.45, boostHeatRate: 0.2, boostCoolRate: 0.085, overheatLockout: 3.5,
+  },
+};
+
+/** Tyre compounds: grip multiplier and wear speed relative to the medium compound. */
+const TYRE_COMPOUNDS = {
+  hard: { id: 'hard', grip: 0.972, wear: 0.55 },
+  medium: { id: 'medium', grip: 1, wear: 1 },
+  soft: { id: 'soft', grip: 1.034, wear: 1.9 },
+};
+const TYRE_ORDER = ['hard', 'medium', 'soft'];
+
+const WING_LEVELS = 5; // 0 = minimum downforce ... 4 = maximum
+
+const DEFAULT_SETUP = { wing: 2, tyres: 'medium', gearbox: 'auto' };
+
+function sanitizeSetup(setup) {
+  const s = { ...DEFAULT_SETUP, ...(setup || {}) };
+  s.wing = Math.max(0, Math.min(WING_LEVELS - 1, Math.round(s.wing)));
+  if (!TYRE_COMPOUNDS[s.tyres]) s.tyres = 'medium';
+  if (s.gearbox !== 'manual') s.gearbox = 'auto';
+  return s;
+}
+
+/**
+ * Flatten spec + setup + profile into the parameter object consumed by the physics step.
+ * Wing: each step trades about 2.3 % of drag-limited top speed for about 7 % of high speed grip.
+ */
+function deriveCarParams(spec, setup, profile, skill = null) {
+  const s = sanitizeSetup(setup);
+  const wingDrag = 0.86 + 0.07 * s.wing;
+  const wingDown = 0.7 + 0.15 * s.wing;
+  const compound = TYRE_COMPOUNDS[s.tyres];
+  const powerSkill = skill ? skill.power : 1;
+  return {
+    spec, profile, setup: s,
+    wheelbase: spec.wheelbase,
+    halfLength: spec.collisionHalfLength,
+    halfWidth: spec.collisionHalfWidth,
+    power: spec.powerPerMass * profile.powerScale * powerSkill,
+    drag: spec.dragCoefficient * wingDrag,
+    downforce: spec.downforceCoefficient * wingDown,
+    grip: spec.gripBase * profile.gripScale * compound.grip,
+    wearRate: compound.wear,
+    brake: spec.brakeDecel * profile.brakeScale,
+    manual: s.gearbox === 'manual',
+    gearCount: spec.gearTopSpeeds.length,
+  };
+}
+
+/** Maximum lateral (or braking) acceleration available at speed v on a surface. */
+function gripLimit(params, v, surfaceGrip = 1, tyreFactor = 1) {
+  return GRAVITY * params.grip * surfaceGrip * tyreFactor * (1 + params.downforce * v * v);
+}
+
+/** Highest speed at which a corner of curvature kappa can be taken using `usage` of the grip. */
+function cornerSpeed(params, kappa, usage = 1) {
+  const k = Math.abs(kappa);
+  const base = GRAVITY * params.grip * usage;
+  const denom = k - base * params.downforce;
+  if (denom <= 1e-6) return 200;
+  return Math.sqrt(base / denom);
+}
+
+function powerFraction(spec, rpmFraction) {
+  const curve = spec.powerCurve;
+  if (rpmFraction <= curve[0][0]) return curve[0][1];
+  for (let i = 1; i < curve.length; i++) {
+    if (rpmFraction <= curve[i][0]) {
+      const a = curve[i - 1], b = curve[i];
+      return a[1] + ((b[1] - a[1]) * (rpmFraction - a[0])) / (b[0] - a[0]);
+    }
+  }
+  return 0; // above the limiter
+}
+
+__modules["src/vehicles/car-spec.js"] = { GRAVITY, BASE_CAR_SPEC, DRIVING_PROFILES, TYRE_COMPOUNDS, TYRE_ORDER, WING_LEVELS, DEFAULT_SETUP, sanitizeSetup, deriveCarParams, gripLimit, cornerSpeed, powerFraction };
+})();
+// ---- src/tracks/racing-line.js
+(function () {
+// Racing line: lateral offset from the centre line that minimises bending energy inside the
+// track limits (iterative relaxation on a coarse grid, then interpolated to every sample).
+
+const { clamp, lerp, wrapAngle } = __modules["src/core/math.js"];
+
+const COARSE_STEP = 4;       // every 4th sample (~10 m)
+const ITERATIONS = 700;
+const EDGE_MARGIN = 1.6;     // metres kept between the line and the track edge
+const LINE_BLEND = 0.9;      // 1 = pure minimum curvature
+
+function computeRacingLine(track) {
+  const { n, x, z, nx, nz, halfWidth, ds } = track;
+  const m = Math.floor(n / COARSE_STEP);
+  const limit = Math.max(0.5, halfWidth - EDGE_MARGIN);
+  const cx = new Float64Array(m), cz = new Float64Array(m), ux = new Float64Array(m), uz = new Float64Array(m);
+  const d = new Float64Array(m);
+  for (let k = 0; k < m; k++) {
+    const i = Math.floor((k * n) / m);
+    cx[k] = x[i]; cz[k] = z[i]; ux[k] = nx[i]; uz[k] = nz[i];
+  }
+  for (let it = 0; it < ITERATIONS; it++) {
+    for (let pass = 0; pass < 2; pass++) {
+      for (let k = pass; k < m; k += 2) {
+        const a2 = (k + m - 2) % m, a1 = (k + m - 1) % m, b1 = (k + 1) % m, b2 = (k + 2) % m;
+        const p = (q) => cx[q] + ux[q] * d[q];
+        const r = (q) => cz[q] + uz[q] * d[q];
+        const targetX = (4 * (p(a1) + p(b1)) - (p(a2) + p(b2))) / 6;
+        const targetZ = (4 * (r(a1) + r(b1)) - (r(a2) + r(b2))) / 6;
+        const wanted = (targetX - cx[k]) * ux[k] + (targetZ - cz[k]) * uz[k];
+        d[k] = clamp(lerp(d[k], wanted, 0.6), -limit, limit);
+      }
+    }
+  }
+  // Interpolate back to full resolution (Catmull-Rom style cubic through coarse values).
+  const offset = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const f = (i * m) / n;
+    const k = Math.floor(f), t = f - k;
+    const p0 = d[(k + m - 1) % m], p1 = d[k % m], p2 = d[(k + 1) % m], p3 = d[(k + 2) % m];
+    const v = 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
+    offset[i] = clamp(v * LINE_BLEND, -limit, limit);
+  }
+  // Curvature of the resulting line.
+  const kappa = new Float32Array(n);
+  const lx = new Float64Array(n), lz = new Float64Array(n);
+  for (let i = 0; i < n; i++) { lx[i] = x[i] + nx[i] * offset[i]; lz[i] = z[i] + nz[i] * offset[i]; }
+  const span = 2;
+  for (let i = 0; i < n; i++) {
+    const a = (i + n - span) % n, b = (i + span) % n;
+    const h0 = Math.atan2(lz[i] - lz[a], lx[i] - lx[a]);
+    const h1 = Math.atan2(lz[b] - lz[i], lx[b] - lx[i]);
+    const len = 0.5 * (Math.hypot(lx[i] - lx[a], lz[i] - lz[a]) + Math.hypot(lx[b] - lx[i], lz[b] - lz[i]));
+    kappa[i] = wrapAngle(h1 - h0) / Math.max(len, ds);
+  }
+  const tmp = new Float32Array(n);
+  for (let it = 0; it < 3; it++) {
+    for (let i = 0; i < n; i++) tmp[i] = 0.25 * kappa[(i + n - 1) % n] + 0.5 * kappa[i] + 0.25 * kappa[(i + 1) % n];
+    kappa.set(tmp);
+  }
+  return { offset, kappa };
+}
+
+__modules["src/tracks/racing-line.js"] = { computeRacingLine };
+})();
+// ---- src/tracks/track-builder.js
+(function () {
+// Turns a declarative circuit definition (polygon corners with fillet radii) into
+// uniformly sampled track data used by physics, AI and rendering. Pure data: no GPU, no DOM.
+//
+// Conventions: world is Y up; the track lies mostly in the XZ plane. Heading angle `h`
+// gives forward = (cos h, sin h) in (x, z); right = (-sin h, cos h). Lateral offset `d`
+// is positive to the right of the centre line. Curvature > 0 turns right.
+
+const { clamp, lerp, smoothstep, wrapAngle, mod } = __modules["src/core/math.js"];
+const { computeRacingLine } = __modules["src/tracks/racing-line.js"];
+
+const SURFACE = { ASPHALT: 0, KERB: 1, GRASS: 2, GRAVEL: 3, PIT: 4 };
+const VERGE = { GRASS: 0, GRAVEL: 1, PIT: 2 };
+
+const SAMPLE_SPACING = 2.5;
+const KERB_WIDTH = 1.5;
+
+/** Default pit lane layout, distances relative to the start line (negative = before it). */
+const PIT_LAYOUT = {
+  entryS: -300, wallStartS: -240, wallEndS: 110, exitS: 170,
+  wallGap: 1.3, wallThickness: 0.5, laneWidth: 10, speedLimit: 22.2,
+  boxFirstS: -36, boxSpacing: 13, boxCount: 9,
+};
+
+function closedSmooth(values, iterations) {
+  const n = values.length;
+  const tmp = new Float32Array(n);
+  for (let it = 0; it < iterations; it++) {
+    for (let i = 0; i < n; i++) {
+      tmp[i] = 0.25 * values[(i + n - 1) % n] + 0.5 * values[i] + 0.25 * values[(i + 1) % n];
+    }
+    values.set(tmp);
+  }
+}
+
+function resampleClosed(px, pz, count) {
+  const n = px.length;
+  const cum = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    cum[i + 1] = cum[i] + Math.hypot(px[j] - px[i], pz[j] - pz[i]);
+  }
+  const total = cum[n];
+  const m = count || Math.max(16, Math.round(total / SAMPLE_SPACING));
+  const ox = new Float32Array(m), oz = new Float32Array(m);
+  let seg = 0;
+  for (let k = 0; k < m; k++) {
+    const target = (k / m) * total;
+    while (seg < n - 1 && cum[seg + 1] < target) seg++;
+    const span = cum[seg + 1] - cum[seg] || 1;
+    const t = (target - cum[seg]) / span;
+    const j = (seg + 1) % n;
+    ox[k] = lerp(px[seg], px[j], t);
+    oz[k] = lerp(pz[seg], pz[j], t);
+  }
+  return { x: ox, z: oz, length: total };
+}
+
+/** Expand polygon corners with fillet radii into a dense closed polyline starting at the start line. */
+function traceCorners(def, warnings) {
+  const corners = def.corners.map((c) => ({ x: c[0], z: c[1], r: c[2], y: c[3] || 0 }));
+  const n = corners.length;
+  const info = [];
+  for (let i = 0; i < n; i++) {
+    const p = corners[(i + n - 1) % n], c = corners[i], q = corners[(i + 1) % n];
+    let d1x = c.x - p.x, d1z = c.z - p.z, d2x = q.x - c.x, d2z = q.z - c.z;
+    const l1 = Math.hypot(d1x, d1z), l2 = Math.hypot(d2x, d2z);
+    d1x /= l1; d1z /= l1; d2x /= l2; d2z /= l2;
+    const turn = Math.atan2(d1x * d2z - d1z * d2x, d1x * d2x + d1z * d2z);
+    info.push({ c, d1x, d1z, d2x, d2z, turn, lenIn: l1, r: c.r, tangent: c.r * Math.tan(Math.abs(turn) / 2) });
+  }
+  // Shrink radii that do not fit on their edges.
+  for (let pass = 0; pass < 4; pass++) {
+    for (let i = 0; i < n; i++) {
+      const a = info[i], b = info[(i + 1) % n];
+      const available = b.lenIn;
+      const need = a.tangent + b.tangent;
+      if (need > available * 0.98) {
+        const k = (available * 0.98) / need;
+        a.r *= k; b.r *= k;
+        a.tangent *= k; b.tangent *= k;
+        if (pass === 0) warnings.push(`radius shrunk at corners ${i}/${(i + 1) % n}`);
+      }
+    }
+  }
+  const last = info[n - 1], first = info[0];
+  const straightLen = first.lenIn - last.tangent - first.tangent;
+  const startDistance = def.startDistance ?? 330;
+  if (straightLen < startDistance + 200) warnings.push(`main straight too short (${straightLen.toFixed(0)} m)`);
+  // Start point on the edge from the last corner to corner 0.
+  const exitX = last.c.x + last.d2x * last.tangent, exitZ = last.c.z + last.d2z * last.tangent;
+  const sx = exitX + last.d2x * startDistance, sz = exitZ + last.d2z * startDistance;
+
+  const px = [], pz = [], stations = [];
+  let cx = sx, cz = sz, travelled = 0;
+  const lineTo = (x, z) => {
+    const len = Math.hypot(x - cx, z - cz);
+    const steps = Math.max(1, Math.ceil(len));
+    for (let k = 0; k < steps; k++) {
+      px.push(lerp(cx, x, k / steps)); pz.push(lerp(cz, z, k / steps));
+    }
+    travelled += len; cx = x; cz = z;
+  };
+  for (let i = 0; i < n; i++) {
+    const a = info[i];
+    const ax = a.c.x - a.d1x * a.tangent, az = a.c.z - a.d1z * a.tangent;
+    lineTo(ax, az);
+    const sign = Math.sign(a.turn) || 1;
+    const ox = ax + -a.d1z * a.r * sign, oz = az + a.d1x * a.r * sign;
+    const arcLen = Math.abs(a.turn) * a.r;
+    const steps = Math.max(2, Math.ceil(arcLen));
+    const rx = ax - ox, rz = az - oz;
+    for (let k = 0; k < steps; k++) {
+      const ang = (a.turn * k) / steps;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      px.push(ox + rx * ca - rz * sa); pz.push(oz + rx * sa + rz * ca);
+    }
+    stations.push({ s: travelled + arcLen / 2, y: a.c.y });
+    travelled += arcLen;
+    cx = a.c.x + a.d2x * a.tangent; cz = a.c.z + a.d2z * a.tangent;
+  }
+  lineTo(sx, sz);
+  return { px, pz, stations, denseLength: travelled };
+}
+
+function buildElevation(stations, denseLength, n, length) {
+  const y = new Float32Array(n);
+  const scale = length / denseLength;
+  const st = stations.map((k) => ({ s: k.s * scale, y: k.y }));
+  const count = st.length;
+  for (let i = 0; i < n; i++) {
+    const s = (i / n) * length;
+    let k = 0;
+    while (k < count && st[k].s <= s) k++;
+    const a = st[(k + count - 1) % count], b = st[k % count];
+    let s0 = a.s, s1 = b.s;
+    if (k === 0) s0 -= length;
+    if (k === count) s1 += length;
+    y[i] = lerp(a.y, b.y, smoothstep(s0, s1, s));
+  }
+  closedSmooth(y, 24);
+  return y;
+}
+
+/**
+ * @param {object} def circuit definition (see track-catalog.js)
+ * @returns {object} track data
+ */
+function buildTrack(def) {
+  const warnings = [];
+  const traced = traceCorners(def, warnings);
+  let res = resampleClosed(traced.px, traced.pz);
+  closedSmooth(res.x, 5);
+  closedSmooth(res.z, 5);
+  res = resampleClosed(res.x, res.z, res.x.length);
+  const n = res.x.length;
+  const length = res.length;
+  const ds = length / n;
+  const x = res.x, z = res.z;
+  const y = buildElevation(traced.stations, traced.denseLength, n, length);
+
+  const heading = new Float32Array(n), tx = new Float32Array(n), tz = new Float32Array(n);
+  const nx = new Float32Array(n), nz = new Float32Array(n);
+  const kappa = new Float32Array(n), grade = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = (i + n - 1) % n, b = (i + 1) % n;
+    const dx = x[b] - x[a], dz = z[b] - z[a];
+    const l = Math.hypot(dx, dz) || 1;
+    tx[i] = dx / l; tz[i] = dz / l;
+    nx[i] = -tz[i]; nz[i] = tx[i];
+    heading[i] = Math.atan2(dz, dx);
+    grade[i] = (y[b] - y[a]) / (2 * ds);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = (i + n - 1) % n, b = (i + 1) % n;
+    kappa[i] = wrapAngle(heading[b] - heading[a]) / (2 * ds);
+  }
+  closedSmooth(kappa, 2);
+
+  const halfWidth = (def.width ?? 13) / 2;
+  const track = {
+    def, id: def.id, name: def.name, theme: def.theme || 'forest',
+    n, ds, length, x, y, z, tx, tz, nx, nz, heading, kappa, grade,
+    halfWidth, kerbWidth: KERB_WIDTH, warnings,
+    kerbL: new Float32Array(n), kerbR: new Float32Array(n),
+    barrierL: new Float32Array(n), barrierR: new Float32Array(n),
+    vergeL: new Uint8Array(n), vergeR: new Uint8Array(n),
+    pit: null, line: null, lineKappa: null,
+    sectors: [length / 3, (2 * length) / 3],
+  };
+  layoutEdges(track, def);
+  layoutPit(track, def);
+  const line = computeRacingLine(track);
+  track.line = line.offset;
+  track.lineKappa = line.kappa;
+  return track;
+}
+
+/** Kerbs, verge widths and barrier offsets on both sides. */
+function layoutEdges(track, def) {
+  const { n, ds, kappa, x, z, nx, nz, tx, tz, halfWidth } = track;
+  const absK = new Float32Array(n);
+  for (let i = 0; i < n; i++) absK[i] = Math.abs(kappa[i]);
+  const around = (m) => Math.round(m / ds);
+  const exitShift = around(30), lookAhead = around(130), lookBehind = around(25);
+  const baseVerge = def.verge ?? 9;
+  const desiredL = new Float32Array(n), desiredR = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    // Inside kerb through the corner; outside kerb from mid corner to ~30 m past the exit.
+    const inside = smoothstep(1 / 300, 1 / 150, absK[i]);
+    let exitR = 0, exitL = 0;
+    for (let k = 2; k <= exitShift; k += 2) {
+      const j = (i + n - k) % n;
+      const strength = smoothstep(1 / 260, 1 / 130, absK[j]);
+      if (kappa[j] > 0) exitL = Math.max(exitL, strength); else exitR = Math.max(exitR, strength);
+    }
+    track.kerbR[i] = Math.max(kappa[i] > 0 ? inside : 0, exitR);
+    track.kerbL[i] = Math.max(kappa[i] < 0 ? inside : 0, exitL);
+    // Run-off: widen the verge on the outside of an upcoming or current corner.
+    let peak = 0, peakSign = 0;
+    for (let k = -lookBehind; k <= lookAhead; k += 3) {
+      const j = mod(i + k, n);
+      const weight = k > 0 ? 1 - (k / lookAhead) * 0.5 : 1;
+      if (absK[j] * weight > peak) { peak = absK[j] * weight; peakSign = Math.sign(kappa[j]); }
+    }
+    const runoff = smoothstep(1 / 220, 1 / 70, peak);
+    desiredR[i] = baseVerge + (peakSign < 0 ? runoff * 15 : 0);
+    desiredL[i] = baseVerge + (peakSign > 0 ? runoff * 15 : 0);
+    track.vergeR[i] = peakSign < 0 && runoff > 0.55 ? VERGE.GRAVEL : VERGE.GRASS;
+    track.vergeL[i] = peakSign > 0 && runoff > 0.55 ? VERGE.GRAVEL : VERGE.GRASS;
+  }
+  // Clearance against other parts of the circuit, per side.
+  const skip = around(45);
+  const clearL = new Float32Array(n).fill(1e9), clearR = new Float32Array(n).fill(1e9);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j += 2) {
+      const gap = Math.min(mod(i - j, n), mod(j - i, n));
+      if (gap < skip) continue;
+      const dx = x[j] - x[i], dz = z[j] - z[i];
+      const dist = Math.hypot(dx, dz);
+      if (dist > 90) continue;
+      const lateral = dx * nx[i] + dz * nz[i];
+      const along = dx * tx[i] + dz * tz[i];
+      if (Math.abs(lateral) < Math.abs(along) * 0.6) continue;
+      if (lateral > 0) clearR[i] = Math.min(clearR[i], dist); else clearL[i] = Math.min(clearL[i], dist);
+    }
+  }
+  const minBarrier = halfWidth + 2.2;
+  track.minClearance = 1e9;
+  for (let i = 0; i < n; i++) {
+    const radius = 1 / Math.max(absK[i], 1e-5);
+    const foldLimitR = kappa[i] > 0 ? radius * 0.72 : 1e9;
+    const foldLimitL = kappa[i] < 0 ? radius * 0.72 : 1e9;
+    track.minClearance = Math.min(track.minClearance, clearL[i], clearR[i]);
+    track.barrierR[i] = Math.max(minBarrier, Math.min(halfWidth + desiredR[i], clearR[i] / 2 - 0.6, foldLimitR));
+    track.barrierL[i] = Math.max(minBarrier, Math.min(halfWidth + desiredL[i], clearL[i] / 2 - 0.6, foldLimitL));
+  }
+  // Smooth the walls but never exceed the hard limits.
+  const limR = Float32Array.from(track.barrierR), limL = Float32Array.from(track.barrierL);
+  for (let pass = 0; pass < 3; pass++) {
+    closedSmooth(track.barrierR, 6);
+    closedSmooth(track.barrierL, 6);
+    for (let i = 0; i < n; i++) {
+      track.barrierR[i] = Math.max(minBarrier, Math.min(track.barrierR[i], limR[i]));
+      track.barrierL[i] = Math.max(minBarrier, Math.min(track.barrierL[i], limL[i]));
+    }
+  }
+  if (track.minClearance < 2 * minBarrier + 1) {
+    track.warnings.push(`layout too tight: clearance ${track.minClearance.toFixed(1)} m`);
+  }
+}
+
+function layoutPit(track, def) {
+  const side = def.pitSide ?? 1;
+  const p = { ...PIT_LAYOUT, ...(def.pit || {}) };
+  const { n, ds, halfWidth, length } = track;
+  const wallD = halfWidth + p.wallGap + p.wallThickness / 2;
+  const outerD = wallD + p.wallThickness / 2 + p.laneWidth;
+  const laneD = wallD + p.wallThickness / 2 + 2.6;
+  const boxD = outerD - 2.4;
+  track.pit = {
+    side, entryS: p.entryS, wallStartS: p.wallStartS, wallEndS: p.wallEndS, exitS: p.exitS,
+    wallD, wallThickness: p.wallThickness, laneD, boxD, outerD, speedLimit: p.speedLimit,
+    boxFirstS: p.boxFirstS, boxSpacing: p.boxSpacing, boxCount: p.boxCount,
+  };
+  const barrier = side > 0 ? track.barrierR : track.barrierL;
+  const verge = side > 0 ? track.vergeR : track.vergeL;
+  const kerb = side > 0 ? track.kerbR : track.kerbL;
+  const from = Math.floor(p.entryS / ds), to = Math.ceil(p.exitS / ds);
+  for (let k = from; k <= to; k++) {
+    const i = mod(k, n);
+    const s = k * ds;
+    const ramp = Math.min(smoothstep(p.entryS, p.wallStartS, s), 1 - smoothstep(p.wallEndS, p.exitS, s));
+    barrier[i] = lerp(barrier[i], outerD, ramp);
+    if (ramp > 0.02) { verge[i] = VERGE.PIT; kerb[i] = 0; }
+  }
+  if (Math.abs(track.kappa[mod(from, n)]) > 1e-3 || Math.abs(track.kappa[mod(to, n)]) > 1e-3) {
+    track.warnings.push('pit lane overlaps a corner');
+  }
+  void length;
+}
+
+/** Signed distance along the track from the start line, in (-length/2, length/2]. */
+function relativeS(track, s) {
+  let r = mod(s, track.length);
+  if (r > track.length / 2) r -= track.length;
+  return r;
+}
+
+/** World pose at track coordinates (s, d). Writes x,y,z,heading,grade into `out`. */
+function trackPose(track, s, d, out) {
+  const f = mod(s, track.length) / track.ds;
+  const i = Math.floor(f) % track.n, j = (i + 1) % track.n, t = f - Math.floor(f);
+  const cx = lerp(track.x[i], track.x[j], t), cz = lerp(track.z[i], track.z[j], t);
+  const nxv = lerp(track.nx[i], track.nx[j], t), nzv = lerp(track.nz[i], track.nz[j], t);
+  out.x = cx + nxv * d;
+  out.z = cz + nzv * d;
+  out.y = lerp(track.y[i], track.y[j], t);
+  out.heading = track.heading[i] + wrapAngle(track.heading[j] - track.heading[i]) * t;
+  out.grade = lerp(track.grade[i], track.grade[j], t);
+  return out;
+}
+
+/**
+ * Project a world position on the centre line. `hint` is the previous sample index (or -1 for a
+ * global search). Writes index, s, d into `out`.
+ */
+function locateOnTrack(track, px, pz, hint, out) {
+  const { n, x, z, tx, tz, nx, nz, ds } = track;
+  let best = -1, bestDist = 1e18;
+  if (hint >= 0) {
+    for (let k = -6; k <= 10; k++) {
+      const i = mod(hint + k, n);
+      const dx = px - x[i], dz = pz - z[i];
+      const dist = dx * dx + dz * dz;
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    }
+    if (bestDist > 60 * 60) best = -1;
+  }
+  if (best < 0) {
+    bestDist = 1e18;
+    for (let i = 0; i < n; i++) {
+      const dx = px - x[i], dz = pz - z[i];
+      const dist = dx * dx + dz * dz;
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    }
+  }
+  const dx = px - x[best], dz = pz - z[best];
+  let along = dx * tx[best] + dz * tz[best];
+  let index = best;
+  if (along < 0) { index = (best + n - 1) % n; along += ds; }
+  const t = clamp(along / ds, 0, 1);
+  const j = (index + 1) % n;
+  const cx = lerp(x[index], x[j], t), cz = lerp(z[index], z[j], t);
+  const nxv = lerp(nx[index], nx[j], t), nzv = lerp(nz[index], nz[j], t);
+  out.index = index;
+  out.s = (index + t) * ds;
+  out.d = (px - cx) * nxv + (pz - cz) * nzv;
+  return out;
+}
+
+/** Linear interpolation of a per-sample array at distance s. */
+function sampleArray(track, array, s) {
+  const f = mod(s, track.length) / track.ds;
+  const i = Math.floor(f) % track.n, j = (i + 1) % track.n;
+  return lerp(array[i], array[j], f - Math.floor(f));
+}
+
+/** Is distance `s` inside the pit zone section [a, b] given relative to the start line? */
+function inPitRange(track, s, a, b) {
+  const r = relativeS(track, s);
+  return r >= a && r <= b;
+}
+
+/** Surface type under lateral offset d at sample index i. */
+function surfaceAt(track, i, d) {
+  const ad = Math.abs(d);
+  if (ad <= track.halfWidth) return SURFACE.ASPHALT;
+  const right = d > 0;
+  const kerb = right ? track.kerbR[i] : track.kerbL[i];
+  if (kerb > 0.5 && ad <= track.halfWidth + track.kerbWidth) return SURFACE.KERB;
+  const verge = right ? track.vergeR[i] : track.vergeL[i];
+  if (verge === VERGE.PIT) return SURFACE.PIT;
+  if (verge === VERGE.GRAVEL && ad > track.halfWidth + 3) return SURFACE.GRAVEL;
+  return SURFACE.GRASS;
+}
+
+/** Starting grid slot k (0 = pole): staggered two-by-two formation behind the line. */
+function gridSlot(track, k, out) {
+  out.s = -(8 + k * 8);
+  out.d = (k % 2 === 0 ? -1 : 1) * track.halfWidth * 0.45;
+  return out;
+}
+
+/** Pit box position (track coordinates) for a team index. */
+function pitBox(track, teamIndex, out) {
+  const p = track.pit;
+  out.s = p.boxFirstS - (teamIndex % p.boxCount) * p.boxSpacing;
+  out.d = p.side * p.boxD;
+  return out;
+}
+
+__modules["src/tracks/track-builder.js"] = { SURFACE, VERGE, buildTrack, relativeS, trackPose, locateOnTrack, sampleArray, inPitRange, surfaceAt, gridSlot, pitBox };
+})();
+// ---- src/physics/collision-tuning.js
+(function () {
+// Parameters of the arcade collision model: contacts between cars, roadside obstacles, flights
+// and landings. Kept apart from the driving profiles (car-spec.js): nothing here changes how a
+// car accelerates, brakes, steers or grips in normal driving.
+//
+// Two kinds of numbers live here and must not be confused:
+//  - MEASURED: read on a reference gameplay video (docs/research/vroom-gameplay-analysis.md).
+//    They are approximate (25 fps footage of a ~18 fps game), not historical constants.
+//  - DESIGN: thresholds the footage cannot give (one example of each accident). They are
+//    choices, to be tuned by play-testing.
+
+const COLLISION_TUNING = {
+  // ---- contacts on the ground
+  contactSpeedLoss: 13.33,       // MEASURED m/s (48 km/h) lost by the car that runs into another (E4: 115 -> 67, 104 -> 56)
+  sideContactLosses: 2,          // MEASURED a wheel-to-wheel side contact costs about twice that (E2: ~140 -> ~50 km/h)
+  leaderMargin: 0.5,             // DESIGN m/s: after a rear-end bump the follower is at most this much slower than the car it hit
+  leaderPush: 0.8,               // DESIGN m/s gained by the car that is hit from behind (keeps the two apart)
+  sideKick: 1.2,                 // DESIGN m/s of lateral velocity pushing two cars apart after a side contact
+  penaltyCooldown: 0.4,          // DESIGN s between two speed penalties for the same car (cars rubbing do not stall)
+  computerPenaltyScale: 0.3,     // DESIGN share of the fixed loss applied to computer-driven cars: the field keeps flowing (1 = same as the players)
+  penaltyFloorSpeed: 5,          // DESIGN m/s: a penalty never brings a car below this
+  alignedCos: 0.8,               // DESIGN cars heading within ~37 degrees of each other count as "same direction"
+  contactDive: 0.065,            // MEASURED view dive at a contact, fraction of the view height (5 to 8 %)
+  contactDiveIn: 0.16,           // MEASURED s to reach it
+  contactDiveOut: 0.24,          // MEASURED s to come back
+  sparkLife: 0.16,               // MEASURED s (E2)
+
+  // ---- roadside obstacles (boards)
+  obstacleSpeedFactor: 0.6,      // DESIGN share of its speed a car keeps when it knocks a board down below the launch speed
+  obstacleLaunchSpeed: 40,       // DESIGN m/s above which hitting a board throws the car in the air (E5 happened at 67 m/s)
+  obstacleHalfDepth: 0.35,       // DESIGN m, thickness of a board along the track
+
+  // ---- launches
+  launchClosingSpeed: 15,        // DESIGN m/s of closing speed needed to ride over the car ahead
+  launchMinSpeed: 50,            // DESIGN m/s, the follower must be at least this fast (E3: 73 m/s; E4, no launch: 29 to 41 m/s)
+  launchOverlapMin: 0.2,         // DESIGN share of the width overlapping: wheel over wheel, not nose to tail
+  launchOverlapMax: 0.8,
+  flightTimeCar: 0.85,           // MEASURED s (E3)
+  flightTimeObstacle: 0.6,       // MEASURED s, by analogy (E5)
+  airDecel: 13.9,                // MEASURED m/s^2 (50 km/h per second) while airborne
+  airPeakHeight: 1.3,            // DESIGN m, height reached by the car in a 0.85 s flight (scaled with the square of the flight time)
+  hardAfterCar: true,            // DESIGN a launch over a car ends in a hard landing (E3)
+  hardAfterObstacle: false,      // DESIGN a launch over an obstacle ends in a light landing (E5)
+
+  // ---- landings
+  hardLandingSpeedFactor: 0.15,  // MEASURED 228 -> 35 km/h in one step
+  hardLandingStopTime: 0.85,     // MEASURED s from the landing to standstill
+  wreckHoldTime: 3.2,            // MEASURED s at standstill before the car restarts
+  restartGhostTime: 2,           // DESIGN s during which the restarting car cannot be hit
+  slideYawRate: 1.5,             // MEASURED rad/s, the car turns slowly while it slides after a light landing (~75 degrees in 0.84 s)
+  slideDecelStart: 8.3,          // MEASURED m/s^2 (30 km/h per second) just after a light landing
+  slideDecelEnd: 50,             // MEASURED m/s^2 (180 km/h per second) at the end of the slide
+  slideDecelDelay: 0.6,          // MEASURED s before the deceleration starts to grow
+  slideDecelRamp: 0.7,           // MEASURED s to reach the final deceleration
+};
+
+__modules["src/physics/collision-tuning.js"] = { COLLISION_TUNING };
+})();
+// ---- src/physics/car-physics.js
+(function () {
+// Arcade single-seater dynamics. One deterministic step function shared by human and AI cars.
+// The model is intentionally light: kinematic steering limited by a speed dependent grip budget,
+// power/drag/brake longitudinal model with gears, surface effects and wall contacts expressed
+// in track coordinates (s along the centre line, d to the right of it).
+
+const { clamp, damp, moveToward, angleDiff, wrapAngle, lerp } = __modules["src/core/math.js"];
+const { GRAVITY, gripLimit, powerFraction } = __modules["src/vehicles/car-spec.js"];
+const { SURFACE, locateOnTrack, relativeS, sampleArray } = __modules["src/tracks/track-builder.js"];
+const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
+
+// AIRBORNE: thrown in the air by a contact; WRECKED: stopped on the spot after a hard landing.
+const CAR_STATE = { GRID: 0, RACING: 1, SPIN: 2, RESET: 3, SERVICE: 4, RETIRED: 5, AIRBORNE: 6, WRECKED: 7 };
+
+const located = { index: 0, s: 0, d: 0 };
+
+function createCarState(index) {
+  return {
+    index, params: null, driver: null, isHuman: false, playerIndex: -1, teamIndex: 0,
+    state: CAR_STATE.GRID,
+    x: 0, y: 0, z: 0, heading: 0, pitch: 0,
+    prevX: 0, prevY: 0, prevZ: 0, prevHeading: 0, prevPitch: 0,
+    speed: 0, vLat: 0, yawRate: 0, velX: 0, velZ: 0,
+    steer: 0, throttle: 0, brake: 0,
+    inSteer: 0, inThrottle: 0, inBrake: 0, inShift: 0, inBoost: false, inReset: false,
+    gear: 1, rpm: 0, shiftTimer: 0, reverse: false, reverseTimer: 0, limiter: false,
+    segIndex: -1, s: 0, d: 0, surface: SURFACE.ASPHALT, progress: 0, headingError: 0,
+    inPit: false, pitAuto: false, autoDrive: false, wantsPit: false, pitBoxS: 0, servicedThisVisit: false, removed: false, timingStarted: false, serviceTimer: 0, serviceTotal: 0, pitStops: 0,
+    tyreWear: 0, fuel: 100, damage: 0, puncture: false, engineOut: false,
+    boostHeat: 0, boostLock: 0, boosting: false,
+    draft: 0, slip: 0, wheelspin: 0, accelLong: 0, accelLat: 0, odometer: 0,
+    spinTimer: 0, spinRate: 0, resetTimer: 0, ghostTimer: 0, stuckTimer: 0, wrongWayTimer: 0,
+    lap: 0, lapStartTime: 0, lastLapTime: 0, bestLapTime: 0, lapTimes: [], sector: 0,
+    sectorStart: 0, lastSectorTime: 0, finished: false, finishTime: 0, position: 0, gridPosition: 0,
+    overtakes: 0, contacts: 0, wallHits: 0, offTrackTime: 0, resets: 0, topSpeed: 0,
+    lastContactTime: -10, compound: 'medium', nextCompound: 'medium',
+    // collisions and accidents (see collision-tuning.js): `clock` is the car's own simulation time,
+    // the other clocks are values of it at the last event, for the animations driven by the state
+    clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
+    airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchClock: -10,
+    landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
+  };
+}
+
+/** Place a car on the track at (s, d), stationary, facing forward. */
+function placeCar(car, track, s, d) {
+  const n = track.n;
+  const f = (((s % track.length) + track.length) % track.length) / track.ds;
+  const i = Math.floor(f) % n, j = (i + 1) % n, t = f - Math.floor(f);
+  const nxv = lerp(track.nx[i], track.nx[j], t), nzv = lerp(track.nz[i], track.nz[j], t);
+  car.x = lerp(track.x[i], track.x[j], t) + nxv * d;
+  car.z = lerp(track.z[i], track.z[j], t) + nzv * d;
+  car.y = lerp(track.y[i], track.y[j], t);
+  car.heading = track.heading[i] + wrapAngle(track.heading[j] - track.heading[i]) * t;
+  car.pitch = Math.atan(lerp(track.grade[i], track.grade[j], t));
+  car.segIndex = i; car.s = f * track.ds; car.d = d;
+  car.speed = 0; car.vLat = 0; car.yawRate = 0; car.velX = 0; car.velZ = 0; car.steer = 0;
+  car.gear = 1; car.reverse = false; car.slip = 0; car.wheelspin = 0;
+  car.prevX = car.x; car.prevY = car.y; car.prevZ = car.z; car.prevHeading = car.heading; car.prevPitch = car.pitch;
+  car.headingError = 0;
+}
+
+function startSpin(car, impact, direction, emit) {
+  if (car.state !== CAR_STATE.RACING) return;
+  const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
+  car.velX = ch * car.speed - sh * car.vLat;
+  car.velZ = sh * car.speed + ch * car.vLat;
+  car.state = CAR_STATE.SPIN;
+  car.slideGentle = false;
+  car.spinTimer = 1.1 + Math.min(impact, 25) * 0.035;
+  car.spinRate = (direction >= 0 ? 1 : -1) * (5 + Math.min(impact, 25) * 0.16);
+  car.pitAuto = false;
+  if (emit) emit('crash', car.index, impact);
+}
+
+/**
+ * Throw a car in the air (it rode over another car, or hit a roadside object). In flight it
+ * follows its velocity, cannot be steered and slows down; it comes down after `duration` seconds,
+ * hard (stopped on the spot, see WRECKED) or light (it slides out of control, see startSlide).
+ * @param side  -1 / 0 / +1: side of the car that took the hit (where the damage shows)
+ */
+function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
+  if (car.state !== CAR_STATE.RACING && car.state !== CAR_STATE.SPIN) return false;
+  if (car.state === CAR_STATE.RACING) {
+    const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
+    car.velX = ch * car.speed - sh * car.vLat;
+    car.velZ = sh * car.speed + ch * car.vLat;
+  }
+  car.state = CAR_STATE.AIRBORNE;
+  car.airTime = 0; car.airDuration = duration; car.airHard = hard; car.airHeight = 0;
+  car.launchSide = side; car.launchClock = car.clock;
+  car.pitAuto = false; car.vLat = 0; car.yawRate = 0;
+  if (emit) emit('launch', car.index, Math.hypot(car.velX, car.velZ), other);
+  return true;
+}
+
+/** Loss of control after a light landing: the car slides on, turning slowly, until it stops. */
+function startSlide(car) {
+  car.state = CAR_STATE.SPIN;
+  car.slideGentle = true;
+  car.spinTimer = 0.2;
+  // it turns toward the track (positive heading error = moving toward positive d)
+  car.spinRate = (car.d > 0 ? -1 : 1) * COLLISION_TUNING.slideYawRate;
+}
+
+function stepAirborne(car, dt, emit) {
+  const T = COLLISION_TUNING, spec = car.params.spec;
+  const v = Math.hypot(car.velX, car.velZ);
+  const nv = Math.max(0, v - T.airDecel * dt);
+  const k = v > 1e-4 ? nv / v : 0;
+  car.velX *= k; car.velZ *= k;
+  car.x += car.velX * dt; car.z += car.velZ * dt;
+  car.airTime += dt;
+  const u = Math.min(1, car.airTime / car.airDuration), reach = car.airDuration / T.flightTimeCar;
+  car.airHeight = T.airPeakHeight * reach * reach * 4 * u * (1 - u);
+  car.speed = nv; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
+  car.throttle = 0; car.brake = 0; car.steer = moveToward(car.steer, 0, 3 * dt);
+  car.rpm = damp(car.rpm, spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * 0.35, 5, dt);
+  car.accelLong = -T.airDecel; car.accelLat = 0;
+  if (car.airTime < car.airDuration) return;
+  // ---- landing
+  car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard;
+  if (car.airHard) {
+    car.velX *= T.hardLandingSpeedFactor; car.velZ *= T.hardLandingSpeedFactor;
+    car.speed = nv * T.hardLandingSpeedFactor;
+    car.state = CAR_STATE.WRECKED;
+    car.wreckTimer = 0; car.wreckDecel = car.speed / T.hardLandingStopTime;
+    if (emit) { emit('landing', car.index, 1); emit('crash', car.index, 20); }
+  } else {
+    startSlide(car);
+    if (emit) emit('landing', car.index, 0);
+  }
+}
+
+/** After a hard landing: the car runs out of speed, stays where it stopped, then restarts in first gear. */
+function stepWrecked(car, track, dt, emit) {
+  const T = COLLISION_TUNING, spec = car.params.spec;
+  const v = Math.hypot(car.velX, car.velZ);
+  const nv = Math.max(0, v - car.wreckDecel * dt);
+  const k = v > 1e-4 ? nv / v : 0;
+  car.velX *= k; car.velZ *= k;
+  car.x += car.velX * dt; car.z += car.velZ * dt;
+  car.speed = nv; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
+  car.throttle = 0; car.brake = 1; car.steer = 0;
+  car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
+  car.accelLong = nv > 0 ? -car.wreckDecel : 0; car.accelLat = 0;
+  car.wreckTimer += dt;
+  if (car.wreckTimer < T.hardLandingStopTime + T.wreckHoldTime) return;
+  // restart on the spot when the car is on the road and pointing the right way; otherwise it is put back
+  car.velX = 0; car.velZ = 0; car.speed = 0; car.gear = 1; car.reverse = false; car.shiftTimer = 0;
+  if (Math.abs(car.d) > track.halfWidth + 1 || Math.abs(car.headingError) > 1.2 || car.engineOut) {
+    car.state = CAR_STATE.RESET; car.resetTimer = 0.1;
+  } else {
+    car.state = CAR_STATE.RACING; car.ghostTimer = T.restartGhostTime; car.stuckTimer = 0;
+  }
+  if (emit) emit('restart', car.index, 0);
+}
+
+function requestReset(car, delay) {
+  if (car.state === CAR_STATE.RETIRED || car.state === CAR_STATE.GRID || car.state === CAR_STATE.SERVICE) return;
+  car.state = CAR_STATE.RESET;
+  car.resetTimer = delay;
+  car.speed = 0; car.vLat = 0; car.yawRate = 0; car.velX = 0; car.velZ = 0;
+}
+
+/** Steering angle at full lock for the current speed (speed sensitive when the aid is on). */
+function steeringLock(params, absV, aMax) {
+  const spec = params.spec;
+  let lock = spec.steerLock;
+  if (absV > 6) {
+    const gripLock = Math.atan((params.wheelbase * aMax * spec.overSteerAllowance) / (absV * absV));
+    lock = lerp(lock, Math.min(lock, gripLock), params.profile.steerAssist);
+  }
+  return lock;
+}
+
+function surfaceGrip(surface, profile) {
+  switch (surface) {
+    case SURFACE.KERB: return 0.94;
+    case SURFACE.GRASS: return profile.offroadGrip;
+    case SURFACE.GRAVEL: return profile.offroadGrip * 0.85;
+    default: return 1;
+  }
+}
+
+function surfaceDrag(surface, profile, v) {
+  switch (surface) {
+    case SURFACE.GRASS: return (3 + 0.035 * v) * profile.offroadDrag;
+    case SURFACE.GRAVEL: return (7.5 + 0.07 * v) * profile.offroadDrag;
+    default: return 0;
+  }
+}
+
+/**
+ * Advance one car by dt.
+ * @param rules  { wear, fuel, damage, tyreLifeMeters, fuelRangeMeters, crashes }
+ * @param emit   function(type, carIndex, value) or null
+ */
+function stepCar(car, track, dt, rules, emit) {
+  car.prevX = car.x; car.prevY = car.y; car.prevZ = car.z;
+  car.prevHeading = car.heading; car.prevPitch = car.pitch;
+  if (car.ghostTimer > 0) car.ghostTimer -= dt;
+  car.clock += dt;
+  const spec = car.params.spec;
+
+  switch (car.state) {
+    case CAR_STATE.GRID:
+    case CAR_STATE.SERVICE: {
+      car.speed = 0; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
+      car.throttle = car.state === CAR_STATE.GRID ? car.inThrottle : 0;
+      const target = spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * 0.78 * car.throttle;
+      car.rpm = damp(car.rpm, target, car.rpm < target ? 9 : 5, dt);
+      car.accelLong = 0; car.accelLat = 0;
+      return;
+    }
+    case CAR_STATE.RESET:
+      car.resetTimer -= dt;
+      car.rpm = damp(car.rpm, spec.rpmIdle, 6, dt);
+      car.slip = 0; car.wheelspin = 0;
+      if (car.resetTimer <= 0) repositionCar(car, track, emit);
+      return;
+    case CAR_STATE.SPIN:
+      stepSpin(car, dt);
+      break;
+    case CAR_STATE.AIRBORNE:
+      stepAirborne(car, dt, emit);
+      break;
+    case CAR_STATE.WRECKED:
+      stepWrecked(car, track, dt, emit);
+      break;
+    case CAR_STATE.RETIRED:
+      car.inThrottle = 0; car.inBrake = car.speed > 0.5 ? 0.35 : 1; car.inSteer = 0;
+      stepDrive(car, track, dt, rules, emit);
+      break;
+    default:
+      stepDrive(car, track, dt, rules, emit);
+  }
+  updateTrackFrame(car, track, dt);
+  collideBoundaries(car, track, rules, emit);
+  if (car.state === CAR_STATE.RACING) watchStuck(car, dt, emit);
+}
+
+function stepSpin(car, dt) {
+  const spec = car.params.spec;
+  const v = Math.hypot(car.velX, car.velZ);
+  let decel = 12 + 0.05 * v;
+  if (car.slideGentle) {
+    // slide after a light landing: little grip at first, then the car digs in
+    const T = COLLISION_TUNING, t = car.clock - car.landClock;
+    decel = T.slideDecelStart + (T.slideDecelEnd - T.slideDecelStart) * clamp((t - T.slideDecelDelay) / T.slideDecelRamp, 0, 1);
+  }
+  const nv = Math.max(0, v - decel * dt);
+  const k = v > 1e-4 ? nv / v : 0;
+  car.velX *= k; car.velZ *= k;
+  car.x += car.velX * dt; car.z += car.velZ * dt;
+  car.heading = wrapAngle(car.heading + car.spinRate * dt);
+  if (!car.slideGentle) car.spinRate *= Math.exp(-0.9 * dt); else if (nv < 2) car.spinRate = 0;
+  car.spinTimer -= dt;
+  car.speed = nv; car.vLat = 0; car.yawRate = car.spinRate;
+  car.slip = Math.min(2, v * 0.1); car.wheelspin = 0;
+  car.throttle = 0; car.brake = 1; car.steer = 0;
+  car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
+  car.accelLong = -decel; car.accelLat = 0;
+  if ((car.spinTimer <= 0 && nv < (car.slideGentle ? 0.3 : 4)) || car.spinTimer < (car.slideGentle ? -6 : -3)) {
+    car.state = CAR_STATE.RESET;
+    car.resetTimer = 0.7;
+    car.speed = 0; car.slideGentle = false;
+  }
+}
+
+function repositionCar(car, track, emit) {
+  let d = 0;
+  if (car.inPit) d = track.pit.side * track.pit.laneD;
+  placeCar(car, track, car.s, d);
+  car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING;
+  car.ghostTimer = 2.5;
+  car.stuckTimer = 0;
+  car.resets++;
+  if (emit) emit('reset', car.index, 0);
+}
+
+function stepDrive(car, track, dt, rules, emit) {
+  const p = car.params, spec = p.spec, profile = p.profile;
+  let v = car.speed;
+  const absV = Math.abs(v);
+  const throttleIn = clamp(car.inThrottle, 0, 1), brakeIn = clamp(car.inBrake, 0, 1);
+
+  // ---- tyres and surface
+  let tyreFactor = 1 - 0.2 * car.tyreWear * car.tyreWear;
+  if (car.puncture) tyreFactor *= 0.62;
+  if (rules.damage) tyreFactor *= 1 - 0.12 * Math.min(1, car.damage);
+  const sGrip = surfaceGrip(car.surface, profile);
+  const aMax = gripLimit(p, absV, sGrip, tyreFactor);
+
+  // ---- steering
+  const steerTarget = clamp(car.inSteer, -1, 1);
+  const towardCentre = Math.abs(steerTarget) < Math.abs(car.steer) || steerTarget * car.steer < 0;
+  car.steer = moveToward(car.steer, steerTarget, (towardCentre ? spec.steerReturnRate : spec.steerRate) * dt);
+  const lock = steeringLock(p, absV, aMax);
+  const yawWanted = (v * Math.tan(car.steer * lock)) / p.wheelbase;
+  const latWanted = Math.abs(v * yawWanted);
+  let slip = latWanted > aMax ? latWanted / aMax - 1 : 0;
+  let yawTarget = yawWanted;
+  if (slip > 0) yawTarget = (yawWanted * (1 + Math.min(slip, 0.5) * 0.12)) / (1 + slip);
+  car.yawRate = damp(car.yawRate, yawTarget, spec.yawResponse, dt);
+  car.heading = wrapAngle(car.heading + car.yawRate * dt);
+  car.accelLat = v * car.yawRate;
+
+  // ---- gearbox
+  const gears = spec.gearTopSpeeds;
+  if (car.shiftTimer > 0) car.shiftTimer -= dt;
+  if (!car.reverse) {
+    if (p.manual && !car.pitAuto && !car.autoDrive) {
+      if (car.inShift > 0 && car.gear < p.gearCount) { car.gear++; car.shiftTimer = spec.shiftTime; if (emit) emit('shift', car.index, 1); }
+      else if (car.inShift < 0 && car.gear > 1 && absV < gears[car.gear - 2] * 1.06) { car.gear--; car.shiftTimer = spec.shiftTime; if (emit) emit('shift', car.index, -1); }
+    } else if (car.shiftTimer <= 0) {
+      if (car.gear < p.gearCount && absV > gears[car.gear - 1] * spec.autoUpshiftAt && throttleIn > 0.1) {
+        car.gear++; car.shiftTimer = spec.shiftTime; if (emit) emit('shift', car.index, 1);
+      } else if (car.gear > 1 && absV < gears[car.gear - 2] * spec.autoDownshiftAt) {
+        car.gear--; car.shiftTimer = spec.shiftTime * 0.6; if (emit) emit('shift', car.index, -1);
+      }
+    }
+  }
+  car.inShift = 0;
+  const gearTop = car.reverse ? gears[0] : gears[car.gear - 1];
+  const rpmFraction = absV / gearTop;
+  car.limiter = rpmFraction >= 1;
+
+  // ---- reverse engagement (hold brake at standstill)
+  if (absV < 0.6 && brakeIn > 0.3 && throttleIn < 0.1 && car.isHuman && !car.pitAuto && !car.autoDrive && car.state === CAR_STATE.RACING) {
+    car.reverseTimer += dt;
+    if (car.reverseTimer > 0.35) car.reverse = true;
+  } else if (!car.reverse || throttleIn > 0.1) {
+    if (car.reverse && throttleIn > 0.1 && v > -0.6) car.reverse = false;
+    car.reverseTimer = 0;
+  }
+
+  // ---- boost (turbo profile)
+  let boostFactor = 1;
+  car.boosting = false;
+  if (profile.boost) {
+    if (car.boostLock > 0) car.boostLock -= dt;
+    if (car.inBoost && car.boostLock <= 0 && throttleIn > 0.5 && !car.reverse) {
+      car.boosting = true;
+      boostFactor = profile.boostPower;
+      car.boostHeat += profile.boostHeatRate * dt;
+      if (car.boostHeat >= 1) { car.boostHeat = 1; car.boostLock = profile.overheatLockout; if (emit) emit('overheat', car.index, 0); }
+    } else {
+      car.boostHeat = Math.max(0, car.boostHeat - profile.boostCoolRate * dt);
+    }
+  }
+
+  // ---- longitudinal forces
+  let accel = 0;
+  const engineAlive = !car.engineOut && (!rules.fuel || car.fuel > 0);
+  const fuelFactor = 1 / (1 + (rules.fuel ? spec.fuelMassPenalty * (car.fuel / spec.fuelCapacity) : 0));
+  let drive = 0;
+  car.wheelspin = 0;
+  if (car.reverse) {
+    if (brakeIn > 0.05 && v > -spec.reverseSpeed) accel -= 6 * brakeIn;
+    if (throttleIn > 0.05) accel += Math.min(-v * 6, 14) * throttleIn;
+  } else {
+    if (engineAlive && car.shiftTimer <= 0 && throttleIn > 0) {
+      const raw = (throttleIn * p.power * boostFactor * powerFraction(spec, rpmFraction) * fuelFactor) / Math.max(absV, spec.minPowerSpeed);
+      const traction = aMax * spec.tractionFraction;
+      drive = Math.min(raw, traction);
+      if (raw > traction * 1.25 && absV < 34) car.wheelspin = Math.min(1, (raw / traction - 1.25) * 2) * throttleIn;
+    }
+    accel += drive;
+    const brakeMax = Math.min(p.brake * (1 + p.downforce * v * v * 0.9) * sGrip, aMax * 1.15);
+    accel -= brakeIn * brakeMax;
+    accel -= spec.engineBraking * Math.min(1, rpmFraction) * (1 - throttleIn);
+  }
+  const dragCoefficient = p.drag * (1 - 0.32 * car.draft) * (car.puncture ? 2.4 : 1) * (1 + (rules.damage ? 0.5 * car.damage : 0));
+  const resist = dragCoefficient * v * v + spec.rollingResistance + surfaceDrag(car.surface, profile, absV) + spec.slipScrub * Math.min(slip, 1.5);
+  accel -= Math.sign(v) * resist;
+  accel -= GRAVITY * Math.sin(car.pitch);
+
+  // Pit lane limiter.
+  if (car.inPit && track.pit && absV > track.pit.speedLimit) {
+    const rel = relativeS(track, car.s);
+    if (rel > track.pit.wallStartS - 20 && rel < track.pit.wallEndS) accel = Math.min(accel, -22);
+  }
+
+  let nv = v + accel * dt;
+  if (!car.reverse && v >= 0 && nv < 0) nv = 0;        // brakes never push the car backwards
+  if (car.reverse && nv > 0 && throttleIn < 0.05) nv = Math.min(nv, 0);
+  if (car.limiter && nv > gearTop && drive > 0) nv = Math.max(gearTop, v - 0.5 * dt);
+  car.accelLong = (nv - v) / dt;
+  v = nv;
+  car.speed = v;
+
+  // ---- lateral slide (visible drift when beyond the limit, decays with grip)
+  if (slip > 0) car.vLat -= Math.sign(car.yawRate) * Math.min(slip, 1.5) * aMax * 0.22 * dt;
+  car.vLat *= Math.exp(-spec.lateralRecovery * sGrip * dt);
+  car.slip = damp(car.slip, slip + Math.abs(car.vLat) * 0.12, 12, dt);
+
+  // ---- integrate position
+  const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
+  car.x += (ch * v - sh * car.vLat) * dt;
+  car.z += (sh * v + ch * car.vLat) * dt;
+  car.odometer += v * dt;
+
+  // ---- engine speed
+  const rpmTarget = car.reverse
+    ? spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * Math.min(1, absV / gears[0])
+    : Math.max(spec.rpmIdle, spec.rpmMax * Math.min(1.02, rpmFraction));
+  const slipRev = car.wheelspin > 0 ? spec.rpmMax * 0.25 * car.wheelspin : 0;
+  car.rpm = damp(car.rpm, engineAlive ? Math.min(spec.rpmMax, rpmTarget + slipRev) : 0, 22, dt);
+  car.throttle = throttleIn; car.brake = brakeIn;
+  if (absV > car.topSpeed) car.topSpeed = absV;
+
+  // ---- attrition
+  if (rules.wear && !car.puncture) {
+    const load = 0.45 + 0.55 * Math.min(1, latWanted / aMax) + 2.2 * Math.min(slip, 1.5) + car.wheelspin;
+    car.tyreWear += (absV * dt * load * p.wearRate) / rules.tyreLifeMeters;
+    if (car.tyreWear >= 1) { car.tyreWear = 1; car.puncture = true; if (emit) emit('puncture', car.index, 0); }
+  }
+  if (rules.fuel && car.fuel > 0 && engineAlive) {
+    const burn = (0.35 + 0.65 * throttleIn) * (car.boosting ? 1.6 : 1);
+    car.fuel -= (spec.fuelCapacity * absV * dt * burn) / (rules.fuelRangeMeters * 0.87);
+    if (car.fuel <= 0) { car.fuel = 0; if (emit) emit('fuelOut', car.index, 0); }
+  }
+  if (car.surface === SURFACE.GRASS || car.surface === SURFACE.GRAVEL) car.offTrackTime += dt;
+}
+
+function updateTrackFrame(car, track, dt) {
+  const previousS = car.s;
+  locateOnTrack(track, car.x, car.z, car.segIndex, located);
+  let ds = located.s - previousS;
+  if (ds > track.length / 2) ds -= track.length; else if (ds < -track.length / 2) ds += track.length;
+  if (car.segIndex >= 0) car.progress += ds;
+  car.segIndex = located.index; car.s = located.s; car.d = located.d;
+  const i = located.index;
+  car.headingError = angleDiff(car.heading, track.heading[i]);
+  const ad = Math.abs(car.d);
+  if (ad <= track.halfWidth) car.surface = SURFACE.ASPHALT;
+  else {
+    const right = car.d > 0;
+    const kerb = right ? track.kerbR[i] : track.kerbL[i];
+    const verge = right ? track.vergeR[i] : track.vergeL[i];
+    if (kerb > 0.5 && ad <= track.halfWidth + track.kerbWidth) car.surface = SURFACE.KERB;
+    else if (verge === 2) car.surface = SURFACE.PIT;
+    else if (verge === 1 && ad > track.halfWidth + 3) car.surface = SURFACE.GRAVEL;
+    else car.surface = SURFACE.GRASS;
+  }
+  car.y = sampleArray(track, track.y, car.s);
+  const grade = track.grade[i] * Math.cos(car.headingError);
+  car.pitch = damp(car.pitch, Math.atan(grade), 20, dt);
+}
+
+function wallBounce(car, track, side, penetration, rules, emit) {
+  const i = car.segIndex;
+  const nx = track.nx[i], nz = track.nz[i], tx = track.tx[i], tz = track.tz[i];
+  car.x -= nx * side * penetration;
+  car.z -= nz * side * penetration;
+  car.d -= side * penetration;
+  const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
+  const spinning = car.state === CAR_STATE.SPIN || car.state === CAR_STATE.AIRBORNE || car.state === CAR_STATE.WRECKED;
+  const vx = spinning ? car.velX : ch * car.speed - sh * car.vLat;
+  const vz = spinning ? car.velZ : sh * car.speed + ch * car.vLat;
+  const vn = (vx * nx + vz * nz) * side;
+  if (vn <= 0.15) return;
+  if (car.state === CAR_STATE.AIRBORNE || car.state === CAR_STATE.WRECKED) {
+    // in flight or wrecked: kept inside the barriers, quietly (the accident is already being staged)
+    car.velX -= nx * side * vn; car.velZ -= nz * side * vn;
+    return;
+  }
+  const vt = vx * tx + vz * tz;
+  const profile = car.params.profile;
+  car.wallHits++;
+  if (emit) emit('wall', car.index, vn);
+  if (rules.damage) car.damage = Math.min(1, car.damage + Math.max(0, vn - 2) * 0.011);
+  if (spinning) {
+    const bounce = -vn * 0.4 * side;
+    car.velX = tx * vt * 0.8 + nx * bounce;
+    car.velZ = tz * vt * 0.8 + nz * bounce;
+    return;
+  }
+  const direction = vt >= 0 ? 1 : -1;
+  const loss = clamp(1 - vn * profile.wallSpeedLoss, 0.25, 1);
+  const awayHeading = track.heading[i] + (direction < 0 ? Math.PI : 0) - side * direction * 0.05;
+  const blend = clamp(vn / 6, 0.25, 1);
+  car.heading = wrapAngle(car.heading + angleDiff(awayHeading, car.heading) * blend);
+  const facing = Math.cos(angleDiff(car.heading, track.heading[i])) >= 0 ? 1 : -1;
+  car.speed = Math.abs(vt) * loss * (facing === direction ? 1 : -1);
+  car.vLat = -side * facing * Math.min(vn * 0.3, 3);
+  car.yawRate *= 0.3;
+  if (vn > profile.crashImpact && rules.crashes !== false) startSpin(car, vn, -side * direction, emit);
+}
+
+function collideBoundaries(car, track, rules, emit) {
+  if (car.state !== CAR_STATE.RACING && car.state !== CAR_STATE.SPIN && car.state !== CAR_STATE.RETIRED && car.state !== CAR_STATE.AIRBORNE && car.state !== CAR_STATE.WRECKED) return;
+  const i = car.segIndex, hw = car.params.halfWidth, pit = track.pit;
+  let limitR = track.barrierR[i] - hw, limitL = track.barrierL[i] - hw;
+  const rel = relativeS(track, car.s);
+  const inZone = rel >= pit.entryS && rel <= pit.exitS;
+  const inWall = rel >= pit.wallStartS && rel <= pit.wallEndS;
+  const dp = car.d * pit.side;
+  if (!inZone) car.inPit = false;
+  else if (!inWall) car.inPit = dp > pit.wallD;
+  if (inWall) {
+    const half = pit.wallThickness / 2 + hw;
+    if (car.inPit) {
+      if (dp < pit.wallD + half) wallBounce(car, track, -pit.side, pit.wallD + half - dp, rules, emit);
+    } else if (pit.side > 0) limitR = Math.min(limitR, pit.wallD - half);
+    else limitL = Math.min(limitL, pit.wallD - half);
+  }
+  if (car.d > limitR) wallBounce(car, track, 1, car.d - limitR, rules, emit);
+  else if (car.d < -limitL) wallBounce(car, track, -1, -limitL - car.d, rules, emit);
+}
+
+function watchStuck(car, dt, emit) {
+  if (car.inReset) {
+    car.inReset = false;
+    requestReset(car, 0.5);
+    if (emit) emit('manualReset', car.index, 0);
+    return;
+  }
+  const offLine = car.surface === SURFACE.GRASS || car.surface === SURFACE.GRAVEL || Math.abs(car.headingError) > 1.9;
+  const slow = Math.abs(car.speed) < 1.5;
+  if (slow && (offLine || !car.isHuman) && !car.pitAuto) car.stuckTimer += dt;
+  else car.stuckTimer = Math.max(0, car.stuckTimer - dt * 2);
+  if (car.stuckTimer > (car.isHuman ? 3 : 4)) requestReset(car, 0.4);
+  if (Math.abs(car.headingError) > 1.75 && car.speed > 4) car.wrongWayTimer += dt; else car.wrongWayTimer = 0;
+}
+
+__modules["src/physics/car-physics.js"] = { CAR_STATE, createCarState, placeCar, startSpin, startAirborne, requestReset, steeringLock, stepCar };
+})();
 // ---- src/core/config.js
 (function () {
 // Externalised presentation parameters. Nothing here affects the simulation.
@@ -99,6 +1298,7 @@ const DEFAULT_EFFECTS = {
   skidMarks: true,           // tyre marks on the asphalt
   insets: true,              // small caption panels (overtakes, fastest lap...)
   introPanels: true,         // comic strip shown before a race
+  explosions: true,          // drawn fireball and smoke after a hard landing
 };
 
 const QUALITY_PRESETS = {
@@ -1075,7 +2275,7 @@ const MAX_ROWS = 2160;
 const MAX_QUADS = 16000;
 const MAX_TRACK_SAMPLES = 4096;
 const ATLAS_LAYER_SIZE = 2048;
-const ATLAS_LAYERS = 10;
+const ATLAS_LAYERS = 11;
 const CAR_LAYER_WIDTH = 1024;
 const CAR_LAYER_HEIGHT = 512;
 const BACKDROP_WIDTH = 4096;
@@ -1364,65 +2564,6 @@ const BACKDROP_TAN_BOTTOM = -0.03;           // tan(elevation) at its bottom edg
 
 __modules["src/art/environments/backdrop-rules.js"] = { BACKDROP_PERIOD, BACKDROP_TAN_TOP, BACKDROP_TAN_BOTTOM };
 })();
-// ---- src/physics/collision-tuning.js
-(function () {
-// Parameters of the arcade collision model: contacts between cars, roadside obstacles, flights
-// and landings. Kept apart from the driving profiles (car-spec.js): nothing here changes how a
-// car accelerates, brakes, steers or grips in normal driving.
-//
-// Two kinds of numbers live here and must not be confused:
-//  - MEASURED: read on a reference gameplay video (docs/research/vroom-gameplay-analysis.md).
-//    They are approximate (25 fps footage of a ~18 fps game), not historical constants.
-//  - DESIGN: thresholds the footage cannot give (one example of each accident). They are
-//    choices, to be tuned by play-testing.
-
-const COLLISION_TUNING = {
-  // ---- contacts on the ground
-  contactSpeedLoss: 13.33,       // MEASURED m/s (48 km/h) lost by the car that runs into another (E4: 115 -> 67, 104 -> 56)
-  sideContactLosses: 2,          // MEASURED a wheel-to-wheel side contact costs about twice that (E2: ~140 -> ~50 km/h)
-  leaderMargin: 0.5,             // DESIGN m/s: after a rear-end bump the follower is at most this much slower than the car it hit
-  leaderPush: 0.8,               // DESIGN m/s gained by the car that is hit from behind (keeps the two apart)
-  sideKick: 1.2,                 // DESIGN m/s of lateral velocity pushing two cars apart after a side contact
-  penaltyCooldown: 0.4,          // DESIGN s between two speed penalties for the same car (cars rubbing do not stall)
-  computerPenaltyScale: 0.3,     // DESIGN share of the fixed loss applied to computer-driven cars: the field keeps flowing (1 = same as the players)
-  penaltyFloorSpeed: 5,          // DESIGN m/s: a penalty never brings a car below this
-  alignedCos: 0.8,               // DESIGN cars heading within ~37 degrees of each other count as "same direction"
-  contactDive: 0.065,            // MEASURED view dive at a contact, fraction of the view height (5 to 8 %)
-  contactDiveIn: 0.16,           // MEASURED s to reach it
-  contactDiveOut: 0.24,          // MEASURED s to come back
-  sparkLife: 0.16,               // MEASURED s (E2)
-
-  // ---- roadside obstacles (boards)
-  obstacleSpeedFactor: 0.6,      // DESIGN share of its speed a car keeps when it knocks a board down below the launch speed
-  obstacleLaunchSpeed: 40,       // DESIGN m/s above which hitting a board throws the car in the air (E5 happened at 67 m/s)
-  obstacleHalfDepth: 0.35,       // DESIGN m, thickness of a board along the track
-
-  // ---- launches
-  launchClosingSpeed: 15,        // DESIGN m/s of closing speed needed to ride over the car ahead
-  launchMinSpeed: 50,            // DESIGN m/s, the follower must be at least this fast (E3: 73 m/s; E4, no launch: 29 to 41 m/s)
-  launchOverlapMin: 0.2,         // DESIGN share of the width overlapping: wheel over wheel, not nose to tail
-  launchOverlapMax: 0.8,
-  flightTimeCar: 0.85,           // MEASURED s (E3)
-  flightTimeObstacle: 0.6,       // MEASURED s, by analogy (E5)
-  airDecel: 13.9,                // MEASURED m/s^2 (50 km/h per second) while airborne
-  airPeakHeight: 1.3,            // DESIGN m, height reached by the car in a 0.85 s flight (scaled with the square of the flight time)
-  hardAfterCar: true,            // DESIGN a launch over a car ends in a hard landing (E3)
-  hardAfterObstacle: false,      // DESIGN a launch over an obstacle ends in a light landing (E5)
-
-  // ---- landings
-  hardLandingSpeedFactor: 0.15,  // MEASURED 228 -> 35 km/h in one step
-  hardLandingStopTime: 0.85,     // MEASURED s from the landing to standstill
-  wreckHoldTime: 3.2,            // MEASURED s at standstill before the car restarts
-  restartGhostTime: 2,           // DESIGN s during which the restarting car cannot be hit
-  slideYawRate: 1.5,             // MEASURED rad/s, the car turns slowly while it slides after a light landing (~75 degrees in 0.84 s)
-  slideDecelStart: 8.3,          // MEASURED m/s^2 (30 km/h per second) just after a light landing
-  slideDecelEnd: 50,             // MEASURED m/s^2 (180 km/h per second) at the end of the slide
-  slideDecelDelay: 0.6,          // MEASURED s before the deceleration starts to grow
-  slideDecelRamp: 0.7,           // MEASURED s to reach the final deceleration
-};
-
-__modules["src/physics/collision-tuning.js"] = { COLLISION_TUNING };
-})();
 // ---- src/rendering/compositing/crash-camera.js
 (function () {
 // Movements of the view that stage contacts and accidents. Pure functions of the simulated state
@@ -1441,7 +2582,76 @@ function contactDive(car) {
   return T.contactDive * k * (2 - k);          // eased: quick into the dive, soft out of it
 }
 
-__modules["src/rendering/compositing/crash-camera.js"] = { contactDive };
+/**
+ * Shape of the pitch animation of an accident. The two accidents of the reference footage
+ * follow the same script with different timings: nose up and held, a steady swing to nose down
+ * that ends at the landing, the ground held, a rebound to level, a second dip, the recovery.
+ * Amplitudes are fractions of the view height; times in seconds are MEASURED on the footage
+ * (see the analysis report), the amplitudes are set so that the horizon leaves the picture.
+ */
+const CRASH_CAMERA = {
+  noseUp: 0.6,               // the horizon sinks under the cockpit: only sky is left
+  noseDown: 0.5,             // the horizon leaves by the top: only the ground is left
+  riseTime: 0.06,            // s to rear up at the launch
+  holdFraction: 0.47,        // share of the flight spent nose up (0.40 s of 0.85 s)
+  groundHoldHard: 0.48, groundHoldLight: 0.28,
+  reboundHard: 0.16, reboundLight: 0.08,
+  dipInHard: 0.28, dipInLight: 0.2,
+  dipHoldHard: 0.6, dipHoldLight: 0.24,
+  dipDepthLight: 0.34,       // the second dip of a light landing does not reach the ground-only view
+  recoverHard: 0.28, recoverLight: 0.3,
+  trembleAmplitude: 0.015, trembleHz: 12,
+};
+
+const AIRBORNE = 6, SPIN = 2;      // CAR_STATE values (physics/car-physics.js)
+
+/**
+ * Pitch of the view during and after a flight, as a fraction of the view height
+ * (positive = nose down). A pure function of the car: state, flight clock, landing clock.
+ */
+function crashPitch(car) {
+  const C = CRASH_CAMERA;
+  if (car.state === AIRBORNE) {
+    const u = car.airDuration > 0 ? Math.min(1, car.airTime / car.airDuration) : 1;
+    if (u < C.holdFraction) return -C.noseUp * Math.min(1, car.airTime / C.riseTime);
+    return -C.noseUp + (C.noseUp + C.noseDown) * ((u - C.holdFraction) / (1 - C.holdFraction));
+  }
+  if (car.landClock < 0) return 0;
+  let t = car.clock - car.landClock;
+  if (t < 0) return 0;
+  const hard = car.landHard;
+  const hold = hard ? C.groundHoldHard : C.groundHoldLight;
+  if (t < hold) return C.noseDown;
+  t -= hold;
+  const rebound = hard ? C.reboundHard : C.reboundLight;
+  if (t < rebound) return C.noseDown * (1 - t / rebound);
+  t -= rebound;
+  const depth = hard ? C.noseDown : C.dipDepthLight, dipIn = hard ? C.dipInHard : C.dipInLight;
+  if (t < dipIn) return depth * (t / dipIn);
+  t -= dipIn;
+  const dipHold = hard ? C.dipHoldHard : C.dipHoldLight;
+  if (t < dipHold) return depth;
+  t -= dipHold;
+  const recover = hard ? C.recoverHard : C.recoverLight;
+  if (t < recover) return depth * (1 - t / recover);
+  return 0;
+}
+
+/** Total duration of the pitch animation after a landing (s). */
+function crashPitchDuration(hard) {
+  const C = CRASH_CAMERA;
+  return hard ? C.groundHoldHard + C.reboundHard + C.dipInHard + C.dipHoldHard + C.recoverHard
+    : C.groundHoldLight + C.reboundLight + C.dipInLight + C.dipHoldLight + C.recoverLight;
+}
+
+/** Vertical trembling of the view while the car slides out of control (fraction of the view height). */
+function slideTremble(car) {
+  if (car.state !== SPIN || Math.abs(car.speed) < 5) return 0;
+  const C = CRASH_CAMERA;
+  return C.trembleAmplitude * Math.sin(car.clock * C.trembleHz * Math.PI * 2);
+}
+
+__modules["src/rendering/compositing/crash-camera.js"] = { contactDive, CRASH_CAMERA, crashPitch, crashPitchDuration, slideTremble };
 })();
 // ---- src/rendering/compositing/race-view.js
 (function () {
@@ -1454,7 +2664,7 @@ const { createProjection, updateProjection, focalForFov, depthOf, segmentAt } = 
 const { createViewUniforms, set4, setColors, U } = __modules["src/rendering/compositing/view-uniforms.js"];
 const { MAX_ROWS } = __modules["src/rendering/compositing/renderer.js"];
 const { BACKDROP_PERIOD } = __modules["src/art/environments/backdrop-rules.js"];
-const { contactDive } = __modules["src/rendering/compositing/crash-camera.js"];
+const { contactDive, crashPitch, slideTremble } = __modules["src/rendering/compositing/crash-camera.js"];
 
 const CAMERA = { COCKPIT: 0, CHASE: 1, FRONT: 2, TRACKSIDE: 3 };
 
@@ -1470,7 +2680,7 @@ class RaceView {
     this.yaw = 0; this.pitch = 0; this.dive = 0; this.stretch = 0;
     this.shakeX = 0; this.shakeY = 0; this.shakeAmp = 0; this.impact = 0; this.flash = 0;
     this.speedLines = 0; this.heading = 0; this.focusX = 0;
-    this.contactDive = 0;
+    this.contactDive = 0; this.crashPitch = 0;
     this.tracksideS = 0; this.tracksideD = 0; this.tracksideTimer = 0; this.tracksideAim = 0; this.tracksideGap = 120; this.tracksideFresh = true;
     this.time = 0;
     this.wide = false; this.tall = false; this.horizonRatio = VIEW_CONFIG.horizonRatio;
@@ -1586,8 +2796,10 @@ class RaceView {
     this.horizonRatio = ratio;
     // nose dive: braking (smoothed) and contacts (driven by the car's own clock)
     this.contactDive = this.camera === CAMERA.COCKPIT ? contactDive(car) : 0;
-    const diveShift = this.camera === CAMERA.COCKPIT ? (this.dive * cfg.brakeDive + this.contactDive) * r.h : 0;
-    cam.s = camS; cam.d = camD; cam.eyeHeight = eye; cam.yaw = this.yaw; cam.dir = dir;
+    // accidents: the pitch of the whole flight and landing, and the trembling of a slide
+    this.crashPitch = this.camera === CAMERA.COCKPIT ? crashPitch(car) + (effects.cockpitShake ? slideTremble(car) : 0) : 0;
+    const diveShift = this.camera === CAMERA.COCKPIT ? (this.dive * cfg.brakeDive + this.contactDive + this.crashPitch) * r.h : 0;
+    cam.s = camS; cam.d = camD; cam.eyeHeight = eye + (this.camera === CAMERA.COCKPIT ? car.airHeight || 0 : 0); cam.yaw = this.yaw; cam.dir = dir;
     cam.width = r.w; cam.height = r.h; cam.focal = focal;
     cam.cx = r.w * 0.5 + this.shakeX * 0.35;
     cam.cy = r.h * ratio + focal * Math.tan(this.pitch) - diveShift + this.shakeY * 0.35;
@@ -1675,1043 +2887,6 @@ function buildTrackAttributes(track, capacity) {
 
 __modules["src/rendering/drawing/track-attributes.js"] = { buildTrackAttributes };
 })();
-// ---- src/vehicles/car-spec.js
-(function () {
-// Vehicle parameters. Everything that shapes the handling lives here as plain data so it can be
-// tuned or modded without touching the simulation code. Units: metres, seconds, radians.
-
-const GRAVITY = 9.81;
-
-/** Base single-seater. All values are design choices for an arcade feel, not measurements. */
-const BASE_CAR_SPEC = {
-  length: 4.4,
-  width: 1.9,
-  wheelbase: 2.9,
-  collisionHalfLength: 2.1,
-  collisionHalfWidth: 0.93,
-  powerPerMass: 900,                 // W/kg at peak
-  minPowerSpeed: 12,                 // m/s, avoids infinite force at standstill
-  gearTopSpeeds: [27, 39, 51, 64, 78, 93], // m/s reached at rpmMax in each gear
-  rpmIdle: 3500,
-  rpmMax: 13500,
-  shiftTime: 0.09,
-  autoUpshiftAt: 0.965,              // fraction of rpmMax
-  autoDownshiftAt: 0.86,             // fraction of the lower gear's top speed
-  powerCurve: [[0, 0.22], [0.25, 0.32], [0.4, 0.5], [0.6, 0.76], [0.8, 0.94], [0.92, 1], [1, 0.94]],
-  dragCoefficient: 0.00112,          // 1/m (acceleration = c * v^2)
-  rollingResistance: 0.3,            // m/s^2
-  engineBraking: 2.6,                // m/s^2 at full revs, throttle closed
-  gripBase: 1.72,                    // tyre friction coefficient on asphalt
-  downforceCoefficient: 0.0002,      // extra grip factor = c * v^2
-  tractionFraction: 0.84,            // share of grip usable for acceleration
-  brakeDecel: 17,                    // m/s^2 before downforce
-  steerLock: 0.34,                   // rad at low speed
-  steerRate: 4.6,                    // 1/s toward the requested steering
-  steerReturnRate: 7.5,              // 1/s back to centre
-  yawResponse: 16,                   // 1/s, how quickly yaw rate follows the steering
-  overSteerAllowance: 1.22,          // full lock asks for this multiple of the available grip
-  slipScrub: 7,                      // m/s^2 lost per unit of slip
-  lateralRecovery: 5,                // 1/s decay of lateral slide velocity
-  reverseSpeed: 7,
-  fuelCapacity: 100,
-  fuelMassPenalty: 0.07,             // acceleration loss with a full tank
-};
-
-/**
- * Driving profiles. ARCADE is forgiving (full steering aid, softer contacts, no attrition),
- * RACING adds attrition and a stricter limit, TURBO raises power and enables boost.
- */
-const DRIVING_PROFILES = {
-  arcade: {
-    id: 'arcade', steerAssist: 1, gripScale: 1.08, powerScale: 1, brakeScale: 1.1,
-    wallSpeedLoss: 0.022, crashImpact: 14, carCrashImpact: 19, contactRestitution: 0.35,
-    offroadGrip: 0.62, offroadDrag: 0.75, boost: false,
-  },
-  racing: {
-    id: 'racing', steerAssist: 0.78, gripScale: 1, powerScale: 1, brakeScale: 1,
-    wallSpeedLoss: 0.032, crashImpact: 11, carCrashImpact: 15, contactRestitution: 0.25,
-    offroadGrip: 0.5, offroadDrag: 1, boost: false,
-  },
-  turbo: {
-    id: 'turbo', steerAssist: 0.9, gripScale: 1.04, powerScale: 1.22, brakeScale: 1.05,
-    wallSpeedLoss: 0.026, crashImpact: 12.5, carCrashImpact: 17, contactRestitution: 0.3,
-    offroadGrip: 0.55, offroadDrag: 0.9, boost: true,
-    boostPower: 1.45, boostHeatRate: 0.2, boostCoolRate: 0.085, overheatLockout: 3.5,
-  },
-};
-
-/** Tyre compounds: grip multiplier and wear speed relative to the medium compound. */
-const TYRE_COMPOUNDS = {
-  hard: { id: 'hard', grip: 0.972, wear: 0.55 },
-  medium: { id: 'medium', grip: 1, wear: 1 },
-  soft: { id: 'soft', grip: 1.034, wear: 1.9 },
-};
-const TYRE_ORDER = ['hard', 'medium', 'soft'];
-
-const WING_LEVELS = 5; // 0 = minimum downforce ... 4 = maximum
-
-const DEFAULT_SETUP = { wing: 2, tyres: 'medium', gearbox: 'auto' };
-
-function sanitizeSetup(setup) {
-  const s = { ...DEFAULT_SETUP, ...(setup || {}) };
-  s.wing = Math.max(0, Math.min(WING_LEVELS - 1, Math.round(s.wing)));
-  if (!TYRE_COMPOUNDS[s.tyres]) s.tyres = 'medium';
-  if (s.gearbox !== 'manual') s.gearbox = 'auto';
-  return s;
-}
-
-/**
- * Flatten spec + setup + profile into the parameter object consumed by the physics step.
- * Wing: each step trades about 2.3 % of drag-limited top speed for about 7 % of high speed grip.
- */
-function deriveCarParams(spec, setup, profile, skill = null) {
-  const s = sanitizeSetup(setup);
-  const wingDrag = 0.86 + 0.07 * s.wing;
-  const wingDown = 0.7 + 0.15 * s.wing;
-  const compound = TYRE_COMPOUNDS[s.tyres];
-  const powerSkill = skill ? skill.power : 1;
-  return {
-    spec, profile, setup: s,
-    wheelbase: spec.wheelbase,
-    halfLength: spec.collisionHalfLength,
-    halfWidth: spec.collisionHalfWidth,
-    power: spec.powerPerMass * profile.powerScale * powerSkill,
-    drag: spec.dragCoefficient * wingDrag,
-    downforce: spec.downforceCoefficient * wingDown,
-    grip: spec.gripBase * profile.gripScale * compound.grip,
-    wearRate: compound.wear,
-    brake: spec.brakeDecel * profile.brakeScale,
-    manual: s.gearbox === 'manual',
-    gearCount: spec.gearTopSpeeds.length,
-  };
-}
-
-/** Maximum lateral (or braking) acceleration available at speed v on a surface. */
-function gripLimit(params, v, surfaceGrip = 1, tyreFactor = 1) {
-  return GRAVITY * params.grip * surfaceGrip * tyreFactor * (1 + params.downforce * v * v);
-}
-
-/** Highest speed at which a corner of curvature kappa can be taken using `usage` of the grip. */
-function cornerSpeed(params, kappa, usage = 1) {
-  const k = Math.abs(kappa);
-  const base = GRAVITY * params.grip * usage;
-  const denom = k - base * params.downforce;
-  if (denom <= 1e-6) return 200;
-  return Math.sqrt(base / denom);
-}
-
-function powerFraction(spec, rpmFraction) {
-  const curve = spec.powerCurve;
-  if (rpmFraction <= curve[0][0]) return curve[0][1];
-  for (let i = 1; i < curve.length; i++) {
-    if (rpmFraction <= curve[i][0]) {
-      const a = curve[i - 1], b = curve[i];
-      return a[1] + ((b[1] - a[1]) * (rpmFraction - a[0])) / (b[0] - a[0]);
-    }
-  }
-  return 0; // above the limiter
-}
-
-__modules["src/vehicles/car-spec.js"] = { GRAVITY, BASE_CAR_SPEC, DRIVING_PROFILES, TYRE_COMPOUNDS, TYRE_ORDER, WING_LEVELS, DEFAULT_SETUP, sanitizeSetup, deriveCarParams, gripLimit, cornerSpeed, powerFraction };
-})();
-// ---- src/tracks/racing-line.js
-(function () {
-// Racing line: lateral offset from the centre line that minimises bending energy inside the
-// track limits (iterative relaxation on a coarse grid, then interpolated to every sample).
-
-const { clamp, lerp, wrapAngle } = __modules["src/core/math.js"];
-
-const COARSE_STEP = 4;       // every 4th sample (~10 m)
-const ITERATIONS = 700;
-const EDGE_MARGIN = 1.6;     // metres kept between the line and the track edge
-const LINE_BLEND = 0.9;      // 1 = pure minimum curvature
-
-function computeRacingLine(track) {
-  const { n, x, z, nx, nz, halfWidth, ds } = track;
-  const m = Math.floor(n / COARSE_STEP);
-  const limit = Math.max(0.5, halfWidth - EDGE_MARGIN);
-  const cx = new Float64Array(m), cz = new Float64Array(m), ux = new Float64Array(m), uz = new Float64Array(m);
-  const d = new Float64Array(m);
-  for (let k = 0; k < m; k++) {
-    const i = Math.floor((k * n) / m);
-    cx[k] = x[i]; cz[k] = z[i]; ux[k] = nx[i]; uz[k] = nz[i];
-  }
-  for (let it = 0; it < ITERATIONS; it++) {
-    for (let pass = 0; pass < 2; pass++) {
-      for (let k = pass; k < m; k += 2) {
-        const a2 = (k + m - 2) % m, a1 = (k + m - 1) % m, b1 = (k + 1) % m, b2 = (k + 2) % m;
-        const p = (q) => cx[q] + ux[q] * d[q];
-        const r = (q) => cz[q] + uz[q] * d[q];
-        const targetX = (4 * (p(a1) + p(b1)) - (p(a2) + p(b2))) / 6;
-        const targetZ = (4 * (r(a1) + r(b1)) - (r(a2) + r(b2))) / 6;
-        const wanted = (targetX - cx[k]) * ux[k] + (targetZ - cz[k]) * uz[k];
-        d[k] = clamp(lerp(d[k], wanted, 0.6), -limit, limit);
-      }
-    }
-  }
-  // Interpolate back to full resolution (Catmull-Rom style cubic through coarse values).
-  const offset = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const f = (i * m) / n;
-    const k = Math.floor(f), t = f - k;
-    const p0 = d[(k + m - 1) % m], p1 = d[k % m], p2 = d[(k + 1) % m], p3 = d[(k + 2) % m];
-    const v = 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
-    offset[i] = clamp(v * LINE_BLEND, -limit, limit);
-  }
-  // Curvature of the resulting line.
-  const kappa = new Float32Array(n);
-  const lx = new Float64Array(n), lz = new Float64Array(n);
-  for (let i = 0; i < n; i++) { lx[i] = x[i] + nx[i] * offset[i]; lz[i] = z[i] + nz[i] * offset[i]; }
-  const span = 2;
-  for (let i = 0; i < n; i++) {
-    const a = (i + n - span) % n, b = (i + span) % n;
-    const h0 = Math.atan2(lz[i] - lz[a], lx[i] - lx[a]);
-    const h1 = Math.atan2(lz[b] - lz[i], lx[b] - lx[i]);
-    const len = 0.5 * (Math.hypot(lx[i] - lx[a], lz[i] - lz[a]) + Math.hypot(lx[b] - lx[i], lz[b] - lz[i]));
-    kappa[i] = wrapAngle(h1 - h0) / Math.max(len, ds);
-  }
-  const tmp = new Float32Array(n);
-  for (let it = 0; it < 3; it++) {
-    for (let i = 0; i < n; i++) tmp[i] = 0.25 * kappa[(i + n - 1) % n] + 0.5 * kappa[i] + 0.25 * kappa[(i + 1) % n];
-    kappa.set(tmp);
-  }
-  return { offset, kappa };
-}
-
-__modules["src/tracks/racing-line.js"] = { computeRacingLine };
-})();
-// ---- src/tracks/track-builder.js
-(function () {
-// Turns a declarative circuit definition (polygon corners with fillet radii) into
-// uniformly sampled track data used by physics, AI and rendering. Pure data: no GPU, no DOM.
-//
-// Conventions: world is Y up; the track lies mostly in the XZ plane. Heading angle `h`
-// gives forward = (cos h, sin h) in (x, z); right = (-sin h, cos h). Lateral offset `d`
-// is positive to the right of the centre line. Curvature > 0 turns right.
-
-const { clamp, lerp, smoothstep, wrapAngle, mod } = __modules["src/core/math.js"];
-const { computeRacingLine } = __modules["src/tracks/racing-line.js"];
-
-const SURFACE = { ASPHALT: 0, KERB: 1, GRASS: 2, GRAVEL: 3, PIT: 4 };
-const VERGE = { GRASS: 0, GRAVEL: 1, PIT: 2 };
-
-const SAMPLE_SPACING = 2.5;
-const KERB_WIDTH = 1.5;
-
-/** Default pit lane layout, distances relative to the start line (negative = before it). */
-const PIT_LAYOUT = {
-  entryS: -300, wallStartS: -240, wallEndS: 110, exitS: 170,
-  wallGap: 1.3, wallThickness: 0.5, laneWidth: 10, speedLimit: 22.2,
-  boxFirstS: -36, boxSpacing: 13, boxCount: 9,
-};
-
-function closedSmooth(values, iterations) {
-  const n = values.length;
-  const tmp = new Float32Array(n);
-  for (let it = 0; it < iterations; it++) {
-    for (let i = 0; i < n; i++) {
-      tmp[i] = 0.25 * values[(i + n - 1) % n] + 0.5 * values[i] + 0.25 * values[(i + 1) % n];
-    }
-    values.set(tmp);
-  }
-}
-
-function resampleClosed(px, pz, count) {
-  const n = px.length;
-  const cum = new Float64Array(n + 1);
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    cum[i + 1] = cum[i] + Math.hypot(px[j] - px[i], pz[j] - pz[i]);
-  }
-  const total = cum[n];
-  const m = count || Math.max(16, Math.round(total / SAMPLE_SPACING));
-  const ox = new Float32Array(m), oz = new Float32Array(m);
-  let seg = 0;
-  for (let k = 0; k < m; k++) {
-    const target = (k / m) * total;
-    while (seg < n - 1 && cum[seg + 1] < target) seg++;
-    const span = cum[seg + 1] - cum[seg] || 1;
-    const t = (target - cum[seg]) / span;
-    const j = (seg + 1) % n;
-    ox[k] = lerp(px[seg], px[j], t);
-    oz[k] = lerp(pz[seg], pz[j], t);
-  }
-  return { x: ox, z: oz, length: total };
-}
-
-/** Expand polygon corners with fillet radii into a dense closed polyline starting at the start line. */
-function traceCorners(def, warnings) {
-  const corners = def.corners.map((c) => ({ x: c[0], z: c[1], r: c[2], y: c[3] || 0 }));
-  const n = corners.length;
-  const info = [];
-  for (let i = 0; i < n; i++) {
-    const p = corners[(i + n - 1) % n], c = corners[i], q = corners[(i + 1) % n];
-    let d1x = c.x - p.x, d1z = c.z - p.z, d2x = q.x - c.x, d2z = q.z - c.z;
-    const l1 = Math.hypot(d1x, d1z), l2 = Math.hypot(d2x, d2z);
-    d1x /= l1; d1z /= l1; d2x /= l2; d2z /= l2;
-    const turn = Math.atan2(d1x * d2z - d1z * d2x, d1x * d2x + d1z * d2z);
-    info.push({ c, d1x, d1z, d2x, d2z, turn, lenIn: l1, r: c.r, tangent: c.r * Math.tan(Math.abs(turn) / 2) });
-  }
-  // Shrink radii that do not fit on their edges.
-  for (let pass = 0; pass < 4; pass++) {
-    for (let i = 0; i < n; i++) {
-      const a = info[i], b = info[(i + 1) % n];
-      const available = b.lenIn;
-      const need = a.tangent + b.tangent;
-      if (need > available * 0.98) {
-        const k = (available * 0.98) / need;
-        a.r *= k; b.r *= k;
-        a.tangent *= k; b.tangent *= k;
-        if (pass === 0) warnings.push(`radius shrunk at corners ${i}/${(i + 1) % n}`);
-      }
-    }
-  }
-  const last = info[n - 1], first = info[0];
-  const straightLen = first.lenIn - last.tangent - first.tangent;
-  const startDistance = def.startDistance ?? 330;
-  if (straightLen < startDistance + 200) warnings.push(`main straight too short (${straightLen.toFixed(0)} m)`);
-  // Start point on the edge from the last corner to corner 0.
-  const exitX = last.c.x + last.d2x * last.tangent, exitZ = last.c.z + last.d2z * last.tangent;
-  const sx = exitX + last.d2x * startDistance, sz = exitZ + last.d2z * startDistance;
-
-  const px = [], pz = [], stations = [];
-  let cx = sx, cz = sz, travelled = 0;
-  const lineTo = (x, z) => {
-    const len = Math.hypot(x - cx, z - cz);
-    const steps = Math.max(1, Math.ceil(len));
-    for (let k = 0; k < steps; k++) {
-      px.push(lerp(cx, x, k / steps)); pz.push(lerp(cz, z, k / steps));
-    }
-    travelled += len; cx = x; cz = z;
-  };
-  for (let i = 0; i < n; i++) {
-    const a = info[i];
-    const ax = a.c.x - a.d1x * a.tangent, az = a.c.z - a.d1z * a.tangent;
-    lineTo(ax, az);
-    const sign = Math.sign(a.turn) || 1;
-    const ox = ax + -a.d1z * a.r * sign, oz = az + a.d1x * a.r * sign;
-    const arcLen = Math.abs(a.turn) * a.r;
-    const steps = Math.max(2, Math.ceil(arcLen));
-    const rx = ax - ox, rz = az - oz;
-    for (let k = 0; k < steps; k++) {
-      const ang = (a.turn * k) / steps;
-      const ca = Math.cos(ang), sa = Math.sin(ang);
-      px.push(ox + rx * ca - rz * sa); pz.push(oz + rx * sa + rz * ca);
-    }
-    stations.push({ s: travelled + arcLen / 2, y: a.c.y });
-    travelled += arcLen;
-    cx = a.c.x + a.d2x * a.tangent; cz = a.c.z + a.d2z * a.tangent;
-  }
-  lineTo(sx, sz);
-  return { px, pz, stations, denseLength: travelled };
-}
-
-function buildElevation(stations, denseLength, n, length) {
-  const y = new Float32Array(n);
-  const scale = length / denseLength;
-  const st = stations.map((k) => ({ s: k.s * scale, y: k.y }));
-  const count = st.length;
-  for (let i = 0; i < n; i++) {
-    const s = (i / n) * length;
-    let k = 0;
-    while (k < count && st[k].s <= s) k++;
-    const a = st[(k + count - 1) % count], b = st[k % count];
-    let s0 = a.s, s1 = b.s;
-    if (k === 0) s0 -= length;
-    if (k === count) s1 += length;
-    y[i] = lerp(a.y, b.y, smoothstep(s0, s1, s));
-  }
-  closedSmooth(y, 24);
-  return y;
-}
-
-/**
- * @param {object} def circuit definition (see track-catalog.js)
- * @returns {object} track data
- */
-function buildTrack(def) {
-  const warnings = [];
-  const traced = traceCorners(def, warnings);
-  let res = resampleClosed(traced.px, traced.pz);
-  closedSmooth(res.x, 5);
-  closedSmooth(res.z, 5);
-  res = resampleClosed(res.x, res.z, res.x.length);
-  const n = res.x.length;
-  const length = res.length;
-  const ds = length / n;
-  const x = res.x, z = res.z;
-  const y = buildElevation(traced.stations, traced.denseLength, n, length);
-
-  const heading = new Float32Array(n), tx = new Float32Array(n), tz = new Float32Array(n);
-  const nx = new Float32Array(n), nz = new Float32Array(n);
-  const kappa = new Float32Array(n), grade = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const a = (i + n - 1) % n, b = (i + 1) % n;
-    const dx = x[b] - x[a], dz = z[b] - z[a];
-    const l = Math.hypot(dx, dz) || 1;
-    tx[i] = dx / l; tz[i] = dz / l;
-    nx[i] = -tz[i]; nz[i] = tx[i];
-    heading[i] = Math.atan2(dz, dx);
-    grade[i] = (y[b] - y[a]) / (2 * ds);
-  }
-  for (let i = 0; i < n; i++) {
-    const a = (i + n - 1) % n, b = (i + 1) % n;
-    kappa[i] = wrapAngle(heading[b] - heading[a]) / (2 * ds);
-  }
-  closedSmooth(kappa, 2);
-
-  const halfWidth = (def.width ?? 13) / 2;
-  const track = {
-    def, id: def.id, name: def.name, theme: def.theme || 'forest',
-    n, ds, length, x, y, z, tx, tz, nx, nz, heading, kappa, grade,
-    halfWidth, kerbWidth: KERB_WIDTH, warnings,
-    kerbL: new Float32Array(n), kerbR: new Float32Array(n),
-    barrierL: new Float32Array(n), barrierR: new Float32Array(n),
-    vergeL: new Uint8Array(n), vergeR: new Uint8Array(n),
-    pit: null, line: null, lineKappa: null,
-    sectors: [length / 3, (2 * length) / 3],
-  };
-  layoutEdges(track, def);
-  layoutPit(track, def);
-  const line = computeRacingLine(track);
-  track.line = line.offset;
-  track.lineKappa = line.kappa;
-  return track;
-}
-
-/** Kerbs, verge widths and barrier offsets on both sides. */
-function layoutEdges(track, def) {
-  const { n, ds, kappa, x, z, nx, nz, tx, tz, halfWidth } = track;
-  const absK = new Float32Array(n);
-  for (let i = 0; i < n; i++) absK[i] = Math.abs(kappa[i]);
-  const around = (m) => Math.round(m / ds);
-  const exitShift = around(30), lookAhead = around(130), lookBehind = around(25);
-  const baseVerge = def.verge ?? 9;
-  const desiredL = new Float32Array(n), desiredR = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    // Inside kerb through the corner; outside kerb from mid corner to ~30 m past the exit.
-    const inside = smoothstep(1 / 300, 1 / 150, absK[i]);
-    let exitR = 0, exitL = 0;
-    for (let k = 2; k <= exitShift; k += 2) {
-      const j = (i + n - k) % n;
-      const strength = smoothstep(1 / 260, 1 / 130, absK[j]);
-      if (kappa[j] > 0) exitL = Math.max(exitL, strength); else exitR = Math.max(exitR, strength);
-    }
-    track.kerbR[i] = Math.max(kappa[i] > 0 ? inside : 0, exitR);
-    track.kerbL[i] = Math.max(kappa[i] < 0 ? inside : 0, exitL);
-    // Run-off: widen the verge on the outside of an upcoming or current corner.
-    let peak = 0, peakSign = 0;
-    for (let k = -lookBehind; k <= lookAhead; k += 3) {
-      const j = mod(i + k, n);
-      const weight = k > 0 ? 1 - (k / lookAhead) * 0.5 : 1;
-      if (absK[j] * weight > peak) { peak = absK[j] * weight; peakSign = Math.sign(kappa[j]); }
-    }
-    const runoff = smoothstep(1 / 220, 1 / 70, peak);
-    desiredR[i] = baseVerge + (peakSign < 0 ? runoff * 15 : 0);
-    desiredL[i] = baseVerge + (peakSign > 0 ? runoff * 15 : 0);
-    track.vergeR[i] = peakSign < 0 && runoff > 0.55 ? VERGE.GRAVEL : VERGE.GRASS;
-    track.vergeL[i] = peakSign > 0 && runoff > 0.55 ? VERGE.GRAVEL : VERGE.GRASS;
-  }
-  // Clearance against other parts of the circuit, per side.
-  const skip = around(45);
-  const clearL = new Float32Array(n).fill(1e9), clearR = new Float32Array(n).fill(1e9);
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j += 2) {
-      const gap = Math.min(mod(i - j, n), mod(j - i, n));
-      if (gap < skip) continue;
-      const dx = x[j] - x[i], dz = z[j] - z[i];
-      const dist = Math.hypot(dx, dz);
-      if (dist > 90) continue;
-      const lateral = dx * nx[i] + dz * nz[i];
-      const along = dx * tx[i] + dz * tz[i];
-      if (Math.abs(lateral) < Math.abs(along) * 0.6) continue;
-      if (lateral > 0) clearR[i] = Math.min(clearR[i], dist); else clearL[i] = Math.min(clearL[i], dist);
-    }
-  }
-  const minBarrier = halfWidth + 2.2;
-  track.minClearance = 1e9;
-  for (let i = 0; i < n; i++) {
-    const radius = 1 / Math.max(absK[i], 1e-5);
-    const foldLimitR = kappa[i] > 0 ? radius * 0.72 : 1e9;
-    const foldLimitL = kappa[i] < 0 ? radius * 0.72 : 1e9;
-    track.minClearance = Math.min(track.minClearance, clearL[i], clearR[i]);
-    track.barrierR[i] = Math.max(minBarrier, Math.min(halfWidth + desiredR[i], clearR[i] / 2 - 0.6, foldLimitR));
-    track.barrierL[i] = Math.max(minBarrier, Math.min(halfWidth + desiredL[i], clearL[i] / 2 - 0.6, foldLimitL));
-  }
-  // Smooth the walls but never exceed the hard limits.
-  const limR = Float32Array.from(track.barrierR), limL = Float32Array.from(track.barrierL);
-  for (let pass = 0; pass < 3; pass++) {
-    closedSmooth(track.barrierR, 6);
-    closedSmooth(track.barrierL, 6);
-    for (let i = 0; i < n; i++) {
-      track.barrierR[i] = Math.max(minBarrier, Math.min(track.barrierR[i], limR[i]));
-      track.barrierL[i] = Math.max(minBarrier, Math.min(track.barrierL[i], limL[i]));
-    }
-  }
-  if (track.minClearance < 2 * minBarrier + 1) {
-    track.warnings.push(`layout too tight: clearance ${track.minClearance.toFixed(1)} m`);
-  }
-}
-
-function layoutPit(track, def) {
-  const side = def.pitSide ?? 1;
-  const p = { ...PIT_LAYOUT, ...(def.pit || {}) };
-  const { n, ds, halfWidth, length } = track;
-  const wallD = halfWidth + p.wallGap + p.wallThickness / 2;
-  const outerD = wallD + p.wallThickness / 2 + p.laneWidth;
-  const laneD = wallD + p.wallThickness / 2 + 2.6;
-  const boxD = outerD - 2.4;
-  track.pit = {
-    side, entryS: p.entryS, wallStartS: p.wallStartS, wallEndS: p.wallEndS, exitS: p.exitS,
-    wallD, wallThickness: p.wallThickness, laneD, boxD, outerD, speedLimit: p.speedLimit,
-    boxFirstS: p.boxFirstS, boxSpacing: p.boxSpacing, boxCount: p.boxCount,
-  };
-  const barrier = side > 0 ? track.barrierR : track.barrierL;
-  const verge = side > 0 ? track.vergeR : track.vergeL;
-  const kerb = side > 0 ? track.kerbR : track.kerbL;
-  const from = Math.floor(p.entryS / ds), to = Math.ceil(p.exitS / ds);
-  for (let k = from; k <= to; k++) {
-    const i = mod(k, n);
-    const s = k * ds;
-    const ramp = Math.min(smoothstep(p.entryS, p.wallStartS, s), 1 - smoothstep(p.wallEndS, p.exitS, s));
-    barrier[i] = lerp(barrier[i], outerD, ramp);
-    if (ramp > 0.02) { verge[i] = VERGE.PIT; kerb[i] = 0; }
-  }
-  if (Math.abs(track.kappa[mod(from, n)]) > 1e-3 || Math.abs(track.kappa[mod(to, n)]) > 1e-3) {
-    track.warnings.push('pit lane overlaps a corner');
-  }
-  void length;
-}
-
-/** Signed distance along the track from the start line, in (-length/2, length/2]. */
-function relativeS(track, s) {
-  let r = mod(s, track.length);
-  if (r > track.length / 2) r -= track.length;
-  return r;
-}
-
-/** World pose at track coordinates (s, d). Writes x,y,z,heading,grade into `out`. */
-function trackPose(track, s, d, out) {
-  const f = mod(s, track.length) / track.ds;
-  const i = Math.floor(f) % track.n, j = (i + 1) % track.n, t = f - Math.floor(f);
-  const cx = lerp(track.x[i], track.x[j], t), cz = lerp(track.z[i], track.z[j], t);
-  const nxv = lerp(track.nx[i], track.nx[j], t), nzv = lerp(track.nz[i], track.nz[j], t);
-  out.x = cx + nxv * d;
-  out.z = cz + nzv * d;
-  out.y = lerp(track.y[i], track.y[j], t);
-  out.heading = track.heading[i] + wrapAngle(track.heading[j] - track.heading[i]) * t;
-  out.grade = lerp(track.grade[i], track.grade[j], t);
-  return out;
-}
-
-/**
- * Project a world position on the centre line. `hint` is the previous sample index (or -1 for a
- * global search). Writes index, s, d into `out`.
- */
-function locateOnTrack(track, px, pz, hint, out) {
-  const { n, x, z, tx, tz, nx, nz, ds } = track;
-  let best = -1, bestDist = 1e18;
-  if (hint >= 0) {
-    for (let k = -6; k <= 10; k++) {
-      const i = mod(hint + k, n);
-      const dx = px - x[i], dz = pz - z[i];
-      const dist = dx * dx + dz * dz;
-      if (dist < bestDist) { bestDist = dist; best = i; }
-    }
-    if (bestDist > 60 * 60) best = -1;
-  }
-  if (best < 0) {
-    bestDist = 1e18;
-    for (let i = 0; i < n; i++) {
-      const dx = px - x[i], dz = pz - z[i];
-      const dist = dx * dx + dz * dz;
-      if (dist < bestDist) { bestDist = dist; best = i; }
-    }
-  }
-  const dx = px - x[best], dz = pz - z[best];
-  let along = dx * tx[best] + dz * tz[best];
-  let index = best;
-  if (along < 0) { index = (best + n - 1) % n; along += ds; }
-  const t = clamp(along / ds, 0, 1);
-  const j = (index + 1) % n;
-  const cx = lerp(x[index], x[j], t), cz = lerp(z[index], z[j], t);
-  const nxv = lerp(nx[index], nx[j], t), nzv = lerp(nz[index], nz[j], t);
-  out.index = index;
-  out.s = (index + t) * ds;
-  out.d = (px - cx) * nxv + (pz - cz) * nzv;
-  return out;
-}
-
-/** Linear interpolation of a per-sample array at distance s. */
-function sampleArray(track, array, s) {
-  const f = mod(s, track.length) / track.ds;
-  const i = Math.floor(f) % track.n, j = (i + 1) % track.n;
-  return lerp(array[i], array[j], f - Math.floor(f));
-}
-
-/** Is distance `s` inside the pit zone section [a, b] given relative to the start line? */
-function inPitRange(track, s, a, b) {
-  const r = relativeS(track, s);
-  return r >= a && r <= b;
-}
-
-/** Surface type under lateral offset d at sample index i. */
-function surfaceAt(track, i, d) {
-  const ad = Math.abs(d);
-  if (ad <= track.halfWidth) return SURFACE.ASPHALT;
-  const right = d > 0;
-  const kerb = right ? track.kerbR[i] : track.kerbL[i];
-  if (kerb > 0.5 && ad <= track.halfWidth + track.kerbWidth) return SURFACE.KERB;
-  const verge = right ? track.vergeR[i] : track.vergeL[i];
-  if (verge === VERGE.PIT) return SURFACE.PIT;
-  if (verge === VERGE.GRAVEL && ad > track.halfWidth + 3) return SURFACE.GRAVEL;
-  return SURFACE.GRASS;
-}
-
-/** Starting grid slot k (0 = pole): staggered two-by-two formation behind the line. */
-function gridSlot(track, k, out) {
-  out.s = -(8 + k * 8);
-  out.d = (k % 2 === 0 ? -1 : 1) * track.halfWidth * 0.45;
-  return out;
-}
-
-/** Pit box position (track coordinates) for a team index. */
-function pitBox(track, teamIndex, out) {
-  const p = track.pit;
-  out.s = p.boxFirstS - (teamIndex % p.boxCount) * p.boxSpacing;
-  out.d = p.side * p.boxD;
-  return out;
-}
-
-__modules["src/tracks/track-builder.js"] = { SURFACE, VERGE, buildTrack, relativeS, trackPose, locateOnTrack, sampleArray, inPitRange, surfaceAt, gridSlot, pitBox };
-})();
-// ---- src/physics/car-physics.js
-(function () {
-// Arcade single-seater dynamics. One deterministic step function shared by human and AI cars.
-// The model is intentionally light: kinematic steering limited by a speed dependent grip budget,
-// power/drag/brake longitudinal model with gears, surface effects and wall contacts expressed
-// in track coordinates (s along the centre line, d to the right of it).
-
-const { clamp, damp, moveToward, angleDiff, wrapAngle, lerp } = __modules["src/core/math.js"];
-const { GRAVITY, gripLimit, powerFraction } = __modules["src/vehicles/car-spec.js"];
-const { SURFACE, locateOnTrack, relativeS, sampleArray } = __modules["src/tracks/track-builder.js"];
-
-// AIRBORNE: thrown in the air by a contact; WRECKED: stopped on the spot after a hard landing.
-const CAR_STATE = { GRID: 0, RACING: 1, SPIN: 2, RESET: 3, SERVICE: 4, RETIRED: 5, AIRBORNE: 6, WRECKED: 7 };
-
-const located = { index: 0, s: 0, d: 0 };
-
-function createCarState(index) {
-  return {
-    index, params: null, driver: null, isHuman: false, playerIndex: -1, teamIndex: 0,
-    state: CAR_STATE.GRID,
-    x: 0, y: 0, z: 0, heading: 0, pitch: 0,
-    prevX: 0, prevY: 0, prevZ: 0, prevHeading: 0, prevPitch: 0,
-    speed: 0, vLat: 0, yawRate: 0, velX: 0, velZ: 0,
-    steer: 0, throttle: 0, brake: 0,
-    inSteer: 0, inThrottle: 0, inBrake: 0, inShift: 0, inBoost: false, inReset: false,
-    gear: 1, rpm: 0, shiftTimer: 0, reverse: false, reverseTimer: 0, limiter: false,
-    segIndex: -1, s: 0, d: 0, surface: SURFACE.ASPHALT, progress: 0, headingError: 0,
-    inPit: false, pitAuto: false, autoDrive: false, wantsPit: false, pitBoxS: 0, servicedThisVisit: false, removed: false, timingStarted: false, serviceTimer: 0, serviceTotal: 0, pitStops: 0,
-    tyreWear: 0, fuel: 100, damage: 0, puncture: false, engineOut: false,
-    boostHeat: 0, boostLock: 0, boosting: false,
-    draft: 0, slip: 0, wheelspin: 0, accelLong: 0, accelLat: 0, odometer: 0,
-    spinTimer: 0, spinRate: 0, resetTimer: 0, ghostTimer: 0, stuckTimer: 0, wrongWayTimer: 0,
-    lap: 0, lapStartTime: 0, lastLapTime: 0, bestLapTime: 0, lapTimes: [], sector: 0,
-    sectorStart: 0, lastSectorTime: 0, finished: false, finishTime: 0, position: 0, gridPosition: 0,
-    overtakes: 0, contacts: 0, wallHits: 0, offTrackTime: 0, resets: 0, topSpeed: 0,
-    lastContactTime: -10, compound: 'medium', nextCompound: 'medium',
-    // collisions and accidents (see collision-tuning.js): `clock` is the car's own simulation time,
-    // the other clocks are values of it at the last event, for the animations driven by the state
-    clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
-  };
-}
-
-/** Place a car on the track at (s, d), stationary, facing forward. */
-function placeCar(car, track, s, d) {
-  const n = track.n;
-  const f = (((s % track.length) + track.length) % track.length) / track.ds;
-  const i = Math.floor(f) % n, j = (i + 1) % n, t = f - Math.floor(f);
-  const nxv = lerp(track.nx[i], track.nx[j], t), nzv = lerp(track.nz[i], track.nz[j], t);
-  car.x = lerp(track.x[i], track.x[j], t) + nxv * d;
-  car.z = lerp(track.z[i], track.z[j], t) + nzv * d;
-  car.y = lerp(track.y[i], track.y[j], t);
-  car.heading = track.heading[i] + wrapAngle(track.heading[j] - track.heading[i]) * t;
-  car.pitch = Math.atan(lerp(track.grade[i], track.grade[j], t));
-  car.segIndex = i; car.s = f * track.ds; car.d = d;
-  car.speed = 0; car.vLat = 0; car.yawRate = 0; car.velX = 0; car.velZ = 0; car.steer = 0;
-  car.gear = 1; car.reverse = false; car.slip = 0; car.wheelspin = 0;
-  car.prevX = car.x; car.prevY = car.y; car.prevZ = car.z; car.prevHeading = car.heading; car.prevPitch = car.pitch;
-  car.headingError = 0;
-}
-
-function startSpin(car, impact, direction, emit) {
-  if (car.state !== CAR_STATE.RACING) return;
-  const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
-  car.velX = ch * car.speed - sh * car.vLat;
-  car.velZ = sh * car.speed + ch * car.vLat;
-  car.state = CAR_STATE.SPIN;
-  car.spinTimer = 1.1 + Math.min(impact, 25) * 0.035;
-  car.spinRate = (direction >= 0 ? 1 : -1) * (5 + Math.min(impact, 25) * 0.16);
-  car.pitAuto = false;
-  if (emit) emit('crash', car.index, impact);
-}
-
-function requestReset(car, delay) {
-  if (car.state === CAR_STATE.RETIRED || car.state === CAR_STATE.GRID || car.state === CAR_STATE.SERVICE) return;
-  car.state = CAR_STATE.RESET;
-  car.resetTimer = delay;
-  car.speed = 0; car.vLat = 0; car.yawRate = 0; car.velX = 0; car.velZ = 0;
-}
-
-/** Steering angle at full lock for the current speed (speed sensitive when the aid is on). */
-function steeringLock(params, absV, aMax) {
-  const spec = params.spec;
-  let lock = spec.steerLock;
-  if (absV > 6) {
-    const gripLock = Math.atan((params.wheelbase * aMax * spec.overSteerAllowance) / (absV * absV));
-    lock = lerp(lock, Math.min(lock, gripLock), params.profile.steerAssist);
-  }
-  return lock;
-}
-
-function surfaceGrip(surface, profile) {
-  switch (surface) {
-    case SURFACE.KERB: return 0.94;
-    case SURFACE.GRASS: return profile.offroadGrip;
-    case SURFACE.GRAVEL: return profile.offroadGrip * 0.85;
-    default: return 1;
-  }
-}
-
-function surfaceDrag(surface, profile, v) {
-  switch (surface) {
-    case SURFACE.GRASS: return (3 + 0.035 * v) * profile.offroadDrag;
-    case SURFACE.GRAVEL: return (7.5 + 0.07 * v) * profile.offroadDrag;
-    default: return 0;
-  }
-}
-
-/**
- * Advance one car by dt.
- * @param rules  { wear, fuel, damage, tyreLifeMeters, fuelRangeMeters, crashes }
- * @param emit   function(type, carIndex, value) or null
- */
-function stepCar(car, track, dt, rules, emit) {
-  car.prevX = car.x; car.prevY = car.y; car.prevZ = car.z;
-  car.prevHeading = car.heading; car.prevPitch = car.pitch;
-  if (car.ghostTimer > 0) car.ghostTimer -= dt;
-  car.clock += dt;
-  const spec = car.params.spec;
-
-  switch (car.state) {
-    case CAR_STATE.GRID:
-    case CAR_STATE.SERVICE: {
-      car.speed = 0; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
-      car.throttle = car.state === CAR_STATE.GRID ? car.inThrottle : 0;
-      const target = spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * 0.78 * car.throttle;
-      car.rpm = damp(car.rpm, target, car.rpm < target ? 9 : 5, dt);
-      car.accelLong = 0; car.accelLat = 0;
-      return;
-    }
-    case CAR_STATE.RESET:
-      car.resetTimer -= dt;
-      car.rpm = damp(car.rpm, spec.rpmIdle, 6, dt);
-      car.slip = 0; car.wheelspin = 0;
-      if (car.resetTimer <= 0) repositionCar(car, track, emit);
-      return;
-    case CAR_STATE.SPIN:
-      stepSpin(car, dt);
-      break;
-    case CAR_STATE.RETIRED:
-      car.inThrottle = 0; car.inBrake = car.speed > 0.5 ? 0.35 : 1; car.inSteer = 0;
-      stepDrive(car, track, dt, rules, emit);
-      break;
-    default:
-      stepDrive(car, track, dt, rules, emit);
-  }
-  updateTrackFrame(car, track, dt);
-  collideBoundaries(car, track, rules, emit);
-  if (car.state === CAR_STATE.RACING) watchStuck(car, dt, emit);
-}
-
-function stepSpin(car, dt) {
-  const spec = car.params.spec;
-  const v = Math.hypot(car.velX, car.velZ);
-  const decel = 12 + 0.05 * v;
-  const nv = Math.max(0, v - decel * dt);
-  const k = v > 1e-4 ? nv / v : 0;
-  car.velX *= k; car.velZ *= k;
-  car.x += car.velX * dt; car.z += car.velZ * dt;
-  car.heading = wrapAngle(car.heading + car.spinRate * dt);
-  car.spinRate *= Math.exp(-0.9 * dt);
-  car.spinTimer -= dt;
-  car.speed = nv; car.vLat = 0; car.yawRate = car.spinRate;
-  car.slip = Math.min(2, v * 0.1); car.wheelspin = 0;
-  car.throttle = 0; car.brake = 1; car.steer = 0;
-  car.rpm = damp(car.rpm, spec.rpmIdle, 4, dt);
-  car.accelLong = -decel; car.accelLat = 0;
-  if ((car.spinTimer <= 0 && nv < 4) || car.spinTimer < -3) {
-    car.state = CAR_STATE.RESET;
-    car.resetTimer = 0.7;
-    car.speed = 0;
-  }
-}
-
-function repositionCar(car, track, emit) {
-  let d = 0;
-  if (car.inPit) d = track.pit.side * track.pit.laneD;
-  placeCar(car, track, car.s, d);
-  car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING;
-  car.ghostTimer = 2.5;
-  car.stuckTimer = 0;
-  car.resets++;
-  if (emit) emit('reset', car.index, 0);
-}
-
-function stepDrive(car, track, dt, rules, emit) {
-  const p = car.params, spec = p.spec, profile = p.profile;
-  let v = car.speed;
-  const absV = Math.abs(v);
-  const throttleIn = clamp(car.inThrottle, 0, 1), brakeIn = clamp(car.inBrake, 0, 1);
-
-  // ---- tyres and surface
-  let tyreFactor = 1 - 0.2 * car.tyreWear * car.tyreWear;
-  if (car.puncture) tyreFactor *= 0.62;
-  if (rules.damage) tyreFactor *= 1 - 0.12 * Math.min(1, car.damage);
-  const sGrip = surfaceGrip(car.surface, profile);
-  const aMax = gripLimit(p, absV, sGrip, tyreFactor);
-
-  // ---- steering
-  const steerTarget = clamp(car.inSteer, -1, 1);
-  const towardCentre = Math.abs(steerTarget) < Math.abs(car.steer) || steerTarget * car.steer < 0;
-  car.steer = moveToward(car.steer, steerTarget, (towardCentre ? spec.steerReturnRate : spec.steerRate) * dt);
-  const lock = steeringLock(p, absV, aMax);
-  const yawWanted = (v * Math.tan(car.steer * lock)) / p.wheelbase;
-  const latWanted = Math.abs(v * yawWanted);
-  let slip = latWanted > aMax ? latWanted / aMax - 1 : 0;
-  let yawTarget = yawWanted;
-  if (slip > 0) yawTarget = (yawWanted * (1 + Math.min(slip, 0.5) * 0.12)) / (1 + slip);
-  car.yawRate = damp(car.yawRate, yawTarget, spec.yawResponse, dt);
-  car.heading = wrapAngle(car.heading + car.yawRate * dt);
-  car.accelLat = v * car.yawRate;
-
-  // ---- gearbox
-  const gears = spec.gearTopSpeeds;
-  if (car.shiftTimer > 0) car.shiftTimer -= dt;
-  if (!car.reverse) {
-    if (p.manual && !car.pitAuto && !car.autoDrive) {
-      if (car.inShift > 0 && car.gear < p.gearCount) { car.gear++; car.shiftTimer = spec.shiftTime; if (emit) emit('shift', car.index, 1); }
-      else if (car.inShift < 0 && car.gear > 1 && absV < gears[car.gear - 2] * 1.06) { car.gear--; car.shiftTimer = spec.shiftTime; if (emit) emit('shift', car.index, -1); }
-    } else if (car.shiftTimer <= 0) {
-      if (car.gear < p.gearCount && absV > gears[car.gear - 1] * spec.autoUpshiftAt && throttleIn > 0.1) {
-        car.gear++; car.shiftTimer = spec.shiftTime; if (emit) emit('shift', car.index, 1);
-      } else if (car.gear > 1 && absV < gears[car.gear - 2] * spec.autoDownshiftAt) {
-        car.gear--; car.shiftTimer = spec.shiftTime * 0.6; if (emit) emit('shift', car.index, -1);
-      }
-    }
-  }
-  car.inShift = 0;
-  const gearTop = car.reverse ? gears[0] : gears[car.gear - 1];
-  const rpmFraction = absV / gearTop;
-  car.limiter = rpmFraction >= 1;
-
-  // ---- reverse engagement (hold brake at standstill)
-  if (absV < 0.6 && brakeIn > 0.3 && throttleIn < 0.1 && car.isHuman && !car.pitAuto && !car.autoDrive && car.state === CAR_STATE.RACING) {
-    car.reverseTimer += dt;
-    if (car.reverseTimer > 0.35) car.reverse = true;
-  } else if (!car.reverse || throttleIn > 0.1) {
-    if (car.reverse && throttleIn > 0.1 && v > -0.6) car.reverse = false;
-    car.reverseTimer = 0;
-  }
-
-  // ---- boost (turbo profile)
-  let boostFactor = 1;
-  car.boosting = false;
-  if (profile.boost) {
-    if (car.boostLock > 0) car.boostLock -= dt;
-    if (car.inBoost && car.boostLock <= 0 && throttleIn > 0.5 && !car.reverse) {
-      car.boosting = true;
-      boostFactor = profile.boostPower;
-      car.boostHeat += profile.boostHeatRate * dt;
-      if (car.boostHeat >= 1) { car.boostHeat = 1; car.boostLock = profile.overheatLockout; if (emit) emit('overheat', car.index, 0); }
-    } else {
-      car.boostHeat = Math.max(0, car.boostHeat - profile.boostCoolRate * dt);
-    }
-  }
-
-  // ---- longitudinal forces
-  let accel = 0;
-  const engineAlive = !car.engineOut && (!rules.fuel || car.fuel > 0);
-  const fuelFactor = 1 / (1 + (rules.fuel ? spec.fuelMassPenalty * (car.fuel / spec.fuelCapacity) : 0));
-  let drive = 0;
-  car.wheelspin = 0;
-  if (car.reverse) {
-    if (brakeIn > 0.05 && v > -spec.reverseSpeed) accel -= 6 * brakeIn;
-    if (throttleIn > 0.05) accel += Math.min(-v * 6, 14) * throttleIn;
-  } else {
-    if (engineAlive && car.shiftTimer <= 0 && throttleIn > 0) {
-      const raw = (throttleIn * p.power * boostFactor * powerFraction(spec, rpmFraction) * fuelFactor) / Math.max(absV, spec.minPowerSpeed);
-      const traction = aMax * spec.tractionFraction;
-      drive = Math.min(raw, traction);
-      if (raw > traction * 1.25 && absV < 34) car.wheelspin = Math.min(1, (raw / traction - 1.25) * 2) * throttleIn;
-    }
-    accel += drive;
-    const brakeMax = Math.min(p.brake * (1 + p.downforce * v * v * 0.9) * sGrip, aMax * 1.15);
-    accel -= brakeIn * brakeMax;
-    accel -= spec.engineBraking * Math.min(1, rpmFraction) * (1 - throttleIn);
-  }
-  const dragCoefficient = p.drag * (1 - 0.32 * car.draft) * (car.puncture ? 2.4 : 1) * (1 + (rules.damage ? 0.5 * car.damage : 0));
-  const resist = dragCoefficient * v * v + spec.rollingResistance + surfaceDrag(car.surface, profile, absV) + spec.slipScrub * Math.min(slip, 1.5);
-  accel -= Math.sign(v) * resist;
-  accel -= GRAVITY * Math.sin(car.pitch);
-
-  // Pit lane limiter.
-  if (car.inPit && track.pit && absV > track.pit.speedLimit) {
-    const rel = relativeS(track, car.s);
-    if (rel > track.pit.wallStartS - 20 && rel < track.pit.wallEndS) accel = Math.min(accel, -22);
-  }
-
-  let nv = v + accel * dt;
-  if (!car.reverse && v >= 0 && nv < 0) nv = 0;        // brakes never push the car backwards
-  if (car.reverse && nv > 0 && throttleIn < 0.05) nv = Math.min(nv, 0);
-  if (car.limiter && nv > gearTop && drive > 0) nv = Math.max(gearTop, v - 0.5 * dt);
-  car.accelLong = (nv - v) / dt;
-  v = nv;
-  car.speed = v;
-
-  // ---- lateral slide (visible drift when beyond the limit, decays with grip)
-  if (slip > 0) car.vLat -= Math.sign(car.yawRate) * Math.min(slip, 1.5) * aMax * 0.22 * dt;
-  car.vLat *= Math.exp(-spec.lateralRecovery * sGrip * dt);
-  car.slip = damp(car.slip, slip + Math.abs(car.vLat) * 0.12, 12, dt);
-
-  // ---- integrate position
-  const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
-  car.x += (ch * v - sh * car.vLat) * dt;
-  car.z += (sh * v + ch * car.vLat) * dt;
-  car.odometer += v * dt;
-
-  // ---- engine speed
-  const rpmTarget = car.reverse
-    ? spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * Math.min(1, absV / gears[0])
-    : Math.max(spec.rpmIdle, spec.rpmMax * Math.min(1.02, rpmFraction));
-  const slipRev = car.wheelspin > 0 ? spec.rpmMax * 0.25 * car.wheelspin : 0;
-  car.rpm = damp(car.rpm, engineAlive ? Math.min(spec.rpmMax, rpmTarget + slipRev) : 0, 22, dt);
-  car.throttle = throttleIn; car.brake = brakeIn;
-  if (absV > car.topSpeed) car.topSpeed = absV;
-
-  // ---- attrition
-  if (rules.wear && !car.puncture) {
-    const load = 0.45 + 0.55 * Math.min(1, latWanted / aMax) + 2.2 * Math.min(slip, 1.5) + car.wheelspin;
-    car.tyreWear += (absV * dt * load * p.wearRate) / rules.tyreLifeMeters;
-    if (car.tyreWear >= 1) { car.tyreWear = 1; car.puncture = true; if (emit) emit('puncture', car.index, 0); }
-  }
-  if (rules.fuel && car.fuel > 0 && engineAlive) {
-    const burn = (0.35 + 0.65 * throttleIn) * (car.boosting ? 1.6 : 1);
-    car.fuel -= (spec.fuelCapacity * absV * dt * burn) / (rules.fuelRangeMeters * 0.87);
-    if (car.fuel <= 0) { car.fuel = 0; if (emit) emit('fuelOut', car.index, 0); }
-  }
-  if (car.surface === SURFACE.GRASS || car.surface === SURFACE.GRAVEL) car.offTrackTime += dt;
-}
-
-function updateTrackFrame(car, track, dt) {
-  const previousS = car.s;
-  locateOnTrack(track, car.x, car.z, car.segIndex, located);
-  let ds = located.s - previousS;
-  if (ds > track.length / 2) ds -= track.length; else if (ds < -track.length / 2) ds += track.length;
-  if (car.segIndex >= 0) car.progress += ds;
-  car.segIndex = located.index; car.s = located.s; car.d = located.d;
-  const i = located.index;
-  car.headingError = angleDiff(car.heading, track.heading[i]);
-  const ad = Math.abs(car.d);
-  if (ad <= track.halfWidth) car.surface = SURFACE.ASPHALT;
-  else {
-    const right = car.d > 0;
-    const kerb = right ? track.kerbR[i] : track.kerbL[i];
-    const verge = right ? track.vergeR[i] : track.vergeL[i];
-    if (kerb > 0.5 && ad <= track.halfWidth + track.kerbWidth) car.surface = SURFACE.KERB;
-    else if (verge === 2) car.surface = SURFACE.PIT;
-    else if (verge === 1 && ad > track.halfWidth + 3) car.surface = SURFACE.GRAVEL;
-    else car.surface = SURFACE.GRASS;
-  }
-  car.y = sampleArray(track, track.y, car.s);
-  const grade = track.grade[i] * Math.cos(car.headingError);
-  car.pitch = damp(car.pitch, Math.atan(grade), 20, dt);
-}
-
-function wallBounce(car, track, side, penetration, rules, emit) {
-  const i = car.segIndex;
-  const nx = track.nx[i], nz = track.nz[i], tx = track.tx[i], tz = track.tz[i];
-  car.x -= nx * side * penetration;
-  car.z -= nz * side * penetration;
-  car.d -= side * penetration;
-  const ch = Math.cos(car.heading), sh = Math.sin(car.heading);
-  const spinning = car.state === CAR_STATE.SPIN;
-  const vx = spinning ? car.velX : ch * car.speed - sh * car.vLat;
-  const vz = spinning ? car.velZ : sh * car.speed + ch * car.vLat;
-  const vn = (vx * nx + vz * nz) * side;
-  if (vn <= 0.15) return;
-  const vt = vx * tx + vz * tz;
-  const profile = car.params.profile;
-  car.wallHits++;
-  if (emit) emit('wall', car.index, vn);
-  if (rules.damage) car.damage = Math.min(1, car.damage + Math.max(0, vn - 2) * 0.011);
-  if (spinning) {
-    const bounce = -vn * 0.4 * side;
-    car.velX = tx * vt * 0.8 + nx * bounce;
-    car.velZ = tz * vt * 0.8 + nz * bounce;
-    return;
-  }
-  const direction = vt >= 0 ? 1 : -1;
-  const loss = clamp(1 - vn * profile.wallSpeedLoss, 0.25, 1);
-  const awayHeading = track.heading[i] + (direction < 0 ? Math.PI : 0) - side * direction * 0.05;
-  const blend = clamp(vn / 6, 0.25, 1);
-  car.heading = wrapAngle(car.heading + angleDiff(awayHeading, car.heading) * blend);
-  const facing = Math.cos(angleDiff(car.heading, track.heading[i])) >= 0 ? 1 : -1;
-  car.speed = Math.abs(vt) * loss * (facing === direction ? 1 : -1);
-  car.vLat = -side * facing * Math.min(vn * 0.3, 3);
-  car.yawRate *= 0.3;
-  if (vn > profile.crashImpact && rules.crashes !== false) startSpin(car, vn, -side * direction, emit);
-}
-
-function collideBoundaries(car, track, rules, emit) {
-  if (car.state !== CAR_STATE.RACING && car.state !== CAR_STATE.SPIN && car.state !== CAR_STATE.RETIRED) return;
-  const i = car.segIndex, hw = car.params.halfWidth, pit = track.pit;
-  let limitR = track.barrierR[i] - hw, limitL = track.barrierL[i] - hw;
-  const rel = relativeS(track, car.s);
-  const inZone = rel >= pit.entryS && rel <= pit.exitS;
-  const inWall = rel >= pit.wallStartS && rel <= pit.wallEndS;
-  const dp = car.d * pit.side;
-  if (!inZone) car.inPit = false;
-  else if (!inWall) car.inPit = dp > pit.wallD;
-  if (inWall) {
-    const half = pit.wallThickness / 2 + hw;
-    if (car.inPit) {
-      if (dp < pit.wallD + half) wallBounce(car, track, -pit.side, pit.wallD + half - dp, rules, emit);
-    } else if (pit.side > 0) limitR = Math.min(limitR, pit.wallD - half);
-    else limitL = Math.min(limitL, pit.wallD - half);
-  }
-  if (car.d > limitR) wallBounce(car, track, 1, car.d - limitR, rules, emit);
-  else if (car.d < -limitL) wallBounce(car, track, -1, -limitL - car.d, rules, emit);
-}
-
-function watchStuck(car, dt, emit) {
-  if (car.inReset) {
-    car.inReset = false;
-    requestReset(car, 0.5);
-    if (emit) emit('manualReset', car.index, 0);
-    return;
-  }
-  const offLine = car.surface === SURFACE.GRASS || car.surface === SURFACE.GRAVEL || Math.abs(car.headingError) > 1.9;
-  const slow = Math.abs(car.speed) < 1.5;
-  if (slow && (offLine || !car.isHuman) && !car.pitAuto) car.stuckTimer += dt;
-  else car.stuckTimer = Math.max(0, car.stuckTimer - dt * 2);
-  if (car.stuckTimer > (car.isHuman ? 3 : 4)) requestReset(car, 0.4);
-  if (Math.abs(car.headingError) > 1.75 && car.speed > 4) car.wrongWayTimer += dt; else car.wrongWayTimer = 0;
-}
-
-__modules["src/physics/car-physics.js"] = { CAR_STATE, createCarState, placeCar, startSpin, requestReset, steeringLock, stepCar };
-})();
 // ---- src/core/random.js
 (function () {
 // Deterministic pseudo random generators. The simulation never uses Math.random.
@@ -2777,7 +2952,7 @@ __modules["src/core/random.js"] = { Random, hashString, hash2, valueNoise2, fbm2
 // Car-to-car contacts: oriented boxes, separating axis test, equal-mass impulse response.
 
 const { clamp } = __modules["src/core/math.js"];
-const { CAR_STATE, startSpin } = __modules["src/physics/car-physics.js"];
+const { CAR_STATE, startSpin, startAirborne } = __modules["src/physics/car-physics.js"];
 const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
 
 /** Events emitted for a contact between two cars: `contact` always (sound, statistics), plus the kind when it has consequences. */
@@ -2859,7 +3034,20 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
       // separated along a car: nose to tail. The follower is the one behind.
       const follower = dx * ca + dz * sa > 0 ? a : b, leader = follower === a ? b : a;
       const closing = follower.speed - leader.speed;
-      if (closing > 0.3) { rearContact(follower, leader, closing, Math.abs(-dx * sa + dz * ca), time, emit); return true; }
+      if (closing > 0.3) {
+        const lateral = -dx * sa + dz * ca;                       // sideways offset of b seen from a
+        const overlap = clamp((pa.halfWidth + pb.halfWidth - Math.abs(lateral)) / (2 * Math.min(pa.halfWidth, pb.halfWidth)), 0, 1);
+        // wheel over wheel at a high closing speed: the follower rides over the car ahead and takes off
+        if (rules.crashes !== false && closing >= T.launchClosingSpeed && follower.speed >= T.launchMinSpeed
+          && overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax) {
+          const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
+          startAirborne(follower, T.flightTimeCar, T.hardAfterCar, emit, leader.index, side);
+          countContact(follower, leader, time, emit, closing);
+          return true;
+        }
+        rearContact(follower, leader, closing, time, emit);
+        return true;
+      }
     } else {
       sideContact(a, b, nx, nz, time, emit);
       return true;
@@ -2931,9 +3119,8 @@ function penalise(car, losses, ceiling) {
 /**
  * Nose-to-tail contact. The follower loses a fixed amount of speed (and never stays faster than
  * the car it hit); the leader is nudged forward. No change of direction for either.
- * `lateral` is the sideways offset between the two cars (m).
  */
-function rearContact(follower, leader, closing, lateral, time, emit) {
+function rearContact(follower, leader, closing, time, emit) {
   const T = COLLISION_TUNING;
   const lost = penalise(follower, 1, Math.max(T.penaltyFloorSpeed, leader.speed - T.leaderMargin));
   if (lost > 0.5 && follower.bumpClock === follower.clock) {
@@ -2993,10 +3180,11 @@ __modules["src/physics/collisions.js"] = { CONTACT, resolveCarContacts, updateDr
 // ---- src/physics/obstacles.js
 (function () {
 // Solid roadside objects (boards standing on the verge). A car that runs into one knocks it
-// down for the rest of the race and loses part of its speed.
+// down for the rest of the race; fast enough, it is thrown in the air (car-physics.js: startAirborne),
+// otherwise it loses part of its speed.
 // The list comes from the logical scenery layout of the track: position (s, d) and half width.
 
-const { CAR_STATE } = __modules["src/physics/car-physics.js"];
+const { CAR_STATE, startAirborne } = __modules["src/physics/car-physics.js"];
 const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
 
 /**
@@ -3022,7 +3210,9 @@ function collideObstacles(cars, track, obstacles, down, emit) {
       down[k] = 1; hits++;
       const impact = car.state === CAR_STATE.SPIN ? Math.hypot(car.velX, car.velZ) : Math.abs(car.speed);
       if (emit) emit('obstacle', car.index, impact, k);
-      if (car.state === CAR_STATE.RACING) {
+      if (car.state === CAR_STATE.RACING && car.speed >= T.obstacleLaunchSpeed) {
+        startAirborne(car, T.flightTimeObstacle, T.hardAfterObstacle, emit, -1, o.d > car.d ? 1 : -1);
+      } else if (car.state === CAR_STATE.RACING) {
         car.speed *= T.obstacleSpeedFactor;
         car.bumpClock = car.clock; car.bumpStrength = 1;
       } else { car.velX *= T.obstacleSpeedFactor; car.velZ *= T.obstacleSpeedFactor; }
@@ -7298,7 +7488,7 @@ class SceneBuilder {
 
   emitCar(quads, p, car, index, yawAngle, W) {
     const z = this.carZ[index];
-    if (!projectAtDepth(p, z, this.carD[index], 0, pt)) return;
+    if (!projectAtDepth(p, z, this.carD[index], car.airHeight || 0, pt)) return;      // a car in flight is drawn above the road
     // angle between the car's nose and the line of sight (0 = seen from behind, + = nose to the right)
     const lateral = (pt.x - p.cx) / p.focal;
     let alpha = wrapAngle(pt.theta - yawAngle + car.headingError + (p.dir < 0 ? Math.PI : 0) - Math.atan(lateral));
@@ -7309,7 +7499,8 @@ class SceneBuilder {
     const w = cs.w * k, h = cs.h * k;
     const left = pt.x - (flip ? cs.w - cs.ax : cs.ax) * k, top = pt.y - cs.ay * k;
     if (left > W || left + w < 0) return;
-    let ghost = car.ghostTimer > 0 || car.state === CAR_STATE.RESET ? 0.55 : 1;
+    // cars that cannot be hit are drawn lighter: being put back on the track, restarting, or stopped after an accident
+    let ghost = car.ghostTimer > 0 || car.state === CAR_STATE.RESET || (car.state === CAR_STATE.WRECKED && car.speed < 0.5) ? 0.55 : 1;
     if (z < NEAR_CAR + NEAR_CAR_FADE) ghost *= (z - NEAR_CAR) / NEAR_CAR_FADE;
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
@@ -11257,7 +11448,7 @@ const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degrees (fr
 /** Silhouette pen width of the cars in the race, in metres at the car: the same weight as the cockpit's own outlines. */
 const CAR_INK_WORLD = 0.017;
 const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
-const STATIC_LAYERS = 6;
+const STATIC_LAYERS = 7;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;
 
 /** Which team colour goes to which livery zone (body, flanks, wings) for each paint pattern. */
@@ -12063,7 +12254,7 @@ function paintHand(ctx, c, rimMid, a, S, glove, suit) {
   brushStroke(ctx, [P(S * 0.03, -S * 0.04), P(S * 0.04, -S * 0.018)], 1.8, { color: INK, taper: 0.3 });
 }
 
-function paintSteeringWheel(ctx, S, glove, suit, accent) {
+function paintSteeringWheel(ctx, S, glove, suit, accent, hands = true) {
   const c = S / 2, R = S * 0.452, rimW = S * 0.074, rimMid = R - rimW / 2;
   // spokes (behind the rim)
   const spoke = (a, w0, w1) => {
@@ -12108,8 +12299,10 @@ function paintSteeringWheel(ctx, S, glove, suit, accent) {
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(c + bx, c - S * 0.012, S * 0.017, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke();
   }
-  paintHand(ctx, c, rimMid, Math.PI * 1.16, S, glove, suit);
-  paintHand(ctx, c, rimMid, -Math.PI * 0.16, S, glove, suit);
+  if (hands) {
+    paintHand(ctx, c, rimMid, Math.PI * 1.16, S, glove, suit);
+    paintHand(ctx, c, rimMid, -Math.PI * 0.16, S, glove, suit);
+  }
 }
 
 /**
@@ -12126,7 +12319,7 @@ function defineCockpitArt(art, players) {
   const probe = { eye, focal, cx: 0, cy: 0 };
   const nearParts = (name) => name === 'tub' || name === 'suspension.left' || name === 'exhaust';
   const farParts = (name) => name === 'frontwing.main' || name === 'frontwing.flap.left' || name === 'frontwing.endplate.left' || name === 'frontwing.pylons';
-  const layout = { near: [], far: [], wheels: [], steering: [], dial: null, needle: null, stalk: 'cockpit.stalk' };
+  const layout = { near: [], far: [], wheels: [], steering: [], steeringFree: [], dial: null, needle: null, stalk: 'cockpit.stalk' };
   art.defineStatic('cockpit.stalk', STALK.x1 - STALK.x0, STALK.y1 - STALK.y0, (ctx) => paintMirrorStalk(ctx, -STALK.x0, -STALK.y0), { ox: STALK.x0, oy: STALK.y0 });
 
   const nearBounds = drawCar(null, null, model, probe, { measure: true, include: nearParts });
@@ -12145,7 +12338,9 @@ function defineCockpitArt(art, players) {
       drawCar(ctx, null, model, camera(farCrop), { livery, ink: COCKPIT_INK * 0.8, shadow: false, include: farParts });
     }, { ox: farCrop.x, oy: farCrop.y });
     art.defineStatic(`cockpit.steering.${p}`, STEERING.size, Math.round(STEERING.size * (1 + STEERING.extra)), (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2]));
-    layout.near.push(`cockpit.near.${p}`); layout.far.push(`cockpit.far.${p}`); layout.steering.push(`cockpit.steering.${p}`);
+    // the same wheel let go of: shown while the car slides out of control
+    art.defineStatic(`cockpit.steeringfree.${p}`, STEERING.size, Math.round(STEERING.size * (1 + STEERING.extra)), (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2], false));
+    layout.near.push(`cockpit.near.${p}`); layout.far.push(`cockpit.far.${p}`); layout.steering.push(`cockpit.steering.${p}`); layout.steeringFree.push(`cockpit.steeringfree.${p}`);
   });
 
   // front-left wheel: steering frames x rolling variants, all sharing one crop so frames register
@@ -12205,6 +12400,7 @@ const { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING, MIRROR
 const { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES } = __modules["src/art/vehicles/car-model.js"];
 const { BASE_CAR_SPEC } = __modules["src/vehicles/car-spec.js"];
 const { QUAD_MODE } = __modules["src/rendering/drawing/quad-batch.js"];
+const { CAR_STATE } = __modules["src/physics/car-physics.js"];
 
 const BLUR_SPEED = 17;       // m/s above which the tyre is drawn with speed streaks
 
@@ -12275,6 +12471,9 @@ function place(view) {
   return placement;
 }
 
+/** Scale (k) and vertical origin (oy) of the cockpit drawing in a view, for what must be drawn on the car itself. */
+function cockpitPlacement(view) { return place(view); }
+
 class CockpitLayer {
   constructor(art, layout, text) {
     this.text = text;
@@ -12283,6 +12482,7 @@ class CockpitLayer {
     this.far = layout.far.map((id) => art.sprite(id));
     this.stalk = art.sprite(layout.stalk);
     this.steering = layout.steering.map((id) => art.sprite(id));
+    this.steeringFree = layout.steeringFree.map((id) => art.sprite(id));
     this.wheels = layout.wheels.map((row) => row.map((id) => art.sprite(id)));
     this.dial = art.sprite(layout.dial);
     this.needle = art.sprite(layout.needle);
@@ -12409,8 +12609,10 @@ class CockpitLayer {
     }
 
     // steering wheel with the hands, rotated then flattened (the wheel is tilted toward the driver)
-    const sp = this.steering[p];
-    const angle = car.steer * 0.95;
+    // out of control (spin or slide): the driver has let go of the wheel, which turns on its own
+    const loose = car.state === CAR_STATE.SPIN;
+    const sp = loose ? this.steeringFree[p] : this.steering[p];
+    const angle = loose ? Math.sin(car.clock * 9) * 0.5 : car.steer * 0.95;
     const s = STEERING.size * k * 0.5;
     const cx = ox + STEERING.x * k + view.shakeX * 0.4, cy = oy + STEERING.y * k + view.shakeY * 0.6;
     const co = Math.cos(angle), si = Math.sin(angle), q = STEERING.squash;
@@ -12422,7 +12624,7 @@ class CockpitLayer {
   }
 }
 
-__modules["src/rendering/compositing/cockpit-layer.js"] = { wheelVariant, steerFrame, CockpitLayer };
+__modules["src/rendering/compositing/cockpit-layer.js"] = { wheelVariant, steerFrame, cockpitPlacement, CockpitLayer };
 })();
 // ---- src/ui/text-painter.js
 (function () {
@@ -12590,7 +12792,7 @@ const FR = {
   'options.press': 'APPUYEZ SUR UNE TOUCHE...', 'options.reset': 'RÉTABLIR LES COMMANDES',
   'effect.speedLines': 'TRAITS DE VITESSE', 'effect.perspectiveStretch': 'ÉTIREMENT DE PERSPECTIVE', 'effect.cockpitShake': 'VIBRATIONS',
   'effect.impactFrames': 'EFFETS D\'IMPACT', 'effect.onomatopoeia': 'ONOMATOPÉES', 'effect.dust': 'POUSSIÈRE ET FUMÉE', 'effect.skidMarks': 'TRACES DE GOMME',
-  'effect.insets': 'CARTOUCHES', 'effect.introPanels': 'PLANCHE D\'INTRODUCTION',
+  'effect.insets': 'CARTOUCHES', 'effect.introPanels': 'PLANCHE D\'INTRODUCTION', 'effect.explosions': 'EXPLOSIONS',
   'action.steerLeft': 'GAUCHE', 'action.steerRight': 'DROITE', 'action.throttle': 'ACCÉLÉRER', 'action.brake': 'FREINER',
   'action.shiftUp': 'RAPPORT +', 'action.shiftDown': 'RAPPORT -', 'action.boost': 'TURBO', 'action.reset': 'REMISE EN PISTE', 'action.camera': 'CAMÉRA', 'action.pause': 'PAUSE',
   // hud
@@ -12633,6 +12835,7 @@ const FR = {
   'effect.skidMarks.desc': 'TRACES SOMBRES LAISSÉES PAR LES PNEUS QUI GLISSENT.',
   'effect.insets.desc': 'RÉCITATIFS POUR LES DÉPASSEMENTS ET LES MEILLEURS TOURS.',
   'effect.introPanels.desc': 'PLANCHE DE TROIS CASES AVANT CHAQUE DÉPART.',
+  'effect.explosions.desc': 'BOULE DE FEU ET FUMÉE DESSINÉES APRÈS UN ATTERRISSAGE VIOLENT.',
   'key.ArrowLeft': 'FLÈCHE GAUCHE', 'key.ArrowRight': 'FLÈCHE DROITE', 'key.ArrowUp': 'FLÈCHE HAUT', 'key.ArrowDown': 'FLÈCHE BAS',
   'key.ShiftRight': 'MAJ DROITE', 'key.ShiftLeft': 'MAJ GAUCHE', 'key.ControlRight': 'CTRL DROITE', 'key.ControlLeft': 'CTRL GAUCHE',
   'key.AltRight': 'ALT DROITE', 'key.AltLeft': 'ALT GAUCHE', 'key.Backspace': 'RETOUR ARRIÈRE', 'key.Space': 'ESPACE', 'key.Escape': 'ÉCHAP',
@@ -12674,7 +12877,7 @@ const EN = {
   'options.press': 'PRESS A KEY...', 'options.reset': 'RESET CONTROLS',
   'effect.speedLines': 'SPEED LINES', 'effect.perspectiveStretch': 'PERSPECTIVE STRETCH', 'effect.cockpitShake': 'VIBRATIONS',
   'effect.impactFrames': 'IMPACT EFFECTS', 'effect.onomatopoeia': 'SOUND WORDS', 'effect.dust': 'DUST AND SMOKE', 'effect.skidMarks': 'SKID MARKS',
-  'effect.insets': 'CAPTION BOXES', 'effect.introPanels': 'INTRO STRIP',
+  'effect.insets': 'CAPTION BOXES', 'effect.introPanels': 'INTRO STRIP', 'effect.explosions': 'EXPLOSIONS',
   'action.steerLeft': 'LEFT', 'action.steerRight': 'RIGHT', 'action.throttle': 'ACCELERATE', 'action.brake': 'BRAKE',
   'action.shiftUp': 'GEAR UP', 'action.shiftDown': 'GEAR DOWN', 'action.boost': 'BOOST', 'action.reset': 'BACK ON TRACK', 'action.camera': 'CAMERA', 'action.pause': 'PAUSE',
   'hud.position': 'POSITION', 'hud.lap': 'LAP', 'hud.time': 'TIME', 'hud.last': 'LAST', 'hud.best': 'BEST', 'hud.score': 'SCORE',
@@ -12715,6 +12918,7 @@ const EN = {
   'effect.skidMarks.desc': 'DARK MARKS LEFT BY SLIDING TYRES.',
   'effect.insets.desc': 'CAPTION BOXES FOR OVERTAKES AND BEST LAPS.',
   'effect.introPanels.desc': 'A THREE-PANEL STRIP BEFORE EACH START.',
+  'effect.explosions.desc': 'DRAWN FIREBALL AND SMOKE AFTER A HARD LANDING.',
   'key.ArrowLeft': 'LEFT ARROW', 'key.ArrowRight': 'RIGHT ARROW', 'key.ArrowUp': 'UP ARROW', 'key.ArrowDown': 'DOWN ARROW',
   'key.ShiftRight': 'RIGHT SHIFT', 'key.ShiftLeft': 'LEFT SHIFT', 'key.ControlRight': 'RIGHT CTRL', 'key.ControlLeft': 'LEFT CTRL',
   'key.AltRight': 'RIGHT ALT', 'key.AltLeft': 'LEFT ALT', 'key.Backspace': 'BACKSPACE', 'key.Space': 'SPACE', 'key.Escape': 'ESC',
@@ -13050,12 +13254,16 @@ const { closedCurve, blobPoints, brushStroke, seeded } = __modules["src/art/styl
 const { drawText, measureText } = __modules["src/art/styles/lettering.js"];
 const { hexToRgb } = __modules["src/art/palettes/palettes.js"];
 const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
+const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
+const { cockpitPlacement } = __modules["src/rendering/compositing/cockpit-layer.js"];
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8, MAX_FLASHES = 6;
 const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR'];
 const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6 };
 const FLATOUT_WORDS = 3;        // the engine at full cry has several spellings
 const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6', '#ffd42a', '#f58a1f'];
+/** Phases of an explosion, seconds after the hard landing (MEASURED on the reference footage: 0.48 / 0.44 / 0.2 / 0.12 s, plumes 0.6 s). */
+const BLAST = { grow: 0.48, full: 0.92, dark: 1.12, smokeEnd: 1.24, plumeStart: 1.0, end: 1.6 };
 const FLATOUT_SPEED = 76;       // m/s: the engine at full cry gets its own lettering, now and then
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
@@ -13079,6 +13287,24 @@ function defineEffectsArt(art) {
     }
   });
   puff('fx.puff.0', 11, 6); puff('fx.puff.1', 29, 7); puff('fx.puff.2', 47, 5);
+  // fireball of an explosion: lobed flames in three flat tones under an ink outline (two drawings that alternate)
+  const fire = (id, seed) => art.defineStatic(id, 384, 384, (ctx, w) => {
+    const rnd = seeded(seed), c = w / 2;
+    ctx.lineJoin = 'round';
+    const outer = blobPoints(c, c + 6, 150, 158, 11, 0.3, rnd);
+    ctx.beginPath(); closedCurve(ctx, outer); ctx.strokeStyle = '#16161f'; ctx.lineWidth = 11; ctx.stroke();
+    ctx.fillStyle = '#d5302a'; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = '#f58a1f'; ctx.beginPath(); closedCurve(ctx, blobPoints(c - 6, c + 16, 112, 118, 9, 0.28, rnd)); ctx.fill();
+    ctx.fillStyle = '#ffd42a'; ctx.beginPath(); closedCurve(ctx, blobPoints(c - 10, c + 26, 74, 78, 8, 0.3, rnd)); ctx.fill();
+    ctx.fillStyle = '#fff6c8'; ctx.beginPath(); closedCurve(ctx, blobPoints(c - 12, c + 34, 36, 38, 6, 0.25, rnd)); ctx.fill();
+    ctx.restore();
+    for (let i = 0; i < 7; i++) {                                           // licks of flame drawn with the pen
+      const a = -Math.PI * (0.1 + rnd() * 0.8), r0 = 60 + rnd() * 40, r1 = r0 + 30 + rnd() * 30;
+      brushStroke(ctx, [[c + Math.cos(a) * r0, c + Math.sin(a) * r0], [c + Math.cos(a + 0.2) * (r0 + r1) * 0.5, c + Math.sin(a + 0.2) * (r0 + r1) * 0.5], [c + Math.cos(a - 0.1) * r1, c + Math.sin(a - 0.1) * r1]], 5, { color: '#16161f', taperStart: 0.2, taperEnd: 0.8 });
+    }
+  });
+  fire('fx.fire.0', 71); fire('fx.fire.1', 97);
   art.defineStatic('fx.spark', 64, 64, (ctx, w) => {
     const c = w / 2;
     ctx.beginPath();
@@ -13127,6 +13353,7 @@ class EffectsLayer {
     this.puffs = [art.sprite('fx.puff.0'), art.sprite('fx.puff.1'), art.sprite('fx.puff.2')];
     this.spark = art.sprite('fx.spark');
     this.burst = art.sprite('fx.burst');
+    this.fire = [art.sprite('fx.fire.0'), art.sprite('fx.fire.1')];
     this.mark = art.sprite('fx.mark');
     this.words = WORDS.map((w, i) => art.sprite(`fx.word.${i}`));
     const n = MAX_PARTICLES;
@@ -13152,6 +13379,8 @@ class EffectsLayer {
     this.flashes = Array.from({ length: MAX_FLASHES }, () => ({ car: -1, s: 0, d: 0, h: 0, age: 9, life: 0, size: 1, seg: -1, z: 0 }));
     this.flashCursor = 0;
     this.typedCar = -1; this.typedClock = 9;
+    // explosions after a hard landing: one per car at most, attached to the car, timed on the car's own clock
+    this.blasts = Array.from({ length: 4 }, () => ({ car: -1, seg: -1, z: 0 }));
     this.popClock = [9, 9];
     this.roarClock = [0, 0]; this.wasFlatOut = [false, false];
     this.dust = [0.85, 0.79, 0.64]; this.dirt = [0.55, 0.6, 0.38]; this.smoke = [0.93, 0.92, 0.9];
@@ -13166,6 +13395,7 @@ class EffectsLayer {
     this.emitTimer.fill(0); this.markOdo.fill(0);
     for (const list of this.pops) for (const p of list) p.life = 0;
     for (const f of this.flashes) f.life = 0;
+    for (const b of this.blasts) b.car = -1;
     this.typedCar = -1; this.typedClock = 9;
     this.popClock[0] = 9; this.popClock[1] = 9;
     this.roarClock[0] = 0; this.roarClock[1] = 0; this.wasFlatOut[0] = false; this.wasFlatOut[1] = false;
@@ -13206,6 +13436,7 @@ class EffectsLayer {
     }
     if (event.type === 'bump' || event.type === 'wheel') { this.onTypedContact(event, app); return; }
     if (event.type === 'obstacle') { this.onObstacle(event, app); return; }
+    if (event.type === 'launch' || event.type === 'landing') { this.onFlight(event, app); return; }
     // (a contact that already has its own staging does not get the generic burst as well)
     if (event.type === 'contact' && this.typedClock < 0.1 && (event.car === this.typedCar || event.other === this.typedCar)) return;
     const hit = event.type === 'wall' || event.type === 'contact' || event.type === 'crash';
@@ -13266,6 +13497,26 @@ class EffectsLayer {
       const mine = race.cars[view.carIndex], theirs = mine === car ? other : car;
       const x = wheel ? (theirs.d > mine.d ? 0.68 : 0.32) : 0.5 + (this.random() - 0.5) * 0.2;
       this.pop(v, wheel ? WORD.TCHAK : WORD.BANG, x, 0.33, 0.6, false);
+    }
+  }
+
+  /** Take-off and landing of a car: jolt and sound word for its driver, dust where it comes down, explosion if it is a hard one. */
+  onFlight(event, app) {
+    const fx = app.effects, race = app.race, car = race.cars[event.car];
+    const landing = event.type === 'landing', hard = landing && event.value > 0;
+    if (landing && fx.dust) {
+      for (let k = 0; k < (hard ? 8 : 5); k++) this.spawn(0, car.s + (this.random() - 0.5) * 3, car.d + (this.random() - 0.5) * 2.4, 0.3, car.speed * 0.5, (this.random() - 0.5) * 4, 1, 0.8 + this.random() * 0.5, 1.2, 2.2, car.surface === SURFACE.ASPHALT ? this.smoke : this.dust, 1);
+    }
+    if (hard && fx.explosions !== false) {
+      const slot = this.blasts.find((b) => b.car === event.car) || this.blasts.find((b) => b.car < 0) || this.blasts[0];
+      slot.car = event.car;
+    }
+    for (let v = 0; v < app.viewCount; v++) {
+      const view = app.views[v];
+      if (view.carIndex !== event.car) continue;
+      view.addImpact(landing ? (hard ? 1 : 0.7) : 0.8);
+      // (one sound word at a time: a board that throws the car has already had its own)
+      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, 0.9, false); }
     }
   }
 
@@ -13353,6 +13604,15 @@ class EffectsLayer {
   beginView(app, view) {
     const p = view.projection, quads = app.quads, sp = this.mark;
     const W = view.rect.w;
+    // explosions: placed with their car; over when the car's clock has run past the last phase
+    for (const b of this.blasts) {
+      b.seg = -1;
+      if (b.car < 0) continue;
+      const car = app.race.cars[b.car], age = car.clock - car.landClock;
+      if (age < 0 || age > BLAST.end || !car.landHard) { b.car = -1; continue; }
+      b.z = depthOf(p, car.s + 1.3);
+      if (b.z > 0.6 && b.z < p.farZ - 3) b.seg = segmentAt(p, b.z);
+    }
     // where each contact flash is along the projected road in this view
     for (const f of this.flashes) {
       f.seg = -1;
@@ -13396,6 +13656,7 @@ class EffectsLayer {
       const size = Math.min(view.rect.h * 0.3, f.size * pt.scale) * (t < 0.25 ? 0.7 + 1.2 * t : 1 - (t - 0.25) * 0.55);
       quads.rotated(this.burst, pt.x, pt.y, size, size, f.s * 7, 0.5, 0.5, 1, 1, 1, 1);
     }
+    for (const b of this.blasts) if (b.seg === k) this.drawBlast(app, view, b);
     let i = this.segHead[k];
     if (i < 0) return;
     for (; i >= 0; i = this.pnext[i]) {
@@ -13419,9 +13680,64 @@ class EffectsLayer {
     }
   }
 
+  /**
+   * Explosion of a wrecked car, in four drawn phases timed on the car's clock since the landing:
+   * the fireball grows, burns at full size (two drawings alternate), darkens, turns to smoke;
+   * two plumes then rise from the front wheels. Opaque flat drawings, no fading.
+   */
+  drawBlast(app, view, b) {
+    const car = app.race.cars[b.car];
+    // seen from the car's own cockpit the explosion belongs to the cockpit drawing (see buildFront)
+    if (view.camera === CAMERA.COCKPIT && view.carIndex === b.car) return;
+    const p = view.projection, age = car.clock - car.landClock, cap = view.rect.h * 0.42;
+    const side = car.launchSide || -1;
+    if (age < BLAST.smokeEnd && projectAtDepth(p, b.z, car.d + side * 0.8, 0.55, pt)) {
+      this.blastFire(app.quads, age, pt.x, pt.y, Math.min(cap, 2.6 * pt.scale));
+    }
+    if (age > BLAST.plumeStart && age < BLAST.end) {
+      const u = (age - BLAST.plumeStart) / (BLAST.end - BLAST.plumeStart);
+      for (let w = -1; w <= 1; w += 2) {
+        if (!projectAtDepth(p, b.z + 0.3, car.d + w * 0.85, 0.7 + u * 1.3, pt)) continue;
+        this.blastPlume(app.quads, u, pt.x, pt.y, Math.min(cap * 0.5, 0.8 * pt.scale), w);
+      }
+    }
+  }
+
+  /** Fireball of an explosion at (x, y), `size` pixels across at full size, `age` seconds after the landing. */
+  blastFire(quads, age, x, y, size) {
+    let scale, r = 1, g = 1, bl = 1, sprite = this.fire[Math.floor(age / 0.08) & 1];
+    if (age < BLAST.grow) scale = 0.15 + 0.85 * Math.sqrt(age / BLAST.grow);
+    else if (age < BLAST.full) scale = 1 + 0.06 * Math.sin((age - BLAST.grow) * 30);
+    else if (age < BLAST.dark) { const u = (age - BLAST.full) / (BLAST.dark - BLAST.full); scale = 1 - 0.15 * u; r = 0.78; g = 0.42; bl = 0.4; }
+    else { scale = 1.05; sprite = this.puffs[1]; r = 0.2; g = 0.2; bl = 0.25; }
+    const s = size * scale;
+    quads.sprite(sprite, x - s / 2, y - s * 0.62, s, s, r, g, bl, 1, 0, false);
+  }
+
+  /** One of the two dark plumes that end an explosion (u = 0..1 along its life). */
+  blastPlume(quads, u, x, y, size, side) {
+    const s = size * (1 + 0.75 * u) * (u > 0.75 ? 1 - (u - 0.75) * 2.4 : 1);
+    quads.sprite(this.puffs[side > 0 ? 0 : 2], x - s / 2, y - s / 2, s, s, 0.22, 0.22, 0.28, 1, 0, side > 0);
+  }
+
   /** Screen-space bursts and sound words of this view. */
   buildFront(app, view) {
     const quads = app.quads, r = view.rect;
+    // explosion of the followed car, seen from its cockpit: on the front wheel that took the hit,
+    // then a plume over each front wheel (positions in the units of the cockpit drawing)
+    if (view.camera === CAMERA.COCKPIT) {
+      for (const b of this.blasts) {
+        if (b.car !== view.carIndex) continue;
+        const car = app.race.cars[b.car], age = car.clock - car.landClock;
+        if (age < 0 || age > BLAST.end || !car.landHard) continue;
+        const place = cockpitPlacement(view), k = place.k, cx = r.w / 2, side = car.launchSide || -1;
+        if (age < BLAST.smokeEnd) this.blastFire(quads, age, cx + side * 800 * k, place.oy + 430 * k, 470 * k);
+        if (age > BLAST.plumeStart) {
+          const t = (age - BLAST.plumeStart) / (BLAST.end - BLAST.plumeStart);
+          for (let w = -1; w <= 1; w += 2) this.blastPlume(quads, t, cx + w * 820 * k, place.oy + (330 - 260 * t) * k, 200 * k, w);
+        }
+      }
+    }
     const u = Math.min(r.w / 2560, (r.h / 1440) * (view.wide ? 1.6 : 1));
     for (const p of this.pops[view.index]) {
       if (p.life <= 0) continue;
@@ -13443,7 +13759,7 @@ class EffectsLayer {
   }
 }
 
-__modules["src/rendering/effects/effects-layer.js"] = { defineEffectsArt, EffectsLayer };
+__modules["src/rendering/effects/effects-layer.js"] = { BLAST, defineEffectsArt, EffectsLayer };
 })();
 // ---- src/input/bindings.js
 (function () {
@@ -15634,6 +15950,8 @@ class GameAudio {
         break;
       }
       case 'wall':
+      case 'obstacle':
+      case 'landing':
       case 'contact': {
         let gain = this.locate(index, app);
         if (type === 'contact' && gain < 1 && event.other >= 0) {
@@ -15641,7 +15959,7 @@ class GameAudio {
           if (this.locate(event.other, app) > gain) gain = hear.gain;
           else { hear.gain = gain; hear.pan = pan; hear.slot = slot; }
         }
-        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, Math.abs(value), type === 'wall', time);
+        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, type === 'landing' ? 14 : Math.min(20, Math.abs(value)), type !== 'contact', time);
         break;
       }
       case 'crash':
@@ -16662,7 +16980,7 @@ class GameFlow {
 
   effectsMenu() {
     const s = this.settings;
-    const items = Object.keys(DEFAULT_EFFECTS).map((key) => ({ label: t(`effect.${key}`), desc: () => this.describe(`effect.${key}`), value: () => t(s.effects[key] ? 'options.on' : 'options.off'), adjust: () => { s.effects[key] = !s.effects[key]; } }));
+    const items = Object.keys(DEFAULT_EFFECTS).map((key) => ({ label: t(`effect.${key}`), desc: () => this.describe(`effect.${key}`), value: () => t((s.effects[key] ?? DEFAULT_EFFECTS[key]) ? 'options.on' : 'options.off'), adjust: () => { s.effects[key] = !(s.effects[key] ?? DEFAULT_EFFECTS[key]); } }));
     items.push({ label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() });
     return { id: 'effects', heading: () => t('options.effects'), hero: { team: 2, yaw: 1.2 }, items, selected: 0, onChange: () => this.saveSettings() };
   }
@@ -17039,6 +17357,8 @@ __modules["src/core/benchmark.js"] = { BENCHMARK_SCENARIOS, runBenchmark, descri
 // Entry point: boots the application and exposes a small automation API used by tests,
 // captures and benchmarks (window.virage).
 
+const { placeCar, CAR_STATE } = __modules["src/physics/car-physics.js"];
+const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
 const { GameApp } = __modules["src/core/game-app.js"];
 const { GpuUnavailableError } = __modules["src/rendering/gpu-context.js"];
 const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
@@ -17156,7 +17476,8 @@ async function boot() {
     notice.textContent = results.runs.map((r) => `${r.scenario}: ${r.fps.toFixed(1)} fps — interval moy. ${r.frameInterval.mean.toFixed(2)} ms, p99 ${r.frameInterval.p99.toFixed(2)} ms, max ${r.frameInterval.max.toFixed(2)} ms — GPU ${r.gpuPass ? `${r.gpuPass.mean.toFixed(2)} / p99 ${r.gpuPass.p99.toFixed(2)} / max ${r.gpuPass.max.toFixed(2)} ms` : 'n/d'} — CPU ${r.cpuFrame.mean.toFixed(2)} ms — > 16,7 ms : ${r.framesOver16_7ms}/${r.frames}`).join('\n');
     return results;
   };
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate };
+  // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, debug: { placeCar, CAR_STATE, COLLISION_TUNING } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
   if (!params.manual) app.start();
   if (params.benchmark) benchmark(params.benchmark === 'all' ? Object.keys(BENCHMARK_SCENARIOS) : params.benchmark.split(','), +(params.seconds || 60));

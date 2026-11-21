@@ -213,7 +213,7 @@ export class GameFlow {
 
   effectsMenu() {
     const s = this.settings;
-    const items = Object.keys(DEFAULT_EFFECTS).map((key) => ({ label: t(`effect.${key}`), desc: () => this.describe(`effect.${key}`), value: () => t(s.effects[key] ? 'options.on' : 'options.off'), adjust: () => { s.effects[key] = !s.effects[key]; } }));
+    const items = Object.keys(DEFAULT_EFFECTS).map((key) => ({ label: t(`effect.${key}`), desc: () => this.describe(`effect.${key}`), value: () => t((s.effects[key] ?? DEFAULT_EFFECTS[key]) ? 'options.on' : 'options.off'), adjust: () => { s.effects[key] = !(s.effects[key] ?? DEFAULT_EFFECTS[key]); } }));
     items.push({ label: t('menu.back'), desc: () => this.describe('menu.back'), accept: () => this.pop() });
     return { id: 'effects', heading: () => t('options.effects'), hero: { team: 2, yaw: 1.2 }, items, selected: 0, onChange: () => this.saveSettings() };
   }

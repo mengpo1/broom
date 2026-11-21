@@ -1,7 +1,7 @@
 // Car-to-car contacts: oriented boxes, separating axis test, equal-mass impulse response.
 
 import { clamp } from '../core/math.js';
-import { CAR_STATE, startSpin } from './car-physics.js';
+import { CAR_STATE, startSpin, startAirborne } from './car-physics.js';
 import { COLLISION_TUNING } from './collision-tuning.js';
 
 /** Events emitted for a contact between two cars: `contact` always (sound, statistics), plus the kind when it has consequences. */
@@ -83,7 +83,20 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
       // separated along a car: nose to tail. The follower is the one behind.
       const follower = dx * ca + dz * sa > 0 ? a : b, leader = follower === a ? b : a;
       const closing = follower.speed - leader.speed;
-      if (closing > 0.3) { rearContact(follower, leader, closing, Math.abs(-dx * sa + dz * ca), time, emit); return true; }
+      if (closing > 0.3) {
+        const lateral = -dx * sa + dz * ca;                       // sideways offset of b seen from a
+        const overlap = clamp((pa.halfWidth + pb.halfWidth - Math.abs(lateral)) / (2 * Math.min(pa.halfWidth, pb.halfWidth)), 0, 1);
+        // wheel over wheel at a high closing speed: the follower rides over the car ahead and takes off
+        if (rules.crashes !== false && closing >= T.launchClosingSpeed && follower.speed >= T.launchMinSpeed
+          && overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax) {
+          const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
+          startAirborne(follower, T.flightTimeCar, T.hardAfterCar, emit, leader.index, side);
+          countContact(follower, leader, time, emit, closing);
+          return true;
+        }
+        rearContact(follower, leader, closing, time, emit);
+        return true;
+      }
     } else {
       sideContact(a, b, nx, nz, time, emit);
       return true;
@@ -155,9 +168,8 @@ function penalise(car, losses, ceiling) {
 /**
  * Nose-to-tail contact. The follower loses a fixed amount of speed (and never stays faster than
  * the car it hit); the leader is nudged forward. No change of direction for either.
- * `lateral` is the sideways offset between the two cars (m).
  */
-function rearContact(follower, leader, closing, lateral, time, emit) {
+function rearContact(follower, leader, closing, time, emit) {
   const T = COLLISION_TUNING;
   const lost = penalise(follower, 1, Math.max(T.penaltyFloorSpeed, leader.speed - T.leaderMargin));
   if (lost > 0.5 && follower.bumpClock === follower.clock) {

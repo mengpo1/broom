@@ -561,6 +561,8 @@ export class GameAudio {
         break;
       }
       case 'wall':
+      case 'obstacle':
+      case 'landing':
       case 'contact': {
         let gain = this.locate(index, app);
         if (type === 'contact' && gain < 1 && event.other >= 0) {
@@ -568,7 +570,7 @@ export class GameAudio {
           if (this.locate(event.other, app) > gain) gain = hear.gain;
           else { hear.gain = gain; hear.pan = pan; hear.slot = slot; }
         }
-        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, Math.abs(value), type === 'wall', time);
+        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, type === 'landing' ? 14 : Math.min(20, Math.abs(value)), type !== 'contact', time);
         break;
       }
       case 'crash':

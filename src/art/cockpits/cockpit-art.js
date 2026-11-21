@@ -239,7 +239,7 @@ function paintHand(ctx, c, rimMid, a, S, glove, suit) {
   brushStroke(ctx, [P(S * 0.03, -S * 0.04), P(S * 0.04, -S * 0.018)], 1.8, { color: INK, taper: 0.3 });
 }
 
-function paintSteeringWheel(ctx, S, glove, suit, accent) {
+function paintSteeringWheel(ctx, S, glove, suit, accent, hands = true) {
   const c = S / 2, R = S * 0.452, rimW = S * 0.074, rimMid = R - rimW / 2;
   // spokes (behind the rim)
   const spoke = (a, w0, w1) => {
@@ -284,8 +284,10 @@ function paintSteeringWheel(ctx, S, glove, suit, accent) {
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(c + bx, c - S * 0.012, S * 0.017, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke();
   }
-  paintHand(ctx, c, rimMid, Math.PI * 1.16, S, glove, suit);
-  paintHand(ctx, c, rimMid, -Math.PI * 0.16, S, glove, suit);
+  if (hands) {
+    paintHand(ctx, c, rimMid, Math.PI * 1.16, S, glove, suit);
+    paintHand(ctx, c, rimMid, -Math.PI * 0.16, S, glove, suit);
+  }
 }
 
 /**
@@ -302,7 +304,7 @@ export function defineCockpitArt(art, players) {
   const probe = { eye, focal, cx: 0, cy: 0 };
   const nearParts = (name) => name === 'tub' || name === 'suspension.left' || name === 'exhaust';
   const farParts = (name) => name === 'frontwing.main' || name === 'frontwing.flap.left' || name === 'frontwing.endplate.left' || name === 'frontwing.pylons';
-  const layout = { near: [], far: [], wheels: [], steering: [], dial: null, needle: null, stalk: 'cockpit.stalk' };
+  const layout = { near: [], far: [], wheels: [], steering: [], steeringFree: [], dial: null, needle: null, stalk: 'cockpit.stalk' };
   art.defineStatic('cockpit.stalk', STALK.x1 - STALK.x0, STALK.y1 - STALK.y0, (ctx) => paintMirrorStalk(ctx, -STALK.x0, -STALK.y0), { ox: STALK.x0, oy: STALK.y0 });
 
   const nearBounds = drawCar(null, null, model, probe, { measure: true, include: nearParts });
@@ -321,7 +323,9 @@ export function defineCockpitArt(art, players) {
       drawCar(ctx, null, model, camera(farCrop), { livery, ink: COCKPIT_INK * 0.8, shadow: false, include: farParts });
     }, { ox: farCrop.x, oy: farCrop.y });
     art.defineStatic(`cockpit.steering.${p}`, STEERING.size, Math.round(STEERING.size * (1 + STEERING.extra)), (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2]));
-    layout.near.push(`cockpit.near.${p}`); layout.far.push(`cockpit.far.${p}`); layout.steering.push(`cockpit.steering.${p}`);
+    // the same wheel let go of: shown while the car slides out of control
+    art.defineStatic(`cockpit.steeringfree.${p}`, STEERING.size, Math.round(STEERING.size * (1 + STEERING.extra)), (ctx, w) => paintSteeringWheel(ctx, w, player.glove, player.suit, player.colors[2], false));
+    layout.near.push(`cockpit.near.${p}`); layout.far.push(`cockpit.far.${p}`); layout.steering.push(`cockpit.steering.${p}`); layout.steeringFree.push(`cockpit.steeringfree.${p}`);
   });
 
   // front-left wheel: steering frames x rolling variants, all sharing one crop so frames register

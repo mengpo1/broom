@@ -36,6 +36,7 @@ export const DEFAULT_EFFECTS = {
   skidMarks: true,           // tyre marks on the asphalt
   insets: true,              // small caption panels (overtakes, fastest lap...)
   introPanels: true,         // comic strip shown before a race
+  explosions: true,          // drawn fireball and smoke after a hard landing
 };
 
 export const QUALITY_PRESETS = {

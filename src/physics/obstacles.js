@@ -1,8 +1,9 @@
 // Solid roadside objects (boards standing on the verge). A car that runs into one knocks it
-// down for the rest of the race and loses part of its speed.
+// down for the rest of the race; fast enough, it is thrown in the air (car-physics.js: startAirborne),
+// otherwise it loses part of its speed.
 // The list comes from the logical scenery layout of the track: position (s, d) and half width.
 
-import { CAR_STATE } from './car-physics.js';
+import { CAR_STATE, startAirborne } from './car-physics.js';
 import { COLLISION_TUNING } from './collision-tuning.js';
 
 /**
@@ -28,7 +29,9 @@ export function collideObstacles(cars, track, obstacles, down, emit) {
       down[k] = 1; hits++;
       const impact = car.state === CAR_STATE.SPIN ? Math.hypot(car.velX, car.velZ) : Math.abs(car.speed);
       if (emit) emit('obstacle', car.index, impact, k);
-      if (car.state === CAR_STATE.RACING) {
+      if (car.state === CAR_STATE.RACING && car.speed >= T.obstacleLaunchSpeed) {
+        startAirborne(car, T.flightTimeObstacle, T.hardAfterObstacle, emit, -1, o.d > car.d ? 1 : -1);
+      } else if (car.state === CAR_STATE.RACING) {
         car.speed *= T.obstacleSpeedFactor;
         car.bumpClock = car.clock; car.bumpStrength = 1;
       } else { car.velX *= T.obstacleSpeedFactor; car.velZ *= T.obstacleSpeedFactor; }

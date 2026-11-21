@@ -308,7 +308,7 @@ export class SceneBuilder {
 
   emitCar(quads, p, car, index, yawAngle, W) {
     const z = this.carZ[index];
-    if (!projectAtDepth(p, z, this.carD[index], 0, pt)) return;
+    if (!projectAtDepth(p, z, this.carD[index], car.airHeight || 0, pt)) return;      // a car in flight is drawn above the road
     // angle between the car's nose and the line of sight (0 = seen from behind, + = nose to the right)
     const lateral = (pt.x - p.cx) / p.focal;
     let alpha = wrapAngle(pt.theta - yawAngle + car.headingError + (p.dir < 0 ? Math.PI : 0) - Math.atan(lateral));
@@ -319,7 +319,8 @@ export class SceneBuilder {
     const w = cs.w * k, h = cs.h * k;
     const left = pt.x - (flip ? cs.w - cs.ax : cs.ax) * k, top = pt.y - cs.ay * k;
     if (left > W || left + w < 0) return;
-    let ghost = car.ghostTimer > 0 || car.state === CAR_STATE.RESET ? 0.55 : 1;
+    // cars that cannot be hit are drawn lighter: being put back on the track, restarting, or stopped after an accident
+    let ghost = car.ghostTimer > 0 || car.state === CAR_STATE.RESET || (car.state === CAR_STATE.WRECKED && car.speed < 0.5) ? 0.55 : 1;
     if (z < NEAR_CAR + NEAR_CAR_FADE) ghost *= (z - NEAR_CAR) / NEAR_CAR_FADE;
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,

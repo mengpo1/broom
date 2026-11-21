@@ -9,6 +9,7 @@ import { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING, MIRRO
 import { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES } from '../../art/vehicles/car-model.js';
 import { BASE_CAR_SPEC } from '../../vehicles/car-spec.js';
 import { QUAD_MODE } from '../drawing/quad-batch.js';
+import { CAR_STATE } from '../../physics/car-physics.js';
 
 const BLUR_SPEED = 17;       // m/s above which the tyre is drawn with speed streaks
 
@@ -79,6 +80,9 @@ function place(view) {
   return placement;
 }
 
+/** Scale (k) and vertical origin (oy) of the cockpit drawing in a view, for what must be drawn on the car itself. */
+export function cockpitPlacement(view) { return place(view); }
+
 export class CockpitLayer {
   constructor(art, layout, text) {
     this.text = text;
@@ -87,6 +91,7 @@ export class CockpitLayer {
     this.far = layout.far.map((id) => art.sprite(id));
     this.stalk = art.sprite(layout.stalk);
     this.steering = layout.steering.map((id) => art.sprite(id));
+    this.steeringFree = layout.steeringFree.map((id) => art.sprite(id));
     this.wheels = layout.wheels.map((row) => row.map((id) => art.sprite(id)));
     this.dial = art.sprite(layout.dial);
     this.needle = art.sprite(layout.needle);
@@ -213,8 +218,10 @@ export class CockpitLayer {
     }
 
     // steering wheel with the hands, rotated then flattened (the wheel is tilted toward the driver)
-    const sp = this.steering[p];
-    const angle = car.steer * 0.95;
+    // out of control (spin or slide): the driver has let go of the wheel, which turns on its own
+    const loose = car.state === CAR_STATE.SPIN;
+    const sp = loose ? this.steeringFree[p] : this.steering[p];
+    const angle = loose ? Math.sin(car.clock * 9) * 0.5 : car.steer * 0.95;
     const s = STEERING.size * k * 0.5;
     const cx = ox + STEERING.x * k + view.shakeX * 0.4, cy = oy + STEERING.y * k + view.shakeY * 0.6;
     const co = Math.cos(angle), si = Math.sin(angle), q = STEERING.squash;
