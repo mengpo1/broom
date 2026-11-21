@@ -349,10 +349,15 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
   if (ad <= hw) {
     // ---------------------------------------------------------------- asphalt
     c = col(C_ASPHALT);
-    let wob = (vnoise(vec2f(s * 0.045, 7.0)) - 0.5) * 1.1;
+    // rubber laid on the racing line: a band whose edges are frayed into long pen strokes (each
+    // narrow lane of the surface ends at its own distance), so that it never reads as a seam
+    let wob = (vnoise(vec2f(s * 0.045, 7.0)) - 0.5) * 0.9;
     let gd = abs(d - lineOffset * 0.9);
-    let groove = 1.0 - aastep(1.55 + wob, gd, mpp * 2.0 + 0.05);
-    c = mix(c, col(C_GROOVE), groove * 0.8);
+    let lane = floor(d / 0.2);
+    let laneN = hash21(vec2f(lane, floor(s / 11.0 + hash21(vec2f(lane, 3.0)) * 11.0)));
+    let fray = mix(0.55, laneN, clamp(0.16 / mpp, 0.0, 1.0));
+    let groove = 1.0 - aastep(0.95 + fray * 1.25 + wob, gd, mpp * 2.0 + 0.05);
+    c = mix(c, col(C_GROOVE), groove * 0.62);
     let patchN = vnoise(vec2f(s * 0.021, d * 0.16 + 11.0));
     c = mix(c, col(C_ASPHALT_LIGHT), aastep(0.66, patchN, 0.02 + mpr * 0.02) * 0.35 * (1.0 - groove));
     let dash = dashField(s, d, 0.9, 13.0, 0.05, 0.5, mpp, mpr, 1.0);
@@ -417,12 +422,18 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     let gravel = verge > 0.5 && verge < 1.5 && ad > hw + 3.0;
     if (gravel) {
       c = col(C_GRAVEL_A);
-      let rake = fract(d / 0.9 + vnoise(vec2f(s * 0.03, 2.0)) * 0.6);
-      c = mix(c, col(C_GRAVEL_B), aaband(0.0, 0.16, rake, mpp / 0.9) * 0.55 * clamp(0.14 / mpp, 0.0, 1.0));
-      let cell = vec2f(floor(d / 0.45), floor(s / 2.6));
+      // raked furrows: thin, wavering, broken lines along the trap
+      let rakeRow = floor(d / 1.15 + 0.5);
+      let rake = abs(d + (vnoise(vec2f(s * 0.11, rakeRow)) - 0.5) * 0.5 - rakeRow * 1.15);
+      let rakeOn = step(0.42, vnoise(vec2f(s * 0.045 + rakeRow * 3.7, rakeRow)));
+      c = mix(c, col(C_GRAVEL_B), (1.0 - aastep(0.045, rake, mpp)) * rakeOn * 0.5 * clamp(0.12 / mpp, 0.0, 1.0));
+      // grains: round pebbles of several sizes, the larger ones with a spot of shade
+      let cell = vec2f(floor(d / 0.55), floor(s / 0.55));
       let h = hash22(cell);
-      let speck = (1.0 - aastep(0.09, abs(d - (cell.x + 0.2 + 0.6 * h.x) * 0.45), mpp)) * aaband(0.0, 0.9, s - (cell.y + 0.6 * h.y) * 2.6, mpr);
-      c = mix(c, mix(col(C_GRAVEL_B), ink, 0.25), speck * step(h.x + h.y, 0.9) * 0.7 * detail * clamp(0.18 / mpp, 0.0, 1.0));
+      let pd = vec2f(d - (cell.x + 0.2 + 0.6 * h.x) * 0.55, s - (cell.y + 0.2 + 0.6 * h.y) * 0.55);
+      let grain = 0.035 + 0.075 * hash21(cell + vec2f(7.0, 3.0));
+      let pebble = (1.0 - aastep(grain, length(pd), max(mpp, mpr * 0.5))) * step(h.x * h.y, 0.42);
+      c = mix(c, mix(col(C_GRAVEL_B), ink, 0.22), pebble * 0.75 * detail * clamp(0.1 / mpp, 0.0, 1.0));
       c = mix(c, ink, (1.0 - aastep(inkW, ad - (hw + 3.0), mpp)) * inkA * 0.7);
     } else {
       let warp = (vnoise(vec2f(d * 0.22, s * 0.035)) - 0.5) * 7.0;
@@ -570,24 +581,28 @@ const OVERLAY_WGSL = COMMON_WGSL + /* wgsl */`
   let r = length(p * vec2f(0.82, 1.0));
   var outC = vec4f(0.0);
   if (intensity > 0.004) {
-    let cells = 150.0;
+    // Long pen strokes that stream away from the vanishing point along the ground on both sides
+    // of the road (never across the sky): each one lives for a good part of a second.
+    let cells = 96.0;
     let a = (atan2(p.y, p.x) / 6.2831853 + 0.5) * cells;
     let cell = floor(a);
     let f = fract(a) - 0.5;
     let hsh = hash22(vec2f(cell, 17.0));
     let hs2 = hash22(vec2f(cell, 91.0));
-    let present = step(hsh.x, 0.16 + 0.5 * intensity);
-    let speedK = 0.9 + 1.6 * hs2.x;
-    let phase = fract(view.cam.z * speedK * (0.5 + intensity) + hsh.y);
-    let start = mix(0.34, 1.05, phase);
-    let len = 0.1 + 0.26 * hs2.y + 0.2 * intensity;
+    let present = step(hsh.x, 0.2 + 0.45 * intensity);
+    let speedK = 0.45 + 0.5 * hs2.x;
+    let phase = fract(view.cam.z * speedK * (0.45 + 0.55 * intensity) + hsh.y);
+    let start = mix(0.3, 1.0, phase);
+    let len = 0.2 + 0.3 * hs2.y + 0.25 * intensity;
     let along = (r - start) / len;
-    let taper = clamp(along, 0.0, 1.0) * clamp((1.0 - along) * 3.0, 0.0, 1.0);
-    let halfW = (0.05 + 0.2 * hs2.y) * taper;
+    let taper = clamp(along * 1.5, 0.0, 1.0) * clamp((1.0 - along) * 2.5, 0.0, 1.0);
+    let halfW = (0.05 + 0.17 * hs2.y) * taper;
     let aw = cells * 0.16 / max(r * h, 1.0);         // one pixel in cell units
     let line = (1.0 - aastep(halfW, abs(f), aw)) * step(0.0, along) * step(along, 1.0);
-    let periphery = smoothstep(0.36, 0.6, r) * (0.35 + 0.65 * smoothstep(0.0, 0.25, abs(p.x)));
-    let alpha = line * present * periphery * clamp(intensity * 1.6, 0.0, 1.0);
+    let life = smoothstep(0.0, 0.12, phase) * (1.0 - smoothstep(0.82, 1.0, phase));
+    let ground = smoothstep(0.015, 0.07, p.y);       // below the horizon only
+    let periphery = smoothstep(0.34, 0.58, r) * (0.3 + 0.7 * smoothstep(0.05, 0.3, abs(p.x))) * ground;
+    let alpha = line * present * periphery * life * clamp(intensity * 1.6, 0.0, 1.0);
     let lightLine = hs2.x > 0.38;
     let rgb = select(view.colors[C_SPEED_DARK].rgb, view.colors[C_SPEED_LIGHT].rgb, lightLine);
     let al = alpha * select(0.5, 0.82, lightLine);
@@ -6462,7 +6477,8 @@ const { hexToRgb } = __modules["src/art/palettes/palettes.js"];
 const DEFAULT_GANTRY_LIGHTS = [0.42, 0.46, 0.5, 0.54, 0.58].map((fx) => ({ fx, fy: 0.3, fr: 0.014 }));
 
 const MAX_CARS = 32;
-const NEAR_CAR = 2.3;        // a car whose centre is nearer than this (alongside) is not drawn; it fades in over the next metre
+const NEAR_CAR = 1.9;        // a car whose centre is nearer than this (alongside, already out of the picture) is not drawn
+const NEAR_CAR_FADE = 0.5;   // and it fades in over this distance, so that it never pops
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
@@ -6696,7 +6712,7 @@ class SceneBuilder {
     const left = pt.x - (flip ? cs.w - cs.ax : cs.ax) * k, top = pt.y - cs.ay * k;
     if (left > W || left + w < 0) return;
     let ghost = car.ghostTimer > 0 || car.state === CAR_STATE.RESET ? 0.55 : 1;
-    if (z < NEAR_CAR + 1) ghost *= z - NEAR_CAR;
+    if (z < NEAR_CAR + NEAR_CAR_FADE) ghost *= (z - NEAR_CAR) / NEAR_CAR_FADE;
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
       u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, z > 3.4 ? z - 2.9 : 0.5);   // clip test at the car's near end: the drawing extends in front of its centre
@@ -7001,7 +7017,7 @@ function plate(part, outline, y0, y1, roleOut, roleIn, roleEdge) {
 }
 
 /** Wheel: tyre as a surface of revolution about the lateral axis, rim discs on both sides. */
-function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false) {
+function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePhase = 0, brakeBlur = false) {
   const tyre = new PartBuilder(`${name}.tyre`, { ink: 1 });
   const hw = width / 2, rimR = radius * 0.6, shoulder = 0.055;
   // profile from the inner bead across the tread to the outer bead: [lateral, radius]
@@ -7032,7 +7048,10 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false) {
   for (const sign of [-1, 1]) {
     const y = cy + sign * (hw - 0.035);
     const outer = sign === outerSign;
-    const rings = [[0, ROLE.METAL], [0.045, ROLE.BLACK], [0.075, ROLE.RIM], [rimR * 0.8, ROLE.RIM], [rimR + 0.004, ROLE.METAL]];
+    // outer face: wheel nut, hub and the dish of the rim; inner face: upright, brake disc and the rim edge
+    const rings = outer
+      ? [[0, ROLE.METAL], [0.045, ROLE.BLACK], [0.075, ROLE.RIM], [rimR * 0.8, ROLE.RIM], [rimR + 0.004, ROLE.METAL]]
+      : [[0, ROLE.BLACK], [0.05, ROLE.CARBON], [0.085, ROLE.METAL], [rimR * 0.76, ROLE.BLACK], [rimR + 0.004, ROLE.RIM]];
     const ridx = [];
     for (let r = 0; r < rings.length; r++) {
       const row = [];
@@ -7046,6 +7065,23 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false) {
       const s1 = (s + 1) % seg;
       const spoke = !spin && r === 2 && outer && s % 8 < 2;     // five dark spoke windows on the visible face (at rest)
       rim.face([ridx[r][s], ridx[r][s1], ridx[r + 1][s1], ridx[r + 1][s]], spoke ? ROLE.CARBON : rings[r + 1][1]);
+    }
+    if (!outer) {
+      // brake: vent slots on the disc (they turn with the wheel) and the caliper gripping its rear edge
+      const slots = 12, turn = spin ? 0 : ((brakePhase || 0) / 3) * ((Math.PI * 2) / slots);
+      if (spin || brakeBlur) {
+        for (const [rr, from, to] of [[rimR * 0.34, 0.4, 2.2], [rimR * 0.5, 2.9, 4.9], [rimR * 0.64, 5.2, 7.0]]) {
+          const pts = [];
+          for (let k = 0; k <= 12; k++) { const t = from + ((to - from) * k) / 12; pts.push([cx + rr * Math.cos(t), y + sign * 0.004, cz + rr * Math.sin(t)]); }
+          rim.lines.push({ pts, normal: [0, sign, 0], weight: 0.8, hex: '#59616d' });
+        }
+      } else {
+        for (let k = 0; k < slots; k++) {
+          const t = turn + (k / slots) * Math.PI * 2, r0 = rimR * 0.3, r1 = rimR * 0.7;
+          rim.lines.push({ pts: [[cx + r0 * Math.cos(t), y + sign * 0.004, cz + r0 * Math.sin(t)], [cx + r1 * Math.cos(t + 0.22), y + sign * 0.004, cz + r1 * Math.sin(t + 0.22)]], normal: [0, sign, 0], weight: 0.8, hex: '#59616d' });
+        }
+      }
+      box(rim, cx - rimR * 0.56, y + sign * 0.03, cz + rimR * 0.1, 0.085, 0.05, 0.19, ROLE.CARBON, 0, 0.1);
     }
     if (outer) {
       // sidewall marking: a pale ring, as drawn on racing tyres
@@ -7279,10 +7315,11 @@ function buildCarModel(options = {}) {
   const steer = options.steer ?? 0;
   const susp = new PartBuilder('suspension.left', { ink: 0.5 });
   const rod = (a, b, radius = 0.011, role = ROLE.CARBON) => susp.rods.push({ a, b, radius, role });
-  rod([1.72, 0.19, 0.42], [1.55, 0.74, 0.445]); rod([1.3, 0.215, 0.445], [1.55, 0.74, 0.445]);
-  rod([1.76, 0.17, 0.15], [1.55, 0.75, 0.175]); rod([1.32, 0.2, 0.14], [1.55, 0.75, 0.175]);
-  rod([1.55, 0.73, 0.19], [1.5, 0.21, 0.46], 0.009);
-  rod([1.68, 0.2, 0.33], [1.67 - Math.sin(steer) * 0.12, 0.74, 0.33], 0.008, ROLE.METAL);
+  // front wishbones, push rod and steering arm: the inner ends sit on the skin of the tub
+  rod([1.72, 0.122, 0.352], [1.55, 0.74, 0.445]); rod([1.3, 0.2, 0.43], [1.55, 0.74, 0.445]);
+  rod([1.76, 0.128, 0.168], [1.55, 0.75, 0.175]); rod([1.32, 0.2, 0.14], [1.55, 0.75, 0.175]);
+  rod([1.55, 0.73, 0.19], [1.5, 0.13, 0.42], 0.009);
+  rod([1.68, 0.15, 0.3], [1.67 - Math.sin(steer) * 0.12, 0.74, 0.33], 0.008, ROLE.METAL);
   rod([-1.1, 0.17, 0.4], [-1.35, 0.6, 0.42]); rod([-1.54, 0.12, 0.4], [-1.35, 0.6, 0.42]);
   rod([-1.08, 0.2, 0.14], [-1.35, 0.61, 0.17]); rod([-1.56, 0.14, 0.15], [-1.35, 0.61, 0.17]);
   rod([-1.35, 0.1, 0.33], [-1.35, 0.6, 0.33], 0.02, ROLE.METAL);
@@ -7307,7 +7344,7 @@ function buildCarModel(options = {}) {
 
 /** Build a wheel at its place on the car, steered by `steerAngle` about the vertical axis. */
 function placeWheel(name, x, y, tyre, steerAngle, tread = null, spin = false) {
-  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin);
+  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin, tread && tread.phase ? tread.phase : 0, !!(tread && tread.blur));
   if (tread) addTreadMarks(t, tyre, tread);
   t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
   const c = Math.cos(steerAngle), s = Math.sin(steerAngle);
@@ -11619,53 +11656,85 @@ function paintHand(ctx, c, rimMid, a, S, glove, suit) {
   if (ty > 0) { tx = -tx; ty = -ty; }                       // tangent pointing up the rim
   const hx = c + ux * (rimMid + S * 0.012), hy = c + uy * (rimMid + S * 0.012);
   const P = (along, out) => [hx + tx * along + ux * out, hy + ty * along + uy * out];
-  const gloveShade = shadeHex(glove, 0.4), gloveLight = lightHex(glove, 0.3);
-  // sleeve from the wrist to beyond the lower corner of the drawing
+  const gloveShade = shadeHex(glove, 0.4), gloveLight = lightHex(glove, 0.3), suitShade = shadeHex(suit, 0.3);
+  const shape = (pts, tension = 0.7) => { ctx.beginPath(); closedCurve(ctx, pts, tension); };
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // ---- forearm: a sleeve that swells toward the elbow, running out of the lower corner of the drawing
   const side = ux < 0 ? -1 : 1;
-  const wrist = P(-S * 0.085, S * 0.03);
-  const elbow = [c + side * S * 0.56, c + S * 1.25];
-  const nx = -(elbow[1] - wrist[1]), ny = elbow[0] - wrist[0];
-  const nl = Math.hypot(nx, ny) || 1;
-  const wx = (nx / nl) * S * 0.06, wy = (ny / nl) * S * 0.06;
-  const sleeve = [[wrist[0] - wx * 0.9, wrist[1] - wy * 0.9], [wrist[0] + wx * 0.9, wrist[1] + wy * 0.9], [elbow[0] + wx * 1.8, elbow[1] + wy * 1.8], [elbow[0] - wx * 1.8, elbow[1] - wy * 1.8]];
-  ctx.beginPath(); ctx.moveTo(sleeve[0][0], sleeve[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(sleeve[i][0], sleeve[i][1]); ctx.closePath();
-  ctx.fillStyle = suit; ctx.fill();
+  const wrist = P(-S * 0.1, S * 0.03);
+  const elbow = [c + side * S * 0.58, c + S * 1.27];
+  const ax = elbow[0] - wrist[0], ay = elbow[1] - wrist[1];
+  const al = Math.hypot(ax, ay) || 1;
+  const nx = -ay / al, ny = ax / al;                        // across the arm
+  const A = (t, w) => [wrist[0] + ax * t + nx * w * S, wrist[1] + ay * t + ny * w * S];
+  const sleeve = [A(0, -0.05), A(0.18, -0.074), A(0.5, -0.094), A(1, -0.11), A(1, 0.11), A(0.5, 0.09), A(0.18, 0.066), A(0, 0.048)];
+  shape(sleeve, 0.5); ctx.fillStyle = suit; ctx.fill();
   ctx.save(); ctx.clip();
-  ctx.fillStyle = shadeHex(suit, 0.3);
-  ctx.beginPath(); ctx.moveTo(sleeve[1][0], sleeve[1][1]); ctx.lineTo(sleeve[2][0], sleeve[2][1]);
-  ctx.lineTo(elbow[0] + wx * 0.5, elbow[1] + wy * 0.5); ctx.lineTo(wrist[0] + wx * 0.25, wrist[1] + wy * 0.25); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = suitShade;                                // shade along the underside of the arm
+  shape([A(0, 0.012), A(0.3, 0.03), A(0.7, 0.038), A(1, 0.04), A(1, 0.13), A(0, 0.08)], 0.5); ctx.fill();
   ctx.restore();
-  ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(sleeve[0][0], sleeve[0][1]); ctx.lineTo(sleeve[3][0], sleeve[3][1]); ctx.moveTo(sleeve[1][0], sleeve[1][1]); ctx.lineTo(sleeve[2][0], sleeve[2][1]); ctx.stroke();
-  for (let i = 1; i <= 3; i++) {   // cloth folds
-    const t = i / 4.5;
-    const fx = wrist[0] + (elbow[0] - wrist[0]) * t, fy = wrist[1] + (elbow[1] - wrist[1]) * t;
-    brushCurve(ctx, [[fx - wx * (0.7 + t), fy - wy * (0.7 + t)], [fx - wx * 0.1 + (elbow[0] - wrist[0]) * 0.03, fy - wy * 0.1 + (elbow[1] - wrist[1]) * 0.03], [fx + wx * 0.5, fy + wy * 0.5]], 2.6, { color: INK, taper: 0.45 });
+  shape(sleeve, 0.5); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.stroke();
+  // seam along the arm and the folds of the cloth gathered at the wrist and in the crook of the elbow
+  brushCurve(ctx, [A(0.04, -0.012), A(0.4, -0.02), A(0.95, -0.016)], 2.2, { color: INK, taper: 0.5 });
+  for (const [t, w0, w1, bend] of [[0.07, -0.05, 0.02, 0.03], [0.15, -0.066, -0.005, 0.035], [0.26, 0.068, 0.012, -0.03], [0.62, -0.096, -0.03, 0.04], [0.74, 0.094, 0.03, -0.04], [0.86, -0.104, -0.045, 0.035]]) {
+    brushCurve(ctx, [A(t, w0), A(t + bend, (w0 + w1) / 2), A(t + bend * 0.4, w1)], 2.8, { color: INK, taperStart: 0.05, taperEnd: 0.7 });
   }
-  // cuff
-  const cuff = [P(-S * 0.1, -S * 0.035), P(-S * 0.1, S * 0.085), P(-S * 0.062, S * 0.092), P(-S * 0.062, -S * 0.04)];
-  ctx.beginPath(); ctx.moveTo(cuff[0][0], cuff[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(cuff[i][0], cuff[i][1]); ctx.closePath();
-  ctx.fillStyle = '#f1efe6'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.stroke();
-  // back of the hand and fingers wrapped over the rim
-  const back = [P(-S * 0.07, -S * 0.045), P(-S * 0.075, S * 0.05), P(-S * 0.03, S * 0.092), P(S * 0.04, S * 0.098), P(S * 0.085, S * 0.07), P(S * 0.092, S * 0.02), P(S * 0.075, -S * 0.04), P(S * 0.0, -S * 0.055)];
-  ctx.beginPath(); closedCurve(ctx, back, 0.7);
-  ctx.fillStyle = glove; ctx.fill();
+
+  // ---- gauntlet: the long cuff of the glove over the end of the sleeve, closed by a strap
+  const cuff = [P(-S * 0.135, -S * 0.052), P(-S * 0.14, S * 0.02), P(-S * 0.132, S * 0.094), P(-S * 0.07, S * 0.086), P(-S * 0.062, S * 0.02), P(-S * 0.068, -S * 0.044)];
+  shape(cuff, 0.45); ctx.fillStyle = glove; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = gloveShade; shape([P(-S * 0.15, -S * 0.07), P(-S * 0.15, -S * 0.012), P(-S * 0.05, -S * 0.016), P(-S * 0.05, -S * 0.07)], 0.4); ctx.fill();
+  ctx.restore();
+  shape(cuff, 0.45); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 0.8; ctx.stroke();
+  const strap = [P(-S * 0.112, -S * 0.05), P(-S * 0.116, S * 0.092), P(-S * 0.094, S * 0.09), P(-S * 0.09, -S * 0.048)];
+  ctx.beginPath(); ctx.moveTo(strap[0][0], strap[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(strap[i][0], strap[i][1]); ctx.closePath();
+  ctx.fillStyle = '#f1efe6'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.stroke();
+
+  // ---- back of the hand
+  const back = [P(-S * 0.072, -S * 0.046), P(-S * 0.078, S * 0.02), P(-S * 0.066, S * 0.058), P(-S * 0.02, S * 0.066), P(S * 0.05, S * 0.064), P(S * 0.082, S * 0.04), P(S * 0.086, -S * 0.012), P(S * 0.06, -S * 0.046), P(-S * 0.005, -S * 0.056)];
+  shape(back); ctx.fillStyle = glove; ctx.fill();
   ctx.save(); ctx.clip();
   ctx.fillStyle = gloveShade;
-  ctx.beginPath(); closedCurve(ctx, [P(-S * 0.08, S * 0.0), P(-S * 0.02, -S * 0.02), P(S * 0.1, -S * 0.01), P(S * 0.1, -S * 0.08), P(-S * 0.09, -S * 0.08)], 0.6); ctx.fill();
-  ctx.fillStyle = gloveLight;
-  for (let f = 0; f < 4; f++) { const al = -S * 0.035 + f * S * 0.032; ctx.beginPath(); ctx.ellipse(...P(al, S * 0.07), S * 0.012, S * 0.016, a, 0, Math.PI * 2); ctx.fill(); }
+  shape([P(-S * 0.09, -S * 0.004), P(-S * 0.02, -S * 0.022), P(S * 0.1, -S * 0.012), P(S * 0.1, -S * 0.09), P(-S * 0.09, -S * 0.09)], 0.6); ctx.fill();
   ctx.restore();
-  ctx.beginPath(); closedCurve(ctx, back, 0.7); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.stroke();
-  for (let f = 1; f < 4; f++) {   // finger separations
-    const al = -S * 0.05 + f * S * 0.033;
-    brushCurve(ctx, [P(al, S * 0.094), P(al - S * 0.004, S * 0.055), P(al + S * 0.002, S * 0.012)], 3, { color: INK, taperStart: 0.05, taperEnd: 0.6 });
+  shape(back); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.stroke();
+  // stitched panel on the back of the glove
+  brushCurve(ctx, [P(-S * 0.058, S * 0.036), P(-S * 0.03, S * 0.012), P(S * 0.02, S * 0.006), P(S * 0.064, S * 0.022)], 2, { color: INK, taper: 0.4 });
+
+  // ---- four fingers closed over the rim, each drawn on its own, of unequal lengths
+  const lengths = [0.1, 0.112, 0.108, 0.094];
+  for (let f = 0; f < 4; f++) {
+    const m = -S * 0.049 + f * S * 0.037, w = S * 0.0175, tip = S * lengths[f], root = S * 0.034;
+    const finger = [P(m - w, root), P(m - w * 1.04, (root + tip) / 2), P(m - w * 0.8, tip - w * 0.5), P(m, tip), P(m + w * 0.8, tip - w * 0.5), P(m + w * 1.04, (root + tip) / 2), P(m + w, root)];
+    shape(finger, 0.6); ctx.fillStyle = glove; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = gloveShade;                             // far side of each finger in shade
+    shape([P(m - w * 1.3, root - S * 0.01), P(m - w * 0.25, root), P(m - w * 0.3, tip + S * 0.01), P(m - w * 1.3, tip + S * 0.01)], 0.4); ctx.fill();
+    ctx.fillStyle = gloveLight;                             // light on the first joint
+    ctx.beginPath(); ctx.ellipse(...P(m + w * 0.3, root + (tip - root) * 0.3), w * 0.42, w * 0.9, a, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    shape(finger, 0.6); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 0.75; ctx.stroke();
+    // joint creases
+    brushCurve(ctx, [P(m - w * 0.8, root + (tip - root) * 0.5), P(m, root + (tip - root) * 0.56), P(m + w * 0.8, root + (tip - root) * 0.5)], 1.8, { color: INK, taper: 0.4 });
+    brushCurve(ctx, [P(m - w * 0.7, root + (tip - root) * 0.8), P(m, root + (tip - root) * 0.85), P(m + w * 0.7, root + (tip - root) * 0.8)], 1.5, { color: INK, taper: 0.4 });
   }
-  brushCurve(ctx, [P(-S * 0.055, S * 0.045), P(-S * 0.01, S * 0.038), P(S * 0.06, S * 0.045)], 2.2, { color: INK, taper: 0.4 });   // knuckle seam
-  // thumb lying along the inside of the rim
+  // knuckles: short arcs where the fingers leave the hand
+  for (let f = 0; f < 4; f++) {
+    const m = -S * 0.049 + f * S * 0.037;
+    brushCurve(ctx, [P(m - S * 0.013, S * 0.03), P(m, S * 0.04), P(m + S * 0.013, S * 0.03)], 2.4, { color: INK, taper: 0.35 });
+  }
+
+  // ---- thumb lying along the inside of the rim
   const thumb = [P(-S * 0.02, -S * 0.03), P(S * 0.05, -S * 0.052), P(S * 0.105, -S * 0.05), P(S * 0.118, -S * 0.03), P(S * 0.1, -S * 0.012), P(S * 0.04, -S * 0.008)];
-  ctx.beginPath(); closedCurve(ctx, thumb, 0.7); ctx.fillStyle = glove; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3.4; ctx.stroke();
-  brushStroke(ctx, [P(S * 0.085, -S * 0.044), P(S * 0.1, -S * 0.024)], 2, { color: INK, taper: 0.3 });
+  shape(thumb); ctx.fillStyle = glove; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = gloveLight; ctx.beginPath(); ctx.ellipse(...P(S * 0.07, -S * 0.022), S * 0.026, S * 0.007, Math.atan2(ty, tx), 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  shape(thumb); ctx.strokeStyle = INK; ctx.lineWidth = 3.4; ctx.stroke();
+  brushStroke(ctx, [P(S * 0.085, -S * 0.046), P(S * 0.1, -S * 0.024)], 2, { color: INK, taper: 0.3 });
+  brushStroke(ctx, [P(S * 0.03, -S * 0.04), P(S * 0.04, -S * 0.018)], 1.8, { color: INK, taper: 0.3 });
 }
 
 function paintSteeringWheel(ctx, S, glove, suit, accent) {
@@ -12646,9 +12715,10 @@ const { drawText, measureText } = __modules["src/art/styles/lettering.js"];
 const { hexToRgb } = __modules["src/art/palettes/palettes.js"];
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8;
-const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !'];
-const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5 };
-const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b'];
+const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH'];
+const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6 };
+const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6'];
+const FLATOUT_SPEED = 76;       // m/s: the engine at full cry gets its own lettering, now and then
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
@@ -12740,6 +12810,7 @@ class EffectsLayer {
     for (let v = 0; v < 2; v++) this.pops.push(Array.from({ length: MAX_POPS }, () => ({ age: 9, life: 0, x: 0, y: 0, word: -1, size: 1, burst: false, angle: 0 })));
     this.popCursor = [0, 0];
     this.popClock = [9, 9];
+    this.roarClock = [0, 0]; this.wasFlatOut = [false, false];
     this.dust = [0.85, 0.79, 0.64]; this.dirt = [0.55, 0.6, 0.38]; this.smoke = [0.93, 0.92, 0.9];
     this.track = null;
     this.seed = 1;
@@ -12752,6 +12823,7 @@ class EffectsLayer {
     this.emitTimer.fill(0); this.markOdo.fill(0);
     for (const list of this.pops) for (const p of list) p.life = 0;
     this.popClock[0] = 9; this.popClock[1] = 9;
+    this.roarClock[0] = 0; this.roarClock[1] = 0; this.wasFlatOut[0] = false; this.wasFlatOut[1] = false;
     if (palette) { this.dust = hexToRgb(palette.dust); this.dirt = hexToRgb(palette.grassDark); this.smoke = hexToRgb(palette.smoke); }
   }
 
@@ -12777,7 +12849,7 @@ class EffectsLayer {
     const list = this.pops[viewIndex];
     const p = list[this.popCursor[viewIndex]];
     this.popCursor[viewIndex] = (this.popCursor[viewIndex] + 1) % MAX_POPS;
-    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
+    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word === WORD.FLATOUT ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
     p.angle = (this.random() - 0.5) * 0.3;
   }
 
@@ -12829,6 +12901,17 @@ class EffectsLayer {
     }
     for (const list of this.pops) for (const p of list) if (p.life > 0) { p.age += dt; if (p.age > p.life) p.life = 0; }
     this.popClock[0] += dt; this.popClock[1] += dt;
+    // the engine at full cry: a sound word low in the picture when a player reaches top speed
+    for (let v = 0; v < app.viewCount && v < 2; v++) {
+      this.roarClock[v] -= dt;
+      const followed = cars[app.views[v].carIndex];
+      const flat = !!followed && followed.speed > FLATOUT_SPEED && followed.throttle > 0.8;
+      if (flat && !this.wasFlatOut[v] && this.roarClock[v] <= 0 && fx.onomatopoeia && this.popClock[v] > 1) {
+        this.pop(v, WORD.FLATOUT, 0.8, 0.5, 0.5, false);
+        this.roarClock[v] = 16;
+      }
+      this.wasFlatOut[v] = flat;
+    }
     const count = Math.min(cars.length, 32);
     for (let i = 0; i < count; i++) {
       const car = cars[i];
@@ -15211,6 +15294,9 @@ const { drawCar, drawCarFitted } = __modules["src/art/vehicles/car-illustrator.j
 const { liveryColors } = __modules["src/art/art-library.js"];
 const { rgbToHex, getPalette } = __modules["src/art/palettes/palettes.js"];
 const { ALL_TEAMS, DRIVERS, PLAYER_DRIVERS } = __modules["src/vehicles/liveries.js"];
+const { paintBackdropLayer, backdropHorizon } = __modules["src/art/environments/backdrops.js"];
+const { getTheme } = __modules["src/tracks/themes.js"];
+const { hashString } = __modules["src/core/random.js"];
 
 const INK = '#16161f', PAPER = '#f4efe2', PAPER_SHADE = '#e4dcc8', CAPTION = '#f6e27a', RED = '#d5302a', BLUE = '#2f5fa8';
 
@@ -15332,8 +15418,9 @@ class PagePainter {
     for (let i = 0; i < track.n; i += 2) pts.push([ox + track.x[i] * k, oz + track.z[i] * k]);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.beginPath(); tracePolygon(ctx, pts);
-    ctx.strokeStyle = color; ctx.lineWidth = 15 * this.S; ctx.stroke();
-    ctx.strokeStyle = '#8b8d95'; ctx.lineWidth = 8.5 * this.S; ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = 19 * this.S; ctx.stroke();
+    ctx.strokeStyle = '#f1efe6'; ctx.lineWidth = 13 * this.S; ctx.stroke();
+    ctx.strokeStyle = '#6c6e77'; ctx.lineWidth = 9 * this.S; ctx.stroke();
     const nx = track.nx[0], nz = track.nz[0], tx = track.tx[0], tz = track.tz[0];
     ctx.strokeStyle = RED; ctx.lineWidth = 6 * this.S;
     ctx.beginPath(); ctx.moveTo(pts[0][0] - nx * 14 * this.S, pts[0][1] - nz * 14 * this.S); ctx.lineTo(pts[0][0] + nx * 14 * this.S, pts[0][1] + nz * 14 * this.S); ctx.stroke();
@@ -15341,6 +15428,73 @@ class PagePainter {
     const ax = pts[0][0] + tx * 40 * this.S + nx * 30 * this.S, az = pts[0][1] + tz * 40 * this.S + nz * 30 * this.S;
     ctx.fillStyle = RED; ctx.beginPath();
     ctx.moveTo(ax + tx * 22 * this.S, az + tz * 22 * this.S); ctx.lineTo(ax - tx * 10 * this.S + nx * 12 * this.S, az - tz * 10 * this.S + nz * 12 * this.S); ctx.lineTo(ax - tx * 10 * this.S - nx * 12 * this.S, az - tz * 10 * this.S - nz * 12 * this.S); ctx.closePath(); ctx.fill();
+  }
+
+  /**
+   * View of the place where a circuit lies: sky and the circuit's own distant scenery (the
+   * panoramas of the race), over open ground. Cached per circuit and size.
+   * @param horizon height of the horizon in the picture, as a fraction of h
+   * @param zoom    how much of the panorama is shown (1 = its natural scale for this height)
+   */
+  vista(track, w, h, horizon, zoom = 1) {
+    const key = `vista:${track.id}:${Math.round(w)}x${Math.round(h)}:${horizon}:${zoom}`;
+    let canvas = this.cache.get(key);
+    if (canvas) return canvas;
+    canvas = makeCanvas(Math.ceil(w), Math.ceil(h));
+    const ctx = canvas.getContext('2d'), P = getPalette(track.theme), theme = getTheme(track.theme);
+    const yH = Math.round(h * horizon);
+    const sky = ctx.createLinearGradient(0, 0, 0, yH);
+    sky.addColorStop(0, P.skyTop); sky.addColorStop(0.55, P.skyMid); sky.addColorStop(1, P.skyLow);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, yH + 2);
+    ctx.fillStyle = P.farGround; ctx.fillRect(0, yH, w, h - yH);
+    const sw = 2048, sh = 384, strip = makeCanvas(sw, sh), sctx = strip.getContext('2d');
+    const bandH = yH * 1.25 * zoom, k = bandH / sh, stripHorizon = backdropHorizon(sh) * k;
+    for (let layer = 0; layer < 3; layer++) {
+      sctx.clearRect(0, 0, sw, sh);
+      paintBackdropLayer(layer, sctx, sw, sh, P, theme.backdrop, seeded(hashString(`backdrop:${track.id}:${layer}`)), theme);
+      ctx.drawImage(strip, 0, 0, Math.min(sw, w / k), sh, 0, yH - stripHorizon, Math.min(sw, w / k) * k, bandH);
+    }
+    this.cache.set(key, canvas);
+    return canvas;
+  }
+
+  /** Scenery of an illustrated circuit plan: woods around the track, grandstand and pits by the start line. */
+  mapScenery(track, x, y, w, h, P) {
+    const ctx = this.ctx, S = this.S;
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+    for (let i = 0; i < track.n; i++) { minX = Math.min(minX, track.x[i]); maxX = Math.max(maxX, track.x[i]); minZ = Math.min(minZ, track.z[i]); maxZ = Math.max(maxZ, track.z[i]); }
+    const k = Math.min(w / (maxX - minX), h / (maxZ - minZ)) * 0.9;
+    const ox = x + w / 2 - ((minX + maxX) / 2) * k, oz = y + h / 2 - ((minZ + maxZ) / 2) * k;
+    const rnd = seeded(hashString(`map:${track.id}`));
+    const step = Math.max(1, Math.floor(track.n / 160));
+    const near = (px, py, limit) => {
+      for (let i = 0; i < track.n; i += step) { const dx = ox + track.x[i] * k - px, dy = oz + track.z[i] * k - py; if (dx * dx + dy * dy < limit * limit) return true; }
+      return false;
+    };
+    // clumps of trees, kept clear of the road
+    ctx.lineJoin = 'round';
+    for (let n = 0; n < 150; n++) {
+      const px = x - 40 * S + rnd() * (w + 80 * S), py = y - 20 * S + rnd() * (h + 60 * S), r = (9 + rnd() * 9) * S;
+      if (near(px, py, 30 * S + r)) continue;
+      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fillStyle = P.leafShade; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.2 * S; ctx.stroke();
+      ctx.beginPath(); ctx.arc(px - r * 0.22, py - r * 0.26, r * 0.62, 0, Math.PI * 2); ctx.fillStyle = rnd() < 0.5 ? P.leaf : P.pine; ctx.fill();
+      ctx.beginPath(); ctx.arc(px - r * 0.36, py - r * 0.4, r * 0.28, 0, Math.PI * 2); ctx.fillStyle = P.leafLight; ctx.fill();
+    }
+    // grandstand on one side of the start line, pit building on the other
+    const sx = ox + track.x[0] * k, sy = oz + track.z[0] * k;
+    const tx = track.tx[0], tz = track.tz[0], nx = track.nx[0], nz = track.nz[0];
+    const block = (side, len, depth, gap, roof, body) => {
+      const cx = sx + nx * side * gap * S, cy = sy + nz * side * gap * S;
+      const hx = tx * len * S * 0.5, hy = tz * len * S * 0.5, dx = nx * side * depth * S, dy = nz * side * depth * S;
+      ctx.beginPath(); ctx.moveTo(cx - hx, cy - hy); ctx.lineTo(cx + hx, cy + hy); ctx.lineTo(cx + hx + dx, cy + hy + dy); ctx.lineTo(cx - hx + dx, cy - hy + dy); ctx.closePath();
+      ctx.fillStyle = body; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3 * S; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - hx + dx * 0.45, cy - hy + dy * 0.45); ctx.lineTo(cx + hx + dx * 0.45, cy + hy + dy * 0.45); ctx.lineTo(cx + hx + dx, cy + hy + dy); ctx.lineTo(cx - hx + dx, cy - hy + dy); ctx.closePath();
+      ctx.fillStyle = roof; ctx.fill(); ctx.stroke();
+    };
+    const pitSide = track.pit ? track.pit.side : 1;
+    block(-pitSide, 150, 30, 22, P.roof, P.crowd[2]);
+    block(pitSide, 190, 24, 26, P.metalLight, P.concrete);
   }
 
   paperBackground() {
@@ -15378,9 +15532,12 @@ class PagePainter {
     const p1 = [[m, m], [leftW + 60 * S, m], [leftW - 20 * S, H * 0.68], [m, H * 0.68]];
     this.beginPanel(p1);
     if (model.track) {
-      ctx.fillStyle = '#e9e2cf'; ctx.fillRect(m, m, leftW + 80 * S, H * 0.68);
-      ctx.fillStyle = palette.grassA; ctx.globalAlpha = 0.25; ctx.fillRect(m, m, leftW + 80 * S, H * 0.68); ctx.globalAlpha = 1;
-      this.trackMap(model.track, m + 60 * S, m + 150 * S, leftW - 180 * S, H * 0.68 - m - 230 * S);
+      // an illustrated plan: the circuit laid on its ground, under the skyline of the place
+      const tp = getPalette(model.track.theme);
+      ctx.drawImage(this.vista(model.track, leftW + 80 * S, H * 0.68, 0.2), m, m);
+      const mx = m + 70 * S, my = m + H * 0.68 * 0.25, mw = leftW - 200 * S, mh = H * 0.68 * 0.7 - m;
+      this.mapScenery(model.track, mx, my, mw, mh, tp);
+      this.trackMap(model.track, mx, my, mw, mh);
       drawText(ctx, model.track.name, m + 44 * S, m + 104 * S, 62 * S, { style: 'impact', color: '#ffd42a', outline: INK, outlineWidth: 9 * S, shadow: { dx: 6 * S, dy: 7 * S, color: INK }, seed: 2 });
     } else {
       this.speedBackdrop(m, m, leftW + 80 * S, H * 0.68, palette, 7);
@@ -15445,10 +15602,17 @@ class PagePainter {
       ctx.beginPath(); ctx.moveTo(m, cy); ctx.lineTo(m + leftW * 0.42, cy); ctx.lineTo(m + leftW * 0.34, H - m); ctx.lineTo(m, H - m); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = INK; ctx.lineWidth = 5 * S; ctx.beginPath(); ctx.moveTo(m + leftW * 0.42, cy); ctx.lineTo(m + leftW * 0.34, H - m); ctx.stroke();
     }
+    if (model.track) {
+      const vw = leftW * 0.5, vx = m + leftW - vw - 40 * S;
+      ctx.drawImage(this.vista(model.track, vw, H - cy, 0.62, 1.5), vx, cy);
+      ctx.fillStyle = '#fbf8ee';
+      ctx.beginPath(); ctx.moveTo(vx - 2, cy); ctx.lineTo(vx + 70 * S, cy); ctx.lineTo(vx + 10 * S, H - m); ctx.lineTo(vx - 2, H - m); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 5 * S; ctx.beginPath(); ctx.moveTo(vx + 70 * S, cy); ctx.lineTo(vx + 10 * S, H - m); ctx.stroke();
+    }
     this.endPanel(p3);
     let ty = cy + 34 * S;
     if (model.info) for (const line of model.info) { drawText(ctx, line, m + 36 * S, ty + 30 * S, 30 * S, { style: 'bold', color: INK, jitter: 0 }); ty += 46 * S; }
-    if (item && item.desc) this.caption(item.desc, m + 34 * S, ty + 6 * S, model.track ? leftW - 190 * S : leftW * 0.5, 27 * S);
+    if (item && item.desc) this.caption(item.desc, m + 34 * S, ty + 6 * S, model.track ? leftW * 0.46 : leftW * 0.5, 27 * S);
     drawText(ctx, t('menu.hint'), W - m - 10 * S, H - m - 8 * S, 19 * S, { style: 'caption', color: '#6b6d78', align: 'right', jitter: 0 });
   }
 
@@ -15984,7 +16148,7 @@ class GameFlow {
   trackInfo() {
     const def = getCircuit(this.choices.circuitId), track = this.app.getTrack(this.choices.circuitId);
     const record = this.storage.data.records[this.choices.circuitId];
-    return [`${def.region}`, `${t('setup.length')} : ${(track.length / 1000).toFixed(3)} KM     ${t('setup.record')} : ${formatTime(record)}`];
+    return [`${def.region}`, `${t('setup.length')} : ${(track.length / 1000).toFixed(3)} KM`, `${t('setup.record')} : ${formatTime(record)}`];
   }
 
   trainingMenu() {

@@ -146,7 +146,7 @@ export class GameFlow {
   trackInfo() {
     const def = getCircuit(this.choices.circuitId), track = this.app.getTrack(this.choices.circuitId);
     const record = this.storage.data.records[this.choices.circuitId];
-    return [`${def.region}`, `${t('setup.length')} : ${(track.length / 1000).toFixed(3)} KM     ${t('setup.record')} : ${formatTime(record)}`];
+    return [`${def.region}`, `${t('setup.length')} : ${(track.length / 1000).toFixed(3)} KM`, `${t('setup.record')} : ${formatTime(record)}`];
   }
 
   trainingMenu() {

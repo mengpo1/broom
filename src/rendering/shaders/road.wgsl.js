@@ -71,10 +71,15 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
   if (ad <= hw) {
     // ---------------------------------------------------------------- asphalt
     c = col(C_ASPHALT);
-    let wob = (vnoise(vec2f(s * 0.045, 7.0)) - 0.5) * 1.1;
+    // rubber laid on the racing line: a band whose edges are frayed into long pen strokes (each
+    // narrow lane of the surface ends at its own distance), so that it never reads as a seam
+    let wob = (vnoise(vec2f(s * 0.045, 7.0)) - 0.5) * 0.9;
     let gd = abs(d - lineOffset * 0.9);
-    let groove = 1.0 - aastep(1.55 + wob, gd, mpp * 2.0 + 0.05);
-    c = mix(c, col(C_GROOVE), groove * 0.8);
+    let lane = floor(d / 0.2);
+    let laneN = hash21(vec2f(lane, floor(s / 11.0 + hash21(vec2f(lane, 3.0)) * 11.0)));
+    let fray = mix(0.55, laneN, clamp(0.16 / mpp, 0.0, 1.0));
+    let groove = 1.0 - aastep(0.95 + fray * 1.25 + wob, gd, mpp * 2.0 + 0.05);
+    c = mix(c, col(C_GROOVE), groove * 0.62);
     let patchN = vnoise(vec2f(s * 0.021, d * 0.16 + 11.0));
     c = mix(c, col(C_ASPHALT_LIGHT), aastep(0.66, patchN, 0.02 + mpr * 0.02) * 0.35 * (1.0 - groove));
     let dash = dashField(s, d, 0.9, 13.0, 0.05, 0.5, mpp, mpr, 1.0);
@@ -139,12 +144,18 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     let gravel = verge > 0.5 && verge < 1.5 && ad > hw + 3.0;
     if (gravel) {
       c = col(C_GRAVEL_A);
-      let rake = fract(d / 0.9 + vnoise(vec2f(s * 0.03, 2.0)) * 0.6);
-      c = mix(c, col(C_GRAVEL_B), aaband(0.0, 0.16, rake, mpp / 0.9) * 0.55 * clamp(0.14 / mpp, 0.0, 1.0));
-      let cell = vec2f(floor(d / 0.45), floor(s / 2.6));
+      // raked furrows: thin, wavering, broken lines along the trap
+      let rakeRow = floor(d / 1.15 + 0.5);
+      let rake = abs(d + (vnoise(vec2f(s * 0.11, rakeRow)) - 0.5) * 0.5 - rakeRow * 1.15);
+      let rakeOn = step(0.42, vnoise(vec2f(s * 0.045 + rakeRow * 3.7, rakeRow)));
+      c = mix(c, col(C_GRAVEL_B), (1.0 - aastep(0.045, rake, mpp)) * rakeOn * 0.5 * clamp(0.12 / mpp, 0.0, 1.0));
+      // grains: round pebbles of several sizes, the larger ones with a spot of shade
+      let cell = vec2f(floor(d / 0.55), floor(s / 0.55));
       let h = hash22(cell);
-      let speck = (1.0 - aastep(0.09, abs(d - (cell.x + 0.2 + 0.6 * h.x) * 0.45), mpp)) * aaband(0.0, 0.9, s - (cell.y + 0.6 * h.y) * 2.6, mpr);
-      c = mix(c, mix(col(C_GRAVEL_B), ink, 0.25), speck * step(h.x + h.y, 0.9) * 0.7 * detail * clamp(0.18 / mpp, 0.0, 1.0));
+      let pd = vec2f(d - (cell.x + 0.2 + 0.6 * h.x) * 0.55, s - (cell.y + 0.2 + 0.6 * h.y) * 0.55);
+      let grain = 0.035 + 0.075 * hash21(cell + vec2f(7.0, 3.0));
+      let pebble = (1.0 - aastep(grain, length(pd), max(mpp, mpr * 0.5))) * step(h.x * h.y, 0.42);
+      c = mix(c, mix(col(C_GRAVEL_B), ink, 0.22), pebble * 0.75 * detail * clamp(0.1 / mpp, 0.0, 1.0));
       c = mix(c, ink, (1.0 - aastep(inkW, ad - (hw + 3.0), mpp)) * inkA * 0.7);
     } else {
       let warp = (vnoise(vec2f(d * 0.22, s * 0.035)) - 0.5) * 7.0;

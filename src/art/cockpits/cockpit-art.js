@@ -149,53 +149,85 @@ function paintHand(ctx, c, rimMid, a, S, glove, suit) {
   if (ty > 0) { tx = -tx; ty = -ty; }                       // tangent pointing up the rim
   const hx = c + ux * (rimMid + S * 0.012), hy = c + uy * (rimMid + S * 0.012);
   const P = (along, out) => [hx + tx * along + ux * out, hy + ty * along + uy * out];
-  const gloveShade = shadeHex(glove, 0.4), gloveLight = lightHex(glove, 0.3);
-  // sleeve from the wrist to beyond the lower corner of the drawing
+  const gloveShade = shadeHex(glove, 0.4), gloveLight = lightHex(glove, 0.3), suitShade = shadeHex(suit, 0.3);
+  const shape = (pts, tension = 0.7) => { ctx.beginPath(); closedCurve(ctx, pts, tension); };
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // ---- forearm: a sleeve that swells toward the elbow, running out of the lower corner of the drawing
   const side = ux < 0 ? -1 : 1;
-  const wrist = P(-S * 0.085, S * 0.03);
-  const elbow = [c + side * S * 0.56, c + S * 1.25];
-  const nx = -(elbow[1] - wrist[1]), ny = elbow[0] - wrist[0];
-  const nl = Math.hypot(nx, ny) || 1;
-  const wx = (nx / nl) * S * 0.06, wy = (ny / nl) * S * 0.06;
-  const sleeve = [[wrist[0] - wx * 0.9, wrist[1] - wy * 0.9], [wrist[0] + wx * 0.9, wrist[1] + wy * 0.9], [elbow[0] + wx * 1.8, elbow[1] + wy * 1.8], [elbow[0] - wx * 1.8, elbow[1] - wy * 1.8]];
-  ctx.beginPath(); ctx.moveTo(sleeve[0][0], sleeve[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(sleeve[i][0], sleeve[i][1]); ctx.closePath();
-  ctx.fillStyle = suit; ctx.fill();
+  const wrist = P(-S * 0.1, S * 0.03);
+  const elbow = [c + side * S * 0.58, c + S * 1.27];
+  const ax = elbow[0] - wrist[0], ay = elbow[1] - wrist[1];
+  const al = Math.hypot(ax, ay) || 1;
+  const nx = -ay / al, ny = ax / al;                        // across the arm
+  const A = (t, w) => [wrist[0] + ax * t + nx * w * S, wrist[1] + ay * t + ny * w * S];
+  const sleeve = [A(0, -0.05), A(0.18, -0.074), A(0.5, -0.094), A(1, -0.11), A(1, 0.11), A(0.5, 0.09), A(0.18, 0.066), A(0, 0.048)];
+  shape(sleeve, 0.5); ctx.fillStyle = suit; ctx.fill();
   ctx.save(); ctx.clip();
-  ctx.fillStyle = shadeHex(suit, 0.3);
-  ctx.beginPath(); ctx.moveTo(sleeve[1][0], sleeve[1][1]); ctx.lineTo(sleeve[2][0], sleeve[2][1]);
-  ctx.lineTo(elbow[0] + wx * 0.5, elbow[1] + wy * 0.5); ctx.lineTo(wrist[0] + wx * 0.25, wrist[1] + wy * 0.25); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = suitShade;                                // shade along the underside of the arm
+  shape([A(0, 0.012), A(0.3, 0.03), A(0.7, 0.038), A(1, 0.04), A(1, 0.13), A(0, 0.08)], 0.5); ctx.fill();
   ctx.restore();
-  ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(sleeve[0][0], sleeve[0][1]); ctx.lineTo(sleeve[3][0], sleeve[3][1]); ctx.moveTo(sleeve[1][0], sleeve[1][1]); ctx.lineTo(sleeve[2][0], sleeve[2][1]); ctx.stroke();
-  for (let i = 1; i <= 3; i++) {   // cloth folds
-    const t = i / 4.5;
-    const fx = wrist[0] + (elbow[0] - wrist[0]) * t, fy = wrist[1] + (elbow[1] - wrist[1]) * t;
-    brushCurve(ctx, [[fx - wx * (0.7 + t), fy - wy * (0.7 + t)], [fx - wx * 0.1 + (elbow[0] - wrist[0]) * 0.03, fy - wy * 0.1 + (elbow[1] - wrist[1]) * 0.03], [fx + wx * 0.5, fy + wy * 0.5]], 2.6, { color: INK, taper: 0.45 });
+  shape(sleeve, 0.5); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.stroke();
+  // seam along the arm and the folds of the cloth gathered at the wrist and in the crook of the elbow
+  brushCurve(ctx, [A(0.04, -0.012), A(0.4, -0.02), A(0.95, -0.016)], 2.2, { color: INK, taper: 0.5 });
+  for (const [t, w0, w1, bend] of [[0.07, -0.05, 0.02, 0.03], [0.15, -0.066, -0.005, 0.035], [0.26, 0.068, 0.012, -0.03], [0.62, -0.096, -0.03, 0.04], [0.74, 0.094, 0.03, -0.04], [0.86, -0.104, -0.045, 0.035]]) {
+    brushCurve(ctx, [A(t, w0), A(t + bend, (w0 + w1) / 2), A(t + bend * 0.4, w1)], 2.8, { color: INK, taperStart: 0.05, taperEnd: 0.7 });
   }
-  // cuff
-  const cuff = [P(-S * 0.1, -S * 0.035), P(-S * 0.1, S * 0.085), P(-S * 0.062, S * 0.092), P(-S * 0.062, -S * 0.04)];
-  ctx.beginPath(); ctx.moveTo(cuff[0][0], cuff[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(cuff[i][0], cuff[i][1]); ctx.closePath();
-  ctx.fillStyle = '#f1efe6'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.stroke();
-  // back of the hand and fingers wrapped over the rim
-  const back = [P(-S * 0.07, -S * 0.045), P(-S * 0.075, S * 0.05), P(-S * 0.03, S * 0.092), P(S * 0.04, S * 0.098), P(S * 0.085, S * 0.07), P(S * 0.092, S * 0.02), P(S * 0.075, -S * 0.04), P(S * 0.0, -S * 0.055)];
-  ctx.beginPath(); closedCurve(ctx, back, 0.7);
-  ctx.fillStyle = glove; ctx.fill();
+
+  // ---- gauntlet: the long cuff of the glove over the end of the sleeve, closed by a strap
+  const cuff = [P(-S * 0.135, -S * 0.052), P(-S * 0.14, S * 0.02), P(-S * 0.132, S * 0.094), P(-S * 0.07, S * 0.086), P(-S * 0.062, S * 0.02), P(-S * 0.068, -S * 0.044)];
+  shape(cuff, 0.45); ctx.fillStyle = glove; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = gloveShade; shape([P(-S * 0.15, -S * 0.07), P(-S * 0.15, -S * 0.012), P(-S * 0.05, -S * 0.016), P(-S * 0.05, -S * 0.07)], 0.4); ctx.fill();
+  ctx.restore();
+  shape(cuff, 0.45); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 0.8; ctx.stroke();
+  const strap = [P(-S * 0.112, -S * 0.05), P(-S * 0.116, S * 0.092), P(-S * 0.094, S * 0.09), P(-S * 0.09, -S * 0.048)];
+  ctx.beginPath(); ctx.moveTo(strap[0][0], strap[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(strap[i][0], strap[i][1]); ctx.closePath();
+  ctx.fillStyle = '#f1efe6'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.stroke();
+
+  // ---- back of the hand
+  const back = [P(-S * 0.072, -S * 0.046), P(-S * 0.078, S * 0.02), P(-S * 0.066, S * 0.058), P(-S * 0.02, S * 0.066), P(S * 0.05, S * 0.064), P(S * 0.082, S * 0.04), P(S * 0.086, -S * 0.012), P(S * 0.06, -S * 0.046), P(-S * 0.005, -S * 0.056)];
+  shape(back); ctx.fillStyle = glove; ctx.fill();
   ctx.save(); ctx.clip();
   ctx.fillStyle = gloveShade;
-  ctx.beginPath(); closedCurve(ctx, [P(-S * 0.08, S * 0.0), P(-S * 0.02, -S * 0.02), P(S * 0.1, -S * 0.01), P(S * 0.1, -S * 0.08), P(-S * 0.09, -S * 0.08)], 0.6); ctx.fill();
-  ctx.fillStyle = gloveLight;
-  for (let f = 0; f < 4; f++) { const al = -S * 0.035 + f * S * 0.032; ctx.beginPath(); ctx.ellipse(...P(al, S * 0.07), S * 0.012, S * 0.016, a, 0, Math.PI * 2); ctx.fill(); }
+  shape([P(-S * 0.09, -S * 0.004), P(-S * 0.02, -S * 0.022), P(S * 0.1, -S * 0.012), P(S * 0.1, -S * 0.09), P(-S * 0.09, -S * 0.09)], 0.6); ctx.fill();
   ctx.restore();
-  ctx.beginPath(); closedCurve(ctx, back, 0.7); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.stroke();
-  for (let f = 1; f < 4; f++) {   // finger separations
-    const al = -S * 0.05 + f * S * 0.033;
-    brushCurve(ctx, [P(al, S * 0.094), P(al - S * 0.004, S * 0.055), P(al + S * 0.002, S * 0.012)], 3, { color: INK, taperStart: 0.05, taperEnd: 0.6 });
+  shape(back); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK; ctx.stroke();
+  // stitched panel on the back of the glove
+  brushCurve(ctx, [P(-S * 0.058, S * 0.036), P(-S * 0.03, S * 0.012), P(S * 0.02, S * 0.006), P(S * 0.064, S * 0.022)], 2, { color: INK, taper: 0.4 });
+
+  // ---- four fingers closed over the rim, each drawn on its own, of unequal lengths
+  const lengths = [0.1, 0.112, 0.108, 0.094];
+  for (let f = 0; f < 4; f++) {
+    const m = -S * 0.049 + f * S * 0.037, w = S * 0.0175, tip = S * lengths[f], root = S * 0.034;
+    const finger = [P(m - w, root), P(m - w * 1.04, (root + tip) / 2), P(m - w * 0.8, tip - w * 0.5), P(m, tip), P(m + w * 0.8, tip - w * 0.5), P(m + w * 1.04, (root + tip) / 2), P(m + w, root)];
+    shape(finger, 0.6); ctx.fillStyle = glove; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = gloveShade;                             // far side of each finger in shade
+    shape([P(m - w * 1.3, root - S * 0.01), P(m - w * 0.25, root), P(m - w * 0.3, tip + S * 0.01), P(m - w * 1.3, tip + S * 0.01)], 0.4); ctx.fill();
+    ctx.fillStyle = gloveLight;                             // light on the first joint
+    ctx.beginPath(); ctx.ellipse(...P(m + w * 0.3, root + (tip - root) * 0.3), w * 0.42, w * 0.9, a, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    shape(finger, 0.6); ctx.strokeStyle = INK; ctx.lineWidth = COCKPIT_INK * 0.75; ctx.stroke();
+    // joint creases
+    brushCurve(ctx, [P(m - w * 0.8, root + (tip - root) * 0.5), P(m, root + (tip - root) * 0.56), P(m + w * 0.8, root + (tip - root) * 0.5)], 1.8, { color: INK, taper: 0.4 });
+    brushCurve(ctx, [P(m - w * 0.7, root + (tip - root) * 0.8), P(m, root + (tip - root) * 0.85), P(m + w * 0.7, root + (tip - root) * 0.8)], 1.5, { color: INK, taper: 0.4 });
   }
-  brushCurve(ctx, [P(-S * 0.055, S * 0.045), P(-S * 0.01, S * 0.038), P(S * 0.06, S * 0.045)], 2.2, { color: INK, taper: 0.4 });   // knuckle seam
-  // thumb lying along the inside of the rim
+  // knuckles: short arcs where the fingers leave the hand
+  for (let f = 0; f < 4; f++) {
+    const m = -S * 0.049 + f * S * 0.037;
+    brushCurve(ctx, [P(m - S * 0.013, S * 0.03), P(m, S * 0.04), P(m + S * 0.013, S * 0.03)], 2.4, { color: INK, taper: 0.35 });
+  }
+
+  // ---- thumb lying along the inside of the rim
   const thumb = [P(-S * 0.02, -S * 0.03), P(S * 0.05, -S * 0.052), P(S * 0.105, -S * 0.05), P(S * 0.118, -S * 0.03), P(S * 0.1, -S * 0.012), P(S * 0.04, -S * 0.008)];
-  ctx.beginPath(); closedCurve(ctx, thumb, 0.7); ctx.fillStyle = glove; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3.4; ctx.stroke();
-  brushStroke(ctx, [P(S * 0.085, -S * 0.044), P(S * 0.1, -S * 0.024)], 2, { color: INK, taper: 0.3 });
+  shape(thumb); ctx.fillStyle = glove; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = gloveLight; ctx.beginPath(); ctx.ellipse(...P(S * 0.07, -S * 0.022), S * 0.026, S * 0.007, Math.atan2(ty, tx), 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  shape(thumb); ctx.strokeStyle = INK; ctx.lineWidth = 3.4; ctx.stroke();
+  brushStroke(ctx, [P(S * 0.085, -S * 0.046), P(S * 0.1, -S * 0.024)], 2, { color: INK, taper: 0.3 });
+  brushStroke(ctx, [P(S * 0.03, -S * 0.04), P(S * 0.04, -S * 0.018)], 1.8, { color: INK, taper: 0.3 });
 }
 
 function paintSteeringWheel(ctx, S, glove, suit, accent) {

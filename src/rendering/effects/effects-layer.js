@@ -13,9 +13,10 @@ import { drawText, measureText } from '../../art/styles/lettering.js';
 import { hexToRgb } from '../../art/palettes/palettes.js';
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8;
-const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !'];
-const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5 };
-const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b'];
+const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH'];
+const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6 };
+const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6'];
+const FLATOUT_SPEED = 76;       // m/s: the engine at full cry gets its own lettering, now and then
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
@@ -107,6 +108,7 @@ export class EffectsLayer {
     for (let v = 0; v < 2; v++) this.pops.push(Array.from({ length: MAX_POPS }, () => ({ age: 9, life: 0, x: 0, y: 0, word: -1, size: 1, burst: false, angle: 0 })));
     this.popCursor = [0, 0];
     this.popClock = [9, 9];
+    this.roarClock = [0, 0]; this.wasFlatOut = [false, false];
     this.dust = [0.85, 0.79, 0.64]; this.dirt = [0.55, 0.6, 0.38]; this.smoke = [0.93, 0.92, 0.9];
     this.track = null;
     this.seed = 1;
@@ -119,6 +121,7 @@ export class EffectsLayer {
     this.emitTimer.fill(0); this.markOdo.fill(0);
     for (const list of this.pops) for (const p of list) p.life = 0;
     this.popClock[0] = 9; this.popClock[1] = 9;
+    this.roarClock[0] = 0; this.roarClock[1] = 0; this.wasFlatOut[0] = false; this.wasFlatOut[1] = false;
     if (palette) { this.dust = hexToRgb(palette.dust); this.dirt = hexToRgb(palette.grassDark); this.smoke = hexToRgb(palette.smoke); }
   }
 
@@ -144,7 +147,7 @@ export class EffectsLayer {
     const list = this.pops[viewIndex];
     const p = list[this.popCursor[viewIndex]];
     this.popCursor[viewIndex] = (this.popCursor[viewIndex] + 1) % MAX_POPS;
-    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
+    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word === WORD.FLATOUT ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
     p.angle = (this.random() - 0.5) * 0.3;
   }
 
@@ -196,6 +199,17 @@ export class EffectsLayer {
     }
     for (const list of this.pops) for (const p of list) if (p.life > 0) { p.age += dt; if (p.age > p.life) p.life = 0; }
     this.popClock[0] += dt; this.popClock[1] += dt;
+    // the engine at full cry: a sound word low in the picture when a player reaches top speed
+    for (let v = 0; v < app.viewCount && v < 2; v++) {
+      this.roarClock[v] -= dt;
+      const followed = cars[app.views[v].carIndex];
+      const flat = !!followed && followed.speed > FLATOUT_SPEED && followed.throttle > 0.8;
+      if (flat && !this.wasFlatOut[v] && this.roarClock[v] <= 0 && fx.onomatopoeia && this.popClock[v] > 1) {
+        this.pop(v, WORD.FLATOUT, 0.8, 0.5, 0.5, false);
+        this.roarClock[v] = 16;
+      }
+      this.wasFlatOut[v] = flat;
+    }
     const count = Math.min(cars.length, 32);
     for (let i = 0; i < count; i++) {
       const car = cars[i];

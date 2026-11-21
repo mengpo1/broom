@@ -279,7 +279,7 @@ function plate(part, outline, y0, y1, roleOut, roleIn, roleEdge) {
 }
 
 /** Wheel: tyre as a surface of revolution about the lateral axis, rim discs on both sides. */
-function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false) {
+function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false, brakePhase = 0, brakeBlur = false) {
   const tyre = new PartBuilder(`${name}.tyre`, { ink: 1 });
   const hw = width / 2, rimR = radius * 0.6, shoulder = 0.055;
   // profile from the inner bead across the tread to the outer bead: [lateral, radius]
@@ -310,7 +310,10 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false) {
   for (const sign of [-1, 1]) {
     const y = cy + sign * (hw - 0.035);
     const outer = sign === outerSign;
-    const rings = [[0, ROLE.METAL], [0.045, ROLE.BLACK], [0.075, ROLE.RIM], [rimR * 0.8, ROLE.RIM], [rimR + 0.004, ROLE.METAL]];
+    // outer face: wheel nut, hub and the dish of the rim; inner face: upright, brake disc and the rim edge
+    const rings = outer
+      ? [[0, ROLE.METAL], [0.045, ROLE.BLACK], [0.075, ROLE.RIM], [rimR * 0.8, ROLE.RIM], [rimR + 0.004, ROLE.METAL]]
+      : [[0, ROLE.BLACK], [0.05, ROLE.CARBON], [0.085, ROLE.METAL], [rimR * 0.76, ROLE.BLACK], [rimR + 0.004, ROLE.RIM]];
     const ridx = [];
     for (let r = 0; r < rings.length; r++) {
       const row = [];
@@ -324,6 +327,23 @@ function wheel(name, cx, cy, cz, radius, width, outerSign, spin = false) {
       const s1 = (s + 1) % seg;
       const spoke = !spin && r === 2 && outer && s % 8 < 2;     // five dark spoke windows on the visible face (at rest)
       rim.face([ridx[r][s], ridx[r][s1], ridx[r + 1][s1], ridx[r + 1][s]], spoke ? ROLE.CARBON : rings[r + 1][1]);
+    }
+    if (!outer) {
+      // brake: vent slots on the disc (they turn with the wheel) and the caliper gripping its rear edge
+      const slots = 12, turn = spin ? 0 : ((brakePhase || 0) / 3) * ((Math.PI * 2) / slots);
+      if (spin || brakeBlur) {
+        for (const [rr, from, to] of [[rimR * 0.34, 0.4, 2.2], [rimR * 0.5, 2.9, 4.9], [rimR * 0.64, 5.2, 7.0]]) {
+          const pts = [];
+          for (let k = 0; k <= 12; k++) { const t = from + ((to - from) * k) / 12; pts.push([cx + rr * Math.cos(t), y + sign * 0.004, cz + rr * Math.sin(t)]); }
+          rim.lines.push({ pts, normal: [0, sign, 0], weight: 0.8, hex: '#59616d' });
+        }
+      } else {
+        for (let k = 0; k < slots; k++) {
+          const t = turn + (k / slots) * Math.PI * 2, r0 = rimR * 0.3, r1 = rimR * 0.7;
+          rim.lines.push({ pts: [[cx + r0 * Math.cos(t), y + sign * 0.004, cz + r0 * Math.sin(t)], [cx + r1 * Math.cos(t + 0.22), y + sign * 0.004, cz + r1 * Math.sin(t + 0.22)]], normal: [0, sign, 0], weight: 0.8, hex: '#59616d' });
+        }
+      }
+      box(rim, cx - rimR * 0.56, y + sign * 0.03, cz + rimR * 0.1, 0.085, 0.05, 0.19, ROLE.CARBON, 0, 0.1);
     }
     if (outer) {
       // sidewall marking: a pale ring, as drawn on racing tyres
@@ -557,10 +577,11 @@ export function buildCarModel(options = {}) {
   const steer = options.steer ?? 0;
   const susp = new PartBuilder('suspension.left', { ink: 0.5 });
   const rod = (a, b, radius = 0.011, role = ROLE.CARBON) => susp.rods.push({ a, b, radius, role });
-  rod([1.72, 0.19, 0.42], [1.55, 0.74, 0.445]); rod([1.3, 0.215, 0.445], [1.55, 0.74, 0.445]);
-  rod([1.76, 0.17, 0.15], [1.55, 0.75, 0.175]); rod([1.32, 0.2, 0.14], [1.55, 0.75, 0.175]);
-  rod([1.55, 0.73, 0.19], [1.5, 0.21, 0.46], 0.009);
-  rod([1.68, 0.2, 0.33], [1.67 - Math.sin(steer) * 0.12, 0.74, 0.33], 0.008, ROLE.METAL);
+  // front wishbones, push rod and steering arm: the inner ends sit on the skin of the tub
+  rod([1.72, 0.122, 0.352], [1.55, 0.74, 0.445]); rod([1.3, 0.2, 0.43], [1.55, 0.74, 0.445]);
+  rod([1.76, 0.128, 0.168], [1.55, 0.75, 0.175]); rod([1.32, 0.2, 0.14], [1.55, 0.75, 0.175]);
+  rod([1.55, 0.73, 0.19], [1.5, 0.13, 0.42], 0.009);
+  rod([1.68, 0.15, 0.3], [1.67 - Math.sin(steer) * 0.12, 0.74, 0.33], 0.008, ROLE.METAL);
   rod([-1.1, 0.17, 0.4], [-1.35, 0.6, 0.42]); rod([-1.54, 0.12, 0.4], [-1.35, 0.6, 0.42]);
   rod([-1.08, 0.2, 0.14], [-1.35, 0.61, 0.17]); rod([-1.56, 0.14, 0.15], [-1.35, 0.61, 0.17]);
   rod([-1.35, 0.1, 0.33], [-1.35, 0.6, 0.33], 0.02, ROLE.METAL);
@@ -585,7 +606,7 @@ export function buildCarModel(options = {}) {
 
 /** Build a wheel at its place on the car, steered by `steerAngle` about the vertical axis. */
 function placeWheel(name, x, y, tyre, steerAngle, tread = null, spin = false) {
-  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin);
+  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin, tread && tread.phase ? tread.phase : 0, !!(tread && tread.blur));
   if (tread) addTreadMarks(t, tyre, tread);
   t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
   const c = Math.cos(steerAngle), s = Math.sin(steerAngle);

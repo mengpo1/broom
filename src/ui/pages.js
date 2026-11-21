@@ -12,6 +12,9 @@ import { drawCar, drawCarFitted } from '../art/vehicles/car-illustrator.js';
 import { liveryColors } from '../art/art-library.js';
 import { rgbToHex, getPalette } from '../art/palettes/palettes.js';
 import { ALL_TEAMS, DRIVERS, PLAYER_DRIVERS } from '../vehicles/liveries.js';
+import { paintBackdropLayer, backdropHorizon } from '../art/environments/backdrops.js';
+import { getTheme } from '../tracks/themes.js';
+import { hashString } from '../core/random.js';
 
 const INK = '#16161f', PAPER = '#f4efe2', PAPER_SHADE = '#e4dcc8', CAPTION = '#f6e27a', RED = '#d5302a', BLUE = '#2f5fa8';
 
@@ -133,8 +136,9 @@ export class PagePainter {
     for (let i = 0; i < track.n; i += 2) pts.push([ox + track.x[i] * k, oz + track.z[i] * k]);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.beginPath(); tracePolygon(ctx, pts);
-    ctx.strokeStyle = color; ctx.lineWidth = 15 * this.S; ctx.stroke();
-    ctx.strokeStyle = '#8b8d95'; ctx.lineWidth = 8.5 * this.S; ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = 19 * this.S; ctx.stroke();
+    ctx.strokeStyle = '#f1efe6'; ctx.lineWidth = 13 * this.S; ctx.stroke();
+    ctx.strokeStyle = '#6c6e77'; ctx.lineWidth = 9 * this.S; ctx.stroke();
     const nx = track.nx[0], nz = track.nz[0], tx = track.tx[0], tz = track.tz[0];
     ctx.strokeStyle = RED; ctx.lineWidth = 6 * this.S;
     ctx.beginPath(); ctx.moveTo(pts[0][0] - nx * 14 * this.S, pts[0][1] - nz * 14 * this.S); ctx.lineTo(pts[0][0] + nx * 14 * this.S, pts[0][1] + nz * 14 * this.S); ctx.stroke();
@@ -142,6 +146,73 @@ export class PagePainter {
     const ax = pts[0][0] + tx * 40 * this.S + nx * 30 * this.S, az = pts[0][1] + tz * 40 * this.S + nz * 30 * this.S;
     ctx.fillStyle = RED; ctx.beginPath();
     ctx.moveTo(ax + tx * 22 * this.S, az + tz * 22 * this.S); ctx.lineTo(ax - tx * 10 * this.S + nx * 12 * this.S, az - tz * 10 * this.S + nz * 12 * this.S); ctx.lineTo(ax - tx * 10 * this.S - nx * 12 * this.S, az - tz * 10 * this.S - nz * 12 * this.S); ctx.closePath(); ctx.fill();
+  }
+
+  /**
+   * View of the place where a circuit lies: sky and the circuit's own distant scenery (the
+   * panoramas of the race), over open ground. Cached per circuit and size.
+   * @param horizon height of the horizon in the picture, as a fraction of h
+   * @param zoom    how much of the panorama is shown (1 = its natural scale for this height)
+   */
+  vista(track, w, h, horizon, zoom = 1) {
+    const key = `vista:${track.id}:${Math.round(w)}x${Math.round(h)}:${horizon}:${zoom}`;
+    let canvas = this.cache.get(key);
+    if (canvas) return canvas;
+    canvas = makeCanvas(Math.ceil(w), Math.ceil(h));
+    const ctx = canvas.getContext('2d'), P = getPalette(track.theme), theme = getTheme(track.theme);
+    const yH = Math.round(h * horizon);
+    const sky = ctx.createLinearGradient(0, 0, 0, yH);
+    sky.addColorStop(0, P.skyTop); sky.addColorStop(0.55, P.skyMid); sky.addColorStop(1, P.skyLow);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, yH + 2);
+    ctx.fillStyle = P.farGround; ctx.fillRect(0, yH, w, h - yH);
+    const sw = 2048, sh = 384, strip = makeCanvas(sw, sh), sctx = strip.getContext('2d');
+    const bandH = yH * 1.25 * zoom, k = bandH / sh, stripHorizon = backdropHorizon(sh) * k;
+    for (let layer = 0; layer < 3; layer++) {
+      sctx.clearRect(0, 0, sw, sh);
+      paintBackdropLayer(layer, sctx, sw, sh, P, theme.backdrop, seeded(hashString(`backdrop:${track.id}:${layer}`)), theme);
+      ctx.drawImage(strip, 0, 0, Math.min(sw, w / k), sh, 0, yH - stripHorizon, Math.min(sw, w / k) * k, bandH);
+    }
+    this.cache.set(key, canvas);
+    return canvas;
+  }
+
+  /** Scenery of an illustrated circuit plan: woods around the track, grandstand and pits by the start line. */
+  mapScenery(track, x, y, w, h, P) {
+    const ctx = this.ctx, S = this.S;
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+    for (let i = 0; i < track.n; i++) { minX = Math.min(minX, track.x[i]); maxX = Math.max(maxX, track.x[i]); minZ = Math.min(minZ, track.z[i]); maxZ = Math.max(maxZ, track.z[i]); }
+    const k = Math.min(w / (maxX - minX), h / (maxZ - minZ)) * 0.9;
+    const ox = x + w / 2 - ((minX + maxX) / 2) * k, oz = y + h / 2 - ((minZ + maxZ) / 2) * k;
+    const rnd = seeded(hashString(`map:${track.id}`));
+    const step = Math.max(1, Math.floor(track.n / 160));
+    const near = (px, py, limit) => {
+      for (let i = 0; i < track.n; i += step) { const dx = ox + track.x[i] * k - px, dy = oz + track.z[i] * k - py; if (dx * dx + dy * dy < limit * limit) return true; }
+      return false;
+    };
+    // clumps of trees, kept clear of the road
+    ctx.lineJoin = 'round';
+    for (let n = 0; n < 150; n++) {
+      const px = x - 40 * S + rnd() * (w + 80 * S), py = y - 20 * S + rnd() * (h + 60 * S), r = (9 + rnd() * 9) * S;
+      if (near(px, py, 30 * S + r)) continue;
+      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fillStyle = P.leafShade; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.2 * S; ctx.stroke();
+      ctx.beginPath(); ctx.arc(px - r * 0.22, py - r * 0.26, r * 0.62, 0, Math.PI * 2); ctx.fillStyle = rnd() < 0.5 ? P.leaf : P.pine; ctx.fill();
+      ctx.beginPath(); ctx.arc(px - r * 0.36, py - r * 0.4, r * 0.28, 0, Math.PI * 2); ctx.fillStyle = P.leafLight; ctx.fill();
+    }
+    // grandstand on one side of the start line, pit building on the other
+    const sx = ox + track.x[0] * k, sy = oz + track.z[0] * k;
+    const tx = track.tx[0], tz = track.tz[0], nx = track.nx[0], nz = track.nz[0];
+    const block = (side, len, depth, gap, roof, body) => {
+      const cx = sx + nx * side * gap * S, cy = sy + nz * side * gap * S;
+      const hx = tx * len * S * 0.5, hy = tz * len * S * 0.5, dx = nx * side * depth * S, dy = nz * side * depth * S;
+      ctx.beginPath(); ctx.moveTo(cx - hx, cy - hy); ctx.lineTo(cx + hx, cy + hy); ctx.lineTo(cx + hx + dx, cy + hy + dy); ctx.lineTo(cx - hx + dx, cy - hy + dy); ctx.closePath();
+      ctx.fillStyle = body; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3 * S; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - hx + dx * 0.45, cy - hy + dy * 0.45); ctx.lineTo(cx + hx + dx * 0.45, cy + hy + dy * 0.45); ctx.lineTo(cx + hx + dx, cy + hy + dy); ctx.lineTo(cx - hx + dx, cy - hy + dy); ctx.closePath();
+      ctx.fillStyle = roof; ctx.fill(); ctx.stroke();
+    };
+    const pitSide = track.pit ? track.pit.side : 1;
+    block(-pitSide, 150, 30, 22, P.roof, P.crowd[2]);
+    block(pitSide, 190, 24, 26, P.metalLight, P.concrete);
   }
 
   paperBackground() {
@@ -179,9 +250,12 @@ export class PagePainter {
     const p1 = [[m, m], [leftW + 60 * S, m], [leftW - 20 * S, H * 0.68], [m, H * 0.68]];
     this.beginPanel(p1);
     if (model.track) {
-      ctx.fillStyle = '#e9e2cf'; ctx.fillRect(m, m, leftW + 80 * S, H * 0.68);
-      ctx.fillStyle = palette.grassA; ctx.globalAlpha = 0.25; ctx.fillRect(m, m, leftW + 80 * S, H * 0.68); ctx.globalAlpha = 1;
-      this.trackMap(model.track, m + 60 * S, m + 150 * S, leftW - 180 * S, H * 0.68 - m - 230 * S);
+      // an illustrated plan: the circuit laid on its ground, under the skyline of the place
+      const tp = getPalette(model.track.theme);
+      ctx.drawImage(this.vista(model.track, leftW + 80 * S, H * 0.68, 0.2), m, m);
+      const mx = m + 70 * S, my = m + H * 0.68 * 0.25, mw = leftW - 200 * S, mh = H * 0.68 * 0.7 - m;
+      this.mapScenery(model.track, mx, my, mw, mh, tp);
+      this.trackMap(model.track, mx, my, mw, mh);
       drawText(ctx, model.track.name, m + 44 * S, m + 104 * S, 62 * S, { style: 'impact', color: '#ffd42a', outline: INK, outlineWidth: 9 * S, shadow: { dx: 6 * S, dy: 7 * S, color: INK }, seed: 2 });
     } else {
       this.speedBackdrop(m, m, leftW + 80 * S, H * 0.68, palette, 7);
@@ -246,10 +320,17 @@ export class PagePainter {
       ctx.beginPath(); ctx.moveTo(m, cy); ctx.lineTo(m + leftW * 0.42, cy); ctx.lineTo(m + leftW * 0.34, H - m); ctx.lineTo(m, H - m); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = INK; ctx.lineWidth = 5 * S; ctx.beginPath(); ctx.moveTo(m + leftW * 0.42, cy); ctx.lineTo(m + leftW * 0.34, H - m); ctx.stroke();
     }
+    if (model.track) {
+      const vw = leftW * 0.5, vx = m + leftW - vw - 40 * S;
+      ctx.drawImage(this.vista(model.track, vw, H - cy, 0.62, 1.5), vx, cy);
+      ctx.fillStyle = '#fbf8ee';
+      ctx.beginPath(); ctx.moveTo(vx - 2, cy); ctx.lineTo(vx + 70 * S, cy); ctx.lineTo(vx + 10 * S, H - m); ctx.lineTo(vx - 2, H - m); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 5 * S; ctx.beginPath(); ctx.moveTo(vx + 70 * S, cy); ctx.lineTo(vx + 10 * S, H - m); ctx.stroke();
+    }
     this.endPanel(p3);
     let ty = cy + 34 * S;
     if (model.info) for (const line of model.info) { drawText(ctx, line, m + 36 * S, ty + 30 * S, 30 * S, { style: 'bold', color: INK, jitter: 0 }); ty += 46 * S; }
-    if (item && item.desc) this.caption(item.desc, m + 34 * S, ty + 6 * S, model.track ? leftW - 190 * S : leftW * 0.5, 27 * S);
+    if (item && item.desc) this.caption(item.desc, m + 34 * S, ty + 6 * S, model.track ? leftW * 0.46 : leftW * 0.5, 27 * S);
     drawText(ctx, t('menu.hint'), W - m - 10 * S, H - m - 8 * S, 19 * S, { style: 'caption', color: '#6b6d78', align: 'right', jitter: 0 });
   }
 

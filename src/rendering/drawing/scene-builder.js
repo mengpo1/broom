@@ -17,7 +17,8 @@ import { hexToRgb } from '../../art/palettes/palettes.js';
 const DEFAULT_GANTRY_LIGHTS = [0.42, 0.46, 0.5, 0.54, 0.58].map((fx) => ({ fx, fy: 0.3, fr: 0.014 }));
 
 const MAX_CARS = 32;
-const NEAR_CAR = 2.3;        // a car whose centre is nearer than this (alongside) is not drawn; it fades in over the next metre
+const NEAR_CAR = 1.9;        // a car whose centre is nearer than this (alongside, already out of the picture) is not drawn
+const NEAR_CAR_FADE = 0.5;   // and it fades in over this distance, so that it never pops
 const pt = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 const ptB = { x: 0, y: 0, scale: 0, z: 0, theta: 0 };
 
@@ -251,7 +252,7 @@ export class SceneBuilder {
     const left = pt.x - (flip ? cs.w - cs.ax : cs.ax) * k, top = pt.y - cs.ay * k;
     if (left > W || left + w < 0) return;
     let ghost = car.ghostTimer > 0 || car.state === CAR_STATE.RESET ? 0.55 : 1;
-    if (z < NEAR_CAR + 1) ghost *= z - NEAR_CAR;
+    if (z < NEAR_CAR + NEAR_CAR_FADE) ghost *= (z - NEAR_CAR) / NEAR_CAR_FADE;
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
       u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, z > 3.4 ? z - 2.9 : 0.5);   // clip test at the car's near end: the drawing extends in front of its centre
