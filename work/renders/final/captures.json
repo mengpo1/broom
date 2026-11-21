@@ -42,7 +42,7 @@
     "speed": 277,
     "s": 319,
     "position": 4,
-    "quads": 2223
+    "quads": 2225
   },
   {
     "name": "05b-chase",
@@ -51,7 +51,7 @@
     "speed": 182,
     "s": 792,
     "position": 8,
-    "quads": 279
+    "quads": 285
   },
   {
     "name": "06-collision",
@@ -93,7 +93,7 @@
     "speed": 199,
     "s": 822,
     "position": 8,
-    "quads": 1206
+    "quads": 1216
   },
   {
     "name": "11-docks",

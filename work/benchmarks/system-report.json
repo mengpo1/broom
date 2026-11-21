@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-21T17:22:01.040Z",
+  "date": "2026-11-21T17:46:06.817Z",
   "system": {
     "distribution": "Ubuntu 24.04.5 LTS",
     "kernel": "6.18.44-fc-v726",
@@ -41,8 +41,8 @@
       "rg11b10ufloat-renderable",
       "bgra8unorm-storage",
       "texture-compression-bc",
-      "chromium-experimental-sampling-resource-table",
       "core-features-and-limits",
+      "chromium-experimental-sampling-resource-table",
       "chromium-experimental-timestamp-query-inside-passes",
       "float32-filterable",
       "indirect-first-instance",
@@ -54,8 +54,8 @@
       "texture-compression-etc2",
       "depth-clip-control",
       "texture-compression-bc-sliced-3d",
-      "clip-distances",
       "timestamp-query",
+      "clip-distances",
       "texture-component-swizzle",
       "subgroups"
     ],
@@ -68,8 +68,8 @@
     "language": "en-US",
     "refreshRateHz": 59.88023952095548,
     "artTimings": {
-      "cars": 21950.300000000047,
-      "static": 2025.399999999965
+      "cars": 19340.100000000093,
+      "static": 1811.8999999999069
     },
     "browserVersion": "153.0.8010.12"
   }
