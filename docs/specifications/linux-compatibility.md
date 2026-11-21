@@ -1,7 +1,7 @@
 # Rapport de compatibilité Linux
 
 Détection effectuée par `node work/scripts/system-report.mjs` (lecture seule : aucune
-configuration du système n'est modifiée). Date : 2026-11-21T08:49:54.910Z.
+configuration du système n'est modifiée). Date : 2026-11-21T17:22:01.040Z.
 
 ## Machine de développement et de test
 
@@ -24,7 +24,7 @@ configuration du système n'est modifiée). Date : 2026-11-21T08:49:54.910Z.
 | Limites | texture 2D max 8192, couches max 256 |
 | Résolution de l'écran (virtuel) | 1280×720, densité 1 |
 | Rafraîchissement mesuré | 59,9 Hz (cadence de `requestAnimationFrame`) |
-| Temps de dessin au chargement | voitures 21,2 s, dessins communs 2,0 s |
+| Temps de dessin au chargement | voitures 22,0 s, dessins communs 2,0 s |
 
 **Conséquence** : cette machine n'a pas de carte graphique. WebGPU y fonctionne grâce à
 SwiftShader (rendu par le processeur) ; le jeu s'y exécute correctement mais très lentement.
@@ -39,7 +39,7 @@ Tout ce qui est fonctionnel a été vérifié ici ; rien de ce qui est performan
 | Wayland / X11 | Aucun code spécifique : le jeu n'utilise que les API web. X11 (Xvfb) testé ; Wayland non testé. |
 | Résolution | Toute taille ; cible 2560×1440. Le découpage s'adapte (plein écran, bandes, moitiés). |
 | Mémoire vidéo | environ 390 Mo de textures générées au chargement. |
-| Hors ligne | Oui : `index.html` (973,194 octets) ne charge aucune ressource externe (vérifié par test). Les sauvegardes utilisent `localStorage`. |
+| Hors ligne | Oui : `index.html` (979,692 octets) ne charge aucune ressource externe (vérifié par test). Les sauvegardes utilisent `localStorage`. |
 | Périphériques | Clavier, souris, jusqu'à deux manettes (Gamepad API, disposition standard). |
 
 ## Vérifications effectuées sous Linux

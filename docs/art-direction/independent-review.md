@@ -135,3 +135,39 @@ la coupe du mur de pneus vient de la règle « ne pas dessiner une barrière tro
 | 17 | Moyen | Plan de circuit : arbres en billes brillantes, plan et élévation mêlés | Bosquets en aplats encrés vus du dessus ; deux registres séparés (voir n° 2) |
 | 18 | Moyen | Forêt et grillage terminés par une verticale | **Non traité** |
 | 19–28 | Mineur | Panneaux au texte inversé, cartouche de vitesse, reflets simplifiés, raccord rail/pneus, zone claire de l'asphalte, rectangle pâle en écran partagé, stries des tubes, apparition de l'onomatopée, spectateurs sans visage, sapin répété | Apparition de l'onomatopée traitée (n° 14) ; le reste non traité |
+
+## Itération 4 (état final)
+
+Captures : `work/renders/final/` (copies JPEG des captures 2560×1440 de l'état final ; les PNG
+d'origine, `work/renders/review-4/`, ne sont pas versionnés à cause de leur poids).
+
+Les corrections qui ont suivi le troisième rapport ont été contrôlées par le développeur sur
+ces captures : le mur de pneus est continu jusqu'au bord de l'image lors d'une collision, le
+bandeau d'horizon de la page de circuit couvre toute la case, les avant-bras ne sont plus
+coupés, les onomatopées de moteur varient.
+
+Un quatrième critique indépendant a été lancé sur ces captures. **Il n'a pas pu rendre son
+rapport** : son exécution a été interrompue deux fois par la limite d'utilisation du service
+(voir l'état en fin de document). Il n'existe donc **aucun jugement indépendant de l'état
+final** au moment où ce document est écrit.
+
+## Bilan
+
+| Itération | Graves | Moyens | Mineurs | Notes les plus basses |
+|---|---|---|---|---|
+| 1 | 5 | 15 | 9 | précision mécanique 2 ; cohérence, continuité, déformations 2,5 |
+| 2 | 2 | 15 | 7 | vitesse 2,5 ; continuité 2,5 |
+| 3 | 2 | 16 | 10 | précision mécanique 2,5 ; continuité 2,5 |
+
+- **L'objectif fixé (plus aucun défaut au-dessus de « mineur ») n'est pas atteint.**
+- Les défauts graves relevés à chaque itération ont été corrigés, mais chaque critique neuf en
+  a trouvé d'autres ; deux des quatre derniers venaient de corrections précédentes. Le nombre
+  de défauts moyens ne baisse pas : les critiques, qui ne se connaissent pas, déplacent leur
+  attention vers ce qui reste le plus faible.
+- Ce que les trois critiques jugent solide, de façon constante : les arrière-plans et les
+  palettes par circuit (4 à 4,5), la lisibilité (4), l'interface en cartouches, le cockpit et
+  son animation, la stabilité de l'image d'une image à l'autre.
+- Ce qui revient dans les trois rapports et n'est pas résolu : les voitures concurrentes vues
+  de près (dessins agrandis, sans numéro ni marquage), l'écart de netteté entre le cockpit et
+  le reste, la vitesse peu lisible sur image fixe, les répétitions et coupes nettes des décors
+  en bandes, les bords de piste lointains crénelés.

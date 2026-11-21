@@ -108,5 +108,6 @@ Défauts connus qui subsistent, par ordre d'importance :
 build du commit `42afaf7`, c'est-à-dire **avant** les corrections qui ont suivi le troisième
 rapport de critique. Ces corrections ne concernent pas une course normale (mur au contact,
 pages de menu, onomatopées variées, avant-bras, lettrage de l'interface) à l'exception de
-l'espacement des lettres de l'interface et des avant-bras du pilote, visibles dans la vidéo
-dans leur état antérieur. La vidéo est réencodée à 5,5 Mbit/s pour tenir dans le dépôt.
+l'espacement des lettres de l'interface, des avant-bras du pilote, des étriers de frein
+(rouges dans la vidéo, métal ensuite), de l'extrémité des vibreurs et de l'ordre de quelques
+objets de bord de piste, visibles dans la vidéo dans leur état antérieur. La vidéo est réencodée à 5,5 Mbit/s pour tenir dans le dépôt.

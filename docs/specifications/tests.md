@@ -6,6 +6,18 @@ Dans le conteneur de développement, WebGPU est exécuté par le rasteriseur log
 SwiftShader derrière un serveur X virtuel (Xvfb) : les tests vérifient le comportement et
 l'image, pas la vitesse.
 
+## 0. Dernière exécution complète
+
+Sur le build final (`index.html`, 979 692 octets), le 21 novembre 2026 :
+
+| Suite | Commande | Résultat |
+|---|---|---|
+| Simulation et logique | `npm test` | 49 / 49 |
+| Navigateur (WebGPU) | `npm run test:browser` | 13 / 13 |
+| Modes de jeu de bout en bout | `node work/scripts/flow-check.mjs` | réussi (5 parcours) |
+| Pages, pause, caméras, souris | `node work/scripts/pages-check.mjs` | 14 / 14 |
+| Audio | `node work/scripts/audio-check.mjs` | 80 / 80 |
+
 ## 1. Tests de simulation et de logique (Node) — 49 / 49 réussis
 
 Dernière exécution : `npm test` → 49 tests, 49 réussis, 0 échec (environ 5 s).

@@ -1,0 +1,107 @@
+[
+  {
+    "name": "01-grid",
+    "found": true,
+    "time": 0,
+    "speed": 0,
+    "s": 3508,
+    "position": 8,
+    "quads": 1636
+  },
+  {
+    "name": "02-straight",
+    "found": true,
+    "time": 59.02,
+    "speed": 290,
+    "s": 8,
+    "position": 5,
+    "quads": 1556
+  },
+  {
+    "name": "03-corner",
+    "found": true,
+    "time": 22.89,
+    "speed": 137,
+    "s": 1126,
+    "position": 10,
+    "quads": 1058
+  },
+  {
+    "name": "04-overtake",
+    "found": true,
+    "time": 6.41,
+    "speed": 241,
+    "s": 114,
+    "position": 13,
+    "quads": 1449
+  },
+  {
+    "name": "05-exterior",
+    "found": true,
+    "time": 7.73,
+    "speed": 277,
+    "s": 319,
+    "position": 4,
+    "quads": 2223
+  },
+  {
+    "name": "05b-chase",
+    "found": true,
+    "time": 16.24,
+    "speed": 182,
+    "s": 792,
+    "position": 8,
+    "quads": 279
+  },
+  {
+    "name": "06-collision",
+    "hit": true,
+    "speed": 39,
+    "wallHits": 1
+  },
+  {
+    "name": "07-split",
+    "found": true,
+    "time": 9.17,
+    "speed": 285,
+    "s": 403,
+    "position": 6,
+    "quads": 2392
+  },
+  {
+    "name": "07b-split-vertical",
+    "found": true,
+    "time": 12.17,
+    "speed": 311,
+    "s": 654,
+    "position": 6,
+    "quads": 2149
+  },
+  {
+    "name": "09-desert",
+    "found": true,
+    "time": 20.67,
+    "speed": 205,
+    "s": 1186,
+    "position": 8,
+    "quads": 568
+  },
+  {
+    "name": "10-dusk",
+    "found": true,
+    "time": 15.17,
+    "speed": 199,
+    "s": 822,
+    "position": 8,
+    "quads": 1206
+  },
+  {
+    "name": "11-docks",
+    "found": true,
+    "time": 14.17,
+    "speed": 152,
+    "s": 764,
+    "position": 9,
+    "quads": 386
+  }
+]
