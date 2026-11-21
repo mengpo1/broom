@@ -13,7 +13,9 @@ window.renderPreview = (canvas, args) => {
   for (const p of model.parts) faces += p.faces.length;
   if (args.hero) {
     const meta = drawCarFitted(ctx, null, model, canvas.width, canvas.height, { yaw: args.yaw ?? 2.5, pitch: args.pitch ?? 0.16, distance: args.distance ?? 7 }, { livery, inkWorld: 0.008, number: args.number });
-    return { build: t1 - t0, draw: performance.now() - t1, faces, meta };
+    const t2 = performance.now();
+    ctx.getImageData(0, 0, 1, 1);      // forces the recorded drawing to be rasterised
+    return { build: t1 - t0, draw: t2 - t1, raster: performance.now() - t2, faces, meta };
   }
   const cols = 4, rows = 3, cw = canvas.width / cols, ch = canvas.height / rows;
   const yaws = args.yaws || [0, 0.2, 0.5, 0.9, 1.3, 1.5708, 2.0, 2.4, 2.8, 3.1416, -0.35, -1.1];

@@ -230,18 +230,38 @@ export function drawCar(ctx, maskCtx, model, cam, options = {}) {
 
   const targets = maskCtx ? [ctx, maskCtx] : [ctx];
   for (const t of targets) { t.lineJoin = 'round'; t.lineCap = 'round'; }
-  const fillPoly = (buf, n, styles) => {
+  // Faces of one colour that follow each other in the drawing order are filled as a single path
+  // (far fewer canvas calls). The batch is flushed whenever anything else has to be drawn.
+  const pending = new Float32Array(8192);      // [n, x0, y0, x1, y1, ..., n, ...]
+  let pendingLen = 0, pendingStyles = null;
+  const flush = () => {
+    if (!pendingStyles) return;
     for (let ti = 0; ti < targets.length; ti++) {
       const t = targets[ti];
       t.beginPath();
-      t.moveTo(buf[0], buf[1]);
-      for (let i = 1; i < n; i++) t.lineTo(buf[i * 3], buf[i * 3 + 1]);
-      t.closePath();
-      t.fillStyle = styles[ti]; t.fill();
-      t.strokeStyle = styles[ti]; t.lineWidth = 1.5; t.stroke();
+      for (let i = 0; i < pendingLen;) {
+        const n = pending[i++];
+        t.moveTo(pending[i], pending[i + 1]);
+        for (let q = 1; q < n; q++) t.lineTo(pending[i + q * 2], pending[i + q * 2 + 1]);
+        t.closePath();
+        i += n * 2;
+      }
+      t.fillStyle = pendingStyles[ti]; t.fill();
+      t.strokeStyle = pendingStyles[ti]; t.lineWidth = 1.5; t.stroke();      // hides the hairline seams between neighbouring faces
     }
+    pendingLen = 0; pendingStyles = null;
+  };
+  const fillPoly = (buf, n, styles) => {
+    if (styles !== pendingStyles || pendingLen + 1 + n * 2 > pending.length) { flush(); pendingStyles = styles; }
+    // one winding direction for all, so that overlapping faces of a batch add up under the nonzero rule
+    let area = 0;
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; area += buf[i * 3] * buf[j * 3 + 1] - buf[j * 3] * buf[i * 3 + 1]; }
+    pending[pendingLen++] = n;
+    if (area >= 0) for (let i = 0; i < n; i++) { pending[pendingLen++] = buf[i * 3]; pending[pendingLen++] = buf[i * 3 + 1]; }
+    else for (let i = n - 1; i >= 0; i--) { pending[pendingLen++] = buf[i * 3]; pending[pendingLen++] = buf[i * 3 + 1]; }
   };
   const strokeSeg = (x0, y0, x1, y1, width, styleFixed, styleMask, cap) => {
+    flush();
     for (let ti = 0; ti < targets.length; ti++) {
       const t = targets[ti];
       t.beginPath(); t.moveTo(x0, y0); t.lineTo(x1, y1);
@@ -341,6 +361,7 @@ export function drawCar(ctx, maskCtx, model, cam, options = {}) {
       strokeSeg(s[0], s[1], s[3], s[4], inkBase * 0.4 * (line.weight || 1), style, '#000');
     }
   }
+  flush();
   if (options.number) drawNumberDecals(ctx, camera, String(options.number), options.numberColors || ['#16161f', '#f1efe6']);
   return bounds;
 }

@@ -64,7 +64,7 @@ export class GameApp {
   }
 
   /**
-   * @param options { quality: 'low'|'medium'|'high', onError, artFactory(app) -> ArtLibrary, sceneFactory(app) -> SceneBuilder }
+   * @param options { quality: 'low'|'medium'|'high', onError, onProgress(done, total), registerArt(art, app), attachLayers(scene, app) }
    */
   async init(options = {}) {
     this.gpu = await createGpuContext(this.canvas, options.onError);
@@ -73,7 +73,7 @@ export class GameApp {
     this.renderer = new Renderer(this.gpu, { sampleCount: this.quality.sampleCount, carLayers: CAR_ANGLES * 2 });
     this.renderer.init();
     this.art = new ArtLibrary(this.renderer);
-    this.art.buildCars();
+    await this.art.buildCars(options.onProgress || null);
     this.art.setLiveries(ALL_TEAMS);
     if (options.registerArt) options.registerArt(this.art, this);
     this.art.buildStatic();

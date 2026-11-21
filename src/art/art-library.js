@@ -30,6 +30,15 @@ export function liveryColors(team) {
   return pattern.map((key) => team[key]);
 }
 
+/** Let the browser run (events, painting) before continuing; not throttled like timers in background tabs. */
+function nextTask() {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => { channel.port1.close(); resolve(); };
+    channel.port2.postMessage(0);
+  });
+}
+
 export class ArtLibrary {
   constructor(renderer) {
     this.renderer = renderer;
@@ -52,8 +61,12 @@ export class ArtLibrary {
     this.timings.static = performance.now() - t0;
   }
 
-  /** Draw the car from every angle: one layer of fixed colours and one livery mask per angle. */
-  buildCars() {
+  /**
+   * Draw the car from every angle: one layer of fixed colours and one livery mask per angle.
+   * Asynchronous: the browser gets a turn after each angle (so the page stays alive and can show
+   * progress); onProgress(done, total) is called after each one.
+   */
+  async buildCars(onProgress = null) {
     const t0 = performance.now();
     const model = buildCarModel({ detail: 1 });
     const fixed = makeCanvas(CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT), mask = makeCanvas(CAR_LAYER_WIDTH, CAR_LAYER_HEIGHT);
@@ -67,6 +80,8 @@ export class ArtLibrary {
       this.renderer.uploadLayer('cars', i * 2, fixed);
       this.renderer.uploadLayer('cars', i * 2 + 1, mask);
       this.cars.push({ layer: i * 2, ppm: meta.ppm, ax: meta.ax, ay: meta.ay, w: CAR_LAYER_WIDTH, h: CAR_LAYER_HEIGHT });
+      if (onProgress) onProgress(i + 1, CAR_ANGLES);
+      await nextTask();
     }
     this.timings.cars = performance.now() - t0;
   }

@@ -43,6 +43,7 @@ async function boot() {
     let cockpitLayout = null;
     await app.init({
       quality: params.quality || storage.data.settings.quality,
+      onProgress: (done, total) => { notice.textContent = `${t('game.title')} — ${t('game.loading')} ${Math.round((done / total) * 100)} %`; },
       registerArt: (art) => {
         const players = PLAYER_TEAMS.map((team) => {
           const colors = liveryColors(team).map((c) => rgbToHex(c[0], c[1], c[2]));
