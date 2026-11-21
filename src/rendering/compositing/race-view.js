@@ -115,7 +115,9 @@ export class RaceView {
     let amp = 0;
     if (effects.cockpitShake && this.camera === CAMERA.COCKPIT) {
       const rough = car.surface === 1 ? 1.0 : car.surface === 2 ? 0.7 : car.surface === 3 ? 1.15 : 0;
-      amp = speedRatio * speedRatio * 0.9 + rough * Math.min(1, Math.abs(car.speed) / 25) * 3.2 + car.slip * 0.7;
+      // nothing at moderate speed (a one-pixel tremble only blurs the fine lines), a frank buzz near top speed
+      const buzz = Math.max(0, speedRatio - 0.6) / 0.4;
+      amp = buzz * buzz * 2.6 + rough * Math.min(1, Math.abs(car.speed) / 25) * 3.2 + car.slip * 0.7;
     }
     if (effects.impactFrames) amp += this.impact * 16;
     this.shakeAmp = damp(this.shakeAmp, amp, 18, dt);

@@ -65,7 +65,12 @@ export class SceneBuilder {
       road: hexToRgb(palette.asphalt), line: hexToRgb(palette.paint),
     };
     this.greenTimer = 99;
-    for (const strip of layout.strips) strip.sprite = this.art.sprite(strip.id);
+    for (const strip of layout.strips) {
+      strip.sprite = this.art.sprite(strip.id);
+      // buildings along the road are volumes: the end of a run shows a gable of this depth (m)
+      strip.gable = /grandstand/.test(strip.id) ? 16 : /pitbuilding|facade/.test(strip.id) ? 12 : /crowdbank/.test(strip.id) ? 9 : 0;
+    }
+    this.gableWall = hexToRgb(palette.concreteShade); this.gableTop = hexToRgb(palette.metalShade); this.inkColor = hexToRgb(palette.ink);
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
       prop.behind = false;
@@ -155,6 +160,7 @@ export class SceneBuilder {
           const strip = layout.strips[list[q]];
           let step = lodStep < strip.tile ? lodStep : strip.tile;
           if (step > 1 && (sample % step !== 0 || k === 0)) { if (sample % step !== 0) continue; step = 1; }
+          if (strip.gable > 0 && k > 0 && sample === (dir > 0 ? strip.from : (strip.from + strip.count - 1) % track.n)) this.emitGable(quads, p, track, strip, k, sample);
           this.emitStrip(quads, p, track, strip, k, Math.min(k + step, nodeCount - 1), sample, W, H);
         }
       }
@@ -162,6 +168,24 @@ export class SceneBuilder {
       for (let i = segHead[k]; i >= 0; i = carNext[i]) this.emitCar(quads, p, cars[i], i, yawAngle, W);
       if (this.effects) this.effects.buildSegment(app, view, k, zNear, zFar);
     }
+  }
+
+  /** End wall of a building strip, facing the camera at the start of its run: a plain inked gable. */
+  emitGable(quads, p, track, strip, k, sample) {
+    const side = strip.side, barrier = side > 0 ? track.barrierR : track.barrierL;
+    const d0 = side * (strip.absolute ? strip.offset : barrier[sample] + strip.offset);
+    projectNode(p, k, d0, strip.base, pt);
+    const x0 = pt.x, y = pt.y, z = pt.z, scale = pt.scale, h = strip.height * scale;
+    projectNode(p, k, d0 + side * strip.gable, strip.base, ptB);
+    const xa = Math.min(x0, ptB.x), xb = Math.max(x0, ptB.x);
+    if (xb - xa < 2 || h < 4) return;
+    const wall = this.gableWall, top = this.gableTop, ink = this.inkColor, line = Math.max(1, 0.09 * scale);
+    const flat = (x, yy, w, hh, c, shade) => quads.quad(x, yy, 1, x + w, yy, 1, x, yy + hh, 1, x + w, yy + hh, 1, 0, 0, 0, 0, 0, QUAD_MODE.FLAT, c[0] * shade, c[1] * shade, c[2] * shade, 1, z);
+    flat(xa, y - h, xb - xa, h, wall, 1);
+    flat(xa, y - h, xb - xa, h * 0.1, top, 1);                       // edge of the roof
+    flat(xa, y - h * 0.34, xb - xa, h * 0.34, wall, 0.86);           // plinth in shade
+    flat(xa, y - h, xb - xa, line, ink, 1); flat(xa, y - h * 0.9, xb - xa, line * 0.6, ink, 1); flat(xa, y - h * 0.34, xb - xa, line * 0.6, ink, 1);
+    flat(xa, y - h, line, h, ink, 1); flat(xb - line, y - h, line, h, ink, 1);
   }
 
   emitStrip(quads, p, track, strip, kNear, kFar, sample, W, H) {
@@ -203,7 +227,7 @@ export class SceneBuilder {
     if (side > 0) { uNear = 1 - uNear; uFar = 1 - uFar; }   // lettering reads left to right from the road
     const du = sp.u1 - sp.u0;
     quads.quad(xN, yNt, zN, xF, yFt, zF, xN, yNb, zN, xF, yFb, zF,
-      sp.u0 + du * uNear, sp.v0, sp.u0 + du * uFar, sp.v1, sp.layer, QUAD_MODE.SPRITE, 1, 1, 1, 1, (zN + zF) * 0.5);
+      sp.u0 + du * uNear, sp.v0, sp.u0 + du * uFar, sp.v1, sp.layer, QUAD_MODE.SPRITE, 1, 1, 1, 1, zN);   // hidden by crests nearer than its near end (testing the middle would nibble its foot)
   }
 
   emitProps(quads, p, layout, from, to, behind, dir, W, reachLimit, detail) {

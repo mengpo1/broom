@@ -27,8 +27,8 @@ export function defineEffectsArt(art) {
     ctx.scale(w / 160, w / 160);                                           // drawn on a 160 unit grid
     const shape = blobPoints(c, c, 62, 58, lobes, 0.2, rnd);
     ctx.lineJoin = 'round';
-    ctx.beginPath(); closedCurve(ctx, shape); ctx.strokeStyle = 'rgba(22,22,31,0.9)'; ctx.lineWidth = 4.5; ctx.stroke();
-    ctx.fillStyle = '#c9c9c9'; ctx.fill();                                  // shade tone (tinted at draw time)
+    ctx.beginPath(); closedCurve(ctx, shape); ctx.strokeStyle = 'rgba(22,22,31,0.85)'; ctx.lineWidth = 3.6; ctx.stroke();
+    ctx.fillStyle = '#dcdcdc'; ctx.fill();                                  // shade tone (tinted at draw time)
     ctx.save(); ctx.clip();
     ctx.fillStyle = '#ffffff';
     ctx.beginPath(); closedCurve(ctx, blobPoints(c - 9, c - 11, 52, 46, lobes, 0.22, rnd)); ctx.fill();
@@ -181,7 +181,7 @@ export class EffectsLayer {
       if (fx.impactFrames) this.pop(v, -1, sideX, 0.52, 0.4 + strength * 0.35, true);
       if (fx.onomatopoeia && strength > 0.45) {
         const word = event.type === 'crash' ? WORD.BOUM : event.type === 'wall' ? (strength > 0.7 ? WORD.CRAC : WORD.SCRI) : (strength > 0.7 ? WORD.BANG : WORD.TCHAK);
-        this.pop(v, word, clamp(sideX + (sideX > 0.5 ? -0.2 : 0.2), 0.25, 0.75), 0.27, 0.7 + strength * 0.3, false);
+        this.pop(v, word, clamp(sideX + (sideX > 0.5 ? -0.13 : 0.13), 0.2, 0.8), 0.37, 0.7 + strength * 0.3, false);   // the word springs from the impact
       }
     }
   }
@@ -282,7 +282,7 @@ export class EffectsLayer {
       } else {
         // drawn smoke stays opaque (no ghosting of contours), swells, then shrinks away at the end of its life
         // (a puff never fills the picture: its drawn size is capped, and right in front of the camera it thins out)
-        const cap = view.rect.h * 0.2;
+        const cap = view.rect.h * 0.16;
         const size = Math.min(cap, (this.psize[i] + this.pgrow[i] * Math.sqrt(t)) * pt.scale * (t > 0.7 ? 1 - ((t - 0.7) / 0.3) * 0.75 : 1));
         const near = clamp((this.pz[i] - 3.5) / 5, 0, 1);
         if (near <= 0) continue;
