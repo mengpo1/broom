@@ -2275,7 +2275,7 @@ const MAX_ROWS = 2160;
 const MAX_QUADS = 16000;
 const MAX_TRACK_SAMPLES = 4096;
 const ATLAS_LAYER_SIZE = 2048;
-const ATLAS_LAYERS = 11;
+const ATLAS_LAYERS = 12;
 const CAR_LAYER_WIDTH = 1024;
 const CAR_LAYER_HEIGHT = 512;
 const BACKDROP_WIDTH = 4096;
@@ -7546,6 +7546,9 @@ const CAR_DIMENSIONS = {
   eye: [-0.35, 0, 0.95],       // driver's eye, used by the cockpit drawing
 };
 
+/** Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side (the cockpit view is drawn from these). */
+const MIRROR_MOUNT = { x: 0.4, y: 0.42, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.3, 0.6] };
+
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
 
 class PartBuilder {
@@ -8097,8 +8100,9 @@ function buildCarModel(options = {}) {
 
   // ---- mirrors
   const mirror = new PartBuilder('mirror.left', { ink: 0.7 });
-  box(mirror, 0.4, 0.42, 0.675, 0.04, 0.14, 0.075, { top: ROLE.BODY, bottom: ROLE.BODY, front: ROLE.BODY, rear: ROLE.GLASS, left: ROLE.BODY, right: ROLE.BODY });
-  mirror.rods.push({ a: [0.4, 0.3, 0.6], b: [0.4, 0.4, 0.655], radius: 0.009, role: ROLE.CARBON });
+  const MM = MIRROR_MOUNT;
+  box(mirror, MM.x, MM.y, MM.z, 0.04, MM.width, MM.height, { top: ROLE.BODY, bottom: ROLE.BODY, front: ROLE.BODY, rear: ROLE.GLASS, left: ROLE.BODY, right: ROLE.BODY });
+  mirror.rods.push({ a: MM.arm, b: [MM.x, MM.y - 0.02, MM.z - 0.02], radius: 0.009, role: ROLE.CARBON });
   parts.push(mirror, mirrorPart(mirror, 'mirror.right'));
 
   // ---- suspension, steering and driveshafts
@@ -8156,6 +8160,8 @@ function placeWheel(name, x, y, tyre, steerAngle, tread = null, spin = false) {
 /** Number of rolling marks around a tyre and of drawn phases between two marks. */
 const TREAD_MARKS = 9;
 const TREAD_PHASES = 3;
+/** Drawn phases of the streaks shown at speed: cycled, they make the tyre visibly turn. */
+const STREAK_PHASES = 3;
 
 /**
  * Pen marks on the tread that make the rolling of a slick tyre visible.
@@ -8174,11 +8180,15 @@ function addTreadMarks(part, tyre, tread) {
   };
   const period = (Math.PI * 2) / TREAD_MARKS;
   if (tread.blur) {
+    // broken streaks; the gaps repeat every five segments, and a phase shifts the whole pattern
+    // by a third of that (the same way as the marks: toward the rear of the tyre over the top)
+    const segment = 0.2094, shift = ((tread.phase || 0) / STREAK_PHASES) * 5 * segment;
     for (let lane = 0; lane < 7; lane++) {
       const lat = -0.085 + lane * 0.028;
       for (let k = 0; k < 30; k++) {
-        if ((k * 7 + lane * 3) % 5 === 0) continue;       // broken streaks
-        arc(lat, k * 0.2094, (k + 1) * 0.2094, lane % 2 ? '#4a4c58' : '#1c1c26', 1.1);
+        // dashes three segments long, two segments apart, staggered from lane to lane
+        if ((k + lane * 2) % 5 >= 3) continue;
+        arc(lat, k * segment - shift, (k + 1) * segment - shift + 0.01, lane % 2 ? '#62657a' : '#101016', 1.5);
       }
     }
     return;
@@ -8186,8 +8196,9 @@ function addTreadMarks(part, tyre, tread) {
   for (let i = 0; i < TREAD_MARKS; i++) {
     const t0 = i * period - (tread.phase / TREAD_PHASES) * period;
     const len = 0.2 + (i % 3) * 0.05;
-    arc(lanes[i % lanes.length], t0, t0 + len, i % 2 ? '#565866' : '#191a23', 1.6);
-    arc(lanes[(i + 4) % lanes.length], t0 + 0.3, t0 + 0.3 + len * 0.6, i % 2 ? '#191a23' : '#565866', 1.2);
+    // (drawn boldly: on a slick tyre these marks are the only thing that shows the wheel turning)
+    arc(lanes[i % lanes.length], t0, t0 + len, i % 2 ? '#7a7d90' : '#0e0e14', 2.6);
+    arc(lanes[(i + 4) % lanes.length], t0 + 0.3, t0 + 0.3 + len * 0.6, i % 2 ? '#0e0e14' : '#7a7d90', 2);
   }
 }
 
@@ -8231,7 +8242,7 @@ function finishPart(p) {
   return { name: p.name, ink: p.ink, bias: p.bias, gloss: p.gloss, outward: p.outward, pos, nor, faces, edges, rods: p.rods, lines: p.lines };
 }
 
-__modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, buildCarModel, TREAD_MARKS, TREAD_PHASES, buildFrontWheelModel };
+__modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, MIRROR_MOUNT, buildCarModel, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES, buildFrontWheelModel };
 })();
 // ---- src/art/vehicles/car-illustrator.js
 (function () {
@@ -11448,7 +11459,7 @@ const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degrees (fr
 /** Silhouette pen width of the cars in the race, in metres at the car: the same weight as the cockpit's own outlines. */
 const CAR_INK_WORLD = 0.017;
 const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
-const STATIC_LAYERS = 7;
+const STATIC_LAYERS = 8;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;
 
 /** Which team colour goes to which livery zone (body, flanks, wings) for each paint pattern. */
@@ -12024,7 +12035,7 @@ __modules["src/core/game-app.js"] = { GameApp };
 // of view, relative to the point (screen centre, horizon line).
 
 const { VIEW_CONFIG } = __modules["src/core/config.js"];
-const { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES } = __modules["src/art/vehicles/car-model.js"];
+const { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES, STREAK_PHASES, MIRROR_MOUNT } = __modules["src/art/vehicles/car-model.js"];
 const { drawCar } = __modules["src/art/vehicles/car-illustrator.js"];
 const { LINE, brushStroke, brushCurve, closedCurve } = __modules["src/art/styles/ink.js"];
 const { drawText } = __modules["src/art/styles/lettering.js"];
@@ -12034,10 +12045,21 @@ const COCKPIT_REF_WIDTH = 2560;
 const COCKPIT_REF_FOCAL = (COCKPIT_REF_WIDTH / 2) / Math.tan(VIEW_CONFIG.hfov / 2);
 const STEER_FRAMES = 5;                 // drawn steering angles of a front wheel, from full right to full left
 const MAX_DRAWN_STEER = 0.26;           // radians at the first / last frame
-const WHEEL_VARIANTS = TREAD_PHASES + 1; // rolling phases, then the streaked "at speed" drawing
+const WHEEL_VARIANTS = TREAD_PHASES + STREAK_PHASES; // rolling phases, then the phases of the streaked "at speed" drawing
 const DIAL = { x: 0, y: 700, r: 92, minAngle: -2.2, maxAngle: 2.2, maxRpm: 14000 };
 const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };   // extra: canvas height added below the wheel for the sleeves
-const MIRROR = { x: -1010, y: 188, w: 300, h: 138, glassInset: 16 };   // left mirror (centre and size); the right one is its reflection
+/**
+ * Left mirror as the driver sees it (centre and size in the units of the cockpit drawing); the
+ * right one is its reflection. It is the projection of the mirror of the car model from the
+ * driver's eye, so that the cockpit and the exterior views show the same car.
+ */
+const MIRROR = (() => {
+  const M = MIRROR_MOUNT, eye = CAR_DIMENSIONS.eye, k = COCKPIT_REF_FOCAL / (M.x - eye[0]);
+  return {
+    x: -M.y * k, y: (eye[2] - M.z) * k, w: (M.width + 0.012) * k, h: (M.height + 0.01) * k, glassInset: 14,
+    armX: -M.arm[1] * k, armY: (eye[2] - M.arm[2]) * k,          // where the arm meets the side of the cockpit
+  };
+})();
 const INK = '#16161f';
 const COCKPIT_INK = 4.2;
 const BOTTOM_LIMIT = 900;                      // nothing is needed further below the horizon than this
@@ -12070,23 +12092,13 @@ function paintBinnacle(ctx, ox, oy) {
 }
 
 /** Left rear-view mirror on its stalk: housing in the body colour, glass with a drawn reflection. */
-/** Bounds (in cockpit units) of the drawing of a mirror's support. */
-const STALK = { x0: MIRROR.x - 80, x1: MIRROR.x + 16, y0: MIRROR.y + MIRROR.h / 2 - 16, y1: BOTTOM_LIMIT };
-
-/**
- * Support of the left mirror: a strut from the housing down toward the side of the car. It is a
- * layer of its own, drawn behind the front wheel, so that only the short length above the tyre shows.
- */
-function paintMirrorStalk(ctx, ox, oy) {
-  const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hh = MIRROR.h / 2;
-  const path = [[cx - 6, cy + hh - 8], [cx - 40, cy + 380], [cx - 52, cy + 760]];
-  brushStroke(ctx, path, 30, { color: INK, taper: 0, swell: 0 });
-  brushStroke(ctx, path, 21, { color: '#30323d', taper: 0, swell: 0 });
-  brushStroke(ctx, [[cx - 11, cy + hh], [cx - 45, cy + 380], [cx - 57, cy + 760]], 5, { color: '#555866', taper: 0, swell: 0 });
-}
-
 function paintMirror(ctx, ox, oy, colors) {
   const cx = ox + MIRROR.x, cy = oy + MIRROR.y, hw = MIRROR.w / 2, hh = MIRROR.h / 2;
+  // arm from the side of the cockpit to the inner lower corner of the housing
+  const arm = [[ox + MIRROR.armX, oy + MIRROR.armY], [cx + hw * 0.55, cy + hh * 1.3], [cx + hw * 0.5, cy + hh * 0.7]];
+  brushStroke(ctx, arm, 26, { color: INK, taper: 0, swell: 0 });
+  brushStroke(ctx, arm, 17, { color: '#30323d', taper: 0, swell: 0 });
+  brushStroke(ctx, arm.map((q) => [q[0] - 4, q[1] - 5]), 4, { color: '#555866', taper: 0, swell: 0 });
   const housing = [[cx - hw, cy - hh * 0.72], [cx - hw * 0.86, cy - hh], [cx + hw * 0.9, cy - hh], [cx + hw, cy - hh * 0.6], [cx + hw * 0.94, cy + hh * 0.86], [cx + hw * 0.8, cy + hh], [cx - hw * 0.88, cy + hh], [cx - hw, cy + hh * 0.7]];
   const trace = (pts) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); };
   trace(housing); ctx.fillStyle = shadeHex(colors[0], 0.16); ctx.fill();
@@ -12319,8 +12331,7 @@ function defineCockpitArt(art, players) {
   const probe = { eye, focal, cx: 0, cy: 0 };
   const nearParts = (name) => name === 'tub' || name === 'suspension.left' || name === 'exhaust';
   const farParts = (name) => name === 'frontwing.main' || name === 'frontwing.flap.left' || name === 'frontwing.endplate.left' || name === 'frontwing.pylons';
-  const layout = { near: [], far: [], wheels: [], steering: [], steeringFree: [], dial: null, needle: null, stalk: 'cockpit.stalk' };
-  art.defineStatic('cockpit.stalk', STALK.x1 - STALK.x0, STALK.y1 - STALK.y0, (ctx) => paintMirrorStalk(ctx, -STALK.x0, -STALK.y0), { ox: STALK.x0, oy: STALK.y0 });
+  const layout = { near: [], far: [], wheels: [], steering: [], steeringFree: [], dial: null, needle: null };
 
   const nearBounds = drawCar(null, null, model, probe, { measure: true, include: nearParts });
   nearBounds.minY = Math.min(nearBounds.minY, MIRROR.y - MIRROR.h / 2 - 6); nearBounds.maxY = BOTTOM_LIMIT;
@@ -12350,7 +12361,7 @@ function defineCockpitArt(art, players) {
   for (let k = 0; k < STEER_FRAMES; k++) {
     const row = [];
     for (let v = 0; v < WHEEL_VARIANTS; v++) {
-      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : { blur: true } });
+      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : { blur: true, phase: v - TREAD_PHASES } });
       row.push(wm);
       if (v === 0) {
         const b = drawCar(null, null, wm, probe, { measure: true });
@@ -12397,22 +12408,44 @@ const { VIEW_CONFIG } = __modules["src/core/config.js"];
 const { clamp, mod } = __modules["src/core/math.js"];
 const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
 const { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING, MIRROR } = __modules["src/art/cockpits/cockpit-art.js"];
-const { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES } = __modules["src/art/vehicles/car-model.js"];
+const { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES } = __modules["src/art/vehicles/car-model.js"];
 const { BASE_CAR_SPEC } = __modules["src/vehicles/car-spec.js"];
 const { QUAD_MODE } = __modules["src/rendering/drawing/quad-batch.js"];
 const { CAR_STATE } = __modules["src/physics/car-physics.js"];
 
-const BLUR_SPEED = 17;       // m/s above which the tyre is drawn with speed streaks
+/**
+ * Speed (m/s) up to which the drawn tread marks can follow the real rotation of the wheel: beyond
+ * it the marks would pass faster than the pictures follow each other and seem to stand still or
+ * turn backwards. Above it the tyre is drawn with streaks that cycle at an apparent rate.
+ */
+const WHEEL_SYNC_SPEED = 4.5;
 
 /**
- * Which drawing of the front wheel to show: rolling phase 0..TREAD_PHASES-1 synchronised with the
- * distance travelled, or TREAD_PHASES (streaks) at speed.
+ * Apparent rotation of the streaked tyre: cycles of the streak pattern shown per metre travelled.
+ * The cycling rate grows with speed (3.5 per second at 16 km/h, 8.6 at 300 km/h) and stays low
+ * enough to read as a steady forward rotation at any display rate from 30 images per second up.
  */
-function wheelVariant(odometer, speed) {
-  if (Math.abs(speed) > BLUR_SPEED) return TREAD_PHASES;
+function streakCyclesPerMetre(speed) {
+  const v = Math.max(Math.abs(speed), WHEEL_SYNC_SPEED);
+  return (3.5 + 5.5 * (1 - Math.exp(-(v - WHEEL_SYNC_SPEED) / 35))) / v;
+}
+
+/**
+ * Which drawing of the front wheel to show. Below WHEEL_SYNC_SPEED: rolling phase
+ * 0..TREAD_PHASES-1, exactly synchronised with the distance travelled. Above: one of the
+ * STREAK_PHASES streaked drawings, chosen by `streakTurn` (cycles of the streak pattern,
+ * accumulated along the distance travelled, see CockpitLayer).
+ */
+function wheelVariant(odometer, speed, streakTurn = 0) {
+  if (Math.abs(speed) > WHEEL_SYNC_SPEED) return TREAD_PHASES + (Math.floor(mod(streakTurn, 1) * STREAK_PHASES) % STREAK_PHASES);
   const angle = odometer / CAR_DIMENSIONS.frontTyre.radius;
   const period = (Math.PI * 2) / TREAD_MARKS;
   return Math.floor((mod(angle, period) / period) * TREAD_PHASES) % TREAD_PHASES;
+}
+
+/** Advance the streak cycle of a wheel over a distance travelled (negative when reversing). */
+function advanceStreak(turn, distance, speed) {
+  return mod(turn + distance * streakCyclesPerMetre(speed), 1);
 }
 
 /** Steering frame (0 = full right ... STEER_FRAMES-1 = full left) of the LEFT wheel for a steering value in -1..1 (+ = right). */
@@ -12480,13 +12513,13 @@ class CockpitLayer {
     this.art = art;
     this.near = layout.near.map((id) => art.sprite(id));
     this.far = layout.far.map((id) => art.sprite(id));
-    this.stalk = art.sprite(layout.stalk);
     this.steering = layout.steering.map((id) => art.sprite(id));
     this.steeringFree = layout.steeringFree.map((id) => art.sprite(id));
     this.wheels = layout.wheels.map((row) => row.map((id) => art.sprite(id)));
     this.dial = art.sprite(layout.dial);
     this.needle = art.sprite(layout.needle);
     this.needleAngle = [0, 0];
+    this.streakTurn = [0, 0]; this.lastOdometer = [NaN, NaN];
     this.wheelAngle = [0, 0];
   }
 
@@ -12576,12 +12609,15 @@ class CockpitLayer {
     const ox = r.w * 0.5 + view.shakeX, oy = placement.oy + view.shakeY + Math.max(0, view.dive) * 6 * k;
     const am = app.scene.ambient;
     this.half(quads, this.far[p], ox, oy, k, am);
-    this.half(quads, this.stalk, ox, oy, k, am);          // mirror supports: behind the wheels, only their top shows
 
     // front wheels: steering frame and rolling variant
     const lock = BASE_CAR_SPEC.steerLock * (0.45 + 0.55 / (1 + Math.abs(car.speed) / 28));
     const frame = steerFrame(car.steer, lock);
-    const variant = wheelVariant(car.odometer, car.speed);
+    // streaks cycle with the distance travelled, not with the images drawn: same motion at any display rate
+    const vi = view.index, travelled = car.odometer - this.lastOdometer[vi];
+    if (Number.isFinite(travelled) && Math.abs(travelled) < 30) this.streakTurn[vi] = advanceStreak(this.streakTurn[vi], travelled, car.speed);
+    this.lastOdometer[vi] = car.odometer;
+    const variant = wheelVariant(car.odometer, car.speed, this.streakTurn[vi]);
     const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
     const jolt = view.shakeAmp * 0.5 * k;
     const wy = oy + left.oy * k + Math.sin(view.time * 61) * jolt;
@@ -12624,7 +12660,7 @@ class CockpitLayer {
   }
 }
 
-__modules["src/rendering/compositing/cockpit-layer.js"] = { wheelVariant, steerFrame, cockpitPlacement, CockpitLayer };
+__modules["src/rendering/compositing/cockpit-layer.js"] = { WHEEL_SYNC_SPEED, streakCyclesPerMetre, wheelVariant, advanceStreak, steerFrame, cockpitPlacement, CockpitLayer };
 })();
 // ---- src/ui/text-painter.js
 (function () {

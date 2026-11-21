@@ -3,9 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { carViewFrame } from '../../src/rendering/drawing/scene-builder.js';
-import { wheelVariant, steerFrame } from '../../src/rendering/compositing/cockpit-layer.js';
-import { STEER_FRAMES, WHEEL_VARIANTS } from '../../src/art/cockpits/cockpit-art.js';
-import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS } from '../../src/art/vehicles/car-model.js';
+import { wheelVariant, steerFrame, streakCyclesPerMetre, advanceStreak, WHEEL_SYNC_SPEED } from '../../src/rendering/compositing/cockpit-layer.js';
+import { STEER_FRAMES, WHEEL_VARIANTS, MIRROR, COCKPIT_REF_FOCAL } from '../../src/art/cockpits/cockpit-art.js';
+import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, MIRROR_MOUNT, buildCarModel } from '../../src/art/vehicles/car-model.js';
 import { CAR_ANGLES } from '../../src/art/art-library.js';
 import { RaceView, CAMERA } from '../../src/rendering/compositing/race-view.js';
 import { DEFAULT_EFFECTS } from '../../src/core/config.js';
@@ -39,13 +39,69 @@ test('front wheels: rolling marks advance in step with the distance travelled', 
   const circumference = Math.PI * 2 * CAR_DIMENSIONS.frontTyre.radius;
   const period = circumference / TREAD_MARKS;            // distance between two marks
   const sequence = [];
-  for (let k = 0; k < TREAD_PHASES * 4; k++) sequence.push(wheelVariant((k + 0.5) * (period / TREAD_PHASES), 5));
+  for (let k = 0; k < TREAD_PHASES * 4; k++) sequence.push(wheelVariant((k + 0.5) * (period / TREAD_PHASES), 3));
   for (let k = 0; k < sequence.length; k++) assert.equal(sequence[k], k % TREAD_PHASES, 'phases follow each other in order');
   assert.equal(wheelVariant(12.34, 3), wheelVariant(12.34 + circumference, 3), 'one wheel turn brings the same drawing back');
   assert.equal(wheelVariant(5, 0), wheelVariant(5, 0), 'a stopped wheel does not animate');
   assert.equal(wheelVariant(100, 40), TREAD_PHASES, 'at speed the streaked drawing is used');
   assert.equal(wheelVariant(100, -40), TREAD_PHASES);
-  assert.equal(WHEEL_VARIANTS, TREAD_PHASES + 1);
+  assert.equal(WHEEL_VARIANTS, TREAD_PHASES + STREAK_PHASES);
+});
+
+test('front wheels at speed: the streaks cycle forward with the distance travelled, faster with speed, the same at any display rate', () => {
+  // exact synchronisation is only possible while a mark moves by less than one drawn phase per image (60 images per second)
+  const phaseAngle = (Math.PI * 2) / TREAD_MARKS / TREAD_PHASES;
+  assert.ok((WHEEL_SYNC_SPEED / CAR_DIMENSIONS.frontTyre.radius) / 60 <= phaseAngle * 1.001, 'marks never skip a phase below the synchronisation speed');
+  // above it: every speed shows the three streak drawings in order, never backwards, never frozen
+  let previousRate = 0;
+  for (const kmh of [20, 60, 120, 200, 300]) {
+    const v = kmh / 3.6, rate = streakCyclesPerMetre(v) * v;          // pattern cycles per second
+    assert.ok(rate > previousRate, `the cycling rate grows with speed (${kmh} km/h: ${rate.toFixed(2)} per second)`);
+    assert.ok(rate >= 3 && rate <= 10, 'between 3 and 10 cycles per second: readable from 30 images per second up');
+    previousRate = rate;
+    for (const fps of [30, 60, 144]) {
+      let turn = 0, odometer = 0, last = wheelVariant(0, v, 0), changes = 0;
+      for (let i = 0; i < fps; i++) {
+        odometer += v / fps; turn = advanceStreak(turn, v / fps, v);
+        const now = wheelVariant(odometer, v, turn);
+        assert.ok(now >= TREAD_PHASES && now < WHEEL_VARIANTS);
+        if (now !== last) { assert.equal(now - TREAD_PHASES, (last - TREAD_PHASES + 1) % STREAK_PHASES, `phases follow each other forward (${kmh} km/h, ${fps} images per second)`); changes++; }
+        last = now;
+      }
+      // after one second the pattern has turned by the same amount whatever the display rate
+      assert.ok(Math.abs(changes - rate * STREAK_PHASES) <= 1.01, `${kmh} km/h at ${fps} images per second: ${changes} phase changes for ${(rate * STREAK_PHASES).toFixed(1)} expected`);
+    }
+  }
+  // reversing turns the pattern the other way; standing still leaves it where it is
+  assert.ok(advanceStreak(0.5, -0.2, -8) < 0.5 && advanceStreak(0.5, 0, 0) === 0.5);
+});
+
+test('mirrors: the cockpit shows the mirrors of the car model where the driver would see them', () => {
+  // the model used by the exterior views: the mirror housing is centred on MIRROR_MOUNT
+  const model = buildCarModel();
+  const parts = model.parts || model;
+  const left = parts.find((p) => p.name === 'mirror.left'), right = parts.find((p) => p.name === 'mirror.right');
+  assert.ok(left && right, 'the model has two mirrors');
+  const centre = (part) => {
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < part.pos.length; i += 3) for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], part.pos[i + a]); hi[a] = Math.max(hi[a], part.pos[i + a]); }
+    return [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2, hi[1] - lo[1], hi[2] - lo[2]];
+  };
+  const cl = centre(left), cr = centre(right);
+  assert.ok(Math.abs(cl[0] - MIRROR_MOUNT.x) < 0.03 && Math.abs(cl[1] - MIRROR_MOUNT.y) < 0.01 && Math.abs(cl[2] - MIRROR_MOUNT.z) < 0.01, `left mirror of the model at ${cl.slice(0, 3)}`);
+  assert.ok(Math.abs(cr[1] + cl[1]) < 1e-9 && Math.abs(cr[2] - cl[2]) < 1e-9, 'the right mirror is the reflection of the left one');
+  assert.ok(Math.abs(cl[3] - MIRROR_MOUNT.width) < 0.01 && Math.abs(cl[4] - MIRROR_MOUNT.height) < 0.01, 'size of the housing');
+  // the cockpit drawing: perspective projection of that point from the driver's eye (x forward, y to the left, z up)
+  const eye = CAR_DIMENSIONS.eye, depth = MIRROR_MOUNT.x - eye[0];
+  assert.ok(depth > 0.3, 'the mirror is in front of the eye');
+  const scale = COCKPIT_REF_FOCAL / depth;
+  assert.ok(Math.abs(MIRROR.x - (-(MIRROR_MOUNT.y - eye[1]) * scale)) < 1e-6, 'horizontal position');
+  assert.ok(Math.abs(MIRROR.y - (eye[2] - MIRROR_MOUNT.z) * scale) < 1e-6, 'vertical position');
+  assert.ok(MIRROR.y > 0, 'below the horizon: the mirror is lower than the eye');
+  assert.ok(MIRROR.w >= MIRROR_MOUNT.width * scale && MIRROR.w < MIRROR_MOUNT.width * scale * 1.2, 'apparent width (housing plus its outline)');
+  assert.ok(MIRROR.h >= MIRROR_MOUNT.height * scale && MIRROR.h < MIRROR_MOUNT.height * scale * 1.25, 'apparent height');
+  // it sits outside the cockpit side and inside the front wheel, as on the model
+  assert.ok(MIRROR_MOUNT.y > Math.abs(MIRROR_MOUNT.arm[1]) && MIRROR_MOUNT.y + MIRROR_MOUNT.width / 2 < CAR_DIMENSIONS.frontTrack - CAR_DIMENSIONS.frontTyre.width / 2, 'between the cockpit side and the inner face of the wheel');
 });
 
 test('front wheels: steering frames are symmetric and monotonic', () => {
