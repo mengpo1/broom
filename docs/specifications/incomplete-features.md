@@ -36,15 +36,21 @@ par le rasteriseur logiciel SwiftShader).
   voiture les porte (bas, contre les flancs) : ils masquent le bas des roues avant
   (`wheels-and-mirrors.md`).
 - **Collisions et accidents** (`collisions.md`) : simulation arcade par états, pas de physique
-  3D. Une voiture en vol est soulevée, pas cabrée, dans les vues extérieures, et son ombre
-  monte avec elle ; pas de son propre au décollage ; les voitures de l'ordinateur ne subissent
-  que 30 % de la perte de vitesse d'un contact et frôlent plus souvent les barrières
-  qu'avant ; seuls les panneaux de freinage sont des obstacles solides (arbres, bâtiments et
-  autres décors restent derrière les barrières).
+  3D. Dans les vues extérieures une voiture en vol est soulevée, penchée et laisse son ombre
+  au sol, mais son tangage ne peut pas être dessiné de dos ; pas de son propre au décollage ;
+  les voitures de l'ordinateur ne subissent que 30 % de la perte de vitesse d'un contact et
+  frôlent plus souvent les barrières qu'avant ; une épave reste traversable par un autre
+  joueur ; seuls les panneaux de freinage sont des obstacles solides (arbres, bâtiments et
+  autres décors restent derrière les barrières) et un panneau heurté disparaît sans débris.
+  Un critique indépendant a relevé 7 défauts moyens et 13 mineurs sur les séquences
+  (`work/reviews/collision-review.md`) ; ce qui n'a pas été traité est listé dans
+  `collisions.md` § 9, et les corrections n'ont pas été revues à leur tour.
 - **Perte de roue** : demandée, **non implémentée**. La vidéo analysée n'en montre pas ; ce
   qu'il faudrait pour la définir est listé dans `collisions.md` § 6.
-- **Roues des autres voitures** : toujours dessinées en rotation, même à l'arrêt (seules les
-  roues avant de la vue cockpit suivent la vitesse).
+- **Roues** : seules les roues avant de la vue cockpit suivent la vitesse (marques
+  synchronisées à basse vitesse, rangées de traits au-delà : une convention de dessin, un pneu
+  lisse réel n'en montre pas) ; celles des autres voitures sont toujours dessinées en
+  rotation, même à l'arrêt.
 - **Monoplaces** : un seul modèle de carrosserie pour toutes les écuries (les livrées changent
   par trois couleurs et cinq schémas) ; les numéros de course n'apparaissent que sur les
   grandes illustrations (menus, planches d'introduction et de résultats), pas sur les voitures

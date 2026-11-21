@@ -3,9 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { carViewFrame } from '../../src/rendering/drawing/scene-builder.js';
-import { wheelVariant, steerFrame, streakCyclesPerMetre, advanceStreak, WHEEL_SYNC_SPEED } from '../../src/rendering/compositing/cockpit-layer.js';
+import { wheelVariant, rollingVariant, streakVariant, streakBlend, steerFrame, streakCyclesPerMetre, advanceStreak, WHEEL_SYNC_SPEED, WHEEL_BLEND_SPEED } from '../../src/rendering/compositing/cockpit-layer.js';
 import { STEER_FRAMES, WHEEL_VARIANTS, MIRROR, COCKPIT_REF_FOCAL } from '../../src/art/cockpits/cockpit-art.js';
-import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, MIRROR_MOUNT, buildCarModel } from '../../src/art/vehicles/car-model.js';
+import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, STREAK_BANDS, MIRROR_MOUNT, buildCarModel, buildFrontWheelModel } from '../../src/art/vehicles/car-model.js';
 import { CAR_ANGLES } from '../../src/art/art-library.js';
 import { RaceView, CAMERA } from '../../src/rendering/compositing/race-view.js';
 import { DEFAULT_EFFECTS } from '../../src/core/config.js';
@@ -57,7 +57,7 @@ test('front wheels at speed: the streaks cycle forward with the distance travell
   for (const kmh of [20, 60, 120, 200, 300]) {
     const v = kmh / 3.6, rate = streakCyclesPerMetre(v) * v;          // pattern cycles per second
     assert.ok(rate > previousRate, `the cycling rate grows with speed (${kmh} km/h: ${rate.toFixed(2)} per second)`);
-    assert.ok(rate >= 3 && rate <= 10, 'between 3 and 10 cycles per second: readable from 30 images per second up');
+    assert.ok(rate >= 6 && rate <= 10, 'between 6 and 10 cycles per second: a new drawing every two or three pictures, and readable from 30 images per second up');
     previousRate = rate;
     for (const fps of [30, 60, 144]) {
       let turn = 0, odometer = 0, last = wheelVariant(0, v, 0), changes = 0;
@@ -74,6 +74,57 @@ test('front wheels at speed: the streaks cycle forward with the distance travell
   }
   // reversing turns the pattern the other way; standing still leaves it where it is
   assert.ok(advanceStreak(0.5, -0.2, -8) < 0.5 && advanceStreak(0.5, 0, 0) === 0.5);
+});
+
+test('front wheels: the marks fade into the streaks between two speeds, without a jump from one drawing to the other', () => {
+  assert.equal(streakBlend(0), 0); assert.equal(streakBlend(WHEEL_BLEND_SPEED), 0);
+  assert.equal(streakBlend(WHEEL_SYNC_SPEED), 1); assert.equal(streakBlend(90), 1); assert.equal(streakBlend(-90), 1);
+  assert.ok(WHEEL_BLEND_SPEED < WHEEL_SYNC_SPEED && WHEEL_BLEND_SPEED > 1.5, 'the marks alone are kept for the lowest speeds');
+  let previous = 0;
+  for (let v = 0; v <= 6; v += 0.05) {
+    const b = streakBlend(v);
+    assert.ok(b >= previous && b - previous < 0.03, `smooth and rising (${v.toFixed(2)} m/s)`);
+    previous = b;
+    // the marks are still exactly synchronised wherever they are visible, and the two drawings are of the right kind
+    if (b < 1) assert.ok(rollingVariant(1.234 + v) < TREAD_PHASES);
+    assert.ok(streakVariant(v) >= TREAD_PHASES && streakVariant(v) < WHEEL_VARIANTS);
+  }
+  // the streak cycle does not slow down or jump where it appears: same law on both sides of the fade
+  const before = streakCyclesPerMetre(WHEEL_SYNC_SPEED - 0.01) * (WHEEL_SYNC_SPEED - 0.01), after = streakCyclesPerMetre(WHEEL_SYNC_SPEED + 0.01) * (WHEEL_SYNC_SPEED + 0.01);
+  assert.ok(Math.abs(after - before) < 0.05, 'continuous cycling rate at the end of the fade');
+});
+
+test('front wheels at speed: the streak pattern slides as one piece, in the direction of the rolling marks', () => {
+  // tread strokes of the drawn model: [mean angle around the hub, lateral position]
+  const strokes = (tread) => {
+    const tyre = buildFrontWheelModel({ steer: 0, tread }).parts[0], D = CAR_DIMENSIONS, out = [];
+    for (const l of tyre.lines) {
+      if (!l.hex || l.pts.length < 2) continue;
+      const a = l.pts[0], b = l.pts.at(-1);
+      const radius = Math.hypot(a[0] - D.frontAxleX, a[2] - D.frontTyre.radius);
+      if (Math.abs(radius - D.frontTyre.radius) > 0.01) continue;                  // on the tread only
+      // an arc is symmetric about its middle: the middle of its chord gives the angle of its centre
+      out.push({ angle: Math.atan2((a[2] + b[2]) / 2 - D.frontTyre.radius, (a[0] + b[0]) / 2 - D.frontAxleX), lat: +(a[1] - D.frontTrack).toFixed(3) });
+    }
+    return out;
+  };
+  const wrap = (a, period) => ((a % period) + period * 1.5) % period - period / 2;
+  const spacing = (Math.PI * 2) / STREAK_BANDS;
+  const phases = [0, 1, 2].map((phase) => strokes({ blur: true, phase }));
+  assert.ok(phases[0].length >= STREAK_BANDS * 5, `streaks found on the tread (${phases[0].length})`);
+  // the dashes of all lanes sit in rows: no lane is staggered against its neighbours by more than a fraction of a phase step
+  for (const st of phases[0]) assert.ok(Math.abs(wrap(st.angle - phases[0][0].angle, spacing)) < 0.25 * (spacing / 3), 'lanes are aligned in rows');
+  // and the dashes are short: a long stroke sliding along itself would not show the rotation
+  const tyre = buildFrontWheelModel({ steer: 0, tread: { blur: true, phase: 0 } }).parts[0];
+  for (const l of tyre.lines) if (l.hex && l.weight > 2) { const a = l.pts[0], b = l.pts.at(-1); assert.ok(Math.hypot(a[0] - b[0], a[2] - b[2]) < 0.45 * spacing * CAR_DIMENSIONS.frontTyre.radius * 1.05, 'dashes shorter than half the spacing of the rows'); }
+  // one phase moves every stroke by a third of the spacing, all the same way
+  const step = (from, to) => { const steps = from.map((st, i) => wrap(to[i].angle - st.angle, spacing)); for (const d of steps) assert.ok(Math.abs(d - steps[0]) < 1e-3, 'all strokes move together'); return steps[0]; };
+  const s01 = step(phases[0], phases[1]), s12 = step(phases[1], phases[2]);
+  assert.ok(Math.abs(Math.abs(s01) - spacing / 3) < 1e-3 && Math.abs(s12 - s01) < 1e-3, `a third of the spacing per phase (${s01.toFixed(3)} rad)`);
+  // same direction as the rolling marks of the slow drawing
+  const marks = [0, 1].map((phase) => strokes({ phase }));
+  const markStep = wrap(marks[1][0].angle - marks[0][0].angle, (Math.PI * 2) / TREAD_MARKS);
+  assert.equal(Math.sign(s01), Math.sign(markStep), 'streaks and marks turn the same way');
 });
 
 test('mirrors: the cockpit shows the mirrors of the car model where the driver would see them', () => {

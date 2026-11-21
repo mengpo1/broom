@@ -17,28 +17,45 @@ import { CAR_STATE } from '../../physics/car-physics.js';
  * turn backwards. Above it the tyre is drawn with streaks that cycle at an apparent rate.
  */
 export const WHEEL_SYNC_SPEED = 4.5;
+/** Speed (m/s) from which the streaks start to show through the marks: the two drawings are cross-faded up to WHEEL_SYNC_SPEED. */
+export const WHEEL_BLEND_SPEED = 2.2;
 
 /**
  * Apparent rotation of the streaked tyre: cycles of the streak pattern shown per metre travelled.
- * The cycling rate grows with speed (3.5 per second at 16 km/h, 8.6 at 300 km/h) and stays low
- * enough to read as a steady forward rotation at any display rate from 30 images per second up.
+ * The cycling rate grows with speed (7 per second where the streaks appear, 10 at top speed): with
+ * three drawn phases that is a new drawing every two or three pictures at 60 images per second,
+ * and never more than one phase per picture at 30, so the direction always reads.
  */
 export function streakCyclesPerMetre(speed) {
-  const v = Math.max(Math.abs(speed), WHEEL_SYNC_SPEED);
-  return (3.5 + 5.5 * (1 - Math.exp(-(v - WHEEL_SYNC_SPEED) / 35))) / v;
+  const v = Math.max(Math.abs(speed), WHEEL_BLEND_SPEED);
+  return (7 + 3 * (1 - Math.exp(-(v - WHEEL_BLEND_SPEED) / 30))) / v;
 }
 
-/**
- * Which drawing of the front wheel to show. Below WHEEL_SYNC_SPEED: rolling phase
- * 0..TREAD_PHASES-1, exactly synchronised with the distance travelled. Above: one of the
- * STREAK_PHASES streaked drawings, chosen by `streakTurn` (cycles of the streak pattern,
- * accumulated along the distance travelled, see CockpitLayer).
- */
-export function wheelVariant(odometer, speed, streakTurn = 0) {
-  if (Math.abs(speed) > WHEEL_SYNC_SPEED) return TREAD_PHASES + (Math.floor(mod(streakTurn, 1) * STREAK_PHASES) % STREAK_PHASES);
+/** Share of the streaked drawing in the picture of the tyre: 0 = marks only, 1 = streaks only. */
+export function streakBlend(speed) {
+  return clamp((Math.abs(speed) - WHEEL_BLEND_SPEED) / (WHEEL_SYNC_SPEED - WHEEL_BLEND_SPEED), 0, 1);
+}
+
+/** Drawing of the rolling marks (0..TREAD_PHASES-1), exactly synchronised with the distance travelled. */
+export function rollingVariant(odometer) {
   const angle = odometer / CAR_DIMENSIONS.frontTyre.radius;
   const period = (Math.PI * 2) / TREAD_MARKS;
   return Math.floor((mod(angle, period) / period) * TREAD_PHASES) % TREAD_PHASES;
+}
+
+/** Drawing of the streaks for a position in their cycle (see advanceStreak). */
+export function streakVariant(streakTurn) {
+  return TREAD_PHASES + (Math.floor(mod(streakTurn, 1) * STREAK_PHASES) % STREAK_PHASES);
+}
+
+/**
+ * The drawing of the front wheel that dominates at a speed. Up to WHEEL_SYNC_SPEED: rolling phase
+ * 0..TREAD_PHASES-1. Above: one of the STREAK_PHASES streaked drawings, chosen by `streakTurn`
+ * (cycles of the streak pattern accumulated along the distance travelled, see CockpitLayer).
+ * Between WHEEL_BLEND_SPEED and WHEEL_SYNC_SPEED the cockpit shows both, cross-faded (streakBlend).
+ */
+export function wheelVariant(odometer, speed, streakTurn = 0) {
+  return Math.abs(speed) > WHEEL_SYNC_SPEED ? streakVariant(streakTurn) : rollingVariant(odometer);
 }
 
 /** Advance the streak cycle of a wheel over a distance travelled (negative when reversing). */
@@ -215,12 +232,17 @@ export class CockpitLayer {
     const vi = view.index, travelled = car.odometer - this.lastOdometer[vi];
     if (Number.isFinite(travelled) && Math.abs(travelled) < 30) this.streakTurn[vi] = advanceStreak(this.streakTurn[vi], travelled, car.speed);
     this.lastOdometer[vi] = car.odometer;
-    const variant = wheelVariant(car.odometer, car.speed, this.streakTurn[vi]);
-    const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
-    const jolt = view.shakeAmp * 0.5 * k;
-    const wy = oy + left.oy * k + Math.sin(view.time * 61) * jolt;
-    quads.sprite(left, ox + left.ox * k, wy, left.w * k, left.h * k, am[0], am[1], am[2], 1, 0, false);
-    quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k - Math.sin(view.time * 53) * jolt, right.w * k, right.h * k, am[0], am[1], am[2], 1, 0, true);
+    // the marks, then the streaks over them as the speed rises (one drawing fades into the other)
+    const blend = streakBlend(car.speed), jolt = view.shakeAmp * 0.5 * k;
+    const joltL = Math.sin(view.time * 61) * jolt, joltR = -Math.sin(view.time * 53) * jolt;
+    for (let pass = 0; pass < 2; pass++) {
+      const alpha = pass === 0 ? 1 : blend;
+      if (pass === 0 ? blend >= 1 : blend <= 0) continue;
+      const variant = pass === 0 ? rollingVariant(car.odometer) : streakVariant(this.streakTurn[vi]);
+      const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
+      quads.sprite(left, ox + left.ox * k, oy + left.oy * k + joltL, left.w * k, left.h * k, am[0], am[1], am[2], alpha, 0, false);
+      quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k + joltR, right.w * k, right.h * k, am[0], am[1], am[2], alpha, 0, true);
+    }
 
     this.mirror(app, view, car, -1, ox, oy, k, am);
     this.mirror(app, view, car, 1, ox, oy, k, am);

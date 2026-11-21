@@ -37,7 +37,7 @@ en écran partagé (haut/bas ou gauche/droite). 18 circuits originaux, 16 advers
 ## Contenu du dépôt
 
 ```
-index.html            le jeu autonome (construit depuis src/), 1 025 302 octets
+index.html            le jeu autonome (construit depuis src/), 1 035 351 octets
 race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s (enregistrée avant le travail sur les collisions)
 src/                  sources (voir docs/architecture/overview.md)
 tests/                tests automatisés (Node et navigateur)
@@ -52,7 +52,7 @@ work/
     collisions/       scénarios de collision joués dans le jeu : vidéos 60 i/s, planches, télémétrie
     comparison/       roues et rétroviseurs avant / après
   benchmarks/         résultats bruts (JSON)
-  reviews/            comptes rendus des critiques
+  reviews/            comptes rendus des critiques (revue artistique, revue des séquences de collision)
 references/           volontairement vide : aucune image de référence n'est embarquée par le jeu
 work/reference-frames/  extraits d'une vidéo de gameplay tierce, pour analyse uniquement
 ```

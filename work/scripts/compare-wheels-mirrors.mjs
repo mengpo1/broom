@@ -48,15 +48,22 @@ for (const [label, file] of Object.entries(builds)) {
       await page.screenshot({ path: `${root}/${outDir}/frames/${label}-wheel-${kmh}-${f}.png` });
     }
   }
-  // mirrors: the same instant seen from the cockpit, from behind and from the front
+  // mirrors: the same situation seen from the cockpit, from behind and from the front. The other cars are
+  // held in the same places around the player in both builds (one behind on the right, one ahead on the
+  // left, one far behind), so that what the mirrors show and hide can be compared.
   await page.evaluate(() => {
-    const { race, me } = window.cmp, others = race.cars.filter((c) => !c.isHuman);
+    const { app, debug } = window.virage, { race, me, track } = window.cmp, others = race.cars.filter((c) => !c.isHuman);
+    const places = [[-13, 2.6], [22, -2.6], [-34, -2.4]];
+    window.cmpFormation = (kmh) => {
+      for (let t = 0; t < 2; t++) { me.speed = kmh / 3.6; race.setPlayerInput(0, 0, 0.5, 0, 0, false, false); app.simulate(); }
+      others.forEach((c, k) => { if (debug && debug.placeCar) debug.placeCar(c, track, me.s + places[k][0], me.d + places[k][1]); c.state = 1; c.ghostTimer = 0; c.speed = me.speed; });
+      app.present(1 / 60, 0);
+    };
     window.cmpPlace(150);
-    for (let i = 0; i < 30; i++) window.cmpStep(150);
-    others.forEach((c, k) => { c.x = me.x; c.z = me.z; });
+    for (let i = 0; i < 30; i++) window.cmpFormation(150);
   });
   for (const cam of ['COCKPIT', 'CHASE', 'FRONT']) {
-    await page.evaluate(async ([cam]) => { const v = window.virage; v.app.views[0].camera = v.CAMERA[cam]; for (let i = 0; i < 12; i++) window.cmpStep(150); await v.app.gpu.device.queue.onSubmittedWorkDone(); }, [cam]);
+    await page.evaluate(async ([cam]) => { const v = window.virage; v.app.views[0].camera = v.CAMERA[cam]; for (let i = 0; i < 12; i++) window.cmpFormation(150); await v.app.gpu.device.queue.onSubmittedWorkDone(); }, [cam]);
     await page.screenshot({ path: `${root}/${outDir}/frames/${label}-mirror-${cam}.png` });
   }
   manifest.variants[label] = { placeCar: hasDebug };

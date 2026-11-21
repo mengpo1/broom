@@ -635,6 +635,8 @@ export const TREAD_MARKS = 9;
 export const TREAD_PHASES = 3;
 /** Drawn phases of the streaks shown at speed: cycled, they make the tyre visibly turn. */
 export const STREAK_PHASES = 3;
+/** Groups of streaks around a tyre: close enough for two of them to be in sight on the tread, so that a phase is a short step. */
+export const STREAK_BANDS = 12;
 
 /**
  * Pen marks on the tread that make the rolling of a slick tyre visible.
@@ -653,15 +655,17 @@ function addTreadMarks(part, tyre, tread) {
   };
   const period = (Math.PI * 2) / TREAD_MARKS;
   if (tread.blur) {
-    // broken streaks; the gaps repeat every five segments, and a phase shifts the whole pattern
-    // by a third of that (the same way as the marks: toward the rear of the tyre over the top)
-    const segment = 0.2094, shift = ((tread.phase || 0) / STREAK_PHASES) * 5 * segment;
+    // a tyre turning fast: STREAK_BANDS rows of short dashes around the tyre, one dash per lane, every
+    // lane of a row on (nearly) the same angle. A dash that slides along itself looks still: what
+    // shows the rotation is the row, a mark across the tread, moving as one piece. A phase moves all
+    // the rows together by a third of their spacing, the same way as the marks of the slow drawing.
+    const spacing = (Math.PI * 2) / STREAK_BANDS, shift = ((tread.phase || 0) / STREAK_PHASES) * spacing;
+    const lengths = [0.3, 0.38, 0.27, 0.36, 0.4, 0.29, 0.34], offsets = [0, 0.03, -0.02, 0.04, -0.03, 0.02, -0.04];   // shares of the spacing: ragged rows
     for (let lane = 0; lane < 7; lane++) {
-      const lat = -0.085 + lane * 0.028;
-      for (let k = 0; k < 30; k++) {
-        // dashes three segments long, two segments apart, staggered from lane to lane
-        if ((k + lane * 2) % 5 >= 3) continue;
-        arc(lat, k * segment - shift, (k + 1) * segment - shift + 0.01, lane % 2 ? '#62657a' : '#101016', 1.5);
+      const lat = -0.085 + lane * 0.028, half = (lengths[lane] * spacing) / 2;
+      for (let k = 0; k < STREAK_BANDS; k++) {
+        const centre = (k + offsets[lane]) * spacing - shift;
+        arc(lat, centre - half, centre + half, lane % 2 ? '#7a7d90' : '#0e0e14', 2.1);
       }
     }
     return;
