@@ -152,7 +152,7 @@ export class Renderer {
         read.done = () => {
           const t = new BigUint64Array(read.buffer.getMappedRange());
           const ns = Number(t[1] - t[0]);
-          if (ns > 0 && ns < 1e9) { this.gpuTimeMs = ns / 1e6; this.gpuTimeSerial++; }
+          if (ns > 0 && ns < 6e10) { this.gpuTimeMs = ns / 1e6; this.gpuTimeSerial++; }      // (a software rasteriser can take seconds per pass)
           read.buffer.unmap();
           read.busy = false;
         };

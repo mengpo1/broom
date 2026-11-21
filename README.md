@@ -57,7 +57,8 @@ references/           volontairement vide : aucune image de référence n'est em
 ## Construire et vérifier
 
 Node 20+ suffit pour construire et pour les tests de simulation ; les tests navigateur
-utilisent Playwright + Chromium.
+utilisent Playwright + Chromium. `flow-check` déroule tous les modes de jeu dans le vrai
+fichier, `pages-check` les pages d'options, la pause, les caméras et la souris.
 
 ```bash
 npm run build
@@ -69,6 +70,14 @@ npm test
 
 ```bash
 npm run test:browser
+```
+
+```bash
+node work/scripts/flow-check.mjs
+```
+
+```bash
+node work/scripts/pages-check.mjs
 ```
 
 ```bash

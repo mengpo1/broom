@@ -30,8 +30,9 @@ par le rasteriseur logiciel SwiftShader).
 
 ## 3. Incomplet ou simplifié
 
-- **Rétroviseurs** : reflet dessiné fixe (route et ciel stylisés) ; ils ne montrent pas les
-  concurrents qui suivent.
+- **Rétroviseurs** : vue arrière simplifiée (ciel, relief, bas-côté et route aux couleurs du
+  lieu, voitures qui suivent à leur place) ; les décors de bord de piste n'y figurent pas et
+  la route y est une courbe approchée.
 - **Monoplaces** : un seul modèle de carrosserie pour toutes les écuries (les livrées changent
   par trois couleurs et cinq schémas) ; les numéros de course n'apparaissent que sur les
   grandes illustrations (menus, planches d'introduction et de résultats), pas sur les voitures
@@ -48,7 +49,10 @@ par le rasteriseur logiciel SwiftShader).
   dévers ; au-delà de 100° de travers la vue se retourne d'un coup.
 - **Décors** : les éléments répétés le long de la piste (tribunes, stands, palissades) sont des
   tuiles : numéros de travée et panneaux se répètent ; les poteaux de grillage penchent dans le
-  mauvais sens d'un côté de la piste.
+  mauvais sens d'un côté de la piste. Les pignons de bâtiments sont des aplats simples.
+- **Vue de très près** : les dessins sont des images ; contre une barrière ou une voiture ils
+  restent moins nets qu'un tracé vectoriel (définition doublée pour les barrières, contour
+  raffermi, effacement des objets trop grossis).
 - **Qualité graphique** : le changement d'anti-crénelage (MSAA) demande un rechargement de la
   page ; le niveau de détail et les distances s'appliquent immédiatement.
 - **Météo, nuit, dégâts visibles sur les voitures** : absents.

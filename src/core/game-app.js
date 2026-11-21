@@ -157,7 +157,8 @@ export class GameApp {
   onFrame(now) {
     if (!this.running) return;
     requestAnimationFrame(this.onFrame);
-    const dt = clamp((now - this.lastTime) / 1000, 0, 0.1);
+    const interval = (now - this.lastTime) / 1000;          // true time between two frames (measurements)
+    const dt = clamp(interval, 0, 0.1);                    // time the game advances by (a stalled tab does not jump)
     this.lastTime = now;
     this.resize();
     const t0 = performance.now();
@@ -175,7 +176,7 @@ export class GameApp {
     this.present(dt, this.paused ? 0 : this.accumulator);
     this.stats.simMs = t1 - t0; this.stats.frameMs = dt * 1000;
     this.stats.fps = this.stats.fps * 0.95 + (dt > 0 ? 1 / dt : 0) * 0.05;
-    if (this.frameHook) this.frameHook(dt, this);
+    if (this.frameHook) this.frameHook(interval, this);
   }
 
   /** One fixed simulation step, including input sampling and event dispatch. */

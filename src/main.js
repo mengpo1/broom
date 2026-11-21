@@ -100,7 +100,12 @@ async function boot() {
   };
   /** Benchmarks (index.html#benchmark=solo|grid|split|all&seconds=60): results on screen and in window.virageBenchmark. */
   const benchmark = async (kinds, seconds) => {
-    const results = { environment: describeEnvironment(app), refreshRateHz: await measureRefreshRate(), runs: [] };
+    // the display's refresh rate is measured with the game loop stopped, so that it is the screen's and not the renderer's
+    const wasRunning = app.running;
+    app.stop();
+    const refreshRateHz = await measureRefreshRate();
+    if (wasRunning) app.start();
+    const results = { environment: describeEnvironment(app), refreshRateHz, runs: [] };
     for (const kind of kinds) {
       const run = await runBenchmark(app, kind, seconds, { circuit: params.circuit, start: (config) => { flow.state = 'race'; app.hud.visible = true; app.session = null; app.startRace(config); } });
       results.runs.push(run);

@@ -111,7 +111,10 @@ l'écran), le lacet de la vue est borné (au-delà de 100° la vue se retourne).
   livrée) ; la livrée est appliquée par le shader (3 couleurs par écurie).
 - **Cockpit** : mêmes outils, depuis l'œil du pilote avec la focale du jeu ; calques séparés
   (aileron, roue par angle de braquage et phase de roulement, coque + suspension + rétroviseur,
-  cadran, aiguille, volant + mains).
+  cadran, aiguille, volant + mains). Le verre des rétroviseurs est laissé ouvert dans le dessin :
+  `CockpitLayer.mirror` y compose une vue arrière (ciel, relief, bas-côté, route, voitures qui
+  suivent) en quadrilatères découpés au cadre. En écran partagé le cockpit est réduit et le
+  champ élargi pour tenir dans la case (`VIEW_CONFIG.hfovWide`, `cockpitScale*`).
 - **Menus** : planches peintes dans un canvas à la taille de l'écran quand leur contenu change,
   puis composées par le shader `blit` (avec volet de transition en bandes obliques).
 

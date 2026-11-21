@@ -1202,7 +1202,7 @@ class Renderer {
         read.done = () => {
           const t = new BigUint64Array(read.buffer.getMappedRange());
           const ns = Number(t[1] - t[0]);
-          if (ns > 0 && ns < 1e9) { this.gpuTimeMs = ns / 1e6; this.gpuTimeSerial++; }
+          if (ns > 0 && ns < 6e10) { this.gpuTimeMs = ns / 1e6; this.gpuTimeSerial++; }      // (a software rasteriser can take seconds per pass)
           read.buffer.unmap();
           read.busy = false;
         };
@@ -11437,7 +11437,8 @@ class GameApp {
   onFrame(now) {
     if (!this.running) return;
     requestAnimationFrame(this.onFrame);
-    const dt = clamp((now - this.lastTime) / 1000, 0, 0.1);
+    const interval = (now - this.lastTime) / 1000;          // true time between two frames (measurements)
+    const dt = clamp(interval, 0, 0.1);                    // time the game advances by (a stalled tab does not jump)
     this.lastTime = now;
     this.resize();
     const t0 = performance.now();
@@ -11455,7 +11456,7 @@ class GameApp {
     this.present(dt, this.paused ? 0 : this.accumulator);
     this.stats.simMs = t1 - t0; this.stats.frameMs = dt * 1000;
     this.stats.fps = this.stats.fps * 0.95 + (dt > 0 ? 1 / dt : 0) * 0.05;
-    if (this.frameHook) this.frameHook(dt, this);
+    if (this.frameHook) this.frameHook(interval, this);
   }
 
   /** One fixed simulation step, including input sampling and event dispatch. */
@@ -16717,7 +16718,12 @@ async function boot() {
   };
   /** Benchmarks (index.html#benchmark=solo|grid|split|all&seconds=60): results on screen and in window.virageBenchmark. */
   const benchmark = async (kinds, seconds) => {
-    const results = { environment: describeEnvironment(app), refreshRateHz: await measureRefreshRate(), runs: [] };
+    // the display's refresh rate is measured with the game loop stopped, so that it is the screen's and not the renderer's
+    const wasRunning = app.running;
+    app.stop();
+    const refreshRateHz = await measureRefreshRate();
+    if (wasRunning) app.start();
+    const results = { environment: describeEnvironment(app), refreshRateHz, runs: [] };
     for (const kind of kinds) {
       const run = await runBenchmark(app, kind, seconds, { circuit: params.circuit, start: (config) => { flow.state = 'race'; app.hud.visible = true; app.session = null; app.startRace(config); } });
       results.runs.push(run);

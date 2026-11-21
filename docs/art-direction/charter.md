@@ -53,12 +53,16 @@ dessin vectoriel produit par le code (`src/art/`), jamais une image 3D filtrée.
 - Une palette de base et une variante par thème de circuit (`forest`, `coast`, `alpine`,
   `desert`, `dusk`…) ; toutes les couleurs sont nommées, aucune n'est codée en dur dans un
   dessin (sauf matériaux fixes de la voiture).
+- **Lumière du lieu** : chaque palette porte une teinte `ambient` multipliée sur ce qui n'est
+  pas repeint par thème — voitures et cockpit — pour qu'ils appartiennent à la scène (blancs
+  réchauffés au crépuscule).
 
 ## 4. Matières
 
 | Matière | Traitement |
 |---|---|
 | Carrosserie peinte | 4 tons, bande de reflet le long des arêtes hautes, joints de panneaux fins |
+| Voitures en course | trait de silhouette de 2,1 cm à l'échelle de la voiture (le même poids que le cockpit), arêtes et jonctions à 45 % ; jantes en disques tournants (arcs concentriques) |
 | Pneu | 3 gris bleutés, bande claire sur le haut de la bande de roulement, filet clair sur le flanc |
 | Jante, métal | 3 gris froids, rayons sombres, écrou central |
 | Carbone, fond plat | sombre, peu de détail, sert de « noir » |
@@ -90,6 +94,10 @@ resserre au freinage ; l'horizon suit partiellement la pente.
 
 ## 6. Niveaux de détail
 
+- Un dessin n'est jamais affiché très au-dessus de sa taille d'encrage : au-delà de 2,2 fois,
+  un objet de bord de piste s'efface ; les barrières, vues de très près, sont dessinées à
+  définition double ; le contour d'un dessin agrandi est raffermi.
+- Les bâtiments en bande (tribunes, stands, façades) montrent un pignon à l'extrémité.
 - Objets : draw-distance propre à chaque famille (buissons 450 m, panneaux 600 m, arbres
   et tribunes 1 300 m), fondu sur les 60 derniers mètres.
 - Bandes de décor : fusionnées par 2 puis 4 segments au-delà de 320 m et 700 m.
@@ -102,7 +110,9 @@ resserre au freinage ; l'horizon suit partiellement la pente.
   l'autre côté ; la vue choisie dépend de l'angle réel entre la voiture et la ligne de
   visée, ce qui donne du volume sans rotation d'image plate.
 - Cockpit : volant et mains tournent ; roues avant dessinées sous plusieurs angles de
-  braquage ; marques de roulement synchronisées avec la vitesse ; vibrations.
+  braquage ; marques de roulement et fentes des disques de frein synchronisées avec la
+  vitesse ; vibrations franches près de la vitesse maximale seulement ; rétroviseurs montrant
+  le lieu et les voitures qui suivent.
 - Interface : apparition des cartouches par glissement court (≤ 0,25 s), jamais de
   clignotement rapide.
 
@@ -110,12 +120,12 @@ resserre au freinage ; l'horizon suit partiellement la pente.
 
 | Effet | Règle |
 |---|---|
-| Traits de vitesse | rayonnent du point de fuite, périphérie seulement, blancs et encre, intensité liée à la vitesse |
+| Traits de vitesse | longs traits qui filent du point de fuite **le long du sol**, de part et d'autre de la route (jamais dans le ciel), durée d'une bonne fraction de seconde, intensité liée à la vitesse |
 | Étirement de perspective | champ de vision +9° à vitesse maximale, −3° en freinage fort |
 | Vibrations du cockpit | amplitude liée à la vitesse, aux vibreurs, à l'herbe |
 | Impacts | secousse, éclair bref, éclats en étoile, traits d'impact |
-| Onomatopées | réservées aux chocs importants, au départ, à l'arrivée ; lettrage « impact » |
-| Poussière, fumée | bouffées en aplats 2 tons cernées |
+| Onomatopées | réservées aux chocs importants (le mot jaillit de l'éclat), au départ et au moteur à pleine charge ; lettrage « impact » |
+| Poussière, fumée | bouffées en aplats 2 tons cernées, de taille plafonnée à l'écran, jamais au contact de la caméra |
 | Traces de dérapage | traits sombres sur l'asphalte |
 | Cartouches d'incrustation | récitatifs jaunes pour dépassements, meilleur tour |
 
@@ -126,7 +136,10 @@ resserre au freinage ; l'horizon suit partiellement la pente.
 - Cartouches : fond papier `#f4efe2` ou jaune récitatif `#f6e27a`, filet d'encre, ombre
   portée décalée en aplat. Pas d'éléments futuristes, pas de néon, pas de transparence
   « verre ».
-- Menus : planche de BD (cases, gouttières blanches, illustration de monoplace).
+- Menus : planche de BD (cases, gouttières blanches, illustration de monoplace ; plan illustré
+  du circuit sous le panorama du lieu).
+- Écran partagé : deux cases séparées par une gouttière, chacune cernée d'un filet d'encre et
+  contenant un poste de pilotage entier.
 
 ## 10. À proscrire
 

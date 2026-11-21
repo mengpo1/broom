@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-21T08:03:14.542Z",
+  "date": "2026-11-21T08:49:54.910Z",
   "system": {
     "distribution": "Ubuntu 24.04.5 LTS",
     "kernel": "6.18.44-fc-v726",
@@ -68,8 +68,8 @@
     "language": "en-US",
     "refreshRateHz": 59.88023952095548,
     "artTimings": {
-      "cars": 21715.899999999994,
-      "static": 1983.4000000000233
+      "cars": 21217.799999999814,
+      "static": 2014.4000000003725
     },
     "browserVersion": "153.0.8010.12"
   }
