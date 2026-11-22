@@ -9,7 +9,7 @@
 // of view, relative to the point (screen centre, horizon line).
 
 import { VIEW_CONFIG } from '../../core/config.js';
-import { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES, STREAK_PHASES, MIRROR_MOUNT } from '../vehicles/car-model.js';
+import { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES, STREAK_PHASES, FAST_PHASES, MIRROR_MOUNT } from '../vehicles/car-model.js';
 import { drawCar } from '../vehicles/car-illustrator.js';
 import { LINE, brushStroke, brushCurve, closedCurve } from '../styles/ink.js';
 import { drawText } from '../styles/lettering.js';
@@ -19,7 +19,7 @@ export const COCKPIT_REF_WIDTH = 2560;
 export const COCKPIT_REF_FOCAL = (COCKPIT_REF_WIDTH / 2) / Math.tan(VIEW_CONFIG.hfov / 2);
 export const STEER_FRAMES = 5;                 // drawn steering angles of a front wheel, from full right to full left
 export const MAX_DRAWN_STEER = 0.26;           // radians at the first / last frame
-export const WHEEL_VARIANTS = TREAD_PHASES + STREAK_PHASES; // rolling phases, then the phases of the streaked "at speed" drawing
+export const WHEEL_VARIANTS = TREAD_PHASES + STREAK_PHASES + FAST_PHASES; // rolling phases, the phases of the rows of dashes "at speed", then those of the tyre turning very fast
 export const DIAL = { x: 0, y: 700, r: 92, minAngle: -2.2, maxAngle: 2.2, maxRpm: 14000 };
 export const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };   // extra: canvas height added below the wheel for the sleeves
 /**
@@ -335,7 +335,7 @@ export function defineCockpitArt(art, players) {
   for (let k = 0; k < STEER_FRAMES; k++) {
     const row = [];
     for (let v = 0; v < WHEEL_VARIANTS; v++) {
-      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : { blur: true, phase: v - TREAD_PHASES } });
+      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : v < TREAD_PHASES + STREAK_PHASES ? { blur: true, phase: v - TREAD_PHASES } : { fast: true, phase: v - TREAD_PHASES - STREAK_PHASES } });
       row.push(wm);
       if (v === 0) {
         const b = drawCar(null, null, wm, probe, { measure: true });

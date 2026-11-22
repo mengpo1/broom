@@ -3,9 +3,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { carViewFrame } from '../../src/rendering/drawing/scene-builder.js';
-import { wheelVariant, rollingVariant, streakVariant, streakBlend, steerFrame, streakCyclesPerMetre, advanceStreak, WHEEL_SYNC_SPEED, WHEEL_BLEND_SPEED } from '../../src/rendering/compositing/cockpit-layer.js';
+import { wheelVariant, rollingVariant, streakVariant, streakBlend, fastVariant, fastBlend, steerFrame, streakCyclesPerMetre, advanceStreak, WHEEL_SYNC_SPEED, WHEEL_BLEND_SPEED, WHEEL_FAST_START, WHEEL_FAST_FULL } from '../../src/rendering/compositing/cockpit-layer.js';
 import { STEER_FRAMES, WHEEL_VARIANTS, MIRROR, COCKPIT_REF_FOCAL } from '../../src/art/cockpits/cockpit-art.js';
-import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, STREAK_BANDS, MIRROR_MOUNT, buildCarModel, buildFrontWheelModel } from '../../src/art/vehicles/car-model.js';
+import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, STREAK_BANDS, FAST_PHASES, FAST_RINGS, MIRROR_MOUNT, buildCarModel, buildFrontWheelModel } from '../../src/art/vehicles/car-model.js';
+import { BASE_CAR_SPEC } from '../../src/vehicles/car-spec.js';
 import { CAR_ANGLES } from '../../src/art/art-library.js';
 import { RaceView, CAMERA } from '../../src/rendering/compositing/race-view.js';
 import { DEFAULT_EFFECTS } from '../../src/core/config.js';
@@ -45,7 +46,8 @@ test('front wheels: rolling marks advance in step with the distance travelled', 
   assert.equal(wheelVariant(5, 0), wheelVariant(5, 0), 'a stopped wheel does not animate');
   assert.equal(wheelVariant(100, 40), TREAD_PHASES, 'at speed the streaked drawing is used');
   assert.equal(wheelVariant(100, -40), TREAD_PHASES);
-  assert.equal(WHEEL_VARIANTS, TREAD_PHASES + STREAK_PHASES);
+  // (changed: a third family of drawings, the tyre turning very fast, was added after the two others)
+  assert.equal(WHEEL_VARIANTS, TREAD_PHASES + STREAK_PHASES + FAST_PHASES);
 });
 
 test('front wheels at speed: the streaks cycle forward with the distance travelled, faster with speed, the same at any display rate', () => {
@@ -54,7 +56,11 @@ test('front wheels at speed: the streaks cycle forward with the distance travell
   assert.ok((WHEEL_SYNC_SPEED / CAR_DIMENSIONS.frontTyre.radius) / 60 <= phaseAngle * 1.001, 'marks never skip a phase below the synchronisation speed');
   // above it: every speed shows the three streak drawings in order, never backwards, never frozen
   let previousRate = 0;
-  for (const kmh of [20, 60, 120, 200, 300]) {
+  // (changed: near top speed the drawing shown is of the "very fast" family, which follows the same cycle;
+  // the test now reads the phase whatever the family, and covers 250 km/h and top speed as well)
+  const phaseOf = (variant) => (variant - TREAD_PHASES) % STREAK_PHASES;
+  assert.equal(STREAK_PHASES, FAST_PHASES, 'the two families cycle in step');
+  for (const kmh of [20, 60, 120, 200, 250, 300, 330]) {
     const v = kmh / 3.6, rate = streakCyclesPerMetre(v) * v;          // pattern cycles per second
     assert.ok(rate > previousRate, `the cycling rate grows with speed (${kmh} km/h: ${rate.toFixed(2)} per second)`);
     assert.ok(rate >= 6 && rate <= 10, 'between 6 and 10 cycles per second: a new drawing every two or three pictures, and readable from 30 images per second up');
@@ -65,7 +71,7 @@ test('front wheels at speed: the streaks cycle forward with the distance travell
         odometer += v / fps; turn = advanceStreak(turn, v / fps, v);
         const now = wheelVariant(odometer, v, turn);
         assert.ok(now >= TREAD_PHASES && now < WHEEL_VARIANTS);
-        if (now !== last) { assert.equal(now - TREAD_PHASES, (last - TREAD_PHASES + 1) % STREAK_PHASES, `phases follow each other forward (${kmh} km/h, ${fps} images per second)`); changes++; }
+        if (now !== last) { assert.equal(phaseOf(now), (phaseOf(last) + 1) % STREAK_PHASES, `phases follow each other forward (${kmh} km/h, ${fps} images per second)`); changes++; }
         last = now;
       }
       // after one second the pattern has turned by the same amount whatever the display rate
@@ -125,6 +131,71 @@ test('front wheels at speed: the streak pattern slides as one piece, in the dire
   const marks = [0, 1].map((phase) => strokes({ phase }));
   const markStep = wrap(marks[1][0].angle - marks[0][0].angle, (Math.PI * 2) / TREAD_MARKS);
   assert.equal(Math.sign(s01), Math.sign(markStep), 'streaks and marks turn the same way');
+});
+
+test('front wheels near top speed: a third drawing, the tyre turning very fast, fades in over the rows of dashes', () => {
+  // nothing changes at low and medium speeds
+  for (const kmh of [0, 8, 40, 120, 170]) assert.equal(fastBlend(kmh / 3.6), 0, `${kmh} km/h: no trace of the fast drawing`);
+  assert.equal(fastBlend(WHEEL_FAST_START), 0); assert.equal(fastBlend(WHEEL_FAST_FULL), 1); assert.equal(fastBlend(-WHEEL_FAST_FULL), 1);
+  // it grows smoothly between high speed and top speed: the picture keeps changing with the speed
+  const at = [200, 250, 300].map((kmh) => fastBlend(kmh / 3.6));
+  assert.ok(at[0] > 0.1 && at[0] < 0.3 && at[1] > 0.45 && at[1] < 0.75 && at[2] === 1, `share at 200 / 250 / 300 km/h: ${at.map((b) => b.toFixed(2)).join(' / ')}`);
+  let previous = 0;
+  for (let v = 0; v <= 95; v += 0.25) { const b = fastBlend(v); assert.ok(b >= previous && b - previous < 0.01, 'smooth and rising'); previous = b; }
+  // every car reaches the speed where the drawing is complete (top speeds: 311 to 332 km/h depending on the wings)
+  assert.ok(WHEEL_FAST_FULL * 3.6 < 305 && WHEEL_FAST_START > WHEEL_SYNC_SPEED * 5, 'complete just below the lowest top speed, absent from the speeds already validated');
+  assert.ok(BASE_CAR_SPEC.gearTopSpeeds.at(-1) > WHEEL_FAST_FULL, 'top gear goes beyond it');
+  // the drawing shown follows the same cycle as the rows of dashes: one fades into the other in step
+  for (const turn of [0, 0.2, 0.4, 0.7, 0.99]) {
+    assert.equal(fastVariant(turn) - streakVariant(turn), STREAK_PHASES);
+    assert.ok(fastVariant(turn) >= TREAD_PHASES + STREAK_PHASES && fastVariant(turn) < WHEEL_VARIANTS);
+  }
+  assert.equal(wheelVariant(0, 90, 0.4), fastVariant(0.4), 'near top speed the fast drawing dominates');
+  assert.equal(wheelVariant(0, 52, 0.4), streakVariant(0.4), 'at 190 km/h the rows of dashes still do');
+});
+
+test('front wheels near top speed: trails and rings round the tyre, moving as one piece the same way as the marks', () => {
+  const D = CAR_DIMENSIONS, spacing = (Math.PI * 2) / STREAK_BANDS;
+  const strokes = (tread) => {
+    const out = [];
+    for (const l of buildFrontWheelModel({ steer: 0, tread }).parts[0].lines) {
+      if (!l.hex || l.pts.length < 2) continue;
+      const a = l.pts[0], b = l.pts.at(-1);
+      if (Math.abs(Math.hypot(a[0] - D.frontAxleX, a[2] - D.frontTyre.radius) - D.frontTyre.radius) > 0.01) continue;
+      const angle = (p) => Math.atan2(p[2] - D.frontTyre.radius, p[0] - D.frontAxleX);
+      let length = 0;
+      for (let i = 1; i < l.pts.length; i++) length += Math.hypot(l.pts[i][0] - l.pts[i - 1][0], l.pts[i][2] - l.pts[i - 1][2]);
+      out.push({ start: angle(a), length: length / D.frontTyre.radius, lat: +(a[1] - D.frontTrack).toFixed(3), weight: l.weight });
+    }
+    return out;
+  };
+  const wrap = (a, period) => ((a % period) + period * 1.5) % period - period / 2;
+  const fast = [0, 1, 2].map((phase) => strokes({ fast: true, phase })), dashes = strokes({ blur: true, phase: 0 });
+  // rings right round the tyre: no end, so nothing in them can seem to stand still, jump or turn backwards
+  const rings = fast[0].filter((st) => st.length > Math.PI * 1.9);
+  assert.equal(rings.length, FAST_RINGS.length, 'rings drawn right round');
+  for (const phase of fast) assert.deepEqual(phase.filter((st) => st.length > Math.PI * 1.9).map((st) => st.lat), rings.map((st) => st.lat), 'the rings are the same in every phase');
+  // the trails: far more of the tread is covered by pen strokes than with the rows of dashes (marks run into each other)
+  const cover = (list) => list.filter((st) => st.length < Math.PI * 1.9).reduce((sum, st) => sum + st.length, 0);
+  assert.ok(cover(fast[0]) > 2 * cover(dashes), `strokes cover ${(cover(fast[0]) / cover(dashes)).toFixed(1)} times what the rows of dashes cover`);
+  const lanes = [...new Set(fast[0].filter((st) => st.length < Math.PI * 1.9).map((st) => st.lat))];
+  for (const lat of lanes) {
+    const covered = fast[0].filter((st) => st.lat === lat && st.length < Math.PI * 1.9).reduce((sum, st) => sum + st.length, 0);
+    assert.ok(covered > 0.7 * Math.PI * 2 && covered < Math.PI * 2, `lane ${lat}: nearly a full circle of strokes (${(covered / (Math.PI * 2) * 100).toFixed(0)} %), with gaps that travel`);
+  }
+  // fewer bold heads than there are dashes, and each thinner: a single mark no longer stands out
+  const heads = fast[0].filter((st) => st.weight > 1.6 && st.length < 1), bold = dashes.filter((st) => st.weight > 2);
+  assert.ok(heads.length <= bold.length * 0.6 && heads.every((st) => st.weight < bold[0].weight), `${heads.length} heads for ${bold.length} dashes`);
+  // one phase moves every trail by a third of the row spacing, all together, the same way as the rolling marks
+  const moving = (list) => list.filter((st) => st.length < Math.PI * 1.9);
+  const step = (from, to) => { const steps = moving(from).map((st, i) => wrap(moving(to)[i].start - st.start, spacing)); for (const d of steps) assert.ok(Math.abs(d - steps[0]) < 1e-3, 'all trails move together'); return steps[0]; };
+  const s01 = step(fast[0], fast[1]), s12 = step(fast[1], fast[2]);
+  assert.ok(Math.abs(Math.abs(s01) - spacing / 3) < 1e-3 && Math.abs(s12 - s01) < 1e-3, 'a third of the spacing per phase');
+  const marks = [0, 1].map((phase) => strokes({ phase }));
+  assert.equal(Math.sign(s01), Math.sign(wrap(marks[1][0].start - marks[0][0].start, (Math.PI * 2) / TREAD_MARKS)), 'same direction as the rolling marks: never backwards');
+  // the heads sit where the dashes of the drawing "at speed" are: the two drawings fade into each other in place
+  const dashStarts = dashes.map((st) => `${st.lat}:${wrap(st.start, spacing).toFixed(3)}`);
+  for (const h of heads) assert.ok(dashStarts.includes(`${h.lat}:${wrap(h.start, spacing).toFixed(3)}`), 'a head lies on a dash of the other drawing');
 });
 
 test('mirrors: the cockpit shows the mirrors of the car model where the driver would see them', () => {
