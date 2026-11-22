@@ -10,6 +10,12 @@ import { COLLISION_TUNING } from './collision-tuning.js';
 
 // AIRBORNE: thrown in the air by a contact; WRECKED: stopped on the spot after a hard landing.
 export const CAR_STATE = { GRID: 0, RACING: 1, SPIN: 2, RESET: 3, SERVICE: 4, RETIRED: 5, AIRBORNE: 6, WRECKED: 7 };
+/**
+ * How a flight ends. LIGHT: the car slides out of control until it stops (launch on an obstacle).
+ * HARD: stopped on the spot, explosion, restart (launch over a car). RECOVERABLE: it comes down on
+ * its wheels and drives on, the steering disturbed for a moment (hop over a wheel).
+ */
+export const LANDING = { LIGHT: 0, HARD: 1, RECOVERABLE: 2 };
 
 const located = { index: 0, s: 0, d: 0 };
 
@@ -38,6 +44,7 @@ export function createCarState(index) {
     clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
     airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
     landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
+    airKind: 0, airPeak: 0, landKind: 0, launchAlong: 0, hopLanded: false, rearmClock: -10,
   };
 }
 
@@ -87,10 +94,39 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
   }
   car.state = CAR_STATE.AIRBORNE;
   car.airTime = 0; car.airDuration = duration; car.airHard = hard; car.airHeight = 0;
+  car.airKind = hard ? LANDING.HARD : LANDING.LIGHT;
+  const reach = duration / COLLISION_TUNING.flightTimeCar;
+  car.airPeak = COLLISION_TUNING.airPeakHeight * reach * reach;
   car.launchSide = side; car.launchClock = car.clock; car.launchOther = other;
   car.pitAuto = false; car.vLat = 0; car.yawRate = 0;
   if (emit) emit('launch', car.index, Math.hypot(car.velX, car.velZ), other);
   return true;
+}
+
+/**
+ * Recoverable hop: the car is lifted by the wheel of another one, flies for a short while and comes
+ * down on its wheels (see LANDING.RECOVERABLE). `along` is how far ahead the other car is at the
+ * launch (metres along the motion): the car in flight does not gain ground on it.
+ */
+export function startHop(car, emit, other, side, along) {
+  if (car.state !== CAR_STATE.RACING) return false;
+  const T = COLLISION_TUNING;
+  startAirborne(car, T.hopFlightTime, false, null, other, side);
+  car.airKind = LANDING.RECOVERABLE; car.airPeak = T.hopPeakHeight; car.launchAlong = along;
+  if (emit) { emit('launch', car.index, Math.hypot(car.velX, car.velZ), other); emit('hop', car.index, Math.hypot(car.velX, car.velZ), other); }
+  return true;
+}
+
+/**
+ * Disturbance of the steering after a recoverable landing, added to what the driver asks for (share
+ * of the steering travel): whole swings that grow then fade, so that they cancel out and the car is
+ * left heading where it was. Zero at any other time.
+ */
+export function hopSteerKick(car) {
+  if (car.landKind !== LANDING.RECOVERABLE) return 0;
+  const T = COLLISION_TUNING, x = (car.clock - car.landClock) / T.hopWobbleTime;
+  if (x < 0 || x >= 1) return 0;
+  return -(car.launchSide || 1) * T.hopWobbleSteer * Math.sin(Math.PI * x) * Math.sin(Math.PI * 2 * T.hopWobbleSwings * x);   // first away from the side that was hit
 }
 
 /** Loss of control after a light landing: the car slides on, turning slowly, until it stops. */
@@ -110,16 +146,25 @@ function stepAirborne(car, dt, emit) {
   car.velX *= k; car.velZ *= k;
   car.x += car.velX * dt; car.z += car.velZ * dt;
   car.airTime += dt;
-  const u = Math.min(1, car.airTime / car.airDuration), reach = car.airDuration / T.flightTimeCar;
-  car.airHeight = T.airPeakHeight * reach * reach * 4 * u * (1 - u);
+  const u = Math.min(1, car.airTime / car.airDuration);
+  car.airHeight = car.airPeak * 4 * u * (1 - u);
   car.speed = nv; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
   car.throttle = 0; car.brake = 0; car.steer = moveToward(car.steer, 0, 3 * dt);
   car.rpm = damp(car.rpm, spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * 0.35, 5, dt);
   car.accelLong = -T.airDecel; car.accelLat = 0;
   if (car.airTime < car.airDuration) return;
   // ---- landing
-  car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard;
-  if (car.airHard) {
+  car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
+  if (car.airKind === LANDING.RECOVERABLE) {
+    // on its wheels, most of its speed kept, driving again at once (the car it rode over, if it is
+    // still there, sets an upper limit to that speed: see the contacts between cars)
+    car.velX *= T.hopLandingSpeedFactor; car.velZ *= T.hopLandingSpeedFactor;
+    car.speed = nv * T.hopLandingSpeedFactor;
+    if (nv > 1) car.heading = Math.atan2(car.velZ, car.velX);          // it comes down pointing the way it flew
+    car.state = CAR_STATE.RACING;
+    car.hopLanded = true; car.rearmClock = car.clock; car.stuckTimer = 0;
+    if (emit) emit('landing', car.index, LANDING.RECOVERABLE);
+  } else if (car.airHard) {
     car.velX *= T.hardLandingSpeedFactor; car.velZ *= T.hardLandingSpeedFactor;
     car.speed = nv * T.hardLandingSpeedFactor;
     car.state = CAR_STATE.WRECKED;
@@ -232,8 +277,16 @@ export function stepCar(car, track, dt, rules, emit) {
       car.inThrottle = 0; car.inBrake = car.speed > 0.5 ? 0.35 : 1; car.inSteer = 0;
       stepDrive(car, track, dt, rules, emit);
       break;
-    default:
-      stepDrive(car, track, dt, rules, emit);
+    default: {
+      // (after a recoverable landing the steering swings for a moment around what the driver asks for)
+      const kick = hopSteerKick(car);
+      if (kick !== 0) {
+        const asked = car.inSteer;
+        car.inSteer = clamp(asked + kick, -1, 1);
+        stepDrive(car, track, dt, rules, emit);
+        car.inSteer = asked;
+      } else stepDrive(car, track, dt, rules, emit);
+    }
   }
   updateTrackFrame(car, track, dt);
   collideBoundaries(car, track, rules, emit);
