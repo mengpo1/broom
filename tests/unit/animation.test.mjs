@@ -222,6 +222,13 @@ test('mirrors: the cockpit shows the mirrors of the car model where the driver w
   assert.ok(MIRROR.y > 0, 'below the horizon: the mirror is lower than the eye');
   assert.ok(MIRROR.w >= MIRROR_MOUNT.width * scale && MIRROR.w < MIRROR_MOUNT.width * scale * 1.2, 'apparent width (housing plus its outline)');
   assert.ok(MIRROR.h >= MIRROR_MOUNT.height * scale && MIRROR.h < MIRROR_MOUNT.height * scale * 1.25, 'apparent height');
+  // no overlap with the bodywork: the housing is clear of the cockpit rim beside it, and its arm starts on that rim
+  const tub = parts.find((p) => p.name === 'tub');
+  let rim = 0;
+  for (let i = 0; i < tub.pos.length; i += 3) if (Math.abs(tub.pos[i] - MIRROR_MOUNT.x) < 0.1 && Math.abs(tub.pos[i + 2] - MIRROR_MOUNT.arm[2]) < 0.06) rim = Math.max(rim, Math.abs(tub.pos[i + 1]));
+  assert.ok(rim > 0.15 && MIRROR_MOUNT.y - MIRROR_MOUNT.width / 2 > rim + 0.03, `housing clear of the cockpit rim (inner edge ${(MIRROR_MOUNT.y - MIRROR_MOUNT.width / 2).toFixed(3)} m, rim ${rim.toFixed(3)} m)`);
+  assert.ok(MIRROR_MOUNT.arm[1] <= rim + 0.005 && MIRROR_MOUNT.arm[1] > rim - 0.06, `the arm starts on the rim of the cockpit (${MIRROR_MOUNT.arm[1]} m for a rim at ${rim.toFixed(3)} m)`);
+  assert.ok(MIRROR_MOUNT.z - MIRROR_MOUNT.height / 2 > MIRROR_MOUNT.arm[2], 'and rises to the housing');
   // it sits outside the cockpit side and inside the front wheel, as on the model
   assert.ok(MIRROR_MOUNT.y > Math.abs(MIRROR_MOUNT.arm[1]) && MIRROR_MOUNT.y + MIRROR_MOUNT.width / 2 < CAR_DIMENSIONS.frontTrack - CAR_DIMENSIONS.frontTyre.width / 2, 'between the cockpit side and the inner face of the wheel');
 });

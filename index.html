@@ -7848,8 +7848,15 @@ const CAR_DIMENSIONS = {
   eye: [-0.35, 0, 0.95],       // driver's eye, used by the cockpit drawing
 };
 
-/** Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side (the cockpit view is drawn from these). */
-const MIRROR_MOUNT = { x: 0.4, y: 0.42, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.3, 0.6] };
+/**
+ * Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side.
+ * The right one is its reflection. Every view is drawn from this single definition: the car model seen
+ * from outside, and the cockpit drawing, which projects it from the driver's eye.
+ * (y: 2.5 cm closer to the centre line than at first, and the foot of the arm brought onto the rim of the
+ * cockpit, which it used to miss by a few centimetres: a proposal after a player found the mirrors slightly
+ * too far apart; see work/renders/comparison/mirror-variants.jpg.)
+ */
+const MIRROR_MOUNT = { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };
 
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
 
