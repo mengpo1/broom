@@ -107,13 +107,24 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
  * Recoverable hop: the car is lifted by the wheel of another one, flies for a short while and comes
  * down on its wheels (see LANDING.RECOVERABLE). `along` is how far ahead the other car is at the
  * launch (metres along the motion): the car in flight does not gain ground on it.
+ *
+ * The speed is lost where its cause is seen: at the shock, the car is slowed to a little less than
+ * `otherSpeed` (the speed of the car whose wheel it rides over), by an amount chosen so that the
+ * steady loss of the flight then brings it down `hopSeparation` slower than that car, as after a
+ * bump. Nothing more is taken at the landing. It is never sped up.
  */
-export function startHop(car, emit, other, side, along) {
+export function startHop(car, emit, other, side, along, otherSpeed) {
   if (car.state !== CAR_STATE.RACING) return false;
   const T = COLLISION_TUNING;
   startAirborne(car, T.hopFlightTime, false, null, other, side);
   car.airKind = LANDING.RECOVERABLE; car.airPeak = T.hopPeakHeight; car.launchAlong = along;
-  if (emit) { emit('launch', car.index, Math.hypot(car.velX, car.velZ), other); emit('hop', car.index, Math.hypot(car.velX, car.velZ), other); }
+  const before = Math.hypot(car.velX, car.velZ);
+  if (emit) { emit('launch', car.index, before, other); emit('hop', car.index, before, other); }
+  if (otherSpeed !== undefined && before > 1e-4) {
+    const gap = Math.max(0, T.hopSeparation - T.airDecel * T.hopFlightTime);
+    const after = Math.min(before, Math.max(T.penaltyFloorSpeed, otherSpeed - gap));
+    car.velX *= after / before; car.velZ *= after / before; car.speed = after;
+  }
   return true;
 }
 
@@ -156,8 +167,9 @@ function stepAirborne(car, dt, emit) {
   // ---- landing
   car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
   if (car.airKind === LANDING.RECOVERABLE) {
-    // on its wheels, most of its speed kept, driving again at once (the car it rode over, if it is
-    // still there, sets an upper limit to that speed: see the contacts between cars)
+    // on its wheels and driving again at once, at the speed it had in the air: what the hop costs was
+    // taken at the shock and during the flight (the car it rode over, if it braked meanwhile, still
+    // sets an upper limit to that speed: see the contacts between cars)
     car.velX *= T.hopLandingSpeedFactor; car.velZ *= T.hopLandingSpeedFactor;
     car.speed = nv * T.hopLandingSpeedFactor;
     if (nv > 1) car.heading = Math.atan2(car.velZ, car.velX);          // it comes down pointing the way it flew

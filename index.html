@@ -731,11 +731,16 @@ const COLLISION_TUNING = {
   hopAlignedCos: 0.94,           // angle: the two cars head within about 20 degrees of each other
   hopSideOverlapMax: 0.5,        // contact point, side by side: the cars overlap by at most this share of their length
                                  // (front wheel beside rear wheel; fully alongside, wheels only rub: E2)
-                                 // lateral overlap, from behind: the launch window launchOverlapMin..launchOverlapMax
+  hopOverlapMin: 0,              // lateral overlap, from behind: from the slightest overlap (tyre against tyre at the edge of the
+                                 // cars) up to launchOverlapMax; beyond, nose in the gearbox, the cars bump. (The accident
+                                 // keeps its own, narrower window: launchOverlapMin..launchOverlapMax.)
   hopFlightTime: 0.45,           // s in the air (the hard accident: 0.85 s)
   hopPeakHeight: 0.55,           // m at the top of the hop (the hard accident: 1.3 m)
-  hopLandingSpeedFactor: 0.9,    // share of its speed the car keeps as it comes down (the hard accident: 0.15)
-  hopSeparation: 13.33,          // m/s: it comes down at least this much slower than the car it rode over (as after a bump)
+  hopSeparation: 13.33,          // m/s: it comes down this much slower than the car it rode over was at the shock (as after a bump).
+                                 // The loss is taken where its cause is seen: most of it at the shock (the car is slowed to
+                                 // hopSeparation - airDecel * hopFlightTime below the other car, 25 km/h with these values),
+                                 // the rest steadily during the flight (airDecel, as in any flight); none at the landing.
+  hopLandingSpeedFactor: 1,      // share of its speed the car keeps as its wheels touch down (the hard accident: 0.15)
   hopSideKick: 1.5,              // m/s sideways, away from the car it touched, when the hop starts side by side
   hopWobbleTime: 0.7,            // s during which the steering is disturbed after the landing
   hopWobbleSteer: 0.3,           // peak of the disturbance, share of the steering travel
@@ -868,13 +873,24 @@ function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
  * Recoverable hop: the car is lifted by the wheel of another one, flies for a short while and comes
  * down on its wheels (see LANDING.RECOVERABLE). `along` is how far ahead the other car is at the
  * launch (metres along the motion): the car in flight does not gain ground on it.
+ *
+ * The speed is lost where its cause is seen: at the shock, the car is slowed to a little less than
+ * `otherSpeed` (the speed of the car whose wheel it rides over), by an amount chosen so that the
+ * steady loss of the flight then brings it down `hopSeparation` slower than that car, as after a
+ * bump. Nothing more is taken at the landing. It is never sped up.
  */
-function startHop(car, emit, other, side, along) {
+function startHop(car, emit, other, side, along, otherSpeed) {
   if (car.state !== CAR_STATE.RACING) return false;
   const T = COLLISION_TUNING;
   startAirborne(car, T.hopFlightTime, false, null, other, side);
   car.airKind = LANDING.RECOVERABLE; car.airPeak = T.hopPeakHeight; car.launchAlong = along;
-  if (emit) { emit('launch', car.index, Math.hypot(car.velX, car.velZ), other); emit('hop', car.index, Math.hypot(car.velX, car.velZ), other); }
+  const before = Math.hypot(car.velX, car.velZ);
+  if (emit) { emit('launch', car.index, before, other); emit('hop', car.index, before, other); }
+  if (otherSpeed !== undefined && before > 1e-4) {
+    const gap = Math.max(0, T.hopSeparation - T.airDecel * T.hopFlightTime);
+    const after = Math.min(before, Math.max(T.penaltyFloorSpeed, otherSpeed - gap));
+    car.velX *= after / before; car.velZ *= after / before; car.speed = after;
+  }
   return true;
 }
 
@@ -917,8 +933,9 @@ function stepAirborne(car, dt, emit) {
   // ---- landing
   car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
   if (car.airKind === LANDING.RECOVERABLE) {
-    // on its wheels, most of its speed kept, driving again at once (the car it rode over, if it is
-    // still there, sets an upper limit to that speed: see the contacts between cars)
+    // on its wheels and driving again at once, at the speed it had in the air: what the hop costs was
+    // taken at the shock and during the flight (the car it rode over, if it braked meanwhile, still
+    // sets an upper limit to that speed: see the contacts between cars)
     car.velX *= T.hopLandingSpeedFactor; car.velZ *= T.hopLandingSpeedFactor;
     car.speed = nv * T.hopLandingSpeedFactor;
     if (nv > 1) car.heading = Math.atan2(car.velZ, car.velX);          // it comes down pointing the way it flew
@@ -3190,9 +3207,10 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
           contactDamage(follower, leader, closing, rules);
           return true;
         }
-        // the same contact with less energy: a hop the car recovers from
-        if (wheelOverWheel && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
-          startHop(follower, emit, leader.index, side, Math.abs(dx * ca + dz * sa));
+        // the same contact with less energy, or tyre against tyre at the very edge of the cars (less overlap than the
+        // accident needs): a hop the car recovers from
+        if (overlap > T.hopOverlapMin && overlap <= T.launchOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
+          startHop(follower, emit, leader.index, side, Math.abs(dx * ca + dz * sa), leader.speed);
           countContact(follower, leader, time, emit, closing);
           contactDamage(follower, leader, closing, rules);
           return true;
@@ -3209,7 +3227,7 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
       const lengthwise = (pa.halfLength + pb.halfLength - Math.abs(along)) / (pa.halfLength + pb.halfLength);
       if (lengthwise <= T.hopSideOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
         const lateral = -dx * sa + dz * ca, side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
-        startHop(follower, emit, leader.index, side, Math.abs(along));
+        startHop(follower, emit, leader.index, side, Math.abs(along), leader.speed);
         // thrown clear of the car it touched: it flies parallel to it, drifting away sideways
         const lh = leader.heading, fx = Math.cos(lh), fz = Math.sin(lh);
         const forward = follower.velX * fx + follower.velZ * fz;
@@ -3369,7 +3387,9 @@ function keepHopClear(car, cars) {
 /**
  * Landing of a recoverable hop (called once, in the step where the car comes down): it is clear of
  * every other car, and slower than the car it rode over when that car is still racing, so that the
- * two separate as they do after a bump.
+ * two separate as they do after a bump. That limit is a safeguard: the speed was already brought
+ * to this value by the shock and the flight (startHop), so it only acts when the car ahead slowed
+ * down while the other was in the air.
  */
 function landHop(car, cars) {
   const T = COLLISION_TUNING;
@@ -13860,7 +13880,7 @@ class EffectsLayer {
     const list = this.pops[viewIndex];
     const p = list[this.popCursor[viewIndex]];
     this.popCursor[viewIndex] = (this.popCursor[viewIndex] + 1) % MAX_POPS;
-    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT && word < WORD.FLATOUT + FLATOUT_WORDS ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
+    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT && word < WORD.FLATOUT + FLATOUT_WORDS ? 1.5 : word === WORD.HOP ? 0.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
     p.angle = (this.random() - 0.5) * 0.3;
   }
 
@@ -13976,7 +13996,13 @@ class EffectsLayer {
       if (view.carIndex !== event.car) continue;
       view.addImpact(hop ? (landing ? 0.45 : 0.5) : landing ? (hard ? 1 : 0.7) : 0.8);
       // (one sound word at a time: a board that throws the car has already had its own)
-      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, hop ? WORD.HOP : WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, hop ? 0.75 : 0.9, false); }
+      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) {
+        this.popClock[v] = 0;
+        // (the word of a hop stays out of the way: on the side away from the car touched, higher, and gone when the wheels
+        // touch down, the moment the driver must see that car again)
+        if (hop) this.pop(v, WORD.HOP, 0.5 - car.launchSide * 0.2, 0.3, 0.75, false);
+        else this.pop(v, WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, 0.9, false);
+      }
     }
   }
 
@@ -17860,13 +17886,15 @@ const { CAR_STATE, placeCar } = __modules["src/physics/car-physics.js"];
 /**
  * Scenarios. Speeds in km/h, distances in metres. `me`: the player's car (back: gap behind the car
  * ahead, side: lateral offset from it); `other`: the car ahead, scripted at a constant speed.
- * `release`: the event after which the car is handed back to the player. `afterSide`: when the bench
- * keeps driving after the event (recordings), the lateral offset it then takes to go past the car ahead.
+ * `release`: the event after which the car is handed back to the player. When the bench keeps driving
+ * after the event (recordings), it first holds its line for `afterHold` seconds (hands steady: what
+ * the steering does then is the disturbance of the landing, which belongs to the game), then moves
+ * smoothly, in `afterMove` seconds, to the lateral offset `afterSide` to go past the car ahead.
  */
 const LAB_SCENARIOS = {
   wheel: { key: 'Digit1', circuit: 'kestrel-fields', me: { speed: 146, back: 7, side: -3.2 }, other: { speed: 118 }, steerTo: -1.7, steerFrom: 0.45, hold: 146, release: 'wheel' },
   // (the same staging as the accident below, with less speed; `back` makes the contact happen at the same instant, for comparison)
-  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 200, back: 23, side: -0.93 }, other: { speed: 150 }, steerTo: -0.93, steerFrom: 0, hold: 200, afterSide: -3.4, release: 'landing' },
+  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 200, back: 23, side: -0.93 }, other: { speed: 150 }, steerTo: -0.93, steerFrom: 0, hold: 200, afterHold: 0.8, afterMove: 1.2, afterSide: -2.9, release: 'landing' },
   crash: { key: 'Digit3', circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, release: 'landing' },
   board: { key: 'Digit4', circuit: 'hazelbrook', board: true, me: { speed: 245, back: 70 }, release: 'landing' },
   // a first contact at about 40 km/h of closing speed, then the follower comes back gently on the car ahead (5 km/h faster)
@@ -17876,6 +17904,8 @@ const LAB_SCENARIOS = {
 const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump' };
 const WATCHED = ['bump', 'wheel', 'launch', 'hop', 'landing', 'obstacle', 'crash', 'restart', 'reset', 'contact'];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+/** Scripted driver after a recoverable landing: lateral error (m) to heading asked for (rad), times the speed (m/s). */
+const LAB_AFTER_GAIN = 1.5;
 
 class CollisionLab {
   /**
@@ -17886,7 +17916,7 @@ class CollisionLab {
     this.app = app; this.quickRace = quickRace;
     this.name = null; this.scenario = null; this.race = null;
     this.me = null; this.lead = null; this.board = null;
-    this.tick = 0; this.left = false; this.bumped = false; this.triggered = false; this.released = false;
+    this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
     this.handOver = true;                      // false: the bench keeps driving after the event (recordings)
     this.events = [];
     this.onChange = null;                      // called when the scenario starts or the car is handed back
@@ -17920,7 +17950,7 @@ class CollisionLab {
     const gearFor = (car, v) => { const tops = car.params.spec.gearTopSpeeds; for (let g = 0; g < tops.length; g++) if (v < tops[g] * 0.93) return g + 1; return tops.length; };
     const put = (car, s, d, speed) => { placeCar(car, track, s, d); car.state = CAR_STATE.RACING; car.ghostTimer = 0; car.speed = kmh(speed); car.gear = gearFor(car, kmh(speed)); };
     this.name = key; this.scenario = sc; this.race = race; this.me = me; this.lead = null; this.board = null;
-    this.tick = 0; this.left = false; this.bumped = false; this.triggered = false; this.released = false;
+    this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
     this.handOver = handOver; this.events.length = 0;
     if (sc.board) {
       // a braking board at the end of a straight; the car leaves the road toward it. Only this board is
@@ -17963,6 +17993,7 @@ class CollisionLab {
     if (!this.released) {
       let steer = 0, throttle = 1;
       if (me.state !== CAR_STATE.RACING) this.left = true;               // after the accident: straight on, full throttle
+      else if (this.left && this.backTick < 0) this.backTick = this.tick;  // first step back on its wheels
       if (me.state === CAR_STATE.RACING) {
         if (this.board && !this.left) { steer = clamp((this.board.d - me.d) * 0.22 - me.headingError * 2.4, -0.5, 0.5); throttle = 0.6; }
         else if (this.board) {
@@ -17971,8 +18002,19 @@ class CollisionLab {
           steer = clamp((want - me.headingError) * 2.2, -1, 1);
           throttle = Math.abs(want - me.headingError) > 0.5 ? 0.22 : 0.6;
         } else {
-          const lead = this.lead, side = this.left && sc.afterSide !== undefined ? sc.afterSide : this.tick < Math.round(sc.steerFrom / SIM_DT) ? sc.me.side : sc.steerTo;
+          const lead = this.lead;
+          let side = this.tick < Math.round(sc.steerFrom / SIM_DT) ? sc.me.side : sc.steerTo;
+          if (this.left && sc.afterSide !== undefined) {
+            // back on its wheels: the same line for a moment, then out from behind the car ahead, without a jerk
+            const u = clamp(((this.tick - this.backTick) * SIM_DT - (sc.afterHold || 0)) / (sc.afterMove || 1), 0, 1);
+            side = sc.steerTo + (sc.afterSide - sc.steerTo) * u * u * (3 - 2 * u);
+          }
           steer = clamp((lead.d + side - me.d) * 0.3 - me.headingError * 2.2, -0.4, 0.4);
+          if (this.left && sc.afterSide !== undefined) {
+            // (a calmer hand for this part: the heading asked for shrinks with the speed, so that the car settles on its line without weaving)
+            const want = clamp((lead.d + side - me.d) * LAB_AFTER_GAIN / Math.max(20, me.speed), -0.08, 0.08);
+            steer = clamp((want - me.headingError) * 6, -0.4, 0.4);
+          }
           const hold = this.bumped && sc.afterBump ? lead.speed * 3.6 + sc.afterBump : sc.hold;
           if (hold && !this.left) throttle = clamp(0.5 + (hold / 3.6 - me.speed) * 0.4, 0, 1);
         }
@@ -18022,7 +18064,7 @@ __modules["src/core/collision-lab.js"] = { LAB_SCENARIOS, LAB_ALIASES, Collision
 // Entry point: boots the application and exposes a small automation API used by tests,
 // captures and benchmarks (window.virage).
 
-const { placeCar, CAR_STATE } = __modules["src/physics/car-physics.js"];
+const { placeCar, CAR_STATE, hopSteerKick } = __modules["src/physics/car-physics.js"];
 const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
 const { GameApp } = __modules["src/core/game-app.js"];
 const { GpuUnavailableError } = __modules["src/rendering/gpu-context.js"];
@@ -18150,7 +18192,7 @@ async function boot() {
    */
   const createLab = () => { if (!app.lab) app.lab = new CollisionLab(app, quickRace); return app.lab; };
   // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING } };
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
   if (params.lab) {
     const lab = createLab();

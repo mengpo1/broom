@@ -189,7 +189,7 @@ export class EffectsLayer {
     const list = this.pops[viewIndex];
     const p = list[this.popCursor[viewIndex]];
     this.popCursor[viewIndex] = (this.popCursor[viewIndex] + 1) % MAX_POPS;
-    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT && word < WORD.FLATOUT + FLATOUT_WORDS ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
+    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT && word < WORD.FLATOUT + FLATOUT_WORDS ? 1.5 : word === WORD.HOP ? 0.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
     p.angle = (this.random() - 0.5) * 0.3;
   }
 
@@ -305,7 +305,13 @@ export class EffectsLayer {
       if (view.carIndex !== event.car) continue;
       view.addImpact(hop ? (landing ? 0.45 : 0.5) : landing ? (hard ? 1 : 0.7) : 0.8);
       // (one sound word at a time: a board that throws the car has already had its own)
-      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, hop ? WORD.HOP : WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, hop ? 0.75 : 0.9, false); }
+      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) {
+        this.popClock[v] = 0;
+        // (the word of a hop stays out of the way: on the side away from the car touched, higher, and gone when the wheels
+        // touch down, the moment the driver must see that car again)
+        if (hop) this.pop(v, WORD.HOP, 0.5 - car.launchSide * 0.2, 0.3, 0.75, false);
+        else this.pop(v, WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, 0.9, false);
+      }
     }
   }
 

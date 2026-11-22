@@ -102,9 +102,10 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
           contactDamage(follower, leader, closing, rules);
           return true;
         }
-        // the same contact with less energy: a hop the car recovers from
-        if (wheelOverWheel && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
-          startHop(follower, emit, leader.index, side, Math.abs(dx * ca + dz * sa));
+        // the same contact with less energy, or tyre against tyre at the very edge of the cars (less overlap than the
+        // accident needs): a hop the car recovers from
+        if (overlap > T.hopOverlapMin && overlap <= T.launchOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
+          startHop(follower, emit, leader.index, side, Math.abs(dx * ca + dz * sa), leader.speed);
           countContact(follower, leader, time, emit, closing);
           contactDamage(follower, leader, closing, rules);
           return true;
@@ -121,7 +122,7 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
       const lengthwise = (pa.halfLength + pb.halfLength - Math.abs(along)) / (pa.halfLength + pb.halfLength);
       if (lengthwise <= T.hopSideOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
         const lateral = -dx * sa + dz * ca, side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
-        startHop(follower, emit, leader.index, side, Math.abs(along));
+        startHop(follower, emit, leader.index, side, Math.abs(along), leader.speed);
         // thrown clear of the car it touched: it flies parallel to it, drifting away sideways
         const lh = leader.heading, fx = Math.cos(lh), fz = Math.sin(lh);
         const forward = follower.velX * fx + follower.velZ * fz;
@@ -281,7 +282,9 @@ function keepHopClear(car, cars) {
 /**
  * Landing of a recoverable hop (called once, in the step where the car comes down): it is clear of
  * every other car, and slower than the car it rode over when that car is still racing, so that the
- * two separate as they do after a bump.
+ * two separate as they do after a bump. That limit is a safeguard: the speed was already brought
+ * to this value by the shock and the flight (startHop), so it only acts when the car ahead slowed
+ * down while the other was in the air.
  */
 function landHop(car, cars) {
   const T = COLLISION_TUNING;

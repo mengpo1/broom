@@ -17,8 +17,8 @@ mkdirSync(`${root}/${outDir}`, { recursive: true });
 /** What to record: a case of the test bench (its parameters live in collision-lab.js), a camera, a duration. */
 const SCENARIOS = {
   E2: { title: 'wheel-to-wheel side contact', lab: 'wheel', seconds: 3.2, camera: 'COCKPIT' },
-  HOP: { title: 'recoverable hop: wheel over wheel at a medium closing speed, the race goes on', lab: 'hop', seconds: 6.5, camera: 'COCKPIT' },
-  HOPx: { title: 'the same hop seen from behind', lab: 'hop', seconds: 4.2, camera: 'CHASE' },
+  HOP: { title: 'recoverable hop: wheel over wheel at a medium closing speed, the race goes on', lab: 'hop', seconds: 8, camera: 'COCKPIT' },
+  HOPx: { title: 'the same hop seen from behind', lab: 'hop', seconds: 5.5, camera: 'CHASE' },
   E3: { title: 'launch over a car, hard landing, explosion, stop, restart', lab: 'crash', seconds: 9.5, camera: 'COCKPIT' },
   E3x: { title: 'the same launch seen from behind', lab: 'crash', seconds: 4.2, camera: 'CHASE' },
   E4: { title: 'repeated rear-end bumps', lab: 'bump', seconds: 10, camera: 'COCKPIT' },
@@ -32,7 +32,7 @@ const setup = ([sc, width, height]) => {
   window.virage.input.enabled = false;            // no keyboard here: the bench supplies the controls
   const lab = createLab();
   lab.start(sc.lab, { handOver: false });
-  const me = lab.me;
+  const me = lab.me, L = lab.race.track.length;
   app.views[0].camera = CAMERA[sc.camera];
   app.present(4, 0); app.present(4, 0);          // let anything left of the start run out
   window.scenarioStep = (frame) => {
@@ -42,7 +42,11 @@ const setup = ([sc, width, height]) => {
     const view = app.views[0], events = lab.events.splice(0);
     return { frame, t: +t.toFixed(3), speed: +(me.speed * 3.6).toFixed(1), state: me.state, d: +me.d.toFixed(2), airHeight: +(me.airHeight || 0).toFixed(2),
       pitch: +(view.crashPitch || 0).toFixed(3), contactDive: +(view.contactDive || 0).toFixed(3), brakeDive: +(view.dive * 0.045).toFixed(3), events,
-      other: lab.lead ? +(lab.lead.speed * 3.6).toFixed(1) : null };
+      other: lab.lead ? +(lab.lead.speed * 3.6).toFixed(1) : null,
+      // steering: what the driver asks for (share of the travel), what the game adds to it after a recoverable landing,
+      // where the front wheels are, and the heading of the car relative to the road (degrees)
+      steerAsked: +me.inSteer.toFixed(3), steerDisturbance: +window.virage.debug.hopSteerKick(me).toFixed(3), steer: +me.steer.toFixed(3),
+      headingToRoad: +(me.headingError * 57.2958).toFixed(2), gapToOther: lab.lead ? +((((lab.lead.s - me.s + L * 1.5) % L) - L / 2)).toFixed(2) : null };   // metres along the road, centre to centre
   };
   return { board: lab.board ? { s: lab.board.s, d: lab.board.d } : null, cars: lab.race.cars.length, parameters: lab.scenario };
 };

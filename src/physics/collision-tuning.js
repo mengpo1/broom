@@ -58,11 +58,16 @@ export const COLLISION_TUNING = {
   hopAlignedCos: 0.94,           // angle: the two cars head within about 20 degrees of each other
   hopSideOverlapMax: 0.5,        // contact point, side by side: the cars overlap by at most this share of their length
                                  // (front wheel beside rear wheel; fully alongside, wheels only rub: E2)
-                                 // lateral overlap, from behind: the launch window launchOverlapMin..launchOverlapMax
+  hopOverlapMin: 0,              // lateral overlap, from behind: from the slightest overlap (tyre against tyre at the edge of the
+                                 // cars) up to launchOverlapMax; beyond, nose in the gearbox, the cars bump. (The accident
+                                 // keeps its own, narrower window: launchOverlapMin..launchOverlapMax.)
   hopFlightTime: 0.45,           // s in the air (the hard accident: 0.85 s)
   hopPeakHeight: 0.55,           // m at the top of the hop (the hard accident: 1.3 m)
-  hopLandingSpeedFactor: 0.9,    // share of its speed the car keeps as it comes down (the hard accident: 0.15)
-  hopSeparation: 13.33,          // m/s: it comes down at least this much slower than the car it rode over (as after a bump)
+  hopSeparation: 13.33,          // m/s: it comes down this much slower than the car it rode over was at the shock (as after a bump).
+                                 // The loss is taken where its cause is seen: most of it at the shock (the car is slowed to
+                                 // hopSeparation - airDecel * hopFlightTime below the other car, 25 km/h with these values),
+                                 // the rest steadily during the flight (airDecel, as in any flight); none at the landing.
+  hopLandingSpeedFactor: 1,      // share of its speed the car keeps as its wheels touch down (the hard accident: 0.15)
   hopSideKick: 1.5,              // m/s sideways, away from the car it touched, when the hop starts side by side
   hopWobbleTime: 0.7,            // s during which the steering is disturbed after the landing
   hopWobbleSteer: 0.3,           // peak of the disturbance, share of the steering travel

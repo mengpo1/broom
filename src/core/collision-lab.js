@@ -15,13 +15,15 @@ import { CAR_STATE, placeCar } from '../physics/car-physics.js';
 /**
  * Scenarios. Speeds in km/h, distances in metres. `me`: the player's car (back: gap behind the car
  * ahead, side: lateral offset from it); `other`: the car ahead, scripted at a constant speed.
- * `release`: the event after which the car is handed back to the player. `afterSide`: when the bench
- * keeps driving after the event (recordings), the lateral offset it then takes to go past the car ahead.
+ * `release`: the event after which the car is handed back to the player. When the bench keeps driving
+ * after the event (recordings), it first holds its line for `afterHold` seconds (hands steady: what
+ * the steering does then is the disturbance of the landing, which belongs to the game), then moves
+ * smoothly, in `afterMove` seconds, to the lateral offset `afterSide` to go past the car ahead.
  */
 export const LAB_SCENARIOS = {
   wheel: { key: 'Digit1', circuit: 'kestrel-fields', me: { speed: 146, back: 7, side: -3.2 }, other: { speed: 118 }, steerTo: -1.7, steerFrom: 0.45, hold: 146, release: 'wheel' },
   // (the same staging as the accident below, with less speed; `back` makes the contact happen at the same instant, for comparison)
-  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 200, back: 23, side: -0.93 }, other: { speed: 150 }, steerTo: -0.93, steerFrom: 0, hold: 200, afterSide: -3.4, release: 'landing' },
+  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 200, back: 23, side: -0.93 }, other: { speed: 150 }, steerTo: -0.93, steerFrom: 0, hold: 200, afterHold: 0.8, afterMove: 1.2, afterSide: -2.9, release: 'landing' },
   crash: { key: 'Digit3', circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, release: 'landing' },
   board: { key: 'Digit4', circuit: 'hazelbrook', board: true, me: { speed: 245, back: 70 }, release: 'landing' },
   // a first contact at about 40 km/h of closing speed, then the follower comes back gently on the car ahead (5 km/h faster)
@@ -31,6 +33,8 @@ export const LAB_SCENARIOS = {
 export const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump' };
 const WATCHED = ['bump', 'wheel', 'launch', 'hop', 'landing', 'obstacle', 'crash', 'restart', 'reset', 'contact'];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+/** Scripted driver after a recoverable landing: lateral error (m) to heading asked for (rad), times the speed (m/s). */
+const LAB_AFTER_GAIN = 1.5;
 
 export class CollisionLab {
   /**
@@ -41,7 +45,7 @@ export class CollisionLab {
     this.app = app; this.quickRace = quickRace;
     this.name = null; this.scenario = null; this.race = null;
     this.me = null; this.lead = null; this.board = null;
-    this.tick = 0; this.left = false; this.bumped = false; this.triggered = false; this.released = false;
+    this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
     this.handOver = true;                      // false: the bench keeps driving after the event (recordings)
     this.events = [];
     this.onChange = null;                      // called when the scenario starts or the car is handed back
@@ -75,7 +79,7 @@ export class CollisionLab {
     const gearFor = (car, v) => { const tops = car.params.spec.gearTopSpeeds; for (let g = 0; g < tops.length; g++) if (v < tops[g] * 0.93) return g + 1; return tops.length; };
     const put = (car, s, d, speed) => { placeCar(car, track, s, d); car.state = CAR_STATE.RACING; car.ghostTimer = 0; car.speed = kmh(speed); car.gear = gearFor(car, kmh(speed)); };
     this.name = key; this.scenario = sc; this.race = race; this.me = me; this.lead = null; this.board = null;
-    this.tick = 0; this.left = false; this.bumped = false; this.triggered = false; this.released = false;
+    this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
     this.handOver = handOver; this.events.length = 0;
     if (sc.board) {
       // a braking board at the end of a straight; the car leaves the road toward it. Only this board is
@@ -118,6 +122,7 @@ export class CollisionLab {
     if (!this.released) {
       let steer = 0, throttle = 1;
       if (me.state !== CAR_STATE.RACING) this.left = true;               // after the accident: straight on, full throttle
+      else if (this.left && this.backTick < 0) this.backTick = this.tick;  // first step back on its wheels
       if (me.state === CAR_STATE.RACING) {
         if (this.board && !this.left) { steer = clamp((this.board.d - me.d) * 0.22 - me.headingError * 2.4, -0.5, 0.5); throttle = 0.6; }
         else if (this.board) {
@@ -126,8 +131,19 @@ export class CollisionLab {
           steer = clamp((want - me.headingError) * 2.2, -1, 1);
           throttle = Math.abs(want - me.headingError) > 0.5 ? 0.22 : 0.6;
         } else {
-          const lead = this.lead, side = this.left && sc.afterSide !== undefined ? sc.afterSide : this.tick < Math.round(sc.steerFrom / SIM_DT) ? sc.me.side : sc.steerTo;
+          const lead = this.lead;
+          let side = this.tick < Math.round(sc.steerFrom / SIM_DT) ? sc.me.side : sc.steerTo;
+          if (this.left && sc.afterSide !== undefined) {
+            // back on its wheels: the same line for a moment, then out from behind the car ahead, without a jerk
+            const u = clamp(((this.tick - this.backTick) * SIM_DT - (sc.afterHold || 0)) / (sc.afterMove || 1), 0, 1);
+            side = sc.steerTo + (sc.afterSide - sc.steerTo) * u * u * (3 - 2 * u);
+          }
           steer = clamp((lead.d + side - me.d) * 0.3 - me.headingError * 2.2, -0.4, 0.4);
+          if (this.left && sc.afterSide !== undefined) {
+            // (a calmer hand for this part: the heading asked for shrinks with the speed, so that the car settles on its line without weaving)
+            const want = clamp((lead.d + side - me.d) * LAB_AFTER_GAIN / Math.max(20, me.speed), -0.08, 0.08);
+            steer = clamp((want - me.headingError) * 6, -0.4, 0.4);
+          }
           const hold = this.bumped && sc.afterBump ? lead.speed * 3.6 + sc.afterBump : sc.hold;
           if (hold && !this.left) throttle = clamp(0.5 + (hold / 3.6 - me.speed) * 0.4, 0, 1);
         }

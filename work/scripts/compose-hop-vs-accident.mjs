@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { root } from './lib-browser.mjs';
 
 const dir = `${root}/${process.argv[2] || 'work/renders/collisions'}`;
-const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', seconds = 6.5;
+const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', seconds = 8;
 const label = (text) => `drawtext=fontfile=${font}:text='${text}':x=(w-text_w)/2:y=h-46:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=8`;
 // the views from behind are shorter: their last image is held
 const hold = `tpad=stop_mode=clone:stop_duration=${seconds}`;

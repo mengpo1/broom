@@ -9,7 +9,7 @@ import { getCircuit } from '../../src/tracks/track-catalog.js';
 import { Race, RACE_PHASE, SIM_DT } from '../../src/gameplay/race.js';
 import { RULE_PRESETS } from '../../src/gameplay/rules.js';
 import { DRIVERS, PLAYER_DRIVERS } from '../../src/vehicles/liveries.js';
-import { placeCar, CAR_STATE, LANDING, hopSteerKick } from '../../src/physics/car-physics.js';
+import { placeCar, CAR_STATE, LANDING, hopSteerKick, startHop } from '../../src/physics/car-physics.js';
 import { COLLISION_TUNING as T } from '../../src/physics/collision-tuning.js';
 import { crashPitch, crashPitchDuration, CRASH_CAMERA as C } from '../../src/rendering/compositing/crash-camera.js';
 import { twoCars, run, KMH } from './collision-helpers.mjs';
@@ -74,9 +74,41 @@ test('recoverable hop: wheels interlocked at a medium closing speed lift the car
   assert.ok(log.events.every((e) => e.type !== 'crash' && e.type !== 'reset' && e.type !== 'restart'), 'no explosion, no repositioning');
   // it keeps part of its speed: far more than after the accident, and less than the car it rode over
   assert.ok(landed.a.speed > before.a.speed * 0.5, `${(before.a.speed * KMH).toFixed(0)} -> ${(landed.a.speed * KMH).toFixed(0)} km/h`);
-  assert.ok(Math.abs(landed.b.speed - landed.a.speed - T.hopSeparation) < 0.5, `it lands ${((landed.b.speed - landed.a.speed) * KMH).toFixed(0)} km/h slower than the car it rode over`);
+  assert.ok(Math.abs(before.b.speed - landed.a.speed - T.hopSeparation) < 0.5, `it lands ${((before.b.speed - landed.a.speed) * KMH).toFixed(0)} km/h slower than the car it rode over was at the shock`);
+  assert.ok(landed.b.speed - landed.a.speed > T.hopSeparation - 0.5, 'and at least as much slower than that car is now: the two separate');
   // the car ahead is not disturbed
   assert.ok(Math.abs(flying.b.speed - before.b.speed) < 0.3 && b.state === CAR_STATE.RACING);
+});
+
+test('the speed of a hop is lost where its cause is seen: at the shock and during the flight, none as the wheels touch down', () => {
+  // (the first version took it at the landing: the speed fell by 77 km/h in one image with nothing to explain it)
+  const setup = rearHop();
+  const { a, b } = setup;
+  const speeds = [], leader = [];
+  let launchTick = -1, landTick = -1;
+  stepThrough(setup, 2.4, { throttleA: 1, throttleB: 0.6 }, (i) => {
+    speeds.push(a.speed); leader.push(b.speed);
+    if (launchTick < 0 && a.state === CAR_STATE.AIRBORNE) launchTick = i;
+    if (launchTick >= 0 && landTick < 0 && a.state === CAR_STATE.RACING) landTick = i;
+  });
+  assert.ok(launchTick > 0 && landTick > launchTick, 'the hop happened');
+  // at the shock: slowed to a little less than the car whose wheel it rides over
+  const gap = T.hopSeparation - T.airDecel * T.hopFlightTime;
+  assert.ok(gap > 0 && gap < T.hopSeparation);
+  assert.ok(Math.abs(speeds[launchTick] - (leader[launchTick] - gap)) < 0.3, `after the shock: ${(speeds[launchTick] * KMH).toFixed(1)} km/h, the car ahead at ${(leader[launchTick] * KMH).toFixed(1)}`);
+  assert.ok(speeds[launchTick - 1] - speeds[launchTick] > 10, `the shock costs ${((speeds[launchTick - 1] - speeds[launchTick]) * KMH).toFixed(0)} km/h`);
+  // in the air: the steady loss of any flight, step after step
+  for (let i = launchTick + 1; i < landTick; i++) assert.ok(Math.abs(speeds[i - 1] - speeds[i] - T.airDecel * SIM_DT) < 1e-9, `flight step ${i}`);
+  // as the wheels touch down: no step (only that same steady loss, for the last step of the flight)
+  const atLanding = speeds[landTick - 1] - speeds[landTick];
+  assert.ok(Math.abs(atLanding - T.airDecel * SIM_DT) < 1e-6, `change of speed in the landing step: ${(atLanding * KMH).toFixed(3)} km/h`);
+  // and afterwards the car drives: over the following second no step of speed either
+  for (let i = landTick + 1; i < landTick + 120; i++) assert.ok(Math.abs(speeds[i] - speeds[i - 1]) < 0.25, `step ${i} after the landing: ${((speeds[i] - speeds[i - 1]) * KMH).toFixed(2)} km/h`);
+  assert.equal(T.hopLandingSpeedFactor, 1);
+  // the car is never sped up by a hop: when the car ahead is the faster one over the ground, nothing is added
+  const car = { ...a, state: CAR_STATE.RACING, velX: 40, velZ: 0, speed: 40, clock: 100, rearmClock: -10 };
+  startHop(car, null, 1, 1, 3, 80);
+  assert.equal(Math.hypot(car.velX, car.velZ), 40);
 });
 
 test('recoverable hop from the side: front wheel beside rear wheel; fully alongside, the wheels only rub (E2)', () => {
@@ -147,6 +179,33 @@ test('a hop never stops the car: no standstill, no explosion, no repositioning, 
   assert.ok(a.speed > landedSpeed + 15, `back on the throttle: ${(landedSpeed * KMH).toFixed(0)} -> ${(a.speed * KMH).toFixed(0)} km/h`);
   assert.ok(a.progress - landedS > 120, 'it goes on round the track');
   assert.equal(a.resets, 0);
+});
+
+test('what triggers a hop is the wheel: tyre against tyre at the edge of the cars lifts the car, nose in the gearbox does not', () => {
+  // (the first recorded scene had the cars overlapping by half their width; the independent review asked for proof that
+  // a strict wheel-to-wheel alignment hops and that an in-line contact does not)
+  const width = (lateral) => { const { a, b } = rearHop({ lateral }); return (a.params.halfWidth + b.params.halfWidth - lateral) / (2 * Math.min(a.params.halfWidth, b.params.halfWidth)); };
+  for (const lateral of [0.5, 0.93, 1.2, 1.4, 1.6, 1.75]) {
+    const { race, a } = rearHop({ lateral });
+    const log = run(race, 1.5, { throttleA: 1, throttleB: 0.6 });
+    const landing = first(log, 'landing');
+    assert.ok(first(log, 'hop') && landing && landing.value === LANDING.RECOVERABLE, `offset ${lateral} m (${(width(lateral) * 100).toFixed(0)} % of the width overlapped): hop`);
+    assert.ok(log.events.every((e) => e.type !== 'bump' && e.type !== 'wheel' && e.type !== 'crash'), `offset ${lateral} m: nothing but the hop`);
+    assert.equal(a.state, CAR_STATE.RACING);
+  }
+  assert.ok(width(1.6) < T.launchOverlapMin && width(1.75) < T.launchOverlapMin, 'the last two are tyre against tyre only: less overlap than the accident needs');
+  for (const lateral of [0, 0.3]) {
+    const { race } = rearHop({ lateral });
+    const log = run(race, 1.5, { throttleA: 1, throttleB: 0.6 });
+    assert.ok(first(log, 'bump') && !first(log, 'launch'), `offset ${lateral} m (${(width(lateral) * 100).toFixed(0)} % overlapped, above ${T.launchOverlapMax * 100} %): bump, no flight`);
+  }
+  // with the energy of the accident the same edge contact is a hop too, not the accident: E3 keeps its own window
+  const edge = twoCars(track, { gap: 2, lateral: 1.6, speedA: 262 / KMH, speedB: 188 / KMH, straight: 700 });
+  const log = run(edge.race, 1.5, { throttleA: 1, throttleB: 0.7 });
+  assert.ok(first(log, 'hop') && first(log, 'landing').value === LANDING.RECOVERABLE && !first(log, 'crash'), 'tyre against tyre at high energy: hop, no wreck');
+  // and without any overlap there is no contact at all
+  const clear = rearHop({ lateral: 2.0 });
+  assert.equal(run(clear.race, 1.5, { throttleA: 1, throttleB: 0.6 }).events.filter((e) => ['bump', 'wheel', 'launch'].includes(e.type)).length, 0);
 });
 
 test('low energy: below the hop thresholds nothing changes, the validated contacts keep their outcome', () => {
