@@ -8,25 +8,39 @@ l'image, pas la vitesse.
 
 ## 0. Dernière exécution complète
 
-Sur le build final (`index.html`, 1 035 351 octets), le 21 novembre 2026, après le travail
-sur les collisions :
+Sur le build final (`index.html`, 1 068 261 octets), le 22 novembre 2026, après le lot « saut
+récupérable, roues à très haute vitesse, rétroviseurs rapprochés » et les corrections qui ont
+suivi les revues indépendantes :
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Simulation et logique | `npm test` | 76 / 76 |
+| Simulation et logique | `npm test` | 91 / 91 (76 précédents dont 4 modifiés, 15 nouveaux) |
 | Navigateur (WebGPU) | `node tests/rendering/smoke.browser.mjs` | 13 / 13 |
 | Modes de jeu de bout en bout | `node work/scripts/flow-check.mjs` | réussi (5 parcours) |
 | Pages, pause, caméras, souris | `node work/scripts/pages-check.mjs` | 14 / 14 |
 | Audio | `node work/scripts/audio-check.mjs` | 80 / 80 |
-| Conduite (non-régression) | `node work/scripts/driving-report.mjs` | 165 valeurs identiques à l'état précédent |
+| Banc d'essai des collisions | `node work/scripts/lab-check.mjs` | 19 / 19 |
+| Conduite (non-régression) | `node work/scripts/driving-report.mjs` | 165 valeurs identiques à la PR précédente |
+| Contacts validés (non-régression) | `node work/scripts/collision-sequences.mjs all`, `node work/scripts/collision-comparison.mjs` | télémétrie d'E2, E3, E3x, E4, E5 identique image par image à la PR précédente ; 129 valeurs chiffrées E1–E5 identiques |
+| Courses de l'ordinateur | `node work/scripts/race-contact-table.mjs` | temps du vainqueur et meilleur tour identiques dans six courses ; 16 sauts |
 
-Le test navigateur a d'abord donné 12 / 13 : son point de contrôle « pneu avant par-dessus la
-route » tombait sur le rétroviseur, déplacé par ce travail. Le point a été replacé sur la
+Exécution précédente (21 novembre, build de 1 035 351 octets, après le travail sur les
+collisions) : 76 / 76, 13 / 13, 5 parcours, 14 / 14, 80 / 80, 165 valeurs identiques. Le test
+navigateur avait d'abord donné 12 / 13 : son point de contrôle « pneu avant par-dessus la
+route » tombait sur le rétroviseur, déplacé par ce travail-là. Le point a été replacé sur la
 bande de roulement ; l'image elle-même était correcte.
 
-## 1. Tests de simulation et de logique (Node) — 76 / 76 réussis
+Incident d'outillage pendant ce lot : avec le rasteriseur logiciel, les scripts qui mettaient
+en file beaucoup d'images sans attendre le processeur graphique voyaient parfois le navigateur
+abandonner son périphérique graphique (« A valid external Instance reference no longer
+exists »), d'où des captures à refaire. Le chien de garde graphique du navigateur automatisé
+est maintenant coupé (`--disable-gpu-watchdog`, `lib-browser.mjs`) et le script des
+rétroviseurs attend après chaque image. Le jeu n'est pas concerné.
 
-Dernière exécution : `npm test` → 76 tests, 76 réussis, 0 échec (environ 8 s).
+## 1. Tests de simulation et de logique (Node) — 91 / 91 réussis
+
+Dernière exécution : `npm test` → 91 tests, 91 réussis, 0 échec (environ 10 s) : les 76 tests
+précédents (dont quatre modifiés, voir § 1 bis) et 15 nouveaux.
 
 ### Conduite — `tests/unit/physics.test.mjs`
 
@@ -95,12 +109,31 @@ Scénarios E3 et E5 du rapport.
 - ✅ a wrecked or flying car cannot be hit, and the restarting car is protected for a moment
 - ✅ a computer driver steers round a wreck instead of driving through it
 - ✅ E5 launch on a board: thrown in the air, light landing without loss of speed nor explosion, slide, restart from where it stopped
-- ✅ launch conditions are explicit: no flight below the speed, the closing speed or outside the overlap window
+- ✅ launch conditions are explicit: three levels by energy, and no flight outside the overlap window *(modifié, § 1 bis)*
 - ✅ pitch of the view (E3, hard): nose up and held, steady swing, ground held, rebound, second dip, level again
 - ✅ pitch of the view (E5, light): same script, shorter, second dip partial; trembling only while sliding
 - ✅ the staging depends only on the simulated state: same values whatever the display rate, nothing for the other player
 - ✅ seen from outside: a car in flight is tilted (nose up then down, the side that was hit lifted) and flattened as it lands
 - ✅ explosion: four phases in order, 1.25 s of fire, plumes until 1.6 s
+
+### Saut récupérable — `tests/gameplay/hop.test.mjs` (nouveau)
+
+Niveau intermédiaire entre le contact sans décollage et l'accident violent. Les huit tests
+demandés sont marqués d'un numéro.
+
+- ✅ **(1 — saut récupérable)** recoverable hop: wheels interlocked at a medium closing speed lift the car behind; a short flight, it comes down on its wheels
+- ✅ the speed of a hop is lost where its cause is seen: at the shock and during the flight, none as the wheels touch down *(ajouté après la seconde revue)*
+- ✅ recoverable hop from the side: front wheel beside rear wheel; fully alongside, the wheels only rub (E2)
+- ✅ **(2 — reprise du contrôle)** after a hop the driver has the car back: the steering swings once and settles, then answers as on any car
+- ✅ **(3 — pas d'immobilisation)** a hop never stops the car: no standstill, no explosion, no repositioning, it accelerates again
+- ✅ what triggers a hop is the wheel: tyre against tyre at the edge of the cars lifts the car, nose in the gearbox does not *(ajouté après la seconde revue)*
+- ✅ **(4 — non-déclenchement à faible énergie)** low energy: below the hop thresholds nothing changes, the validated contacts keep their outcome
+- ✅ **(5 — maintien d'E3)** the hard accident E3 is kept: same contact with more energy, hard landing, wreck
+- ✅ **(6 — maintien d'E5)** the launch on a board E5 is kept: light landing, slide, no hop
+- ✅ **(7 — déterminisme à 120 Hz)** deterministic at 120 Hz: the same hop gives the same race, step for step
+- ✅ **(8 — pas de traversée)** no car is driven through: in flight and at the landing the hopping car stays clear of every other car
+- ✅ a car that has just come down cannot be thrown in the air again at once
+- ✅ the landing of a hop is settled before contacts are looked for, whichever car comes first in the list
 
 ### Multijoueur — `tests/integration/multiplayer.test.mjs`
 
@@ -116,11 +149,13 @@ Scénarios E3 et E5 du rapport.
 ### Animation — `tests/unit/animation.test.mjs`
 
 - ✅ car views: turning a car through 360 degrees walks through neighbouring drawings only
-- ✅ front wheels: rolling marks advance in step with the distance travelled
-- ✅ front wheels at speed: the streaks cycle forward with the distance travelled, faster with speed, the same at any display rate
+- ✅ front wheels: rolling marks advance in step with the distance travelled *(modifié, § 1 bis)*
+- ✅ front wheels at speed: the streaks cycle forward with the distance travelled, faster with speed, the same at any display rate *(modifié, § 1 bis)*
 - ✅ front wheels: the marks fade into the streaks between two speeds, without a jump from one drawing to the other
 - ✅ front wheels at speed: the streak pattern slides as one piece, in the direction of the rolling marks
-- ✅ mirrors: the cockpit shows the mirrors of the car model where the driver would see them
+- ✅ front wheels near top speed: a third drawing, the tyre turning very fast, fades in over the rows of dashes *(nouveau)*
+- ✅ front wheels near top speed: trails and rings round the tyre, moving as one piece the same way as the marks *(nouveau)*
+- ✅ mirrors: the cockpit shows the mirrors of the car model where the driver would see them *(complété, § 1 bis)*
 - ✅ front wheels: steering frames are symmetric and monotonic
 - ✅ speed effects grow with speed and are smooth from frame to frame
 - ✅ each effect can be switched off on its own
@@ -136,6 +171,26 @@ Scénarios E3 et E5 du rapport.
 - ✅ championship: qualifying grid, points for the first six, standings, season end
 - ✅ game modes: arcade progression and score, championship round, training
 - ✅ HUD number formatting is exact and allocation-free
+
+## 1 bis. Tests existants modifiés par le lot « saut récupérable, roues, rétroviseurs »
+
+Quatre des 76 tests précédents ont été touchés. Aucune assertion sur un comportement validé
+n'a été retirée ; les autres tests sont inchangés.
+
+| Test | Modification | Raison |
+|---|---|---|
+| `accidents.test.mjs` — *launch conditions are explicit…* | Le test disait « pas de vol » pour tout cas en dessous des seuils de l'accident. Il énonce maintenant les trois niveaux (rien, saut, accident). Un de ses cas — roue sur roue à 170 km/h sur une voiture à 100 — donne désormais un saut ; un cas a été ajouté (trop lent même pour un saut). Les deux cas de l'accident et leurs seuils sont inchangés | Le niveau intermédiaire demandé occupe par définition une partie de ce qui était « sans décollage » |
+| `animation.test.mjs` — *front wheels: rolling marks…* | L'égalité `WHEEL_VARIANTS = TREAD_PHASES + STREAK_PHASES` devient `… + FAST_PHASES` | Une troisième famille de dessins du pneu a été ajoutée |
+| `animation.test.mjs` — *front wheels at speed: the streaks cycle forward…* | La phase est lue quelle que soit la famille de dessins (près de la vitesse maximale, le dessin affiché est de la nouvelle famille, qui suit le même cycle) ; 250 et 330 km/h ajoutés aux vitesses vérifiées | Même raison ; les exigences (sens, cadence, indépendance de la cadence d'affichage) sont les mêmes et couvrent plus de vitesses |
+| `animation.test.mjs` — *mirrors: the cockpit shows the mirrors…* | Assertions ajoutées : le boîtier ne touche pas le bord du cockpit, le bras part de ce bord | Vérifier l'absence de superposition après le rapprochement |
+
+Deux tests **ajoutés par ce lot** ont ensuite été retouchés après la seconde revue
+indépendante (ce ne sont pas des tests de la PR précédente) :
+
+| Test | Modification | Raison |
+|---|---|---|
+| `hop.test.mjs` — *recoverable hop: wheels interlocked…* | L'écart de 48 km/h à l'atterrissage est vérifié par rapport à la vitesse de la voiture de devant **au moment du choc** (et l'écart à l'atterrissage doit être au moins aussi grand) | La perte de vitesse a été déplacée de l'atterrissage au choc (défaut A-1) : la voiture de devant peut avoir accéléré pendant le vol |
+| `animation.test.mjs` — *front wheels near top speed: a third drawing…* | Le dessin est complet à 311 km/h et non plus à 300 ; part attendue à 300 km/h entre 85 et 97 % | La transition a été étirée jusqu'à la plus basse des vitesses maximales (défaut B-1 : plus rien ne changeait entre 300 km/h et la vitesse maximale) |
 
 ## 2. Tests navigateur — `tests/rendering/smoke.browser.mjs` — 13 / 13 réussis
 
@@ -192,25 +247,52 @@ d'écrêtage et de NaN, centroïde spectral croissant avec le régime, différen
 ouvert/fermé, creux de passage de rapport, effet Doppler et panoramique d'un concurrent,
 chaque événement audible isolément, silence en pause et hors course.
 
-## 5 bis. Scénarios de collision dans le vrai jeu — `work/scripts/collision-sequences.mjs`
+## 5 bis. Collisions dans le vrai jeu
 
-Les scénarios E2, E3 (cockpit et vue arrière), E4 et E5 sont joués dans `index.html`, deux pas
-de simulation par image, et enregistrés à 60 images par seconde avec la télémétrie de chaque
-image (`work/renders/collisions/`). Ce n'est pas un test à assertions : les événements
-attendus sont relevés dans le journal, les images sont à regarder. Les valeurs chiffrées sont
-comparées au rapport par `work/scripts/collision-comparison.mjs` (tableau dans
-`collisions.md`).
+**Banc d'essai** — `node work/scripts/lab-check.mjs` — 19 / 19 réussis. Le jeu est ouvert avec
+l'option `#lab=hop`, la boucle tourne en temps réel et le clavier simulé passe par le vrai
+chemin d'entrée : le saut est produit par les règles, la voiture est rendue au joueur (volant
+et accélérateur vérifiés), l'accident E3 est rejoué, chaque touche (1 à 5, Entrée) est essayée ;
+puis, sans l'option, ni les menus ni une course normale ne donnent accès au banc
+(`collision-test-bench.md`).
 
-Non-régression de la conduite : `work/scripts/driving-report.mjs` donne des valeurs
-identiques avant et après ce travail (`work/benchmarks/driving-report-before.json`).
+**Séquences** — `work/scripts/collision-sequences.mjs`. Les cas E2, saut récupérable (cockpit et
+vue arrière), E3 (cockpit et vue arrière), E4 et E5 sont joués dans `index.html` par ce même
+banc, deux pas de simulation par image, et enregistrés à 60 images par seconde avec la
+télémétrie de chaque image (`work/renders/collisions/`). Ce n'est pas un test à assertions : les
+événements attendus sont relevés dans le journal, les images sont à regarder.
 
-Roues avant : `work/scripts/compare-wheels-video.mjs` enregistre l'état précédent et l'état
-actuel côte à côte, `work/scripts/wheel-motion-check.py` y mesure la cadence des changements
-de dessin et le sens du mouvement (`wheels-and-mirrors.md`).
+**Non-régression des contacts validés** : la télémétrie des séquences E2, E3, E3x, E4 et E5
+(vitesse, état, position latérale, tangage de la vue, événements, image par image) est
+**identique** à celle de la PR précédente. Les valeurs chiffrées E1–E5 de
+`work/scripts/collision-comparison.mjs` sont identiques elles aussi ; ce script donne en plus
+les chiffres du saut (`collisions.md` § 2 bis).
 
-Revue indépendante : un critique a jugé les séquences sans voir ni ce document ni le code
-(`work/reviews/collision-review.md`, 0 grave / 7 moyens / 13 mineurs) ; les suites données
-sont dans `collisions.md` § 9. Les corrections qui ont suivi n'ont pas été revues à leur tour.
+**Non-régression de la conduite** : `work/scripts/driving-report.mjs` donne des valeurs
+identiques à la référence (`work/benchmarks/driving-report-before.json`), 165 sur 165.
+
+**Roues avant** : `work/scripts/compare-wheels-video.mjs` enregistre l'état précédent et l'état
+actuel côte à côte à 60 images par seconde, et l'état actuel seul à 30 et 144 ;
+`work/scripts/wheel-motion-check.py` y mesure la cadence des changements de dessin, les plus
+longues suites d'images identiques et le sens du mouvement (`wheels-and-mirrors.md`).
+
+**Rétroviseurs** : `work/scripts/compare-mirror-variants.mjs` capture trois positions dans la
+même scène et mesure la symétrie des deux côtés sur l'image.
+
+**Ce qui déclenche un saut** : `node work/scripts/hop-trigger-table.mjs` (simulation seule)
+donne l'issue du même contact par l'arrière pour neuf décalages latéraux et trois énergies
+(`work/benchmarks/hop-trigger-table.json`, tableau dans `collisions.md` § 2 bis).
+
+**Courses complètes de l'ordinateur** : `node work/scripts/race-contact-table.mjs` rejoue six
+courses de 16 voitures avec l'ancien et le nouveau modèle de contact : temps du vainqueur et
+meilleur tour identiques à la PR précédente dans les six ; 16 sauts au total
+(`collisions.md` § 5).
+
+**Revues indépendantes** : `work/reviews/collision-review.md` (PR précédente : 0 grave,
+7 moyens, 13 mineurs ; suites dans `collisions.md` § 9) ; `work/reviews/second-test-review.md`
+(ce lot : 0 grave, 3 moyens, 13 mineurs ; suites dans `collisions.md` § 10) ;
+`work/reviews/second-test-recheck.md` (contre-vérification des corrections du saut et de la
+planche des rétroviseurs : 4 confirmées, 2 partielles, 0 grave, 0 moyen ; `collisions.md` § 11).
 
 ## 6. Ce que les tests ont trouvé
 
@@ -239,6 +321,12 @@ sont dans `collisions.md` § 9. Les corrections qui ont suivi n'ont pas été re
   qui la traversait (la vidéo de référence la laisse derrière) ; après un tamponnage le
   contact restait collé une seconde puis une pénalité tombait sans nouveau choc ; une
   glissade se terminait par une remise en piste en coupe franche : corrigés, tests ajoutés.
+- Saut récupérable : dans la séquence enregistrée, l'atterrissage était suivi d'un tamponnage
+  parasite. La voiture qui retombait n'était remise à sa vitesse d'atterrissage qu'à son tour
+  dans la liste des voitures, après l'examen de sa paire avec une voiture d'indice plus petit :
+  corrigé (les atterrissages sont réglés avant toute recherche de contact), test ajouté. Les
+  tests écrits d'abord ne le voyaient pas : la voiture qui sautait y avait toujours le plus
+  petit indice.
 - Roues avant : au-delà de 61 km/h le pneu était un dessin fixe (0 % de pixels changeant
   d'une image à l'autre à 120 km/h) : corrigé, mesure dans `wheels-and-mirrors.md`.
 

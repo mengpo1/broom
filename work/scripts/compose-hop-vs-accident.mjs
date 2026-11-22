@@ -11,7 +11,7 @@ const label = (text) => `drawtext=fontfile=${font}:text='${text}':x=(w-text_w)/2
 // the views from behind are shorter: their last image is held
 const hold = `tpad=stop_mode=clone:stop_duration=${seconds}`;
 const graph = [
-  `[0:v]trim=duration=${seconds},setpts=PTS-STARTPTS,${label('SAUT RECUPERABLE - la course continue')}[a]`,
+  `[0:v]trim=duration=${seconds},setpts=PTS-STARTPTS,${label('SAUT RÉCUPÉRABLE - la course continue')}[a]`,
   `[1:v]trim=duration=${seconds},setpts=PTS-STARTPTS,${label('ACCIDENT VIOLENT (E3) - immobilisation')}[b]`,
   `[2:v]${hold},trim=duration=${seconds},setpts=PTS-STARTPTS[c]`,
   `[3:v]${hold},trim=duration=${seconds},setpts=PTS-STARTPTS[d]`,

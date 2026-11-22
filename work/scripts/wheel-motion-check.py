@@ -4,6 +4,8 @@
 
 For each segment and each half (before above, after below, or a single one):
   - how often the drawing of the tread changes (changes per second, longest run without change);
+  - how much the tread changes from one picture to the next (flicker), and how much of it carries
+    a light stroke at a given instant;
   - in which direction the marks move in the two halves of the tread width: the lines on which
     marks (or rows of dashes) are centred are found in every drawing, and each one is matched
     with the nearest mark of the previous drawing. Upward on screen is the direction in which
@@ -72,6 +74,8 @@ for seg in manifest['segments']:
             else: run += 1; longest = max(longest, run); drawings[-1].append(i + 1)
         res = {'changes_per_second': round(changes * FPS / (len(seq) - 1), 1), 'longest_still_run_images': longest,
                'longest_still_run_seconds': round(longest / FPS, 3)}
+        # flicker: how much the tread changes from one picture to the next, on average over its pixels (grey levels out of 255)
+        res['mean_change_between_images'] = round(float(np.mean([np.abs(a - b).mean() for a, b in zip(seq, seq[1:])])), 2)
         # the light strokes of the tread: each drawing minus the darkest state of every pixel over the segment
         patch = np.stack(seq)
         light = patch - patch.min(axis=0)
@@ -106,5 +110,5 @@ json.dump(report, open(out, 'w'), indent=1)
 for name, entry in report['segments'].items():
     for half, r in entry.items():
         print(f"{name:14s} {half:6s} {r['changes_per_second']:5.1f} changes/s, longest still run {r['longest_still_run_images']:2d} images ({r['longest_still_run_seconds']:.2f} s), "
-              f"light strokes on {r['light_stroke_share'] * 100:4.1f} % of the tread, clear steps up/down: outer half {r['outer']['steps_up']}/{r['outer']['steps_down']}, inner half {r['inner']['steps_up']}/{r['inner']['steps_down']} -> {r['direction']}")
+              f"flicker {r['mean_change_between_images']:.2f}, light strokes on {r['light_stroke_share'] * 100:4.1f} % of the tread, clear steps up/down: outer half {r['outer']['steps_up']}/{r['outer']['steps_down']}, inner half {r['inner']['steps_up']}/{r['inner']['steps_down']} -> {r['direction']}")
 print('->', os.path.relpath(out, root))

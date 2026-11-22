@@ -21,19 +21,25 @@ def load(variant, cam):
     return Image.open(os.path.join(F, f"mirror-{variant['id']}-{cam}.png")).convert('RGB')
 
 cell_w, cell_h, band = 640, 360, 54
+LABELS = {'A': 'position précédente', 'B': 'légèrement rapprochés (proposition retenue)', 'C': 'un peu plus rapprochés'}
 front_box = (360, 150, 1000, 510)            # the car seen from the front, enlarged
-chase_box = (300, 428, 820, 720)             # the car seen from three quarters behind
+chase_box = (480, 455, 800, 635)             # the car seen from three quarters behind, enlarged twice on the cockpit and its mirror
+GUIDE_X = 652                                # outer edge of the mirror glass in variant A, in that view (source pixels)
 sheet = Image.new('RGB', (3 * cell_w, band + 3 * cell_h + 2 * 24), (244, 239, 226))
 d = ImageDraw.Draw(sheet)
 for c, v in enumerate(report['variants']):
     x = c * cell_w
-    d.text((x + 10, 6), f"{v['id']} - {v['label']}", fill=(22, 22, 31), font=font)
-    d.text((x + 10, 31), f"centre du retroviseur a {v['y'] * 100:.1f} cm de l'axe ({(v['y'] - report['variants'][0]['y']) * 100:+.1f} cm de chaque cote)", fill=(22, 22, 31), font=small)
+    d.text((x + 10, 6), f"{v['id']} - {LABELS.get(v['id'], v['label'])}", fill=(22, 22, 31), font=font)
+    d.text((x + 10, 31), f"centre du rétroviseur à {v['y'] * 100:.1f} cm de l'axe ({(v['y'] - report['variants'][0]['y']) * 100:+.1f} cm de chaque côté)", fill=(22, 22, 31), font=small)
     sheet.paste(load(v, 'COCKPIT').resize((cell_w, cell_h), Image.LANCZOS), (x, band))
     sheet.paste(load(v, 'FRONT').crop(front_box).resize((cell_w, cell_h), Image.LANCZOS), (x, band + cell_h + 24))
     sheet.paste(load(v, 'CHASE').crop(chase_box).resize((cell_w, cell_h), Image.LANCZOS), (x, band + 2 * cell_h + 48))
+    # the same guide line in the three columns: where the outer edge of the mirror is in variant A
+    gx = x + round((GUIDE_X - chase_box[0]) * cell_w / (chase_box[2] - chase_box[0]))
+    gy = band + 2 * cell_h + 48
+    for y0 in range(gy + 60, gy + 250, 12): d.line((gx, y0, gx, y0 + 6), fill=(255, 214, 10), width=2)
     if c: d.line((x, 0, x, sheet.height), fill=(22, 22, 31), width=2)
-for r, name in enumerate(('vue cockpit', 'vue de face (agrandie)', 'vue de trois quarts arriere (agrandie)')):
+for r, name in enumerate(('vue cockpit', 'vue de face (agrandie)', "vue de trois quarts arrière (agrandie deux fois) - pointillé : bord du rétroviseur en A")):
     if r: d.text((10, band + r * (cell_h + 24) - 21), name, fill=(22, 22, 31), font=small)
 sheet.save(os.path.join(out, 'mirror-variants.jpg'), quality=90)
 

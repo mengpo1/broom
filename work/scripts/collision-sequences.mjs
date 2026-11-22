@@ -18,9 +18,9 @@ mkdirSync(`${root}/${outDir}`, { recursive: true });
 const SCENARIOS = {
   E2: { title: 'wheel-to-wheel side contact', lab: 'wheel', seconds: 3.2, camera: 'COCKPIT' },
   HOP: { title: 'recoverable hop: wheel over wheel at a medium closing speed, the race goes on', lab: 'hop', seconds: 8, camera: 'COCKPIT' },
-  HOPx: { title: 'the same hop seen from behind', lab: 'hop', seconds: 5.5, camera: 'CHASE' },
+  HOPx: { title: 'the same hop seen from behind', lab: 'hop', seconds: 8, camera: 'CHASE' },
   E3: { title: 'launch over a car, hard landing, explosion, stop, restart', lab: 'crash', seconds: 9.5, camera: 'COCKPIT' },
-  E3x: { title: 'the same launch seen from behind', lab: 'crash', seconds: 4.2, camera: 'CHASE' },
+  E3x: { title: 'the same launch seen from behind', lab: 'crash', seconds: 8, camera: 'CHASE' },
   E4: { title: 'repeated rear-end bumps', lab: 'bump', seconds: 10, camera: 'COCKPIT' },
   E5: { title: 'launch on a roadside board, light landing, slide', lab: 'board', seconds: 6.5, camera: 'COCKPIT' },
 };

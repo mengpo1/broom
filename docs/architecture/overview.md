@@ -20,11 +20,12 @@ Aucune bibliothèque externe, aucun moteur de jeu, aucun moteur 3D ou physique t
 
 ```
 src/
-  core/           boucle (game-app), maths, aléa, configuration, benchmark
+  core/           boucle (game-app), maths, aléa, configuration, benchmark, banc d'essai des collisions (collision-lab,
+                  outil de développement activé par l'option de lancement #lab=…)
   tracks/         définition des 18 circuits, construction (courbure, relief, stands), trajectoire idéale,
                   thèmes logiques, disposition logique des décors (scenery-layout)
   physics/        dynamique arcade d'une monoplace ; contacts voiture-voiture classés (tamponnage, roue contre roue,
-                  décollage), panneaux solides, vol et accident ; réglages des collisions (collision-tuning)
+                  saut récupérable, accident), panneaux solides, vol et atterrissages ; réglages des collisions (collision-tuning)
   vehicles/       paramètres de la voiture (car-spec), écuries et pilotes fictifs (liveries)
   ai/             pilote ordinateur (mêmes commandes et même physique que le joueur), profil de vitesse
   gameplay/       course (départ, tours, classement, stands), règles, championnat, sessions (modes de jeu)
@@ -106,7 +107,7 @@ l'écran), le lacet de la vue est borné (au-delà de 100° la vue se retourne).
 
 - **Dessins** : fonctions `(ctx, w, h, palette, rnd)` en chemins vectoriels Canvas 2D, exécutées
   au chargement (dessins communs) ou au chargement d'un circuit (décors du thème, panoramas).
-- **Atlas** : `AtlasBuilder` range les dessins dans des couches 2048² (8 couches communes,
+- **Atlas** : `AtlasBuilder` range les dessins dans des couches 2048² (9 couches communes,
   4 par thème) avec marges et débord horizontal pour les bandes répétées ; mipmaps générés.
 - **Monoplace** : `car-model.js` décrit la voiture en volumes (comme un crayonné de
   construction) ; les volumes qui se pénètrent (pontons, capot, prise d'air, épaules du pilote)

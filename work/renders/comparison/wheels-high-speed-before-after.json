@@ -1,0 +1,65 @@
+{
+ "video": "work/renders/comparison/wheels-high-speed-before-after.mp4",
+ "fps": 60,
+ "steady": false,
+ "halves": [
+  "before",
+  "after"
+ ],
+ "halfHeight": 420,
+ "builds": {
+  "before": "work/renders/sequence/index-pr2.html",
+  "after": "index.html"
+ },
+ "segments": [
+  {
+   "label": "40 km/h",
+   "fromKmh": 40,
+   "toKmh": 40,
+   "frames": 96,
+   "first": 0
+  },
+  {
+   "label": "120 km/h",
+   "fromKmh": 120,
+   "toKmh": 120,
+   "frames": 96,
+   "first": 96
+  },
+  {
+   "label": "200 km/h",
+   "fromKmh": 200,
+   "toKmh": 200,
+   "frames": 96,
+   "first": 192
+  },
+  {
+   "label": "250 km/h",
+   "fromKmh": 250,
+   "toKmh": 250,
+   "frames": 96,
+   "first": 288
+  },
+  {
+   "label": "300 km/h",
+   "fromKmh": 300,
+   "toKmh": 300,
+   "frames": 96,
+   "first": 384
+  },
+  {
+   "label": "322 km/h",
+   "fromKmh": 322,
+   "toKmh": 322,
+   "frames": 96,
+   "first": 480
+  },
+  {
+   "label": "0 a 322 km/h",
+   "fromKmh": 0,
+   "toKmh": 322,
+   "frames": 480,
+   "first": 576
+  }
+ ]
+}
