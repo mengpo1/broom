@@ -16,6 +16,7 @@ export const VARIANTS = [
   { id: 'B', label: 'legerement rapproches (proposition retenue)', y: 0.395, arm: [0.4, 0.25, 0.585] },
   { id: 'C', label: 'un peu plus rapproches', y: 0.37, arm: [0.4, 0.25, 0.585] },
 ];
+const REAR_VIEW_YAW = 0.3;                    // rad: the car turned by 17 degrees in front of the camera that follows it
 const MOUNT = /const MIRROR_MOUNT = \{[^}]*\};/;
 const bundle = readFileSync(`${root}/index.html`, 'utf8');
 if (!MOUNT.test(bundle)) throw new Error('MIRROR_MOUNT not found in index.html');
@@ -24,8 +25,8 @@ mkdirSync(`${root}/${outDir}/frames`, { recursive: true });
 mkdirSync(`${root}/work/renders/sequence`, { recursive: true });
 
 const report = { scene: 'kestrel-fields, 150 km/h, one car behind on the right, one ahead on the left', width: W, height: H, currentDefinition: current, variants: [] };
-/** Runs in the page: the same scene for every variant. */
-const stage = (page) => page.evaluate(([W, H]) => {
+/** Runs in the page: the same scene for every variant (the graphics queue is emptied after each picture, never piled up). */
+const stage = (page) => page.evaluate(async ([W, H]) => {
     const { app, quickRace, debug } = window.virage;
     window.virage.input.enabled = false;
     app.setCanvasSize(W, H);
@@ -40,12 +41,16 @@ const stage = (page) => page.evaluate(([W, H]) => {
     debug.placeCar(me, track, s0 + 40, 0.5); me.state = 1; me.ghostTimer = 0; me.speed = 150 / 3.6; me.gear = 4;
     // the same other cars in the same places in every variant: one behind on the right, one ahead on the left, one far behind
     const places = [[-13, 2.6], [22, -2.6], [-34, -2.4]];
-    window.mirrorStep = () => {
+    // `yaw`: the car is DRAWN turned by this angle (rad) without being driven that way, to see it from three quarters
+    window.mirrorStep = (yaw = 0) => {
       for (let t = 0; t < 2; t++) { me.speed = 150 / 3.6; race.setPlayerInput(0, 0, 0.5, 0, 0, false, false); app.simulate(); }
       others.forEach((c, k) => { debug.placeCar(c, track, me.s + places[k][0], me.d + places[k][1]); c.state = 1; c.ghostTimer = 0; c.speed = me.speed; });
+      const heading = me.heading, headingError = me.headingError;
+      me.heading += yaw; me.headingError += yaw;
       app.present(1 / 60, 0);
+      me.heading = heading; me.headingError = headingError;
     };
-    for (let i = 0; i < 30; i++) window.mirrorStep();
+    for (let i = 0; i < 30; i++) { window.mirrorStep(); await app.gpu.device.queue.onSubmittedWorkDone(); }
   }, [W, H]);
 
 /** Capture one variant; returns false when the browser lost its graphics process on the way (seen now and then with the software renderer). */
@@ -55,7 +60,9 @@ async function capture(v, file) {
   try {
     await stage(page);
     for (const cam of ['COCKPIT', 'FRONT', 'CHASE']) {
-      await page.evaluate(async ([cam]) => { const g = window.virage; g.app.views[0].camera = g.CAMERA[cam]; for (let i = 0; i < 12; i++) window.mirrorStep(); await g.app.gpu.device.queue.onSubmittedWorkDone(); }, [cam]);
+      // (seen from straight behind, the rear wheels hide the mirrors: the rear view is taken from three quarters)
+      const yaw = cam === 'CHASE' ? REAR_VIEW_YAW : 0;
+      await page.evaluate(async ([cam, yaw]) => { const g = window.virage; g.app.views[0].camera = g.CAMERA[cam]; for (let i = 0; i < 40; i++) { window.mirrorStep(yaw); await g.app.gpu.device.queue.onSubmittedWorkDone(); } }, [cam, yaw]);
       await page.screenshot({ path: `${root}/${outDir}/frames/mirror-${v.id}-${cam}.png` });
     }
     const errors = logs.filter((l) => l.startsWith('[error]') || l.startsWith('[pageerror]'));

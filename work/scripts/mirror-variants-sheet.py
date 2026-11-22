@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Assembles the comparison of the three mirror positions captured by compare-mirror-variants.mjs:
 one column per variant, the cockpit view above, the front view (enlarged on the car) below, the
-chase view last. Also measures, on the pictures, where the mirrors moved between the first and the
+three-quarter rear view last. Also measures, on the pictures, where the mirrors moved between the first and the
 last variant, to check that the two sides moved by the same amount (symmetry)."""
 import json, os, sys
 import numpy as np
@@ -22,7 +22,7 @@ def load(variant, cam):
 
 cell_w, cell_h, band = 640, 360, 54
 front_box = (360, 150, 1000, 510)            # the car seen from the front, enlarged
-chase_box = (380, 428, 900, 720)             # the car seen from behind
+chase_box = (300, 428, 820, 720)             # the car seen from three quarters behind
 sheet = Image.new('RGB', (3 * cell_w, band + 3 * cell_h + 2 * 24), (244, 239, 226))
 d = ImageDraw.Draw(sheet)
 for c, v in enumerate(report['variants']):
@@ -33,7 +33,7 @@ for c, v in enumerate(report['variants']):
     sheet.paste(load(v, 'FRONT').crop(front_box).resize((cell_w, cell_h), Image.LANCZOS), (x, band + cell_h + 24))
     sheet.paste(load(v, 'CHASE').crop(chase_box).resize((cell_w, cell_h), Image.LANCZOS), (x, band + 2 * cell_h + 48))
     if c: d.line((x, 0, x, sheet.height), fill=(22, 22, 31), width=2)
-for r, name in enumerate(('vue cockpit', 'vue de face (agrandie)', 'vue arriere (agrandie)')):
+for r, name in enumerate(('vue cockpit', 'vue de face (agrandie)', 'vue de trois quarts arriere (agrandie)')):
     if r: d.text((10, band + r * (cell_h + 24) - 21), name, fill=(22, 22, 31), font=small)
 sheet.save(os.path.join(out, 'mirror-variants.jpg'), quality=90)
 

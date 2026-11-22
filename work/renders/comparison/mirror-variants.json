@@ -48,7 +48,7 @@
   ],
   "left_columns": [
    52,
-   303
+   304
   ],
   "right_columns": [
    976,
@@ -58,6 +58,6 @@
    52,
    303
   ],
-  "largest_difference_px": 0
+  "largest_difference_px": 1
  }
 }
