@@ -30,7 +30,9 @@ export async function openGame({ width = 1280, height = 720, hash = '', extraArg
   await ensureDisplay();
   const browser = await chromium.launch({
     headless: false, channel: 'chromium',
-    args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--ignore-gpu-blocklist', `--window-size=${width + 16},${height + 120}`, ...extraArgs],
+    // (no watchdog on the graphics process: with the software renderer, a script that queues many pictures in one go
+    // keeps it busy for longer than the watchdog allows, and the browser then drops the graphics device)
+    args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--ignore-gpu-blocklist', '--disable-gpu-watchdog', `--window-size=${width + 16},${height + 120}`, ...extraArgs],
   });
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   const logs = [], requests = [];
@@ -60,7 +62,7 @@ export async function openStandalone({ entry, width = 1280, height = 720, body, 
   writeFileSync(file, html);
   const browser = await chromium.launch({
     headless: false, channel: 'chromium',
-    args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', `--window-size=${width + 16},${height + 120}`],
+    args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--ignore-gpu-blocklist', '--disable-gpu-watchdog', '--autoplay-policy=no-user-gesture-required', `--window-size=${width + 16},${height + 120}`],
   });
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   const logs = [];

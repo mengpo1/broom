@@ -1,0 +1,63 @@
+{
+ "scene": "kestrel-fields, 150 km/h, one car behind on the right, one ahead on the left",
+ "width": 1280,
+ "height": 720,
+ "currentDefinition": "const MIRROR_MOUNT = { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };",
+ "variants": [
+  {
+   "id": "A",
+   "label": "position precedente",
+   "y": 0.42,
+   "arm": [
+    0.4,
+    0.3,
+    0.6
+   ],
+   "definition": "const MIRROR_MOUNT = { x: 0.4, y: 0.42, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.3, 0.6] };",
+   "isCurrentBuild": false
+  },
+  {
+   "id": "B",
+   "label": "legerement rapproches (proposition retenue)",
+   "y": 0.395,
+   "arm": [
+    0.4,
+    0.25,
+    0.585
+   ],
+   "definition": "const MIRROR_MOUNT = { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };",
+   "isCurrentBuild": true
+  },
+  {
+   "id": "C",
+   "label": "un peu plus rapproches",
+   "y": 0.37,
+   "arm": [
+    0.4,
+    0.25,
+    0.585
+   ],
+   "definition": "const MIRROR_MOUNT = { x: 0.4, y: 0.37, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };",
+   "isCurrentBuild": false
+  }
+ ],
+ "cockpit_symmetry_first_to_last": {
+  "rows": [
+   568,
+   719
+  ],
+  "left_columns": [
+   52,
+   304
+  ],
+  "right_columns": [
+   976,
+   1227
+  ],
+  "right_columns_reflected": [
+   52,
+   303
+  ],
+  "largest_difference_px": 1
+ }
+}

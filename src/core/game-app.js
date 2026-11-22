@@ -183,6 +183,7 @@ export class GameApp {
   simulate() {
     const race = this.race;
     if (this.input) this.input.apply(race, this);
+    if (this.lab) this.lab.beforeStep();          // development test bench (collision-lab.js): absent in normal play
     race.step(SIM_DT);
     for (let i = 0; i < race.eventCount; i++) this.dispatch(race.events[i]);
     race.eventCount = 0;

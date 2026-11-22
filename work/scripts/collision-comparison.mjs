@@ -84,6 +84,37 @@ const out = { date: new Date().toISOString(), note: 'reference values are approx
       viewDivePercent: r1(T.contactDive * 100), launch: series.events.some((x) => x.type === 'launch') },
     comment: 'rule: the follower leaves the contact 48 km/h slower than the car it hit (loss = 48 km/h + closing speed). At full throttle it comes back as fast as it left, hence a larger loss each time.' };
 }
+// ---- recoverable hop: original gameplay, no reference on the footage
+{
+  const hopOf = (options, inputs) => {
+    const { race, a, b } = twoCars(track, { straight: 700, ...options });
+    const log = run(race, 4, inputs);
+    const ev = (type) => log.events.find((x) => x.type === type && x.car === a.index);
+    const launch = ev('launch'), landing = ev('landing');
+    if (!ev('hop') || !landing) return { hop: false, events: [...new Set(log.events.map((x) => x.type))] };
+    const landed = log.frames[landing.frame], after = log.frames.slice(landing.frame);
+    const states = [...new Set(log.frames.map((f) => f.a.state))];
+    return { hop: true, speedBefore: r1(log.atEvent(launch).a.speed * KMH), carAhead: r1(log.atEvent(launch).b.speed * KMH), closingKmh: r1((log.atEvent(launch).a.speed - log.atEvent(launch).b.speed) * KMH),
+      flightSeconds: r2(landing.time - launch.time), peakHeightMetres: r2(Math.max(...log.frames.map((f) => f.a.airHeight))), speedAfterTheShock: r1(log.frames[launch.frame].a.speed * KMH), speedAtLanding: r1(landed.a.speed * KMH),
+      // where the speed is lost: at the shock, then steadily in the air; the last figure is the change in the single step where the wheels touch down
+      lostAtTheShockKmh: r1((log.atEvent(launch).a.speed - log.frames[launch.frame].a.speed) * KMH), lostInTheAirKmh: r1((log.frames[launch.frame].a.speed - landed.a.speed) * KMH),
+      changeInTheLandingStepKmh: r2((log.frames[landing.frame - 1].a.speed - landed.a.speed) * KMH),
+      slowerThanCarAheadWasAtTheShockKmh: r1((log.atEvent(launch).b.speed - landed.a.speed) * KMH), slowerThanCarAheadKmh: r1((landed.b.speed - landed.a.speed) * KMH), slowestAfterLandingKmh: r1(Math.min(...after.map((f) => f.a.speed)) * KMH),
+      speedTwoSecondsLaterKmh: r1((after[240] || after.at(-1)).a.speed * KMH), sidewaysMetres: r2(Math.max(...after.slice(0, 120).map((f) => Math.abs(f.a.d - landed.a.d)))),
+      headingBackWithinDegrees: r2(Math.abs((after[120] || after.at(-1)).a.heading - landed.a.heading) * 57.3),
+      statesSeen: states, explosion: !!ev('crash'), repositioned: !!ev('reset'), carAheadDisturbed: Math.abs(log.frames[launch.frame].b.speed - log.atEvent(launch).b.speed) > 0.5 };
+  };
+  out.HOP = { reference: 'none: the recoverable hop is an original gameplay choice, not shown by the footage',
+    thresholds: { closingKmh: r1(T.hopClosingSpeed * KMH), minSpeedKmh: r1(T.hopMinSpeed * KMH), alignedWithinDegrees: r1(Math.acos(T.hopAlignedCos) * 57.3), lateralOverlapFromBehind: [T.hopOverlapMin, T.launchOverlapMax], lateralOverlapOfTheAccident: [T.launchOverlapMin, T.launchOverlapMax],
+      lengthwiseOverlapSideBySideMax: T.hopSideOverlapMax, accidentFromClosingKmh: r1(T.launchClosingSpeed * KMH), accidentFromSpeedKmh: r1(T.launchMinSpeed * KMH) },
+    game: {
+      fromBehind200onto150: hopOf({ gap: 2, lateral: 0.93, speedA: 200 / KMH, speedB: 150 / KMH }, { throttleA: 1, throttleB: 0.6 }),
+      fromBehind170onto100: hopOf({ gap: 2, lateral: 0.93, speedA: 170 / KMH, speedB: 100 / KMH }, { throttleA: 1, throttleB: 0.5 }),
+      sideBySide200beside150: hopOf({ gap: 1.2, lateral: 2.1, speedA: 200 / KMH, speedB: 150 / KMH, headingA: 0.02 }, { throttleA: 0.8, throttleB: 0.6 }),
+      belowTheClosingSpeed160onto140: hopOf({ gap: 2, lateral: 0.93, speedA: 160 / KMH, speedB: 140 / KMH }, { throttleA: 0.6, throttleB: 0.5 }),
+      aboveIt262onto190isTheAccident: hopOf({ gap: 2.5, lateral: 0.93, speedA: 262 / KMH, speedB: 190 / KMH }, { throttleA: 1, throttleB: 0.7 }),
+    } };
+}
 // ---- E5: board
 {
   const tr = buildTrack(getCircuit('hazelbrook'));

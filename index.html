@@ -720,6 +720,34 @@ const COLLISION_TUNING = {
   hardAfterCar: true,            // DESIGN a launch over a car ends in a hard landing (E3)
   hardAfterObstacle: false,      // DESIGN a launch over an obstacle ends in a light landing (E5)
 
+  // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
+  // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.
+  // Interlocked wheels (the front wheel of the car behind against the rear wheel of the car ahead) lift
+  // the car behind when it arrives fast enough: a short flight, it comes down on its wheels and drives on.
+  // Ladder of the same contact by energy: below hopClosingSpeed nothing changes (bump or wheel contact);
+  // from hopClosingSpeed a hop; from launchClosingSpeed and launchMinSpeed, from behind, the hard accident.
+  hopClosingSpeed: 10,           // m/s (36 km/h): relative speed from which the wheels lift the car
+  hopMinSpeed: 33,               // m/s (119 km/h): the car behind must be at least this fast
+  hopAlignedCos: 0.94,           // angle: the two cars head within about 20 degrees of each other
+  hopSideOverlapMax: 0.5,        // contact point, side by side: the cars overlap by at most this share of their length
+                                 // (front wheel beside rear wheel; fully alongside, wheels only rub: E2)
+  hopOverlapMin: 0,              // lateral overlap, from behind: from the slightest overlap (tyre against tyre at the edge of the
+                                 // cars) up to launchOverlapMax; beyond, nose in the gearbox, the cars bump. (The accident
+                                 // keeps its own, narrower window: launchOverlapMin..launchOverlapMax.)
+  hopFlightTime: 0.45,           // s in the air (the hard accident: 0.85 s)
+  hopPeakHeight: 0.55,           // m at the top of the hop (the hard accident: 1.3 m)
+  hopSeparation: 13.33,          // m/s: it comes down this much slower than the car it rode over was at the shock (as after a bump).
+                                 // The loss is taken where its cause is seen: most of it at the shock (the car is slowed to
+                                 // hopSeparation - airDecel * hopFlightTime below the other car, 25 km/h with these values),
+                                 // the rest steadily during the flight (airDecel, as in any flight); none at the landing.
+  hopLandingSpeedFactor: 1,      // share of its speed the car keeps as its wheels touch down (the hard accident: 0.15)
+  hopSideKick: 1.5,              // m/s sideways, away from the car it touched, when the hop starts side by side
+  hopWobbleTime: 0.7,            // s during which the steering is disturbed after the landing
+  hopWobbleSteer: 0.3,           // peak of the disturbance, share of the steering travel
+  hopWobbleSwings: 1,            // whole swings in that time (one: away from the car it touched, then back): they cancel
+                                 // out, the car ends up heading as before, about half a metre to the side
+  hopRearmTime: 1.5,             // s after such a landing during which the car cannot be thrown in the air again
+
   // ---- landings
   hardLandingSpeedFactor: 0.15,  // MEASURED 228 -> 35 km/h in one step
   hardLandingStopTime: 0.85,     // MEASURED s from the landing to standstill
@@ -748,6 +776,12 @@ const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
 
 // AIRBORNE: thrown in the air by a contact; WRECKED: stopped on the spot after a hard landing.
 const CAR_STATE = { GRID: 0, RACING: 1, SPIN: 2, RESET: 3, SERVICE: 4, RETIRED: 5, AIRBORNE: 6, WRECKED: 7 };
+/**
+ * How a flight ends. LIGHT: the car slides out of control until it stops (launch on an obstacle).
+ * HARD: stopped on the spot, explosion, restart (launch over a car). RECOVERABLE: it comes down on
+ * its wheels and drives on, the steering disturbed for a moment (hop over a wheel).
+ */
+const LANDING = { LIGHT: 0, HARD: 1, RECOVERABLE: 2 };
 
 const located = { index: 0, s: 0, d: 0 };
 
@@ -776,6 +810,7 @@ function createCarState(index) {
     clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
     airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
     landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
+    airKind: 0, airPeak: 0, landKind: 0, launchAlong: 0, hopLanded: false, rearmClock: -10,
   };
 }
 
@@ -825,10 +860,50 @@ function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
   }
   car.state = CAR_STATE.AIRBORNE;
   car.airTime = 0; car.airDuration = duration; car.airHard = hard; car.airHeight = 0;
+  car.airKind = hard ? LANDING.HARD : LANDING.LIGHT;
+  const reach = duration / COLLISION_TUNING.flightTimeCar;
+  car.airPeak = COLLISION_TUNING.airPeakHeight * reach * reach;
   car.launchSide = side; car.launchClock = car.clock; car.launchOther = other;
   car.pitAuto = false; car.vLat = 0; car.yawRate = 0;
   if (emit) emit('launch', car.index, Math.hypot(car.velX, car.velZ), other);
   return true;
+}
+
+/**
+ * Recoverable hop: the car is lifted by the wheel of another one, flies for a short while and comes
+ * down on its wheels (see LANDING.RECOVERABLE). `along` is how far ahead the other car is at the
+ * launch (metres along the motion): the car in flight does not gain ground on it.
+ *
+ * The speed is lost where its cause is seen: at the shock, the car is slowed to a little less than
+ * `otherSpeed` (the speed of the car whose wheel it rides over), by an amount chosen so that the
+ * steady loss of the flight then brings it down `hopSeparation` slower than that car, as after a
+ * bump. Nothing more is taken at the landing. It is never sped up.
+ */
+function startHop(car, emit, other, side, along, otherSpeed) {
+  if (car.state !== CAR_STATE.RACING) return false;
+  const T = COLLISION_TUNING;
+  startAirborne(car, T.hopFlightTime, false, null, other, side);
+  car.airKind = LANDING.RECOVERABLE; car.airPeak = T.hopPeakHeight; car.launchAlong = along;
+  const before = Math.hypot(car.velX, car.velZ);
+  if (emit) { emit('launch', car.index, before, other); emit('hop', car.index, before, other); }
+  if (otherSpeed !== undefined && before > 1e-4) {
+    const gap = Math.max(0, T.hopSeparation - T.airDecel * T.hopFlightTime);
+    const after = Math.min(before, Math.max(T.penaltyFloorSpeed, otherSpeed - gap));
+    car.velX *= after / before; car.velZ *= after / before; car.speed = after;
+  }
+  return true;
+}
+
+/**
+ * Disturbance of the steering after a recoverable landing, added to what the driver asks for (share
+ * of the steering travel): whole swings that grow then fade, so that they cancel out and the car is
+ * left heading where it was. Zero at any other time.
+ */
+function hopSteerKick(car) {
+  if (car.landKind !== LANDING.RECOVERABLE) return 0;
+  const T = COLLISION_TUNING, x = (car.clock - car.landClock) / T.hopWobbleTime;
+  if (x < 0 || x >= 1) return 0;
+  return -(car.launchSide || 1) * T.hopWobbleSteer * Math.sin(Math.PI * x) * Math.sin(Math.PI * 2 * T.hopWobbleSwings * x);   // first away from the side that was hit
 }
 
 /** Loss of control after a light landing: the car slides on, turning slowly, until it stops. */
@@ -848,16 +923,26 @@ function stepAirborne(car, dt, emit) {
   car.velX *= k; car.velZ *= k;
   car.x += car.velX * dt; car.z += car.velZ * dt;
   car.airTime += dt;
-  const u = Math.min(1, car.airTime / car.airDuration), reach = car.airDuration / T.flightTimeCar;
-  car.airHeight = T.airPeakHeight * reach * reach * 4 * u * (1 - u);
+  const u = Math.min(1, car.airTime / car.airDuration);
+  car.airHeight = car.airPeak * 4 * u * (1 - u);
   car.speed = nv; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
   car.throttle = 0; car.brake = 0; car.steer = moveToward(car.steer, 0, 3 * dt);
   car.rpm = damp(car.rpm, spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * 0.35, 5, dt);
   car.accelLong = -T.airDecel; car.accelLat = 0;
   if (car.airTime < car.airDuration) return;
   // ---- landing
-  car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard;
-  if (car.airHard) {
+  car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
+  if (car.airKind === LANDING.RECOVERABLE) {
+    // on its wheels and driving again at once, at the speed it had in the air: what the hop costs was
+    // taken at the shock and during the flight (the car it rode over, if it braked meanwhile, still
+    // sets an upper limit to that speed: see the contacts between cars)
+    car.velX *= T.hopLandingSpeedFactor; car.velZ *= T.hopLandingSpeedFactor;
+    car.speed = nv * T.hopLandingSpeedFactor;
+    if (nv > 1) car.heading = Math.atan2(car.velZ, car.velX);          // it comes down pointing the way it flew
+    car.state = CAR_STATE.RACING;
+    car.hopLanded = true; car.rearmClock = car.clock; car.stuckTimer = 0;
+    if (emit) emit('landing', car.index, LANDING.RECOVERABLE);
+  } else if (car.airHard) {
     car.velX *= T.hardLandingSpeedFactor; car.velZ *= T.hardLandingSpeedFactor;
     car.speed = nv * T.hardLandingSpeedFactor;
     car.state = CAR_STATE.WRECKED;
@@ -970,8 +1055,16 @@ function stepCar(car, track, dt, rules, emit) {
       car.inThrottle = 0; car.inBrake = car.speed > 0.5 ? 0.35 : 1; car.inSteer = 0;
       stepDrive(car, track, dt, rules, emit);
       break;
-    default:
-      stepDrive(car, track, dt, rules, emit);
+    default: {
+      // (after a recoverable landing the steering swings for a moment around what the driver asks for)
+      const kick = hopSteerKick(car);
+      if (kick !== 0) {
+        const asked = car.inSteer;
+        car.inSteer = clamp(asked + kick, -1, 1);
+        stepDrive(car, track, dt, rules, emit);
+        car.inSteer = asked;
+      } else stepDrive(car, track, dt, rules, emit);
+    }
   }
   updateTrackFrame(car, track, dt);
   collideBoundaries(car, track, rules, emit);
@@ -1275,7 +1368,7 @@ function watchStuck(car, dt, emit) {
   if (Math.abs(car.headingError) > 1.75 && car.speed > 4) car.wrongWayTimer += dt; else car.wrongWayTimer = 0;
 }
 
-__modules["src/physics/car-physics.js"] = { CAR_STATE, createCarState, placeCar, startSpin, startAirborne, requestReset, steeringLock, stepCar };
+__modules["src/physics/car-physics.js"] = { CAR_STATE, LANDING, createCarState, placeCar, startSpin, startAirborne, startHop, hopSteerKick, requestReset, steeringLock, stepCar };
 })();
 // ---- src/core/config.js
 (function () {
@@ -2294,7 +2387,7 @@ const MAX_ROWS = 2160;
 const MAX_QUADS = 16000;
 const MAX_TRACK_SAMPLES = 4096;
 const ATLAS_LAYER_SIZE = 2048;
-const ATLAS_LAYERS = 12;
+const ATLAS_LAYERS = 13;
 const CAR_LAYER_WIDTH = 1024;
 const CAR_LAYER_HEIGHT = 512;
 const BACKDROP_WIDTH = 4096;
@@ -2620,9 +2713,13 @@ const CRASH_CAMERA = {
   dipDepthLight: 0.34,       // the second dip of a light landing does not reach the ground-only view
   recoverHard: 0.28, recoverLight: 0.3,
   trembleAmplitude: 0.015, trembleHz: 12,
+  // recoverable hop (DESIGN, not on the footage): the same script much reduced, the horizon never
+  // leaves the picture and the view is level again a third of a second after the landing
+  hopNoseUp: 0.2, hopNoseDown: 0.13, hopGroundHold: 0.05, hopRebound: 0.1, hopDipIn: 0.07, hopDipHold: 0.03, hopDipDepth: 0.045, hopRecover: 0.1,
 };
 
 const AIRBORNE = 6, SPIN = 2;      // CAR_STATE values (physics/car-physics.js)
+const RECOVERABLE = 2;             // LANDING.RECOVERABLE
 
 /**
  * Pitch of the view during and after a flight, as a fraction of the view height
@@ -2632,12 +2729,24 @@ function crashPitch(car) {
   const C = CRASH_CAMERA;
   if (car.state === AIRBORNE) {
     const u = car.airDuration > 0 ? Math.min(1, car.airTime / car.airDuration) : 1;
-    if (u < C.holdFraction) return -C.noseUp * Math.min(1, car.airTime / C.riseTime);
-    return -C.noseUp + (C.noseUp + C.noseDown) * ((u - C.holdFraction) / (1 - C.holdFraction));
+    const up = car.airKind === RECOVERABLE ? C.hopNoseUp : C.noseUp, down = car.airKind === RECOVERABLE ? C.hopNoseDown : C.noseDown;
+    if (u < C.holdFraction) return -up * Math.min(1, car.airTime / C.riseTime);
+    return -up + (up + down) * ((u - C.holdFraction) / (1 - C.holdFraction));
   }
   if (car.landClock < 0) return 0;
   let t = car.clock - car.landClock;
   if (t < 0) return 0;
+  if (car.landKind === RECOVERABLE) {
+    if (t < C.hopGroundHold) return C.hopNoseDown;
+    t -= C.hopGroundHold;
+    if (t < C.hopRebound) return C.hopNoseDown * (1 - t / C.hopRebound);
+    t -= C.hopRebound;
+    if (t < C.hopDipIn) return C.hopDipDepth * (t / C.hopDipIn);
+    t -= C.hopDipIn;
+    if (t < C.hopDipHold) return C.hopDipDepth;
+    t -= C.hopDipHold;
+    return t < C.hopRecover ? C.hopDipDepth * (1 - t / C.hopRecover) : 0;
+  }
   const hard = car.landHard;
   const hold = hard ? C.groundHoldHard : C.groundHoldLight;
   if (t < hold) return C.noseDown;
@@ -2656,9 +2765,10 @@ function crashPitch(car) {
   return 0;
 }
 
-/** Total duration of the pitch animation after a landing (s). */
+/** Total duration of the pitch animation after a landing (s): hard (true), light (false) or a recoverable hop ('hop'). */
 function crashPitchDuration(hard) {
   const C = CRASH_CAMERA;
+  if (hard === 'hop') return C.hopGroundHold + C.hopRebound + C.hopDipIn + C.hopDipHold + C.hopRecover;
   return hard ? C.groundHoldHard + C.reboundHard + C.dipInHard + C.dipHoldHard + C.recoverHard
     : C.groundHoldLight + C.reboundLight + C.dipInLight + C.dipHoldLight + C.recoverLight;
 }
@@ -2669,21 +2779,22 @@ function crashPitchDuration(hard) {
  * roll (radians, positive = right side up: the side that rode over the other car lifts) and
  * squash (1 = none; below 1 the car is flattened for an instant when it hits the ground).
  */
-const FLIGHT_ATTITUDE = { pitchPerView: 0.4, roll: 0.2, squashHard: 0.24, squashLight: 0.12, squashTime: 0.16 };
+const FLIGHT_ATTITUDE = { pitchPerView: 0.4, roll: 0.2, rollHop: 0.11, squashHard: 0.24, squashLight: 0.12, squashHop: 0.08, squashTime: 0.16 };
 function flightAttitude(car, out) {
   const A = FLIGHT_ATTITUDE;
   out.pitch = 0; out.roll = 0; out.squash = 1;
   if (car.state === AIRBORNE) {
     const u = car.airDuration > 0 ? Math.min(1, car.airTime / car.airDuration) : 1;
     out.pitch = -crashPitch(car) * A.pitchPerView;
-    out.roll = (car.launchSide || 0) * A.roll * Math.sin(Math.PI * u);
+    out.roll = (car.launchSide || 0) * (car.airKind === RECOVERABLE ? A.rollHop : A.roll) * Math.sin(Math.PI * u);
     return out;
   }
   const t = car.clock - car.landClock;
   if (car.landClock < 0 || t < 0 || t >= A.squashTime) return out;
   const k = 1 - t / A.squashTime;
-  out.pitch = -CRASH_CAMERA.noseDown * A.pitchPerView * k;          // it lands on its nose, then settles
-  out.squash = 1 - (car.landHard ? A.squashHard : A.squashLight) * k;
+  const hop = car.landKind === RECOVERABLE;
+  out.pitch = -(hop ? CRASH_CAMERA.hopNoseDown : CRASH_CAMERA.noseDown) * A.pitchPerView * k;          // it lands on its nose, then settles
+  out.squash = 1 - (hop ? A.squashHop : car.landHard ? A.squashHard : A.squashLight) * k;
   return out;
 }
 
@@ -2995,11 +3106,11 @@ __modules["src/core/random.js"] = { Random, hashString, hash2, valueNoise2, fbm2
 // Car-to-car contacts: oriented boxes, separating axis test, equal-mass impulse response.
 
 const { clamp } = __modules["src/core/math.js"];
-const { CAR_STATE, startSpin, startAirborne } = __modules["src/physics/car-physics.js"];
+const { CAR_STATE, LANDING, startSpin, startAirborne, startHop } = __modules["src/physics/car-physics.js"];
 const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
 
 /** Events emitted for a contact between two cars: `contact` always (sound, statistics), plus the kind when it has consequences. */
-const CONTACT = { SIMPLE: 'contact', REAR_BUMP: 'bump', WHEEL: 'wheel', LAUNCH: 'launch' };
+const CONTACT = { SIMPLE: 'contact', REAR_BUMP: 'bump', WHEEL: 'wheel', LAUNCH: 'launch', HOP: 'hop' };
 
 const axes = new Float64Array(8);
 
@@ -3031,9 +3142,14 @@ const va = new Float64Array(2), vb = new Float64Array(2);
 function resolveCarContacts(cars, rules, time, emit) {
   let count = 0;
   const n = cars.length;
+  // cars that have just come down from a hop first (whatever their place in the list): they are set
+  // clear of the others and at their landing speed before any contact is looked for
+  for (let i = 0; i < n; i++) if (cars[i].hopLanded) landHop(cars[i], cars);
   for (let i = 0; i < n; i++) {
     const a = cars[i];
-    if (a.state === CAR_STATE.AIRBORNE && a.launchOther >= 0) holdFlightBehind(a, cars);
+    if (a.state === CAR_STATE.AIRBORNE && a.launchOther >= 0) {
+      if (a.airKind === LANDING.RECOVERABLE) keepHopClear(a, cars); else holdFlightBehind(a, cars);
+    }
     if (!collidable(a)) continue;
     for (let j = i + 1; j < n; j++) {
       const b = cars[j];
@@ -3081,11 +3197,20 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
       if (closing > 0.3) {
         const lateral = -dx * sa + dz * ca;                       // sideways offset of b seen from a
         const overlap = clamp((pa.halfWidth + pb.halfWidth - Math.abs(lateral)) / (2 * Math.min(pa.halfWidth, pb.halfWidth)), 0, 1);
+        const wheelOverWheel = overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax;
+        const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
         // wheel over wheel at a high closing speed: the follower rides over the car ahead and takes off
         if (rules.crashes !== false && closing >= T.launchClosingSpeed && follower.speed >= T.launchMinSpeed
-          && overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax) {
-          const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
+          && wheelOverWheel && rearmed(follower)) {
           startAirborne(follower, T.flightTimeCar, T.hardAfterCar, emit, leader.index, side);
+          countContact(follower, leader, time, emit, closing);
+          contactDamage(follower, leader, closing, rules);
+          return true;
+        }
+        // the same contact with less energy, or tyre against tyre at the very edge of the cars (less overlap than the
+        // accident needs): a hop the car recovers from
+        if (overlap > T.hopOverlapMin && overlap <= T.launchOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
+          startHop(follower, emit, leader.index, side, Math.abs(dx * ca + dz * sa), leader.speed);
           countContact(follower, leader, time, emit, closing);
           contactDamage(follower, leader, closing, rules);
           return true;
@@ -3094,6 +3219,24 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
         return true;
       }
     } else {
+      // side by side. When the car behind has only its front wheel beside the rear wheel of the car ahead
+      // and arrives fast enough, that wheel lifts it: a hop. Otherwise the wheels rub (E2).
+      const along = dx * ca + dz * sa;                             // how far b is ahead of a
+      const follower = along > 0 ? a : b, leader = follower === a ? b : a;
+      const closing = follower.speed - leader.speed;
+      const lengthwise = (pa.halfLength + pb.halfLength - Math.abs(along)) / (pa.halfLength + pb.halfLength);
+      if (lengthwise <= T.hopSideOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
+        const lateral = -dx * sa + dz * ca, side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
+        startHop(follower, emit, leader.index, side, Math.abs(along), leader.speed);
+        // thrown clear of the car it touched: it flies parallel to it, drifting away sideways
+        const lh = leader.heading, fx = Math.cos(lh), fz = Math.sin(lh);
+        const forward = follower.velX * fx + follower.velZ * fz;
+        follower.velX = fx * forward + fz * side * T.hopSideKick;
+        follower.velZ = fz * forward - fx * side * T.hopSideKick;
+        countContact(follower, leader, time, emit, closing);
+        contactDamage(follower, leader, closing, rules);
+        return true;
+      }
       sideContact(a, b, nx, nz, rules, time, emit);
       return true;
     }
@@ -3184,6 +3327,79 @@ function rearContact(follower, leader, closing, rules, time, emit) {
   }
   follower.yawRate *= 0.5;
   countContact(follower, leader, time, emit, closing);
+}
+
+/** A car that has just come down from a hop cannot be thrown in the air again at once. */
+function rearmed(car) { return car.clock - car.rearmClock >= COLLISION_TUNING.hopRearmTime; }
+
+/**
+ * Energy of a wheel-over-wheel contact that lifts the car behind without wrecking it: explicit
+ * thresholds on the relative speed, the speed of the car and the angle between the two
+ * (the geometry of the contact is checked by the caller).
+ */
+function hopEnergy(follower, closing, cosAngle, rules) {
+  const T = COLLISION_TUNING;
+  return rules.crashes !== false && closing >= T.hopClosingSpeed && follower.speed >= T.hopMinSpeed
+    && cosAngle >= T.hopAlignedCos && rearmed(follower);
+}
+
+/** Overlap of the boxes of two cars along the axis where it is smallest (0 when they are apart); the push direction goes to `out`. */
+function boxOverlap(a, b, out) {
+  const pa = a.params, pb = b.params, dx = b.x - a.x, dz = b.z - a.z;
+  const ca = Math.cos(a.heading), sa = Math.sin(a.heading), cb = Math.cos(b.heading), sb = Math.sin(b.heading);
+  let min = 1e9;
+  for (let k = 0; k < 4; k++) {
+    const ax = k === 0 ? ca : k === 1 ? -sa : k === 2 ? cb : -sb, az = k === 0 ? sa : k === 1 ? ca : k === 2 ? sb : cb;
+    const ra = pa.halfLength * Math.abs(ax * ca + az * sa) + pa.halfWidth * Math.abs(-ax * sa + az * ca);
+    const rb = pb.halfLength * Math.abs(ax * cb + az * sb) + pb.halfWidth * Math.abs(-ax * sb + az * cb);
+    const dist = dx * ax + dz * az, overlap = ra + rb - Math.abs(dist);
+    if (overlap <= 0) return 0;
+    if (overlap < min) { min = overlap; const sign = dist >= 0 ? 1 : -1; out[0] = ax * sign; out[1] = az * sign; }
+  }
+  return min;
+}
+
+const pushOut = new Float64Array(2);
+
+/**
+ * A car in a recoverable hop stays clear of the others: it does not gain ground on the car that
+ * lifted it, and it is moved out of the way of any car it would come down into. Only the car in
+ * flight is moved; nothing is taken from anyone's speed here.
+ */
+function keepHopClear(car, cars) {
+  const other = cars[car.launchOther];
+  const v = Math.hypot(car.velX, car.velZ);
+  if (other && other !== car && !other.removed && v > 1) {
+    const ux = car.velX / v, uz = car.velZ / v;
+    const along = (other.x - car.x) * ux + (other.z - car.z) * uz;
+    if (along < car.launchAlong) { car.x -= ux * (car.launchAlong - along); car.z -= uz * (car.launchAlong - along); }
+  }
+  for (let i = 0; i < cars.length; i++) {
+    const o = cars[i];
+    if (o === car || o.removed || o.inPit || (o.state !== CAR_STATE.RACING && o.state !== CAR_STATE.SPIN && o.state !== CAR_STATE.RETIRED && o.state !== CAR_STATE.WRECKED)) continue;
+    const dx = o.x - car.x, dz = o.z - car.z;
+    if (dx * dx + dz * dz > 30) continue;
+    const overlap = boxOverlap(car, o, pushOut);
+    if (overlap > 0) { car.x -= pushOut[0] * (overlap + 0.01); car.z -= pushOut[1] * (overlap + 0.01); }
+  }
+}
+
+/**
+ * Landing of a recoverable hop (called once, in the step where the car comes down): it is clear of
+ * every other car, and slower than the car it rode over when that car is still racing, so that the
+ * two separate as they do after a bump. That limit is a safeguard: the speed was already brought
+ * to this value by the shock and the flight (startHop), so it only acts when the car ahead slowed
+ * down while the other was in the air.
+ */
+function landHop(car, cars) {
+  const T = COLLISION_TUNING;
+  car.hopLanded = false;
+  keepHopClear(car, cars);
+  const other = cars[car.launchOther];
+  if (other && other !== car && !other.removed && other.state === CAR_STATE.RACING) {
+    const limit = Math.max(T.penaltyFloorSpeed, other.speed - T.hopSeparation);
+    if (car.speed > limit) car.speed = limit;
+  }
 }
 
 /**
@@ -7652,8 +7868,15 @@ const CAR_DIMENSIONS = {
   eye: [-0.35, 0, 0.95],       // driver's eye, used by the cockpit drawing
 };
 
-/** Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side (the cockpit view is drawn from these). */
-const MIRROR_MOUNT = { x: 0.4, y: 0.42, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.3, 0.6] };
+/**
+ * Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side.
+ * The right one is its reflection. Every view is drawn from this single definition: the car model seen
+ * from outside, and the cockpit drawing, which projects it from the driver's eye.
+ * (y: 2.5 cm closer to the centre line than at first, and the foot of the arm brought onto the rim of the
+ * cockpit, which it used to miss by a few centimetres: a proposal after a player found the mirrors slightly
+ * too far apart; see work/renders/comparison/mirror-variants.jpg.)
+ */
+const MIRROR_MOUNT = { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };
 
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
 
@@ -8244,7 +8467,7 @@ function buildCarModel(options = {}) {
 
 /** Build a wheel at its place on the car, steered by `steerAngle` about the vertical axis. */
 function placeWheel(name, x, y, tyre, steerAngle, tread = null, spin = false) {
-  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin, tread && tread.phase ? tread.phase : 0, !!(tread && tread.blur));
+  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin, tread && tread.phase ? tread.phase : 0, !!(tread && (tread.blur || tread.fast)));
   if (tread) addTreadMarks(t, tyre, tread);
   t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
   const c = Math.cos(steerAngle), s = Math.sin(steerAngle);
@@ -8270,11 +8493,16 @@ const TREAD_PHASES = 3;
 const STREAK_PHASES = 3;
 /** Groups of streaks around a tyre: close enough for two of them to be in sight on the tread, so that a phase is a short step. */
 const STREAK_BANDS = 12;
+/** Drawn phases of the tyre turning very fast (near top speed): trails and rings, see addTreadMarks. */
+const FAST_PHASES = 3;
+/** Lateral positions (m from the middle of the tread) of the rings drawn right round a tyre turning very fast. */
+const FAST_RINGS = [-0.071, 0.013, 0.069];
 
 /**
  * Pen marks on the tread that make the rolling of a slick tyre visible.
- * tread: { phase: 0..TREAD_PHASES-1 } for distinct marks, or { blur: true } for the streaks drawn
- * at speed. Rolling forward moves the marks from the rear of the tyre over the top.
+ * tread: { phase: 0..TREAD_PHASES-1 } for distinct marks, { blur: true, phase } for the rows of
+ * dashes drawn at speed, { fast: true, phase } for the tyre turning very fast, near top speed.
+ * Rolling forward moves the marks from the rear of the tyre over the top.
  */
 function addTreadMarks(part, tyre, tread) {
   const r = tyre.radius * 1.004;
@@ -8287,6 +8515,29 @@ function addTreadMarks(part, tyre, tread) {
     part.lines.push({ pts, normal: [Math.cos(mid), 0, Math.sin(mid)], weight, hex });
   };
   const period = (Math.PI * 2) / TREAD_MARKS;
+  if (tread.fast) {
+    // a tyre turning very fast: the marks can no longer be told apart. Each one has become a trail drawn
+    // round the tyre, strongest at its head and fading behind it (a mark moves toward smaller angles, so its
+    // trail lies at larger ones), and the trails nearly join into circular lines. Only every other lane keeps
+    // a head in a given row, so that no row of marks stands out. A few rings are drawn right round: they have
+    // no end, hence nothing that could seem to stand still or turn backwards. The rows are those of the
+    // drawing "at speed" (same spacing, same phases): one fades into the other without a jump.
+    const spacing = (Math.PI * 2) / STREAK_BANDS, shift = ((tread.phase || 0) / FAST_PHASES) * spacing;
+    const lengths = [0.3, 0.38, 0.27, 0.36, 0.4, 0.29, 0.34], offsets = [0, 0.03, -0.02, 0.04, -0.03, 0.02, -0.04];
+    const light = ['#6f7286', '#575a6c', '#474a5a'], dark = ['#101017', '#17171f', '#1d1d27'];
+    for (const lat of FAST_RINGS) arc(lat, 0, Math.PI * 2, lat === FAST_RINGS[1] ? '#0e0e14' : '#50536a', 1.1);
+    for (let lane = 0; lane < 7; lane++) {
+      const lat = -0.085 + lane * 0.028, half = (lengths[lane] * spacing) / 2, tones = lane % 2 ? light : dark;
+      for (let k = 0; k < STREAK_BANDS; k++) {
+        const centre = (k + offsets[lane]) * spacing - shift, head = (k + lane) % 2 === 0;
+        if (head) arc(lat, centre - half, centre + half, tones[0], 1.7);
+        const from = head ? centre + half : centre - half;
+        arc(lat, from, centre + 0.42 * spacing, tones[1], 1.4);
+        arc(lat, centre + 0.42 * spacing, centre + 0.78 * spacing, tones[2], 1.0);
+      }
+    }
+    return;
+  }
   if (tread.blur) {
     // a tyre turning fast: STREAK_BANDS rows of short dashes around the tyre, one dash per lane, every
     // lane of a row on (nearly) the same angle. A dash that slides along itself looks still: what
@@ -8352,7 +8603,7 @@ function finishPart(p) {
   return { name: p.name, ink: p.ink, bias: p.bias, gloss: p.gloss, outward: p.outward, pos, nor, faces, edges, rods: p.rods, lines: p.lines };
 }
 
-__modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, MIRROR_MOUNT, buildCarModel, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES, STREAK_BANDS, buildFrontWheelModel };
+__modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, MIRROR_MOUNT, buildCarModel, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES, STREAK_BANDS, FAST_PHASES, FAST_RINGS, buildFrontWheelModel };
 })();
 // ---- src/art/vehicles/car-illustrator.js
 (function () {
@@ -11569,7 +11820,7 @@ const CAR_ANGLES = 25;                 // views from 0 (rear) to 180 degrees (fr
 /** Silhouette pen width of the cars in the race, in metres at the car: the same weight as the cockpit's own outlines. */
 const CAR_INK_WORLD = 0.017;
 const CAR_VIEW_PITCH = 0.085;          // elevation of the viewpoint used for the car views
-const STATIC_LAYERS = 8;
+const STATIC_LAYERS = 9;
 const THEME_LAYERS = ATLAS_LAYERS - STATIC_LAYERS;
 
 /** Which team colour goes to which livery zone (body, flanks, wings) for each paint pattern. */
@@ -12065,6 +12316,7 @@ class GameApp {
   simulate() {
     const race = this.race;
     if (this.input) this.input.apply(race, this);
+    if (this.lab) this.lab.beforeStep();          // development test bench (collision-lab.js): absent in normal play
     race.step(SIM_DT);
     for (let i = 0; i < race.eventCount; i++) this.dispatch(race.events[i]);
     race.eventCount = 0;
@@ -12145,7 +12397,7 @@ __modules["src/core/game-app.js"] = { GameApp };
 // of view, relative to the point (screen centre, horizon line).
 
 const { VIEW_CONFIG } = __modules["src/core/config.js"];
-const { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES, STREAK_PHASES, MIRROR_MOUNT } = __modules["src/art/vehicles/car-model.js"];
+const { buildCarModel, buildFrontWheelModel, CAR_DIMENSIONS, TREAD_PHASES, STREAK_PHASES, FAST_PHASES, MIRROR_MOUNT } = __modules["src/art/vehicles/car-model.js"];
 const { drawCar } = __modules["src/art/vehicles/car-illustrator.js"];
 const { LINE, brushStroke, brushCurve, closedCurve } = __modules["src/art/styles/ink.js"];
 const { drawText } = __modules["src/art/styles/lettering.js"];
@@ -12155,7 +12407,7 @@ const COCKPIT_REF_WIDTH = 2560;
 const COCKPIT_REF_FOCAL = (COCKPIT_REF_WIDTH / 2) / Math.tan(VIEW_CONFIG.hfov / 2);
 const STEER_FRAMES = 5;                 // drawn steering angles of a front wheel, from full right to full left
 const MAX_DRAWN_STEER = 0.26;           // radians at the first / last frame
-const WHEEL_VARIANTS = TREAD_PHASES + STREAK_PHASES; // rolling phases, then the phases of the streaked "at speed" drawing
+const WHEEL_VARIANTS = TREAD_PHASES + STREAK_PHASES + FAST_PHASES; // rolling phases, the phases of the rows of dashes "at speed", then those of the tyre turning very fast
 const DIAL = { x: 0, y: 700, r: 92, minAngle: -2.2, maxAngle: 2.2, maxRpm: 14000 };
 const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };   // extra: canvas height added below the wheel for the sleeves
 /**
@@ -12471,7 +12723,7 @@ function defineCockpitArt(art, players) {
   for (let k = 0; k < STEER_FRAMES; k++) {
     const row = [];
     for (let v = 0; v < WHEEL_VARIANTS; v++) {
-      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : { blur: true, phase: v - TREAD_PHASES } });
+      const wm = buildFrontWheelModel({ steer: steerOf(k), tread: v < TREAD_PHASES ? { phase: v } : v < TREAD_PHASES + STREAK_PHASES ? { blur: true, phase: v - TREAD_PHASES } : { fast: true, phase: v - TREAD_PHASES - STREAK_PHASES } });
       row.push(wm);
       if (v === 0) {
         const b = drawCar(null, null, wm, probe, { measure: true });
@@ -12518,7 +12770,7 @@ const { VIEW_CONFIG } = __modules["src/core/config.js"];
 const { clamp, mod } = __modules["src/core/math.js"];
 const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
 const { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING, MIRROR } = __modules["src/art/cockpits/cockpit-art.js"];
-const { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES } = __modules["src/art/vehicles/car-model.js"];
+const { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES, FAST_PHASES } = __modules["src/art/vehicles/car-model.js"];
 const { BASE_CAR_SPEC } = __modules["src/vehicles/car-spec.js"];
 const { QUAD_MODE } = __modules["src/rendering/drawing/quad-batch.js"];
 const { CAR_STATE } = __modules["src/physics/car-physics.js"];
@@ -12561,12 +12813,32 @@ function streakVariant(streakTurn) {
 }
 
 /**
+ * Third regime, near top speed: the tyre turning very fast (trails and rings, see car-model.js).
+ * It shows through the rows of dashes from WHEEL_FAST_START and replaces them at WHEEL_FAST_FULL
+ * (m/s: 180 and 311 km/h). The cars reach 311 to 332 km/h depending on their wings: the transition
+ * ends at the lowest of these top speeds, so that the picture goes on changing up to the maximum
+ * and every car still reaches the complete drawing.
+ */
+const WHEEL_FAST_START = 50, WHEEL_FAST_FULL = 86.4;
+
+/** Share of the "very fast" drawing in the picture of the tyre: 0 below WHEEL_FAST_START, 1 from WHEEL_FAST_FULL. */
+function fastBlend(speed) {
+  return clamp((Math.abs(speed) - WHEEL_FAST_START) / (WHEEL_FAST_FULL - WHEEL_FAST_START), 0, 1);
+}
+
+/** Drawing of the tyre turning very fast for a position in the same cycle as the streaks: the two families are in step. */
+function fastVariant(streakTurn) {
+  return TREAD_PHASES + STREAK_PHASES + (Math.floor(mod(streakTurn, 1) * FAST_PHASES) % FAST_PHASES);
+}
+
+/**
  * The drawing of the front wheel that dominates at a speed. Up to WHEEL_SYNC_SPEED: rolling phase
  * 0..TREAD_PHASES-1. Above: one of the STREAK_PHASES streaked drawings, chosen by `streakTurn`
  * (cycles of the streak pattern accumulated along the distance travelled, see CockpitLayer).
  * Between WHEEL_BLEND_SPEED and WHEEL_SYNC_SPEED the cockpit shows both, cross-faded (streakBlend).
  */
 function wheelVariant(odometer, speed, streakTurn = 0) {
+  if (fastBlend(speed) >= 0.5) return fastVariant(streakTurn);
   return Math.abs(speed) > WHEEL_SYNC_SPEED ? streakVariant(streakTurn) : rollingVariant(odometer);
 }
 
@@ -12744,13 +13016,14 @@ class CockpitLayer {
     const vi = view.index, travelled = car.odometer - this.lastOdometer[vi];
     if (Number.isFinite(travelled) && Math.abs(travelled) < 30) this.streakTurn[vi] = advanceStreak(this.streakTurn[vi], travelled, car.speed);
     this.lastOdometer[vi] = car.odometer;
-    // the marks, then the streaks over them as the speed rises (one drawing fades into the other)
-    const blend = streakBlend(car.speed), jolt = view.shakeAmp * 0.5 * k;
+    // the marks, then the rows of dashes over them as the speed rises, then the tyre turning very fast
+    // near top speed: each drawing fades into the next
+    const blend = streakBlend(car.speed), fast = fastBlend(car.speed), jolt = view.shakeAmp * 0.5 * k;
     const joltL = Math.sin(view.time * 61) * jolt, joltR = -Math.sin(view.time * 53) * jolt;
-    for (let pass = 0; pass < 2; pass++) {
-      const alpha = pass === 0 ? 1 : blend;
-      if (pass === 0 ? blend >= 1 : blend <= 0) continue;
-      const variant = pass === 0 ? rollingVariant(car.odometer) : streakVariant(this.streakTurn[vi]);
+    for (let pass = 0; pass < 3; pass++) {
+      const alpha = pass === 0 ? 1 : pass === 1 ? blend : fast;
+      if (pass === 0 ? blend >= 1 : pass === 1 ? blend <= 0 || fast >= 1 : fast <= 0) continue;
+      const variant = pass === 0 ? rollingVariant(car.odometer) : pass === 1 ? streakVariant(this.streakTurn[vi]) : fastVariant(this.streakTurn[vi]);
       const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
       quads.sprite(left, ox + left.ox * k, oy + left.oy * k + joltL, left.w * k, left.h * k, am[0], am[1], am[2], alpha, 0, false);
       quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k + joltR, right.w * k, right.h * k, am[0], am[1], am[2], alpha, 0, true);
@@ -12792,7 +13065,7 @@ class CockpitLayer {
   }
 }
 
-__modules["src/rendering/compositing/cockpit-layer.js"] = { WHEEL_SYNC_SPEED, WHEEL_BLEND_SPEED, streakCyclesPerMetre, streakBlend, rollingVariant, streakVariant, wheelVariant, advanceStreak, steerFrame, cockpitPlacement, CockpitLayer };
+__modules["src/rendering/compositing/cockpit-layer.js"] = { WHEEL_SYNC_SPEED, WHEEL_BLEND_SPEED, streakCyclesPerMetre, streakBlend, rollingVariant, streakVariant, WHEEL_FAST_START, fastBlend, fastVariant, wheelVariant, advanceStreak, steerFrame, cockpitPlacement, CockpitLayer };
 })();
 // ---- src/ui/text-painter.js
 (function () {
@@ -13008,6 +13281,11 @@ const FR = {
   'key.ShiftRight': 'MAJ DROITE', 'key.ShiftLeft': 'MAJ GAUCHE', 'key.ControlRight': 'CTRL DROITE', 'key.ControlLeft': 'CTRL GAUCHE',
   'key.AltRight': 'ALT DROITE', 'key.AltLeft': 'ALT GAUCHE', 'key.Backspace': 'RETOUR ARRIÈRE', 'key.Space': 'ESPACE', 'key.Escape': 'ÉCHAP',
   'key.Enter': 'ENTRÉE', 'key.Tab': 'TAB',
+  // banc d'essai des collisions (outil de développement, option de lancement #lab=...)
+  'lab.title': 'BANC D\'ESSAI (DÉVELOPPEMENT)', 'lab.auto': 'pilote automatique jusqu\'au contact', 'lab.yours': 'À VOUS DE CONDUIRE', 'lab.stopped': 'arrêté',
+  'lab.case.wheel': '1 · roue contre roue, sans décollage', 'lab.case.hop': '2 · saut récupérable', 'lab.case.crash': '3 · accident violent (E3)',
+  'lab.case.board': '4 · panneau de bord de piste (E5)', 'lab.case.bump': '5 · tamponnages',
+  'lab.keys': 'Touches 1 à 5 : choisir un cas · Entrée : rejouer · C : changer de caméra',
 };
 
 __modules["src/localization/fr.js"] = { FR };
@@ -13091,6 +13369,11 @@ const EN = {
   'key.ShiftRight': 'RIGHT SHIFT', 'key.ShiftLeft': 'LEFT SHIFT', 'key.ControlRight': 'RIGHT CTRL', 'key.ControlLeft': 'LEFT CTRL',
   'key.AltRight': 'RIGHT ALT', 'key.AltLeft': 'LEFT ALT', 'key.Backspace': 'BACKSPACE', 'key.Space': 'SPACE', 'key.Escape': 'ESC',
   'key.Enter': 'ENTER', 'key.Tab': 'TAB',
+  // collision test bench (development tool, launch option #lab=...)
+  'lab.title': 'TEST BENCH (DEVELOPMENT)', 'lab.auto': 'autopilot until the contact', 'lab.yours': 'YOUR TURN TO DRIVE', 'lab.stopped': 'stopped',
+  'lab.case.wheel': '1 · wheel to wheel, no flight', 'lab.case.hop': '2 · recoverable hop', 'lab.case.crash': '3 · hard accident (E3)',
+  'lab.case.board': '4 · roadside board (E5)', 'lab.case.bump': '5 · rear-end bumps',
+  'lab.keys': 'Keys 1 to 5: choose a case · Enter: replay · C: change camera',
 };
 
 __modules["src/localization/en.js"] = { EN };
@@ -13428,10 +13711,10 @@ const { COCKPIT_REF_FOCAL } = __modules["src/art/cockpits/cockpit-art.js"];
 const { CAR_DIMENSIONS } = __modules["src/art/vehicles/car-model.js"];
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8, MAX_FLASHES = 6;
-const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR'];
-const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6 };
+const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR', 'HOP !'];
+const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6, HOP: 9 };
 const FLATOUT_WORDS = 3;        // the engine at full cry has several spellings
-const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6', '#ffd42a', '#f58a1f'];
+const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6', '#ffd42a', '#f58a1f', '#f1efe6'];
 /** Phases of an explosion, seconds after the hard landing (MEASURED on the reference footage: 0.48 / 0.44 / 0.2 / 0.12 s, plumes 0.6 s). */
 const BLAST = { grow: 0.48, full: 0.92, dark: 1.12, smokeEnd: 1.24, plumeStart: 1.0, end: 1.6 };
 const FLATOUT_SPEED = 76;       // m/s: the engine at full cry gets its own lettering, now and then
@@ -13599,7 +13882,7 @@ class EffectsLayer {
     const list = this.pops[viewIndex];
     const p = list[this.popCursor[viewIndex]];
     this.popCursor[viewIndex] = (this.popCursor[viewIndex] + 1) % MAX_POPS;
-    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
+    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT && word < WORD.FLATOUT + FLATOUT_WORDS ? 1.5 : word === WORD.HOP ? 0.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
     p.angle = (this.random() - 0.5) * 0.3;
   }
 
@@ -13695,7 +13978,8 @@ class EffectsLayer {
   /** Take-off and landing of a car: jolt and sound word for its driver, dust where it comes down, explosion if it is a hard one. */
   onFlight(event, app) {
     const fx = app.effects, race = app.race, car = race.cars[event.car];
-    const landing = event.type === 'landing', hard = landing && event.value > 0;
+    const landing = event.type === 'landing', hard = landing && event.value === 1;
+    const hop = landing ? event.value === 2 : car.airKind === 2;        // recoverable hop: smaller jolt, its own sound word, no explosion
     if (landing && fx.dust) {
       for (let k = 0; k < (hard ? 8 : 5); k++) this.spawn(0, car.s + (this.random() - 0.5) * 3, car.d + (this.random() - 0.5) * 2.4, 0.3, car.speed * 0.5, (this.random() - 0.5) * 4, 1, 0.8 + this.random() * 0.5, 1.2, 2.2, car.surface === SURFACE.ASPHALT ? this.smoke : this.dust, 1);
     }
@@ -13712,9 +13996,15 @@ class EffectsLayer {
     for (let v = 0; v < app.viewCount; v++) {
       const view = app.views[v];
       if (view.carIndex !== event.car) continue;
-      view.addImpact(landing ? (hard ? 1 : 0.7) : 0.8);
+      view.addImpact(hop ? (landing ? 0.45 : 0.5) : landing ? (hard ? 1 : 0.7) : 0.8);
       // (one sound word at a time: a board that throws the car has already had its own)
-      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, 0.9, false); }
+      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) {
+        this.popClock[v] = 0;
+        // (the word of a hop stays out of the way: on the side away from the car touched, higher, and gone when the wheels
+        // touch down, the moment the driver must see that car again)
+        if (hop) this.pop(v, WORD.HOP, 0.5 - car.launchSide * 0.2, 0.3, 0.75, false);
+        else this.pop(v, WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, 0.9, false);
+      }
     }
   }
 
@@ -16186,7 +16476,7 @@ class GameAudio {
           if (this.locate(event.other, app) > gain) gain = hear.gain;
           else { hear.gain = gain; hear.pan = pan; hear.slot = slot; }
         }
-        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, type === 'landing' ? 14 : Math.min(20, Math.abs(value)), type !== 'contact', time);
+        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, type === 'landing' ? (value === 2 ? 8 : 14) : Math.min(20, Math.abs(value)), type !== 'contact', time);   // (landing 2: a recoverable hop, softer)
         break;
       }
       case 'crash':
@@ -17579,12 +17869,204 @@ function measureRefreshRate() {
 
 __modules["src/core/benchmark.js"] = { BENCHMARK_SCENARIOS, runBenchmark, describeEnvironment, measureRefreshRate };
 })();
+// ---- src/core/collision-lab.js
+(function () {
+// Collision test bench — a DEVELOPMENT tool, never reachable from the menus of the game.
+// It is switched on by a launch option only (index.html#lab=hop, see main.js) and replays, on
+// demand, the situations that are rare in a normal race: a wheel contact, a recoverable hop, the
+// hard accident (E3), the launch on a roadside board (E5), repeated bumps (E4).
+//
+// Nothing here is a canned animation: the bench only PLACES two real cars and DRIVES them with
+// ordinary controls (steering, throttle) until they meet. The contact, the flight, the landing and
+// their staging are produced by the rules of the game, exactly as in a race. After the event the
+// car is handed back to the player. The recording script (work/scripts/collision-sequences.mjs)
+// uses this same module, so the videos show what the bench lets a person try.
+
+const { SIM_DT } = __modules["src/gameplay/race.js"];
+const { CAR_STATE, placeCar } = __modules["src/physics/car-physics.js"];
+
+/**
+ * Scenarios. Speeds in km/h, distances in metres. `me`: the player's car (back: gap behind the car
+ * ahead, side: lateral offset from it); `other`: the car ahead, scripted at a constant speed.
+ * `release`: the event after which the car is handed back to the player. When the bench keeps driving
+ * after the event (recordings), it first holds its line for `afterHold` seconds (hands steady: what
+ * the steering does then is the disturbance of the landing, which belongs to the game), then moves
+ * smoothly, in `afterMove` seconds, to the lateral offset `afterSide` to go past the car ahead.
+ */
+const LAB_SCENARIOS = {
+  wheel: { key: 'Digit1', circuit: 'kestrel-fields', me: { speed: 146, back: 7, side: -3.2 }, other: { speed: 118 }, steerTo: -1.7, steerFrom: 0.45, hold: 146, release: 'wheel' },
+  // (the same staging as the accident below, with less speed; `back` makes the contact happen at the same instant, for comparison)
+  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 200, back: 23, side: -0.93 }, other: { speed: 150 }, steerTo: -0.93, steerFrom: 0, hold: 200, afterHold: 0.8, afterMove: 1.2, afterSide: -2.9, release: 'landing' },
+  crash: { key: 'Digit3', circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, release: 'landing' },
+  board: { key: 'Digit4', circuit: 'hazelbrook', board: true, me: { speed: 245, back: 70 }, release: 'landing' },
+  // a first contact at about 40 km/h of closing speed, then the follower comes back gently on the car ahead (5 km/h faster)
+  bump: { key: 'Digit5', circuit: 'kestrel-fields', me: { speed: 146, back: 12, side: 0 }, other: { speed: 105 }, steerTo: 0, steerFrom: 0, hold: 146, afterBump: 5, release: 'bump' },
+};
+/** Other names accepted by the launch option (the names of the events in the analysis report, and French). */
+const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump' };
+const WATCHED = ['bump', 'wheel', 'launch', 'hop', 'landing', 'obstacle', 'crash', 'restart', 'reset', 'contact'];
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+/** Scripted driver after a recoverable landing: lateral error (m) to heading asked for (rad), times the speed (m/s). */
+const LAB_AFTER_GAIN = 1.5;
+
+class CollisionLab {
+  /**
+   * @param app        GameApp
+   * @param quickRace  function(options) that starts a race (main.js)
+   */
+  constructor(app, quickRace) {
+    this.app = app; this.quickRace = quickRace;
+    this.name = null; this.scenario = null; this.race = null;
+    this.me = null; this.lead = null; this.board = null;
+    this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
+    this.handOver = true;                      // false: the bench keeps driving after the event (recordings)
+    this.events = [];
+    this.onChange = null;                      // called when the scenario starts or the car is handed back
+    app.on((type, e) => {
+      if (!this.race || app.race !== this.race || !WATCHED.includes(type)) return;
+      this.events.push({ type, car: e.car, value: +(+e.value).toFixed(2) });
+      if (e.car !== this.me.index) return;
+      if (type === 'bump') this.bumped = true;
+      if (type === this.scenario.release) this.triggered = true;
+    });
+  }
+
+  static resolve(name) {
+    const key = String(name || '').toLowerCase();
+    return LAB_SCENARIOS[key] ? key : LAB_ALIASES[key] || null;
+  }
+
+  get active() { return !!this.race && this.app.race === this.race; }
+
+  /** Build the situation: a fresh race, the start skipped, the cars placed and launched at their speeds. */
+  start(name, { handOver = true } = {}) {
+    const key = CollisionLab.resolve(name);
+    if (!key) return false;
+    const sc = LAB_SCENARIOS[key], app = this.app;
+    const race = this.quickRace({ circuit: sc.circuit, opponents: 3, gridPosition: 3, autoDrive: false, rules: 'arcade', laps: 4, seed: 4 });
+    // past the start (lights, first seconds), without sounds or messages: the simulation alone
+    let guard = 0;
+    while ((race.phase !== 'racing' || race.time < 4) && guard++ < 6000) { race.step(SIM_DT); race.eventCount = 0; }
+    const track = race.track, me = race.playerCars[0], others = race.cars.filter((c) => !c.isHuman);
+    const kmh = (v) => v / 3.6;
+    const gearFor = (car, v) => { const tops = car.params.spec.gearTopSpeeds; for (let g = 0; g < tops.length; g++) if (v < tops[g] * 0.93) return g + 1; return tops.length; };
+    const put = (car, s, d, speed) => { placeCar(car, track, s, d); car.state = CAR_STATE.RACING; car.ghostTimer = 0; car.speed = kmh(speed); car.gear = gearFor(car, kmh(speed)); };
+    this.name = key; this.scenario = sc; this.race = race; this.me = me; this.lead = null; this.board = null;
+    this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
+    this.handOver = handOver; this.events.length = 0;
+    if (sc.board) {
+      // a braking board at the end of a straight; the car leaves the road toward it. Only this board is
+      // left standing: the reference case is a single obstacle.
+      const o = race.obstacles.find((b) => { const i = Math.floor(b.s / track.ds) % track.n; return Math.abs(track.kappa[(i - 20 + track.n) % track.n]) < 0.001; }) || race.obstacles[0];
+      this.board = o;
+      race.obstacles.forEach((b, i) => { if (b !== o) race.obstacleDown[i] = 1; });
+      put(me, o.s - sc.me.back, Math.sign(o.d) * (track.halfWidth - 1.5), sc.me.speed);
+      others.forEach((c, k) => put(c, o.s + track.length / 2 + k * 40, 0, 150));
+    } else {
+      // longest straight away from the pits
+      const need = Math.ceil(520 / track.ds); let run = 0, s0 = 0;
+      for (let i = 0; i < track.n * 2; i++) {
+        const k = i % track.n, rel = k * track.ds > track.length / 2 ? k * track.ds - track.length : k * track.ds;
+        const pits = rel > track.pit.entryS - 40 && rel < track.pit.exitS + 40;
+        if (Math.abs(track.kappa[k]) < 1 / 2500 && !pits) { run++; if (run >= need) { s0 = ((i - need + 1) % track.n) * track.ds; break; } } else run = 0;
+      }
+      const lead = others[0];
+      put(lead, s0 + 60, 0.6, sc.other.speed);
+      put(me, s0 + 60 - 4.2 - sc.me.back, 0.6 + sc.me.side, sc.me.speed);
+      others.slice(1).forEach((c, k) => put(c, s0 + track.length / 2 + k * 40, 0, 150));
+      // the car ahead is scripted (constant speed, straight): taken away from the computer driver
+      this.lead = lead; lead.isHuman = true; this.leadSpeed = kmh(sc.other.speed); this.leadD = lead.d;
+    }
+    if (this.onChange) this.onChange(this);
+    return true;
+  }
+
+  /**
+   * Called before every simulation step, after the player's controls have been read. Until the car
+   * is handed back, the bench supplies the controls of the player's car; the car ahead stays scripted.
+   */
+  beforeStep() {
+    if (!this.active) return;
+    const sc = this.scenario, me = this.me, race = this.race;
+    if (this.handOver && !this.released && ((this.triggered && me.state === CAR_STATE.RACING) || this.tick > 14 / SIM_DT)) {
+      this.released = true;
+      if (this.onChange) this.onChange(this);
+    }
+    if (!this.released) {
+      let steer = 0, throttle = 1;
+      if (me.state !== CAR_STATE.RACING) this.left = true;               // after the accident: straight on, full throttle
+      else if (this.left && this.backTick < 0) this.backTick = this.tick;  // first step back on its wheels
+      if (me.state === CAR_STATE.RACING) {
+        if (this.board && !this.left) { steer = clamp((this.board.d - me.d) * 0.22 - me.headingError * 2.4, -0.5, 0.5); throttle = 0.6; }
+        else if (this.board) {
+          // after the accident the car is where it stopped, across the verge: it is driven back to the road gently
+          const want = clamp((0 - me.d) * 0.05, -0.5, 0.5);              // heading wanted relative to the track
+          steer = clamp((want - me.headingError) * 2.2, -1, 1);
+          throttle = Math.abs(want - me.headingError) > 0.5 ? 0.22 : 0.6;
+        } else {
+          const lead = this.lead;
+          let side = this.tick < Math.round(sc.steerFrom / SIM_DT) ? sc.me.side : sc.steerTo;
+          if (this.left && sc.afterSide !== undefined) {
+            // back on its wheels: the same line for a moment, then out from behind the car ahead, without a jerk
+            const u = clamp(((this.tick - this.backTick) * SIM_DT - (sc.afterHold || 0)) / (sc.afterMove || 1), 0, 1);
+            side = sc.steerTo + (sc.afterSide - sc.steerTo) * u * u * (3 - 2 * u);
+          }
+          steer = clamp((lead.d + side - me.d) * 0.3 - me.headingError * 2.2, -0.4, 0.4);
+          if (this.left && sc.afterSide !== undefined) {
+            // (a calmer hand for this part: the heading asked for shrinks with the speed, so that the car settles on its line without weaving)
+            const want = clamp((lead.d + side - me.d) * LAB_AFTER_GAIN / Math.max(20, me.speed), -0.08, 0.08);
+            steer = clamp((want - me.headingError) * 6, -0.4, 0.4);
+          }
+          const hold = this.bumped && sc.afterBump ? lead.speed * 3.6 + sc.afterBump : sc.hold;
+          if (hold && !this.left) throttle = clamp(0.5 + (hold / 3.6 - me.speed) * 0.4, 0, 1);
+        }
+      }
+      race.setPlayerInput(0, steer, throttle, 0, 0, false, false);
+    }
+    const lead = this.lead;
+    if (lead && lead.state === CAR_STATE.RACING) {
+      const dv = this.leadSpeed - lead.speed;
+      lead.inThrottle = clamp(0.35 + dv * 0.4, 0, 1); lead.inBrake = dv < -2 ? 0.3 : 0;
+      lead.inSteer = clamp((this.leadD - lead.d) * 0.3 - lead.headingError * 2.2, -0.3, 0.3);
+    }
+    this.tick++;
+  }
+}
+
+/**
+ * Interactive use (index.html#lab=...): a line of help above the picture and a few keys, bound only
+ * while this option is present. 1 to 5 choose a case, Enter replays the current one.
+ */
+function attachLabControls(lab, t) {
+  const panel = document.createElement('div');
+  panel.style.cssText = 'position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:5;padding:5px 12px;border:2px solid #16161f;border-radius:4px;'
+    + 'background:#f4efe2;color:#16161f;font:600 13px/1.35 system-ui,sans-serif;text-align:center;pointer-events:none;max-width:94vw';
+  document.body.appendChild(panel);
+  const refresh = () => {
+    const state = !lab.active ? t('lab.stopped') : lab.released ? t('lab.yours') : t('lab.auto');
+    panel.textContent = `${t('lab.title')} — ${t(`lab.case.${lab.name}`)} — ${state}\n${t('lab.keys')}`;
+    panel.style.whiteSpace = 'pre-line';
+  };
+  lab.onChange = refresh;
+  window.addEventListener('keydown', (event) => {
+    if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+    const chosen = Object.keys(LAB_SCENARIOS).find((name) => LAB_SCENARIOS[name].key === event.code);
+    if (chosen) lab.start(chosen);
+    else if (event.code === 'Enter' || event.code === 'NumpadEnter') lab.start(lab.name);
+  });
+  // the line also follows what happens outside the bench (race left from the pause menu)
+  setInterval(refresh, 500);
+  refresh();
+}
+
+__modules["src/core/collision-lab.js"] = { LAB_SCENARIOS, LAB_ALIASES, CollisionLab, attachLabControls };
+})();
 // ---- src/main.js
 (function () {
 // Entry point: boots the application and exposes a small automation API used by tests,
 // captures and benchmarks (window.virage).
 
-const { placeCar, CAR_STATE } = __modules["src/physics/car-physics.js"];
+const { placeCar, CAR_STATE, hopSteerKick } = __modules["src/physics/car-physics.js"];
 const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
 const { GameApp } = __modules["src/core/game-app.js"];
 const { GpuUnavailableError } = __modules["src/rendering/gpu-context.js"];
@@ -17605,6 +18087,7 @@ const { GameAudio } = __modules["src/audio/game-audio.js"];
 const { GameFlow } = __modules["src/ui/game-flow.js"];
 const { t, setLanguage } = __modules["src/localization/i18n.js"];
 const { runBenchmark, describeEnvironment, measureRefreshRate, BENCHMARK_SCENARIOS } = __modules["src/core/benchmark.js"];
+const { CollisionLab, attachLabControls } = __modules["src/core/collision-lab.js"];
 
 function parseParams() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -17704,9 +18187,20 @@ async function boot() {
     notice.textContent = results.runs.map((r) => `${r.scenario}: ${r.fps.toFixed(1)} fps — interval moy. ${r.frameInterval.mean.toFixed(2)} ms, p99 ${r.frameInterval.p99.toFixed(2)} ms, max ${r.frameInterval.max.toFixed(2)} ms — GPU ${r.gpuPass ? `${r.gpuPass.mean.toFixed(2)} / p99 ${r.gpuPass.p99.toFixed(2)} / max ${r.gpuPass.max.toFixed(2)} ms` : 'n/d'} — CPU ${r.cpuFrame.mean.toFixed(2)} ms — > 16,7 ms : ${r.framesOver16_7ms}/${r.frames}`).join('\n');
     return results;
   };
+  /**
+   * Collision test bench, a development tool (core/collision-lab.js). It exists only when asked for:
+   * by the launch option index.html#lab=wheel|hop|crash|board|bump, which also binds its keys, or by
+   * an automation script. Nothing in the menus or in a normal race creates it.
+   */
+  const createLab = () => { if (!app.lab) app.lab = new CollisionLab(app, quickRace); return app.lab; };
   // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, debug: { placeCar, CAR_STATE, COLLISION_TUNING } };
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
+  if (params.lab) {
+    const lab = createLab();
+    attachLabControls(lab, t);
+    lab.start(CollisionLab.resolve(params.lab) || 'hop');
+  }
   if (!params.manual) app.start();
   if (params.benchmark) benchmark(params.benchmark === 'all' ? Object.keys(BENCHMARK_SCENARIOS) : params.benchmark.split(','), +(params.seconds || 60));
   window.dispatchEvent(new Event('virage-ready'));

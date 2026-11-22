@@ -178,20 +178,29 @@ test('E5 launch on a board: thrown in the air, light landing without loss of spe
   assert.equal(car.gear, 1);
 });
 
-test('launch conditions are explicit: no flight below the speed, the closing speed or outside the overlap window', () => {
+// (Changed with the recoverable hop. This test used to say "no flight" for every case below the
+// thresholds of the accident. One of its cases, wheel over wheel at 170 km/h onto a car doing
+// 100 km/h, now sits in the new intermediate level and gives a hop: the test states the three
+// levels instead. The cases and the thresholds of the accident itself are unchanged.)
+test('launch conditions are explicit: three levels by energy, and no flight outside the overlap window', () => {
   const cases = [
-    { name: 'in line (full overlap)', lateral: 0, speedA: 262, speedB: 190, launch: false },
-    { name: 'too slow', lateral: 0.93, speedA: 170, speedB: 100, launch: false },
-    { name: 'low closing speed', lateral: 0.93, speedA: 262, speedB: 240, launch: false },
-    { name: 'wheel over wheel, fast', lateral: 0.93, speedA: 262, speedB: 190, launch: true },
-    { name: 'wheel over wheel, other side', lateral: -0.93, speedA: 262, speedB: 190, launch: true },
+    { name: 'in line (full overlap)', lateral: 0, speedA: 262, speedB: 190, outcome: 'none' },
+    { name: 'too slow for the accident: a hop', lateral: 0.93, speedA: 170, speedB: 100, outcome: 'hop' },
+    { name: 'low closing speed', lateral: 0.93, speedA: 262, speedB: 240, outcome: 'none' },
+    { name: 'too slow even for a hop', lateral: 0.93, speedA: 95, speedB: 45, outcome: 'none' },
+    { name: 'wheel over wheel, fast', lateral: 0.93, speedA: 262, speedB: 190, outcome: 'accident' },
+    { name: 'wheel over wheel, other side', lateral: -0.93, speedA: 262, speedB: 190, outcome: 'accident' },
   ];
   for (const c of cases) {
-    const { race } = twoCars(track, { gap: 2, lateral: c.lateral, speedA: c.speedA / KMH, speedB: c.speedB / KMH, straight: 700 });
+    const { race, a } = twoCars(track, { gap: 2, lateral: c.lateral, speedA: c.speedA / KMH, speedB: c.speedB / KMH, straight: 700 });
     const log = run(race, 0.7, { throttleA: 1, throttleB: 0.8 });
-    assert.equal(log.events.some((e) => e.type === 'launch'), c.launch, c.name);
+    const launched = log.events.some((e) => e.type === 'launch'), hop = log.events.some((e) => e.type === 'hop');
+    assert.equal(launched, c.outcome !== 'none', c.name);
+    assert.equal(hop, c.outcome === 'hop', `${c.name}: hop`);
+    if (c.outcome === 'accident') assert.equal(a.airKind, 1, `${c.name}: hard landing ahead`);
   }
   assert.ok(T.launchMinSpeed * KMH > 146 && T.launchClosingSpeed > 0, 'thresholds stay above the speeds of the bumps of E4');
+  assert.ok(T.hopClosingSpeed * KMH > 30, 'and the hop needs more closing speed than the wheel contact of E2 (about 25 km/h)');
 });
 
 test('pitch of the view (E3, hard): nose up and held, steady swing, ground held, rebound, second dip, level again', () => {

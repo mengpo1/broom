@@ -80,4 +80,9 @@ export const FR = {
   'key.ShiftRight': 'MAJ DROITE', 'key.ShiftLeft': 'MAJ GAUCHE', 'key.ControlRight': 'CTRL DROITE', 'key.ControlLeft': 'CTRL GAUCHE',
   'key.AltRight': 'ALT DROITE', 'key.AltLeft': 'ALT GAUCHE', 'key.Backspace': 'RETOUR ARRIÈRE', 'key.Space': 'ESPACE', 'key.Escape': 'ÉCHAP',
   'key.Enter': 'ENTRÉE', 'key.Tab': 'TAB',
+  // banc d'essai des collisions (outil de développement, option de lancement #lab=...)
+  'lab.title': 'BANC D\'ESSAI (DÉVELOPPEMENT)', 'lab.auto': 'pilote automatique jusqu\'au contact', 'lab.yours': 'À VOUS DE CONDUIRE', 'lab.stopped': 'arrêté',
+  'lab.case.wheel': '1 · roue contre roue, sans décollage', 'lab.case.hop': '2 · saut récupérable', 'lab.case.crash': '3 · accident violent (E3)',
+  'lab.case.board': '4 · panneau de bord de piste (E5)', 'lab.case.bump': '5 · tamponnages',
+  'lab.keys': 'Touches 1 à 5 : choisir un cas · Entrée : rejouer · C : changer de caméra',
 };

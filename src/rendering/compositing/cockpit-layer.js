@@ -6,7 +6,7 @@ import { VIEW_CONFIG } from '../../core/config.js';
 import { clamp, mod } from '../../core/math.js';
 import { CAMERA } from './race-view.js';
 import { COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, DIAL, STEERING, MIRROR } from '../../art/cockpits/cockpit-art.js';
-import { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES } from '../../art/vehicles/car-model.js';
+import { CAR_DIMENSIONS, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES, FAST_PHASES } from '../../art/vehicles/car-model.js';
 import { BASE_CAR_SPEC } from '../../vehicles/car-spec.js';
 import { QUAD_MODE } from '../drawing/quad-batch.js';
 import { CAR_STATE } from '../../physics/car-physics.js';
@@ -49,12 +49,32 @@ export function streakVariant(streakTurn) {
 }
 
 /**
+ * Third regime, near top speed: the tyre turning very fast (trails and rings, see car-model.js).
+ * It shows through the rows of dashes from WHEEL_FAST_START and replaces them at WHEEL_FAST_FULL
+ * (m/s: 180 and 311 km/h). The cars reach 311 to 332 km/h depending on their wings: the transition
+ * ends at the lowest of these top speeds, so that the picture goes on changing up to the maximum
+ * and every car still reaches the complete drawing.
+ */
+export const WHEEL_FAST_START = 50, WHEEL_FAST_FULL = 86.4;
+
+/** Share of the "very fast" drawing in the picture of the tyre: 0 below WHEEL_FAST_START, 1 from WHEEL_FAST_FULL. */
+export function fastBlend(speed) {
+  return clamp((Math.abs(speed) - WHEEL_FAST_START) / (WHEEL_FAST_FULL - WHEEL_FAST_START), 0, 1);
+}
+
+/** Drawing of the tyre turning very fast for a position in the same cycle as the streaks: the two families are in step. */
+export function fastVariant(streakTurn) {
+  return TREAD_PHASES + STREAK_PHASES + (Math.floor(mod(streakTurn, 1) * FAST_PHASES) % FAST_PHASES);
+}
+
+/**
  * The drawing of the front wheel that dominates at a speed. Up to WHEEL_SYNC_SPEED: rolling phase
  * 0..TREAD_PHASES-1. Above: one of the STREAK_PHASES streaked drawings, chosen by `streakTurn`
  * (cycles of the streak pattern accumulated along the distance travelled, see CockpitLayer).
  * Between WHEEL_BLEND_SPEED and WHEEL_SYNC_SPEED the cockpit shows both, cross-faded (streakBlend).
  */
 export function wheelVariant(odometer, speed, streakTurn = 0) {
+  if (fastBlend(speed) >= 0.5) return fastVariant(streakTurn);
   return Math.abs(speed) > WHEEL_SYNC_SPEED ? streakVariant(streakTurn) : rollingVariant(odometer);
 }
 
@@ -232,13 +252,14 @@ export class CockpitLayer {
     const vi = view.index, travelled = car.odometer - this.lastOdometer[vi];
     if (Number.isFinite(travelled) && Math.abs(travelled) < 30) this.streakTurn[vi] = advanceStreak(this.streakTurn[vi], travelled, car.speed);
     this.lastOdometer[vi] = car.odometer;
-    // the marks, then the streaks over them as the speed rises (one drawing fades into the other)
-    const blend = streakBlend(car.speed), jolt = view.shakeAmp * 0.5 * k;
+    // the marks, then the rows of dashes over them as the speed rises, then the tyre turning very fast
+    // near top speed: each drawing fades into the next
+    const blend = streakBlend(car.speed), fast = fastBlend(car.speed), jolt = view.shakeAmp * 0.5 * k;
     const joltL = Math.sin(view.time * 61) * jolt, joltR = -Math.sin(view.time * 53) * jolt;
-    for (let pass = 0; pass < 2; pass++) {
-      const alpha = pass === 0 ? 1 : blend;
-      if (pass === 0 ? blend >= 1 : blend <= 0) continue;
-      const variant = pass === 0 ? rollingVariant(car.odometer) : streakVariant(this.streakTurn[vi]);
+    for (let pass = 0; pass < 3; pass++) {
+      const alpha = pass === 0 ? 1 : pass === 1 ? blend : fast;
+      if (pass === 0 ? blend >= 1 : pass === 1 ? blend <= 0 || fast >= 1 : fast <= 0) continue;
+      const variant = pass === 0 ? rollingVariant(car.odometer) : pass === 1 ? streakVariant(this.streakTurn[vi]) : fastVariant(this.streakTurn[vi]);
       const left = this.wheels[frame][variant], right = this.wheels[STEER_FRAMES - 1 - frame][variant];
       quads.sprite(left, ox + left.ox * k, oy + left.oy * k + joltL, left.w * k, left.h * k, am[0], am[1], am[2], alpha, 0, false);
       quads.sprite(right, ox - (right.ox + right.w) * k, oy + right.oy * k + joltR, right.w * k, right.h * k, am[0], am[1], am[2], alpha, 0, true);

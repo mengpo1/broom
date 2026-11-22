@@ -1,7 +1,7 @@
 // Entry point: boots the application and exposes a small automation API used by tests,
 // captures and benchmarks (window.virage).
 
-import { placeCar, CAR_STATE } from './physics/car-physics.js';
+import { placeCar, CAR_STATE, hopSteerKick } from './physics/car-physics.js';
 import { COLLISION_TUNING } from './physics/collision-tuning.js';
 import { GameApp } from './core/game-app.js';
 import { GpuUnavailableError } from './rendering/gpu-context.js';
@@ -22,6 +22,7 @@ import { GameAudio } from './audio/game-audio.js';
 import { GameFlow } from './ui/game-flow.js';
 import { t, setLanguage } from './localization/i18n.js';
 import { runBenchmark, describeEnvironment, measureRefreshRate, BENCHMARK_SCENARIOS } from './core/benchmark.js';
+import { CollisionLab, attachLabControls } from './core/collision-lab.js';
 
 function parseParams() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -121,9 +122,20 @@ async function boot() {
     notice.textContent = results.runs.map((r) => `${r.scenario}: ${r.fps.toFixed(1)} fps — interval moy. ${r.frameInterval.mean.toFixed(2)} ms, p99 ${r.frameInterval.p99.toFixed(2)} ms, max ${r.frameInterval.max.toFixed(2)} ms — GPU ${r.gpuPass ? `${r.gpuPass.mean.toFixed(2)} / p99 ${r.gpuPass.p99.toFixed(2)} / max ${r.gpuPass.max.toFixed(2)} ms` : 'n/d'} — CPU ${r.cpuFrame.mean.toFixed(2)} ms — > 16,7 ms : ${r.framesOver16_7ms}/${r.frames}`).join('\n');
     return results;
   };
+  /**
+   * Collision test bench, a development tool (core/collision-lab.js). It exists only when asked for:
+   * by the launch option index.html#lab=wheel|hop|crash|board|bump, which also binds its keys, or by
+   * an automation script. Nothing in the menus or in a normal race creates it.
+   */
+  const createLab = () => { if (!app.lab) app.lab = new CollisionLab(app, quickRace); return app.lab; };
   // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, debug: { placeCar, CAR_STATE, COLLISION_TUNING } };
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
+  if (params.lab) {
+    const lab = createLab();
+    attachLabControls(lab, t);
+    lab.start(CollisionLab.resolve(params.lab) || 'hop');
+  }
   if (!params.manual) app.start();
   if (params.benchmark) benchmark(params.benchmark === 'all' ? Object.keys(BENCHMARK_SCENARIOS) : params.benchmark.split(','), +(params.seconds || 60));
   window.dispatchEvent(new Event('virage-ready'));

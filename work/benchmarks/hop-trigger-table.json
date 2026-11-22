@@ -1,0 +1,252 @@
+{
+ "note": "window: launchOverlapMin..launchOverlapMax of the width overlapped",
+ "launchOverlapMin": 0.2,
+ "launchOverlapMax": 0.8,
+ "hopClosingSpeedKmh": 36,
+ "launchClosingSpeedKmh": 54,
+ "rows": [
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 0,
+   "widthOverlapped": 1,
+   "closingAtContact": 22.1,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 0.3,
+   "widthOverlapped": 0.84,
+   "closingAtContact": 21.9,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 0.5,
+   "widthOverlapped": 0.73,
+   "closingAtContact": 21.8,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 0.93,
+   "widthOverlapped": 0.5,
+   "closingAtContact": 21.7,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 1.2,
+   "widthOverlapped": 0.35,
+   "closingAtContact": 21.5,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 1.4,
+   "widthOverlapped": 0.25,
+   "closingAtContact": 21.4,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 1.6,
+   "widthOverlapped": 0.14,
+   "closingAtContact": 21.3,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 1.8,
+   "widthOverlapped": 0.03,
+   "closingAtContact": 21.4,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 2,
+   "widthOverlapped": 0,
+   "closingAtContact": null,
+   "outcome": "aucun contact"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 0,
+   "widthOverlapped": 1,
+   "closingAtContact": 51.8,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 0.3,
+   "widthOverlapped": 0.84,
+   "closingAtContact": 51.8,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 0.5,
+   "widthOverlapped": 0.73,
+   "closingAtContact": 51.7,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 0.93,
+   "widthOverlapped": 0.5,
+   "closingAtContact": 51.6,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 1.2,
+   "widthOverlapped": 0.35,
+   "closingAtContact": 51.5,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 1.4,
+   "widthOverlapped": 0.25,
+   "closingAtContact": 51.5,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 1.6,
+   "widthOverlapped": 0.14,
+   "closingAtContact": 51.5,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 1.8,
+   "widthOverlapped": 0.03,
+   "closingAtContact": 51.5,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 2,
+   "widthOverlapped": 0,
+   "closingAtContact": null,
+   "outcome": "aucun contact"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 0,
+   "widthOverlapped": 1,
+   "closingAtContact": 74.5,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 0.3,
+   "widthOverlapped": 0.84,
+   "closingAtContact": 74.4,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 0.5,
+   "widthOverlapped": 0.73,
+   "closingAtContact": 74.3,
+   "outcome": "accident violent (E3)"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 0.93,
+   "widthOverlapped": 0.5,
+   "closingAtContact": 74.2,
+   "outcome": "accident violent (E3)"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 1.2,
+   "widthOverlapped": 0.35,
+   "closingAtContact": 74.1,
+   "outcome": "accident violent (E3)"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 1.4,
+   "widthOverlapped": 0.25,
+   "closingAtContact": 74,
+   "outcome": "accident violent (E3)"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 1.6,
+   "widthOverlapped": 0.14,
+   "closingAtContact": 74,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 1.8,
+   "widthOverlapped": 0.03,
+   "closingAtContact": 73.9,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 2,
+   "widthOverlapped": 0,
+   "closingAtContact": null,
+   "outcome": "aucun contact"
+  }
+ ]
+}

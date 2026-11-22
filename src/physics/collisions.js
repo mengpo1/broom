@@ -1,11 +1,11 @@
 // Car-to-car contacts: oriented boxes, separating axis test, equal-mass impulse response.
 
 import { clamp } from '../core/math.js';
-import { CAR_STATE, startSpin, startAirborne } from './car-physics.js';
+import { CAR_STATE, LANDING, startSpin, startAirborne, startHop } from './car-physics.js';
 import { COLLISION_TUNING } from './collision-tuning.js';
 
 /** Events emitted for a contact between two cars: `contact` always (sound, statistics), plus the kind when it has consequences. */
-export const CONTACT = { SIMPLE: 'contact', REAR_BUMP: 'bump', WHEEL: 'wheel', LAUNCH: 'launch' };
+export const CONTACT = { SIMPLE: 'contact', REAR_BUMP: 'bump', WHEEL: 'wheel', LAUNCH: 'launch', HOP: 'hop' };
 
 const axes = new Float64Array(8);
 
@@ -37,9 +37,14 @@ const va = new Float64Array(2), vb = new Float64Array(2);
 export function resolveCarContacts(cars, rules, time, emit) {
   let count = 0;
   const n = cars.length;
+  // cars that have just come down from a hop first (whatever their place in the list): they are set
+  // clear of the others and at their landing speed before any contact is looked for
+  for (let i = 0; i < n; i++) if (cars[i].hopLanded) landHop(cars[i], cars);
   for (let i = 0; i < n; i++) {
     const a = cars[i];
-    if (a.state === CAR_STATE.AIRBORNE && a.launchOther >= 0) holdFlightBehind(a, cars);
+    if (a.state === CAR_STATE.AIRBORNE && a.launchOther >= 0) {
+      if (a.airKind === LANDING.RECOVERABLE) keepHopClear(a, cars); else holdFlightBehind(a, cars);
+    }
     if (!collidable(a)) continue;
     for (let j = i + 1; j < n; j++) {
       const b = cars[j];
@@ -87,11 +92,20 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
       if (closing > 0.3) {
         const lateral = -dx * sa + dz * ca;                       // sideways offset of b seen from a
         const overlap = clamp((pa.halfWidth + pb.halfWidth - Math.abs(lateral)) / (2 * Math.min(pa.halfWidth, pb.halfWidth)), 0, 1);
+        const wheelOverWheel = overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax;
+        const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
         // wheel over wheel at a high closing speed: the follower rides over the car ahead and takes off
         if (rules.crashes !== false && closing >= T.launchClosingSpeed && follower.speed >= T.launchMinSpeed
-          && overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax) {
-          const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
+          && wheelOverWheel && rearmed(follower)) {
           startAirborne(follower, T.flightTimeCar, T.hardAfterCar, emit, leader.index, side);
+          countContact(follower, leader, time, emit, closing);
+          contactDamage(follower, leader, closing, rules);
+          return true;
+        }
+        // the same contact with less energy, or tyre against tyre at the very edge of the cars (less overlap than the
+        // accident needs): a hop the car recovers from
+        if (overlap > T.hopOverlapMin && overlap <= T.launchOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
+          startHop(follower, emit, leader.index, side, Math.abs(dx * ca + dz * sa), leader.speed);
           countContact(follower, leader, time, emit, closing);
           contactDamage(follower, leader, closing, rules);
           return true;
@@ -100,6 +114,24 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
         return true;
       }
     } else {
+      // side by side. When the car behind has only its front wheel beside the rear wheel of the car ahead
+      // and arrives fast enough, that wheel lifts it: a hop. Otherwise the wheels rub (E2).
+      const along = dx * ca + dz * sa;                             // how far b is ahead of a
+      const follower = along > 0 ? a : b, leader = follower === a ? b : a;
+      const closing = follower.speed - leader.speed;
+      const lengthwise = (pa.halfLength + pb.halfLength - Math.abs(along)) / (pa.halfLength + pb.halfLength);
+      if (lengthwise <= T.hopSideOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
+        const lateral = -dx * sa + dz * ca, side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
+        startHop(follower, emit, leader.index, side, Math.abs(along), leader.speed);
+        // thrown clear of the car it touched: it flies parallel to it, drifting away sideways
+        const lh = leader.heading, fx = Math.cos(lh), fz = Math.sin(lh);
+        const forward = follower.velX * fx + follower.velZ * fz;
+        follower.velX = fx * forward + fz * side * T.hopSideKick;
+        follower.velZ = fz * forward - fx * side * T.hopSideKick;
+        countContact(follower, leader, time, emit, closing);
+        contactDamage(follower, leader, closing, rules);
+        return true;
+      }
       sideContact(a, b, nx, nz, rules, time, emit);
       return true;
     }
@@ -190,6 +222,79 @@ function rearContact(follower, leader, closing, rules, time, emit) {
   }
   follower.yawRate *= 0.5;
   countContact(follower, leader, time, emit, closing);
+}
+
+/** A car that has just come down from a hop cannot be thrown in the air again at once. */
+function rearmed(car) { return car.clock - car.rearmClock >= COLLISION_TUNING.hopRearmTime; }
+
+/**
+ * Energy of a wheel-over-wheel contact that lifts the car behind without wrecking it: explicit
+ * thresholds on the relative speed, the speed of the car and the angle between the two
+ * (the geometry of the contact is checked by the caller).
+ */
+function hopEnergy(follower, closing, cosAngle, rules) {
+  const T = COLLISION_TUNING;
+  return rules.crashes !== false && closing >= T.hopClosingSpeed && follower.speed >= T.hopMinSpeed
+    && cosAngle >= T.hopAlignedCos && rearmed(follower);
+}
+
+/** Overlap of the boxes of two cars along the axis where it is smallest (0 when they are apart); the push direction goes to `out`. */
+function boxOverlap(a, b, out) {
+  const pa = a.params, pb = b.params, dx = b.x - a.x, dz = b.z - a.z;
+  const ca = Math.cos(a.heading), sa = Math.sin(a.heading), cb = Math.cos(b.heading), sb = Math.sin(b.heading);
+  let min = 1e9;
+  for (let k = 0; k < 4; k++) {
+    const ax = k === 0 ? ca : k === 1 ? -sa : k === 2 ? cb : -sb, az = k === 0 ? sa : k === 1 ? ca : k === 2 ? sb : cb;
+    const ra = pa.halfLength * Math.abs(ax * ca + az * sa) + pa.halfWidth * Math.abs(-ax * sa + az * ca);
+    const rb = pb.halfLength * Math.abs(ax * cb + az * sb) + pb.halfWidth * Math.abs(-ax * sb + az * cb);
+    const dist = dx * ax + dz * az, overlap = ra + rb - Math.abs(dist);
+    if (overlap <= 0) return 0;
+    if (overlap < min) { min = overlap; const sign = dist >= 0 ? 1 : -1; out[0] = ax * sign; out[1] = az * sign; }
+  }
+  return min;
+}
+
+const pushOut = new Float64Array(2);
+
+/**
+ * A car in a recoverable hop stays clear of the others: it does not gain ground on the car that
+ * lifted it, and it is moved out of the way of any car it would come down into. Only the car in
+ * flight is moved; nothing is taken from anyone's speed here.
+ */
+function keepHopClear(car, cars) {
+  const other = cars[car.launchOther];
+  const v = Math.hypot(car.velX, car.velZ);
+  if (other && other !== car && !other.removed && v > 1) {
+    const ux = car.velX / v, uz = car.velZ / v;
+    const along = (other.x - car.x) * ux + (other.z - car.z) * uz;
+    if (along < car.launchAlong) { car.x -= ux * (car.launchAlong - along); car.z -= uz * (car.launchAlong - along); }
+  }
+  for (let i = 0; i < cars.length; i++) {
+    const o = cars[i];
+    if (o === car || o.removed || o.inPit || (o.state !== CAR_STATE.RACING && o.state !== CAR_STATE.SPIN && o.state !== CAR_STATE.RETIRED && o.state !== CAR_STATE.WRECKED)) continue;
+    const dx = o.x - car.x, dz = o.z - car.z;
+    if (dx * dx + dz * dz > 30) continue;
+    const overlap = boxOverlap(car, o, pushOut);
+    if (overlap > 0) { car.x -= pushOut[0] * (overlap + 0.01); car.z -= pushOut[1] * (overlap + 0.01); }
+  }
+}
+
+/**
+ * Landing of a recoverable hop (called once, in the step where the car comes down): it is clear of
+ * every other car, and slower than the car it rode over when that car is still racing, so that the
+ * two separate as they do after a bump. That limit is a safeguard: the speed was already brought
+ * to this value by the shock and the flight (startHop), so it only acts when the car ahead slowed
+ * down while the other was in the air.
+ */
+function landHop(car, cars) {
+  const T = COLLISION_TUNING;
+  car.hopLanded = false;
+  keepHopClear(car, cars);
+  const other = cars[car.launchOther];
+  if (other && other !== car && !other.removed && other.state === CAR_STATE.RACING) {
+    const limit = Math.max(T.penaltyFloorSpeed, other.speed - T.hopSeparation);
+    if (car.speed > limit) car.speed = limit;
+  }
 }
 
 /**

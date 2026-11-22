@@ -18,10 +18,10 @@ import { COCKPIT_REF_FOCAL } from '../../art/cockpits/cockpit-art.js';
 import { CAR_DIMENSIONS } from '../../art/vehicles/car-model.js';
 
 const MAX_PARTICLES = 320, MAX_MARKS = 420, MAX_POPS = 8, MAX_FLASHES = 6;
-const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR'];
-const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6 };
+const WORDS = ['CRAC !', 'BANG !', 'SCRIIII', 'BOUM !', 'TCHAK !', 'VROOAAR !', 'RRRRRRAAAH', 'VRRAAOOUM', 'WAAAAOOOR', 'HOP !'];
+const WORD = { CRAC: 0, BANG: 1, SCRI: 2, BOUM: 3, TCHAK: 4, VROAR: 5, FLATOUT: 6, HOP: 9 };
 const FLATOUT_WORDS = 3;        // the engine at full cry has several spellings
-const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6', '#ffd42a', '#f58a1f'];
+const WORD_COLORS = ['#ffd42a', '#f58a1f', '#f1efe6', '#e0312b', '#ffd42a', '#e0312b', '#f1efe6', '#ffd42a', '#f58a1f', '#f1efe6'];
 /** Phases of an explosion, seconds after the hard landing (MEASURED on the reference footage: 0.48 / 0.44 / 0.2 / 0.12 s, plumes 0.6 s). */
 export const BLAST = { grow: 0.48, full: 0.92, dark: 1.12, smokeEnd: 1.24, plumeStart: 1.0, end: 1.6 };
 const FLATOUT_SPEED = 76;       // m/s: the engine at full cry gets its own lettering, now and then
@@ -189,7 +189,7 @@ export class EffectsLayer {
     const list = this.pops[viewIndex];
     const p = list[this.popCursor[viewIndex]];
     this.popCursor[viewIndex] = (this.popCursor[viewIndex] + 1) % MAX_POPS;
-    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT ? 1.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
+    p.age = 0; p.life = word === WORD.VROAR ? 1.3 : word >= WORD.FLATOUT && word < WORD.FLATOUT + FLATOUT_WORDS ? 1.5 : word === WORD.HOP ? 0.5 : 0.85; p.x = x; p.y = y; p.word = word; p.size = size; p.burst = burst;
     p.angle = (this.random() - 0.5) * 0.3;
   }
 
@@ -285,7 +285,8 @@ export class EffectsLayer {
   /** Take-off and landing of a car: jolt and sound word for its driver, dust where it comes down, explosion if it is a hard one. */
   onFlight(event, app) {
     const fx = app.effects, race = app.race, car = race.cars[event.car];
-    const landing = event.type === 'landing', hard = landing && event.value > 0;
+    const landing = event.type === 'landing', hard = landing && event.value === 1;
+    const hop = landing ? event.value === 2 : car.airKind === 2;        // recoverable hop: smaller jolt, its own sound word, no explosion
     if (landing && fx.dust) {
       for (let k = 0; k < (hard ? 8 : 5); k++) this.spawn(0, car.s + (this.random() - 0.5) * 3, car.d + (this.random() - 0.5) * 2.4, 0.3, car.speed * 0.5, (this.random() - 0.5) * 4, 1, 0.8 + this.random() * 0.5, 1.2, 2.2, car.surface === SURFACE.ASPHALT ? this.smoke : this.dust, 1);
     }
@@ -302,9 +303,15 @@ export class EffectsLayer {
     for (let v = 0; v < app.viewCount; v++) {
       const view = app.views[v];
       if (view.carIndex !== event.car) continue;
-      view.addImpact(landing ? (hard ? 1 : 0.7) : 0.8);
+      view.addImpact(hop ? (landing ? 0.45 : 0.5) : landing ? (hard ? 1 : 0.7) : 0.8);
       // (one sound word at a time: a board that throws the car has already had its own)
-      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, 0.9, false); }
+      if (fx.onomatopoeia && !landing && this.popClock[v] > 0.3) {
+        this.popClock[v] = 0;
+        // (the word of a hop stays out of the way: on the side away from the car touched, higher, and gone when the wheels
+        // touch down, the moment the driver must see that car again)
+        if (hop) this.pop(v, WORD.HOP, 0.5 - car.launchSide * 0.2, 0.3, 0.75, false);
+        else this.pop(v, WORD.BANG, 0.5 + car.launchSide * 0.14, 0.4, 0.9, false);
+      }
     }
   }
 

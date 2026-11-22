@@ -19,8 +19,15 @@ export const CAR_DIMENSIONS = {
   eye: [-0.35, 0, 0.95],       // driver's eye, used by the cockpit drawing
 };
 
-/** Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side (the cockpit view is drawn from these). */
-export const MIRROR_MOUNT = { x: 0.4, y: 0.42, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.3, 0.6] };
+/**
+ * Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side.
+ * The right one is its reflection. Every view is drawn from this single definition: the car model seen
+ * from outside, and the cockpit drawing, which projects it from the driver's eye.
+ * (y: 2.5 cm closer to the centre line than at first, and the foot of the arm brought onto the rim of the
+ * cockpit, which it used to miss by a few centimetres: a proposal after a player found the mirrors slightly
+ * too far apart; see work/renders/comparison/mirror-variants.jpg.)
+ */
+export const MIRROR_MOUNT = { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };
 
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
 
@@ -611,7 +618,7 @@ export function buildCarModel(options = {}) {
 
 /** Build a wheel at its place on the car, steered by `steerAngle` about the vertical axis. */
 function placeWheel(name, x, y, tyre, steerAngle, tread = null, spin = false) {
-  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin, tread && tread.phase ? tread.phase : 0, !!(tread && tread.blur));
+  const [t, r] = wheel(name, 0, 0, 0, tyre.radius, tyre.width, Math.sign(y), spin, tread && tread.phase ? tread.phase : 0, !!(tread && (tread.blur || tread.fast)));
   if (tread) addTreadMarks(t, tyre, tread);
   t.outward = [0, Math.sign(y) * 0.5, 0]; r.outward = [0, Math.sign(y) * 0.5, 0];
   const c = Math.cos(steerAngle), s = Math.sin(steerAngle);
@@ -637,11 +644,16 @@ export const TREAD_PHASES = 3;
 export const STREAK_PHASES = 3;
 /** Groups of streaks around a tyre: close enough for two of them to be in sight on the tread, so that a phase is a short step. */
 export const STREAK_BANDS = 12;
+/** Drawn phases of the tyre turning very fast (near top speed): trails and rings, see addTreadMarks. */
+export const FAST_PHASES = 3;
+/** Lateral positions (m from the middle of the tread) of the rings drawn right round a tyre turning very fast. */
+export const FAST_RINGS = [-0.071, 0.013, 0.069];
 
 /**
  * Pen marks on the tread that make the rolling of a slick tyre visible.
- * tread: { phase: 0..TREAD_PHASES-1 } for distinct marks, or { blur: true } for the streaks drawn
- * at speed. Rolling forward moves the marks from the rear of the tyre over the top.
+ * tread: { phase: 0..TREAD_PHASES-1 } for distinct marks, { blur: true, phase } for the rows of
+ * dashes drawn at speed, { fast: true, phase } for the tyre turning very fast, near top speed.
+ * Rolling forward moves the marks from the rear of the tyre over the top.
  */
 function addTreadMarks(part, tyre, tread) {
   const r = tyre.radius * 1.004;
@@ -654,6 +666,29 @@ function addTreadMarks(part, tyre, tread) {
     part.lines.push({ pts, normal: [Math.cos(mid), 0, Math.sin(mid)], weight, hex });
   };
   const period = (Math.PI * 2) / TREAD_MARKS;
+  if (tread.fast) {
+    // a tyre turning very fast: the marks can no longer be told apart. Each one has become a trail drawn
+    // round the tyre, strongest at its head and fading behind it (a mark moves toward smaller angles, so its
+    // trail lies at larger ones), and the trails nearly join into circular lines. Only every other lane keeps
+    // a head in a given row, so that no row of marks stands out. A few rings are drawn right round: they have
+    // no end, hence nothing that could seem to stand still or turn backwards. The rows are those of the
+    // drawing "at speed" (same spacing, same phases): one fades into the other without a jump.
+    const spacing = (Math.PI * 2) / STREAK_BANDS, shift = ((tread.phase || 0) / FAST_PHASES) * spacing;
+    const lengths = [0.3, 0.38, 0.27, 0.36, 0.4, 0.29, 0.34], offsets = [0, 0.03, -0.02, 0.04, -0.03, 0.02, -0.04];
+    const light = ['#6f7286', '#575a6c', '#474a5a'], dark = ['#101017', '#17171f', '#1d1d27'];
+    for (const lat of FAST_RINGS) arc(lat, 0, Math.PI * 2, lat === FAST_RINGS[1] ? '#0e0e14' : '#50536a', 1.1);
+    for (let lane = 0; lane < 7; lane++) {
+      const lat = -0.085 + lane * 0.028, half = (lengths[lane] * spacing) / 2, tones = lane % 2 ? light : dark;
+      for (let k = 0; k < STREAK_BANDS; k++) {
+        const centre = (k + offsets[lane]) * spacing - shift, head = (k + lane) % 2 === 0;
+        if (head) arc(lat, centre - half, centre + half, tones[0], 1.7);
+        const from = head ? centre + half : centre - half;
+        arc(lat, from, centre + 0.42 * spacing, tones[1], 1.4);
+        arc(lat, centre + 0.42 * spacing, centre + 0.78 * spacing, tones[2], 1.0);
+      }
+    }
+    return;
+  }
   if (tread.blur) {
     // a tyre turning fast: STREAK_BANDS rows of short dashes around the tyre, one dash per lane, every
     // lane of a row on (nearly) the same angle. A dash that slides along itself looks still: what

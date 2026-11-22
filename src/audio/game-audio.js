@@ -570,7 +570,7 @@ export class GameAudio {
           if (this.locate(event.other, app) > gain) gain = hear.gain;
           else { hear.gain = gain; hear.pan = pan; hear.slot = slot; }
         }
-        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, type === 'landing' ? 14 : Math.min(20, Math.abs(value)), type !== 'contact', time);
+        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, type === 'landing' ? (value === 2 ? 8 : 14) : Math.min(20, Math.abs(value)), type !== 'contact', time);   // (landing 2: a recoverable hop, softer)
         break;
       }
       case 'crash':

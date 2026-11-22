@@ -1,0 +1,153 @@
+{
+ "video": "work/renders/sequence/wheels-steady-30.mp4",
+ "fps": 30,
+ "segments": {
+  "40 km/h": {
+   "after": {
+    "changes_per_second": 23.7,
+    "longest_still_run_images": 1,
+    "longest_still_run_seconds": 0.033,
+    "mean_change_between_images": 3.34,
+    "light_stroke_share": 0.0827,
+    "outer": {
+     "steps_up": 34,
+     "steps_down": 8,
+     "median_step_rows": 13.5
+    },
+    "inner": {
+     "steps_up": 26,
+     "steps_down": 7,
+     "median_step_rows": 13.5
+    },
+    "halves_agree": true,
+    "direction": "up"
+   }
+  },
+  "120 km/h": {
+   "after": {
+    "changes_per_second": 26.5,
+    "longest_still_run_images": 1,
+    "longest_still_run_seconds": 0.033,
+    "mean_change_between_images": 3.77,
+    "light_stroke_share": 0.0869,
+    "outer": {
+     "steps_up": 45,
+     "steps_down": 2,
+     "median_step_rows": 12.0
+    },
+    "inner": {
+     "steps_up": 36,
+     "steps_down": 12,
+     "median_step_rows": 13.25
+    },
+    "halves_agree": true,
+    "direction": "up"
+   }
+  },
+  "200 km/h": {
+   "after": {
+    "changes_per_second": 28.6,
+    "longest_still_run_images": 1,
+    "longest_still_run_seconds": 0.033,
+    "mean_change_between_images": 3.88,
+    "light_stroke_share": 0.0889,
+    "outer": {
+     "steps_up": 30,
+     "steps_down": 4,
+     "median_step_rows": 8.75
+    },
+    "inner": {
+     "steps_up": 27,
+     "steps_down": 0,
+     "median_step_rows": 14.5
+    },
+    "halves_agree": true,
+    "direction": "up"
+   }
+  },
+  "250 km/h": {
+   "after": {
+    "changes_per_second": 29.3,
+    "longest_still_run_images": 1,
+    "longest_still_run_seconds": 0.033,
+    "mean_change_between_images": 3.22,
+    "light_stroke_share": 0.0768,
+    "outer": {
+     "steps_up": 15,
+     "steps_down": 1,
+     "median_step_rows": 15.0
+    },
+    "inner": {
+     "steps_up": 28,
+     "steps_down": 28,
+     "median_step_rows": 20.5
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   }
+  },
+  "300 km/h": {
+   "after": {
+    "changes_per_second": 29.3,
+    "longest_still_run_images": 1,
+    "longest_still_run_seconds": 0.033,
+    "mean_change_between_images": 2.36,
+    "light_stroke_share": 0.0674,
+    "outer": {
+     "steps_up": 1,
+     "steps_down": 2,
+     "median_step_rows": 18.0
+    },
+    "inner": {
+     "steps_up": 14,
+     "steps_down": 14,
+     "median_step_rows": 30.5
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   }
+  },
+  "322 km/h": {
+   "after": {
+    "changes_per_second": 29.3,
+    "longest_still_run_images": 1,
+    "longest_still_run_seconds": 0.033,
+    "mean_change_between_images": 2.05,
+    "light_stroke_share": 0.0717,
+    "outer": {
+     "steps_up": 5,
+     "steps_down": 5,
+     "median_step_rows": 9.5
+    },
+    "inner": {
+     "steps_up": 24,
+     "steps_down": 16,
+     "median_step_rows": 13.5
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   }
+  },
+  "0 a 322 km/h": {
+   "after": {
+    "changes_per_second": 27.4,
+    "longest_still_run_images": 1,
+    "longest_still_run_seconds": 0.033,
+    "mean_change_between_images": 3.5,
+    "light_stroke_share": 0.158,
+    "outer": {
+     "steps_up": 26,
+     "steps_down": 40,
+     "median_step_rows": 10.25
+    },
+    "inner": {
+     "steps_up": 60,
+     "steps_down": 29,
+     "median_step_rows": 13.5
+    },
+    "halves_agree": false,
+    "direction": "unclear"
+   }
+  }
+ }
+}

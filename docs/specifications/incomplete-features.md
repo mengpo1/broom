@@ -45,12 +45,24 @@ par le rasteriseur logiciel SwiftShader).
   Un critique indépendant a relevé 7 défauts moyens et 13 mineurs sur les séquences
   (`work/reviews/collision-review.md`) ; ce qui n'a pas été traité est listé dans
   `collisions.md` § 9, et les corrections n'ont pas été revues à leur tour.
+- **Saut récupérable** : choix de gameplay original (rien de tel dans la vidéo de référence),
+  ajouté à la demande du joueur. Ses seuils et son dosage sont des réglages de départ, jamais
+  essayés au volant ; il se teste avec le banc d'essai (`collision-test-bench.md`). Les
+  voitures de l'ordinateur sautent aussi (1 à 5 fois par course de 16 voitures sur six courses
+  d'essai) : trop ou trop peu, c'est au joueur de le dire. Un second critique indépendant a
+  relevé 3 défauts moyens et 13 mineurs sur le saut, les roues et les rétroviseurs
+  (`work/reviews/second-test-review.md`) ; les suites sont dans `collisions.md` § 10, et la
+  contre-vérification des corrections au § 11. Restent notamment : la vitesse du saut est
+  toujours perdue d'un coup (76 km/h en une image), maintenant à l'instant du choc et non
+  plus à l'atterrissage ; la vue cockpit ne roule pas pendant le saut alors que la vue extérieure penche
+  la voiture ; le dessin de la voiture de devant change de vue pendant une image à l'instant
+  du choc.
 - **Perte de roue** : demandée, **non implémentée**. La vidéo analysée n'en montre pas ; ce
   qu'il faudrait pour la définir est listé dans `collisions.md` § 6.
 - **Roues** : seules les roues avant de la vue cockpit suivent la vitesse (marques
-  synchronisées à basse vitesse, rangées de traits au-delà : une convention de dessin, un pneu
-  lisse réel n'en montre pas) ; celles des autres voitures sont toujours dessinées en
-  rotation, même à l'arrêt.
+  synchronisées à basse vitesse, rangées de traits au-delà, traînées et anneaux près de la
+  vitesse maximale : des conventions de dessin, un pneu lisse réel ne montre rien de tel) ;
+  celles des autres voitures sont toujours dessinées en rotation, même à l'arrêt.
 - **Monoplaces** : un seul modèle de carrosserie pour toutes les écuries (les livrées changent
   par trois couleurs et cinq schémas) ; les numéros de course n'apparaissent que sur les
   grandes illustrations (menus, planches d'introduction et de résultats), pas sur les voitures
@@ -74,7 +86,7 @@ par le rasteriseur logiciel SwiftShader).
 - **Qualité graphique** : le changement d'anti-crénelage (MSAA) demande un rechargement de la
   page ; le niveau de détail et les distances s'appliquent immédiatement.
 - **Météo, nuit, dégâts visibles sur les voitures** : absents (une voiture accidentée repart intacte).
-- **Mémoire vidéo** : environ 435 Mo de textures (atlas 12 × 2048², 50 couches de voitures
+- **Mémoire vidéo** : environ 460 Mo de textures (atlas 13 × 2048², 50 couches de voitures
   1024×512, 3 panoramas 4096×768, mipmaps).
 - **Temps de chargement** : tous les dessins sont produits au lancement, avec un pourcentage
   d'avancement. Mesuré dans le conteneur (4 cœurs virtuels, tout en logiciel) : environ 25 s,

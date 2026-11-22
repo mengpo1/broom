@@ -30,6 +30,6 @@ export function raceStats(circuit, laps, seed = 11) {
   return { circuit, laps, finished: race.phase === RACE_PHASE.FINISHED, raceTime: +race.time.toFixed(2), winnerTime: +(table[0].time ?? race.time).toFixed?.(2) || null,
     bestLap: +best.toFixed(3), finishers: race.cars.filter((c) => c.finished).length, resets: race.cars.reduce((n, c) => n + c.resets, 0),
     retired: race.cars.filter((c) => c.state === 5).length, damage: +race.cars.reduce((n, c) => n + c.damage, 0).toFixed(2),
-    contact: counts.contact || 0, bump: counts.bump || 0, wheel: counts.wheel || 0, obstacle: counts.obstacle || 0, launch: counts.launch || 0, crash: counts.crash || 0, wall: counts.wall || 0 };
+    contact: counts.contact || 0, bump: counts.bump || 0, wheel: counts.wheel || 0, obstacle: counts.obstacle || 0, launch: counts.launch || 0, hop: counts.hop || 0, crash: counts.crash || 0, wall: counts.wall || 0 };
 }
 if (process.argv[1].endsWith('race-contact-stats.mjs')) console.log(JSON.stringify(raceStats(args[0] || 'hazelbrook', +(args[1] || 3))));

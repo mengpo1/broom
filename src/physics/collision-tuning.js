@@ -47,6 +47,34 @@ export const COLLISION_TUNING = {
   hardAfterCar: true,            // DESIGN a launch over a car ends in a hard landing (E3)
   hardAfterObstacle: false,      // DESIGN a launch over an obstacle ends in a light landing (E5)
 
+  // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
+  // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.
+  // Interlocked wheels (the front wheel of the car behind against the rear wheel of the car ahead) lift
+  // the car behind when it arrives fast enough: a short flight, it comes down on its wheels and drives on.
+  // Ladder of the same contact by energy: below hopClosingSpeed nothing changes (bump or wheel contact);
+  // from hopClosingSpeed a hop; from launchClosingSpeed and launchMinSpeed, from behind, the hard accident.
+  hopClosingSpeed: 10,           // m/s (36 km/h): relative speed from which the wheels lift the car
+  hopMinSpeed: 33,               // m/s (119 km/h): the car behind must be at least this fast
+  hopAlignedCos: 0.94,           // angle: the two cars head within about 20 degrees of each other
+  hopSideOverlapMax: 0.5,        // contact point, side by side: the cars overlap by at most this share of their length
+                                 // (front wheel beside rear wheel; fully alongside, wheels only rub: E2)
+  hopOverlapMin: 0,              // lateral overlap, from behind: from the slightest overlap (tyre against tyre at the edge of the
+                                 // cars) up to launchOverlapMax; beyond, nose in the gearbox, the cars bump. (The accident
+                                 // keeps its own, narrower window: launchOverlapMin..launchOverlapMax.)
+  hopFlightTime: 0.45,           // s in the air (the hard accident: 0.85 s)
+  hopPeakHeight: 0.55,           // m at the top of the hop (the hard accident: 1.3 m)
+  hopSeparation: 13.33,          // m/s: it comes down this much slower than the car it rode over was at the shock (as after a bump).
+                                 // The loss is taken where its cause is seen: most of it at the shock (the car is slowed to
+                                 // hopSeparation - airDecel * hopFlightTime below the other car, 25 km/h with these values),
+                                 // the rest steadily during the flight (airDecel, as in any flight); none at the landing.
+  hopLandingSpeedFactor: 1,      // share of its speed the car keeps as its wheels touch down (the hard accident: 0.15)
+  hopSideKick: 1.5,              // m/s sideways, away from the car it touched, when the hop starts side by side
+  hopWobbleTime: 0.7,            // s during which the steering is disturbed after the landing
+  hopWobbleSteer: 0.3,           // peak of the disturbance, share of the steering travel
+  hopWobbleSwings: 1,            // whole swings in that time (one: away from the car it touched, then back): they cancel
+                                 // out, the car ends up heading as before, about half a metre to the side
+  hopRearmTime: 1.5,             // s after such a landing during which the car cannot be thrown in the air again
+
   // ---- landings
   hardLandingSpeedFactor: 0.15,  // MEASURED 228 -> 35 km/h in one step
   hardLandingStopTime: 0.85,     // MEASURED s from the landing to standstill
