@@ -17,9 +17,8 @@ of the tyre turning very fast), a changing speed, or no change at all (a frozen 
 
 python3 work/scripts/wheel-motion-check.py [video.mp4] [out.json]
 """
-import json, os, subprocess, sys, tempfile
+import json, os, subprocess, sys
 import numpy as np
-from PIL import Image
 
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 video = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(root, 'work/renders/comparison/wheels-before-after.mp4')
@@ -31,10 +30,19 @@ BANDS = {'outer': (115, 155), 'inner': (155, 195)}            # the two halves o
 ROWS = (150, 283)
 MAX_SHIFT = 34                               # a phase of either drawing moves the pattern by less than this; the opposite reading needs more
 
-with tempfile.TemporaryDirectory() as tmp:
-    subprocess.run(['ffmpeg', '-v', 'error', '-i', video, '-start_number', '0', os.path.join(tmp, '%05d.png')], check=True)
-    names = sorted(os.listdir(tmp))
-    frames = [np.asarray(Image.open(os.path.join(tmp, n)).convert('L'), dtype=np.float32) for n in names]
+# Only the tread of the tyre is kept from each picture (one small patch per half): a long video at
+# 144 images per second would not fit in memory otherwise.
+X0, Y0, X1, Y1 = TREAD
+probe = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', video], check=True, capture_output=True, text=True)
+WIDTH, HEIGHT = (int(v) for v in probe.stdout.strip().split(','))
+decoder = subprocess.Popen(['ffmpeg', '-v', 'error', '-i', video, '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE)
+patches = [[] for _ in manifest['halves']]
+while True:
+    raw = decoder.stdout.read(WIDTH * HEIGHT)
+    if len(raw) < WIDTH * HEIGHT: break
+    picture = np.frombuffer(raw, dtype=np.uint8).reshape(HEIGHT, WIDTH)
+    for hi in range(len(patches)): patches[hi].append(picture[hi * HALF + Y0:hi * HALF + Y1, X0:X1].astype(np.float32))
+decoder.wait()
 
 def mark_rows(residual):
     """Lines (rows of the picture) on which a mark or a row of dashes is centred, from the light strokes of a tread patch."""
@@ -53,20 +61,19 @@ report = {'video': os.path.relpath(video, root), 'fps': FPS, 'segments': {}}
 for seg in manifest['segments']:
     entry = {}
     for hi, half in enumerate(manifest['halves']):
-        top = hi * HALF
         skip = max(1, round(FPS / 15))
-        seq = frames[seg['first'] + skip:seg['first'] + seg['frames'] - skip]
-        x0, y0, x1, y1 = TREAD
+        seq = patches[hi][seg['first'] + skip:seg['first'] + seg['frames'] - skip]
+        x0 = X0
         changes, run, longest = 0, 0, 0
         drawings = [[0]]                         # runs of pictures showing the same drawing of the tread
         for i, (a, b) in enumerate(zip(seq, seq[1:])):
-            diff = np.abs(a[top + y0:top + y1, x0:x1] - b[top + y0:top + y1, x0:x1]) > 24
+            diff = np.abs(a - b) > 24
             if diff.mean() > 0.0025: changes += 1; run = 0; drawings.append([i + 1])
             else: run += 1; longest = max(longest, run); drawings[-1].append(i + 1)
         res = {'changes_per_second': round(changes * FPS / (len(seq) - 1), 1), 'longest_still_run_images': longest,
                'longest_still_run_seconds': round(longest / FPS, 3)}
         # the light strokes of the tread: each drawing minus the darkest state of every pixel over the segment
-        patch = np.stack([f[top + ROWS[0]:top + ROWS[1], x0:x1] for f in seq])
+        patch = np.stack(seq)
         light = patch - patch.min(axis=0)
         res['light_stroke_share'] = round(float((light > 14).mean()), 4)          # how much of the tread carries a light stroke at a given instant
         for band, (bx0, bx1) in BANDS.items():

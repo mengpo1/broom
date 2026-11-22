@@ -138,12 +138,14 @@ test('front wheels near top speed: a third drawing, the tyre turning very fast, 
   for (const kmh of [0, 8, 40, 120, 170]) assert.equal(fastBlend(kmh / 3.6), 0, `${kmh} km/h: no trace of the fast drawing`);
   assert.equal(fastBlend(WHEEL_FAST_START), 0); assert.equal(fastBlend(WHEEL_FAST_FULL), 1); assert.equal(fastBlend(-WHEEL_FAST_FULL), 1);
   // it grows smoothly between high speed and top speed: the picture keeps changing with the speed
-  const at = [200, 250, 300].map((kmh) => fastBlend(kmh / 3.6));
-  assert.ok(at[0] > 0.1 && at[0] < 0.3 && at[1] > 0.45 && at[1] < 0.75 && at[2] === 1, `share at 200 / 250 / 300 km/h: ${at.map((b) => b.toFixed(2)).join(' / ')}`);
+  // (the transition first ended at 300 km/h; the independent review found that nothing changed any more between 300 km/h
+  // and the top speed, so it now runs up to the lowest top speed of the cars, 311 km/h)
+  const at = [200, 250, 300, 311.1].map((kmh) => fastBlend(kmh / 3.6));
+  assert.ok(at[0] > 0.1 && at[0] < 0.3 && at[1] > 0.4 && at[1] < 0.7 && at[2] > 0.85 && at[2] < 0.97 && at[3] === 1, `share at 200 / 250 / 300 / 311 km/h: ${at.map((b) => b.toFixed(2)).join(' / ')}`);
   let previous = 0;
   for (let v = 0; v <= 95; v += 0.25) { const b = fastBlend(v); assert.ok(b >= previous && b - previous < 0.01, 'smooth and rising'); previous = b; }
   // every car reaches the speed where the drawing is complete (top speeds: 311 to 332 km/h depending on the wings)
-  assert.ok(WHEEL_FAST_FULL * 3.6 < 305 && WHEEL_FAST_START > WHEEL_SYNC_SPEED * 5, 'complete just below the lowest top speed, absent from the speeds already validated');
+  assert.ok(WHEEL_FAST_FULL * 3.6 > 305 && WHEEL_FAST_FULL * 3.6 <= 311.1 && WHEEL_FAST_START > WHEEL_SYNC_SPEED * 5, 'complete at the lowest top speed, absent from the speeds already validated');
   assert.ok(BASE_CAR_SPEC.gearTopSpeeds.at(-1) > WHEEL_FAST_FULL, 'top gear goes beyond it');
   // the drawing shown follows the same cycle as the rows of dashes: one fades into the other in step
   for (const turn of [0, 0.2, 0.4, 0.7, 0.99]) {

@@ -51,9 +51,11 @@ export function streakVariant(streakTurn) {
 /**
  * Third regime, near top speed: the tyre turning very fast (trails and rings, see car-model.js).
  * It shows through the rows of dashes from WHEEL_FAST_START and replaces them at WHEEL_FAST_FULL
- * (m/s: 180 and 300 km/h; the cars reach 311 to 332 km/h depending on their wings).
+ * (m/s: 180 and 311 km/h). The cars reach 311 to 332 km/h depending on their wings: the transition
+ * ends at the lowest of these top speeds, so that the picture goes on changing up to the maximum
+ * and every car still reaches the complete drawing.
  */
-export const WHEEL_FAST_START = 50, WHEEL_FAST_FULL = 83.3;
+export const WHEEL_FAST_START = 50, WHEEL_FAST_FULL = 86.4;
 
 /** Share of the "very fast" drawing in the picture of the tyre: 0 below WHEEL_FAST_START, 1 from WHEEL_FAST_FULL. */
 export function fastBlend(speed) {
