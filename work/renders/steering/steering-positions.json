@@ -1,0 +1,117 @@
+{
+ "width": 1280,
+ "height": 720,
+ "profile": "arcade",
+ "shots": [
+  {
+   "kmh": 60,
+   "request": 0,
+   "file": "work/renders/steering/frames/steer-60-0.png",
+   "secondsAfterTheKey": 0,
+   "drawing": 0,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 0,
+   "wheelAngleOfTheSimulationDeg": 0,
+   "wheelAngleDrawnDeg": 0
+  },
+  {
+   "kmh": 60,
+   "request": 0.25,
+   "file": "work/renders/steering/frames/steer-60-25.png",
+   "secondsAfterTheKey": 0.054,
+   "drawing": 1,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 13.6,
+   "wheelAngleOfTheSimulationDeg": 3.44,
+   "wheelAngleDrawnDeg": 3.9
+  },
+  {
+   "kmh": 60,
+   "request": 0.5,
+   "file": "work/renders/steering/frames/steer-60-50.png",
+   "secondsAfterTheKey": 0.109,
+   "drawing": 1,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 27.2,
+   "wheelAngleOfTheSimulationDeg": 6.88,
+   "wheelAngleDrawnDeg": 7.7
+  },
+  {
+   "kmh": 60,
+   "request": 0.75,
+   "file": "work/renders/steering/frames/steer-60-75.png",
+   "secondsAfterTheKey": 0.163,
+   "drawing": 2,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 40.8,
+   "wheelAngleOfTheSimulationDeg": 10.32,
+   "wheelAngleDrawnDeg": 11.6
+  },
+  {
+   "kmh": 60,
+   "request": 1,
+   "file": "work/renders/steering/frames/steer-60-100.png",
+   "secondsAfterTheKey": 0.217,
+   "drawing": 2,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 54.4,
+   "wheelAngleOfTheSimulationDeg": 13.77,
+   "wheelAngleDrawnDeg": 14.9
+  },
+  {
+   "kmh": 250,
+   "request": 0,
+   "file": "work/renders/steering/frames/steer-250-0.png",
+   "secondsAfterTheKey": 0,
+   "drawing": 0,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 0,
+   "wheelAngleOfTheSimulationDeg": 0,
+   "wheelAngleDrawnDeg": 0
+  },
+  {
+   "kmh": 250,
+   "request": 0.25,
+   "file": "work/renders/steering/frames/steer-250-25.png",
+   "secondsAfterTheKey": 0.054,
+   "drawing": 0,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 13.6,
+   "wheelAngleOfTheSimulationDeg": 0.38,
+   "wheelAngleDrawnDeg": 3
+  },
+  {
+   "kmh": 250,
+   "request": 0.5,
+   "file": "work/renders/steering/frames/steer-250-50.png",
+   "secondsAfterTheKey": 0.109,
+   "drawing": 1,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 27.2,
+   "wheelAngleOfTheSimulationDeg": 0.75,
+   "wheelAngleDrawnDeg": 5.9
+  },
+  {
+   "kmh": 250,
+   "request": 0.75,
+   "file": "work/renders/steering/frames/steer-250-75.png",
+   "secondsAfterTheKey": 0.163,
+   "drawing": 1,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 40.8,
+   "wheelAngleOfTheSimulationDeg": 1.13,
+   "wheelAngleDrawnDeg": 8.9
+  },
+  {
+   "kmh": 250,
+   "request": 1,
+   "file": "work/renders/steering/frames/steer-250-100.png",
+   "secondsAfterTheKey": 0.217,
+   "drawing": 2,
+   "drawingsEachSide": 2,
+   "steeringWheelDeg": 54.4,
+   "wheelAngleOfTheSimulationDeg": 1.5,
+   "wheelAngleDrawnDeg": 11.8
+  }
+ ]
+}

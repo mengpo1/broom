@@ -123,3 +123,45 @@ test('manual gearbox obeys shift requests; the simulation is deterministic', () 
   run(a, 7, drive); run(b, 7, drive);
   assert.equal(a.x, b.x); assert.equal(a.z, b.z); assert.equal(a.speed, b.speed);
 });
+
+// Guard of the validated steering (added with the study of the held steering key,
+// docs/specifications/steering-study.md): any experimental variant must leave this default as it is.
+test('steering reference: the stop is reached in a quarter of a second and holding the key adds nothing; no slide, no spin', () => {
+  // the parameters of the validated driving
+  assert.deepEqual([BASE_CAR_SPEC.steerLock, BASE_CAR_SPEC.steerRate, BASE_CAR_SPEC.steerReturnRate, BASE_CAR_SPEC.yawResponse, BASE_CAR_SPEC.overSteerAllowance, BASE_CAR_SPEC.slipScrub, BASE_CAR_SPEC.lateralRecovery],
+    [0.34, 4.6, 7.5, 16, 1.22, 7, 5]);
+  assert.deepEqual([DRIVING_PROFILES.arcade.steerAssist, DRIVING_PROFILES.racing.steerAssist, DRIVING_PROFILES.turbo.steerAssist], [1, 0.78, 0.9]);
+  // a very wide stretch of asphalt: a copy of a circuit widened to 900 m, so that four seconds of full lock stay on the road
+  const wide = buildTrack({ ...getCircuit('kestrel-fields'), width: 900 });
+  let s0 = 0, runLength = 0;
+  for (let i = 0; i < wide.n * 2; i++) { const k = i % wide.n; if (Math.abs(wide.kappa[k]) < 1 / 2500) { if (++runLength * wide.ds >= 600) { s0 = ((i - runLength + 1) % wide.n) * wide.ds + 60; break; } } else runLength = 0; }
+  for (const [profile, kmh] of [['arcade', 60], ['arcade', 150], ['arcade', 250], ['racing', 150], ['turbo', 250]]) {
+    const car = createCarState(0);
+    car.params = deriveCarParams(BASE_CAR_SPEC, null, DRIVING_PROFILES[profile], null);
+    car.isHuman = true;
+    placeCar(car, wide, s0, 0);
+    car.state = CAR_STATE.RACING; car.speed = kmh / 3.6;
+    car.gear = BASE_CAR_SPEC.gearTopSpeeds.findIndex((top) => car.speed < top * 0.93) + 1 || 6;
+    const r = resolveRules(RULE_PRESETS.training, wide), events = [];
+    let atStop = -1, yawAtHalf = 0, worstSlide = 0;
+    for (let i = 1; i <= 4 / DT; i++) {
+      car.inSteer = 1; car.inThrottle = 0;
+      stepCar(car, wide, DT, r, (type) => events.push(type));
+      if (atStop < 0 && Math.abs(car.steer) >= 1) atStop = i * DT;
+      if (i === Math.round(0.5 / DT)) yawAtHalf = Math.abs(car.yawRate);
+      worstSlide = Math.max(worstSlide, Math.atan2(Math.abs(car.vLat), Math.max(1, car.speed)));
+      assert.equal(car.state, CAR_STATE.RACING, `${profile} ${kmh} km/h: still driving`);
+      assert.equal(car.surface, SURFACE.ASPHALT);
+      if (i * DT > 0.5) {
+        // (lifting off, the car slows down and the same lock turns it more: only the lateral acceleration is bounded)
+        const grip = 9.81 * car.params.grip * (1 + car.params.downforce * car.speed * car.speed);
+        assert.ok(Math.abs(car.accelLat) <= grip * 1.1, `${profile} ${kmh} km/h: never more than the grip allows (${(Math.abs(car.accelLat) / grip).toFixed(2)})`);
+        assert.equal(Math.abs(car.steer), 1, 'the steering stays at its stop');
+      }
+    }
+    assert.ok(Math.abs(atStop - 0.225) < DT, `${profile}: stop of the steering reached ${atStop.toFixed(3)} s after the key`);
+    assert.ok(yawAtHalf > 0.3, 'the car turns');
+    assert.ok(worstSlide < 0.05, `${profile} ${kmh} km/h: no slide builds up (${(worstSlide * 57.3).toFixed(2)} degrees at most)`);
+    assert.ok(!events.includes('spin') && !events.includes('reset'), 'no spin from the steering alone');
+  }
+});

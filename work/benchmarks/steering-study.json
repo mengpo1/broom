@@ -1,0 +1,3577 @@
+{
+ "note": "measurement of the current game; nothing is changed",
+ "simulationStepSeconds": 0.008333333333333333,
+ "keyToFullLock": {
+  "keyboardRamp": "none: the request is -1, 0 or +1 at once",
+  "steerRatePerSecond": 4.6,
+  "steerReturnRatePerSecond": 7.5,
+  "secondsFromCentreToFullLock": 0.225,
+  "secondsFromFullLockToCentre": 0.133,
+  "secondsFromFullLockToOppositeLock": 0.358,
+  "afterThat": "the steering stays at its stop for as long as the key is held: there is no second stage"
+ },
+ "byProfile": {
+  "arcade": {
+   "steerAssist": 1,
+   "gripScale": 1.08,
+   "rows": [
+    {
+     "kmh": 30,
+     "gripLimitMs2": 18.5,
+     "lockOfTheSimulationDeg": 19.48,
+     "askedShareOfGrip": 0.46,
+     "slipAtFullLock": 0,
+     "steadyYawDegPerSecond": 58.2,
+     "steadyLateralG": 0.86,
+     "turningRadiusM": 8.2,
+     "scrubMs2": 0,
+     "lockDrawnDeg": 14.9,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.048,
+     "secondStepAfterSeconds": 0.143
+    },
+    {
+     "kmh": 60,
+     "gripLimitMs2": 19.2,
+     "lockOfTheSimulationDeg": 13.77,
+     "askedShareOfGrip": 1.22,
+     "slipAtFullLock": 0.22,
+     "steadyYawDegPerSecond": 67.9,
+     "steadyLateralG": 2.01,
+     "turningRadiusM": 14.1,
+     "scrubMs2": 1.5,
+     "lockDrawnDeg": 14.9,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.052,
+     "secondStepAfterSeconds": 0.157
+    },
+    {
+     "kmh": 100,
+     "gripLimitMs2": 21,
+     "lockOfTheSimulationDeg": 5.51,
+     "askedShareOfGrip": 1.22,
+     "slipAtFullLock": 0.22,
+     "steadyYawDegPerSecond": 44.5,
+     "steadyLateralG": 2.2,
+     "turningRadiusM": 35.7,
+     "scrubMs2": 1.5,
+     "lockDrawnDeg": 14.1,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.057,
+     "secondStepAfterSeconds": 0.172
+    },
+    {
+     "kmh": 150,
+     "gripLimitMs2": 24.6,
+     "lockOfTheSimulationDeg": 2.86,
+     "askedShareOfGrip": 1.22,
+     "slipAtFullLock": 0.22,
+     "steadyYawDegPerSecond": 34.7,
+     "steadyLateralG": 2.57,
+     "turningRadiusM": 68.9,
+     "scrubMs2": 1.5,
+     "lockDrawnDeg": 13.1,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.062,
+     "secondStepAfterSeconds": 0.186
+    },
+    {
+     "kmh": 200,
+     "gripLimitMs2": 29.5,
+     "lockOfTheSimulationDeg": 1.93,
+     "askedShareOfGrip": 1.22,
+     "slipAtFullLock": 0.22,
+     "steadyYawDegPerSecond": 31.2,
+     "steadyLateralG": 3.08,
+     "turningRadiusM": 102,
+     "scrubMs2": 1.5,
+     "lockDrawnDeg": 12.4,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.066,
+     "secondStepAfterSeconds": 0.197
+    },
+    {
+     "kmh": 250,
+     "gripLimitMs2": 35.8,
+     "lockOfTheSimulationDeg": 1.5,
+     "askedShareOfGrip": 1.22,
+     "slipAtFullLock": 0.22,
+     "steadyYawDegPerSecond": 30.3,
+     "steadyLateralG": 3.75,
+     "turningRadiusM": 131.2,
+     "scrubMs2": 1.5,
+     "lockDrawnDeg": 11.8,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.068,
+     "secondStepAfterSeconds": 0.205
+    },
+    {
+     "kmh": 300,
+     "gripLimitMs2": 43.5,
+     "lockOfTheSimulationDeg": 1.27,
+     "askedShareOfGrip": 1.22,
+     "slipAtFullLock": 0.22,
+     "steadyYawDegPerSecond": 30.7,
+     "steadyLateralG": 4.55,
+     "turningRadiusM": 155.4,
+     "scrubMs2": 1.5,
+     "lockDrawnDeg": 11.5,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.071,
+     "secondStepAfterSeconds": 0.212
+    }
+   ]
+  },
+  "racing": {
+   "steerAssist": 0.78,
+   "gripScale": 1,
+   "rows": [
+    {
+     "kmh": 30,
+     "gripLimitMs2": 17.1,
+     "lockOfTheSimulationDeg": 19.48,
+     "askedShareOfGrip": 0.5,
+     "slipAtFullLock": 0,
+     "steadyYawDegPerSecond": 58.2,
+     "steadyLateralG": 0.86,
+     "turningRadiusM": 8.2,
+     "scrubMs2": 0,
+     "lockDrawnDeg": 14.9,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.048,
+     "secondStepAfterSeconds": 0.143
+    },
+    {
+     "kmh": 60,
+     "gripLimitMs2": 17.8,
+     "lockOfTheSimulationDeg": 14.26,
+     "askedShareOfGrip": 1.37,
+     "slipAtFullLock": 0.37,
+     "steadyYawDegPerSecond": 63.9,
+     "steadyLateralG": 1.9,
+     "turningRadiusM": 14.9,
+     "scrubMs2": 2.6,
+     "lockDrawnDeg": 14.9,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.052,
+     "secondStepAfterSeconds": 0.157
+    },
+    {
+     "kmh": 100,
+     "gripLimitMs2": 19.5,
+     "lockOfTheSimulationDeg": 8.27,
+     "askedShareOfGrip": 1.98,
+     "slipAtFullLock": 0.98,
+     "steadyYawDegPerSecond": 42.6,
+     "steadyLateralG": 2.1,
+     "turningRadiusM": 37.4,
+     "scrubMs2": 6.9,
+     "lockDrawnDeg": 14.1,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.057,
+     "secondStepAfterSeconds": 0.172
+    },
+    {
+     "kmh": 150,
+     "gripLimitMs2": 22.7,
+     "lockOfTheSimulationDeg": 6.35,
+     "askedShareOfGrip": 2.93,
+     "slipAtFullLock": 1.93,
+     "steadyYawDegPerSecond": 33.1,
+     "steadyLateralG": 2.46,
+     "turningRadiusM": 72.1,
+     "scrubMs2": 10.5,
+     "lockDrawnDeg": 13.1,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.062,
+     "secondStepAfterSeconds": 0.186
+    },
+    {
+     "kmh": 200,
+     "gripLimitMs2": 27.3,
+     "lockOfTheSimulationDeg": 5.68,
+     "askedShareOfGrip": 3.88,
+     "slipAtFullLock": 2.88,
+     "steadyYawDegPerSecond": 29.8,
+     "steadyLateralG": 2.95,
+     "turningRadiusM": 106.7,
+     "scrubMs2": 10.5,
+     "lockDrawnDeg": 12.4,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.066,
+     "secondStepAfterSeconds": 0.197
+    },
+    {
+     "kmh": 250,
+     "gripLimitMs2": 33.1,
+     "lockOfTheSimulationDeg": 5.37,
+     "askedShareOfGrip": 4.72,
+     "slipAtFullLock": 3.72,
+     "steadyYawDegPerSecond": 29,
+     "steadyLateralG": 3.58,
+     "turningRadiusM": 137.3,
+     "scrubMs2": 10.5,
+     "lockDrawnDeg": 11.8,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.068,
+     "secondStepAfterSeconds": 0.205
+    },
+    {
+     "kmh": 300,
+     "gripLimitMs2": 40.3,
+     "lockOfTheSimulationDeg": 5.2,
+     "askedShareOfGrip": 5.41,
+     "slipAtFullLock": 4.41,
+     "steadyYawDegPerSecond": 29.4,
+     "steadyLateralG": 4.36,
+     "turningRadiusM": 162.5,
+     "scrubMs2": 10.5,
+     "lockDrawnDeg": 11.5,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.071,
+     "secondStepAfterSeconds": 0.212
+    }
+   ]
+  },
+  "turbo": {
+   "steerAssist": 0.9,
+   "gripScale": 1.04,
+   "rows": [
+    {
+     "kmh": 30,
+     "gripLimitMs2": 17.8,
+     "lockOfTheSimulationDeg": 19.48,
+     "askedShareOfGrip": 0.48,
+     "slipAtFullLock": 0,
+     "steadyYawDegPerSecond": 58.2,
+     "steadyLateralG": 0.86,
+     "turningRadiusM": 8.2,
+     "scrubMs2": 0,
+     "lockDrawnDeg": 14.9,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.048,
+     "secondStepAfterSeconds": 0.143
+    },
+    {
+     "kmh": 60,
+     "gripLimitMs2": 18.5,
+     "lockOfTheSimulationDeg": 13.9,
+     "askedShareOfGrip": 1.28,
+     "slipAtFullLock": 0.28,
+     "steadyYawDegPerSecond": 65.8,
+     "steadyLateralG": 1.95,
+     "turningRadiusM": 14.5,
+     "scrubMs2": 2,
+     "lockDrawnDeg": 14.9,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.052,
+     "secondStepAfterSeconds": 0.157
+    },
+    {
+     "kmh": 100,
+     "gripLimitMs2": 20.3,
+     "lockOfTheSimulationDeg": 6.72,
+     "askedShareOfGrip": 1.55,
+     "slipAtFullLock": 0.55,
+     "steadyYawDegPerSecond": 44.3,
+     "steadyLateralG": 2.19,
+     "turningRadiusM": 35.9,
+     "scrubMs2": 3.8,
+     "lockDrawnDeg": 14.1,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.057,
+     "secondStepAfterSeconds": 0.172
+    },
+    {
+     "kmh": 150,
+     "gripLimitMs2": 23.6,
+     "lockOfTheSimulationDeg": 4.43,
+     "askedShareOfGrip": 1.96,
+     "slipAtFullLock": 0.96,
+     "steadyYawDegPerSecond": 34.5,
+     "steadyLateralG": 2.55,
+     "turningRadiusM": 69.3,
+     "scrubMs2": 6.7,
+     "lockDrawnDeg": 13.1,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.062,
+     "secondStepAfterSeconds": 0.186
+    },
+    {
+     "kmh": 200,
+     "gripLimitMs2": 28.4,
+     "lockOfTheSimulationDeg": 3.63,
+     "askedShareOfGrip": 2.38,
+     "slipAtFullLock": 1.38,
+     "steadyYawDegPerSecond": 31,
+     "steadyLateralG": 3.07,
+     "turningRadiusM": 102.6,
+     "scrubMs2": 9.6,
+     "lockDrawnDeg": 12.4,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.066,
+     "secondStepAfterSeconds": 0.197
+    },
+    {
+     "kmh": 250,
+     "gripLimitMs2": 34.5,
+     "lockOfTheSimulationDeg": 3.25,
+     "askedShareOfGrip": 2.74,
+     "slipAtFullLock": 1.74,
+     "steadyYawDegPerSecond": 30.1,
+     "steadyLateralG": 3.72,
+     "turningRadiusM": 132,
+     "scrubMs2": 10.5,
+     "lockDrawnDeg": 11.8,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.068,
+     "secondStepAfterSeconds": 0.205
+    },
+    {
+     "kmh": 300,
+     "gripLimitMs2": 41.9,
+     "lockOfTheSimulationDeg": 3.05,
+     "askedShareOfGrip": 3.04,
+     "slipAtFullLock": 2.04,
+     "steadyYawDegPerSecond": 30.6,
+     "steadyLateralG": 4.53,
+     "turningRadiusM": 156.3,
+     "scrubMs2": 10.5,
+     "lockDrawnDeg": 11.5,
+     "drawingAtFullLock": "2 of 2 steps from the centre",
+     "firstStepAfterSeconds": 0.071,
+     "secondStepAfterSeconds": 0.212
+    }
+   ]
+  }
+ },
+ "drawings": {
+  "frontWheelDrawings": 5,
+  "stepsEachSide": 2,
+  "largestAngleDrawnDeg": 14.9,
+  "lockAtRestDeg": 19.5,
+  "steeringWheelRotationAtFullLockDeg": 54.4,
+  "steeringWheelFollows": "the request (-1..1), whatever the speed; reached with the stop of the steering"
+ },
+ "hold": {
+  "track": "kestrel-fields widened to 900 m (asphalt everywhere the car goes)",
+  "seconds": 4,
+  "runs": [
+   {
+    "profile": "arcade",
+    "startKmh": 60,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.22,
+    "peakSlip": 0.26,
+    "peakSlideAngleDeg": 0.4,
+    "headingTurnedDeg": 144.5,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 65.6,
+      "yawDegPerSecond": 18.5,
+      "lateralG": 0.6,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 71.2,
+      "yawDegPerSecond": 45.9,
+      "lateralG": 1.6,
+      "shareOfGrip": 0.8,
+      "slip": 0.02,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 76.4,
+      "yawDegPerSecond": 54.3,
+      "lateralG": 2.04,
+      "shareOfGrip": 1.01,
+      "slip": 0.16,
+      "slideAngleDeg": 0.21,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 86.8,
+      "yawDegPerSecond": 51.2,
+      "lateralG": 2.19,
+      "shareOfGrip": 1.05,
+      "slip": 0.23,
+      "slideAngleDeg": 0.35,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 107.8,
+      "yawDegPerSecond": 43.3,
+      "lateralG": 2.3,
+      "shareOfGrip": 1.05,
+      "slip": 0.24,
+      "slideAngleDeg": 0.37,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 159,
+      "yawDegPerSecond": 34.1,
+      "lateralG": 2.67,
+      "shareOfGrip": 1.04,
+      "slip": 0.25,
+      "slideAngleDeg": 0.3,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 199,
+      "yawDegPerSecond": 31.3,
+      "lateralG": 3.08,
+      "shareOfGrip": 1.03,
+      "slip": 0.25,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 226.3,
+      "yawDegPerSecond": 30.6,
+      "lateralG": 3.41,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 60,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.35,
+    "peakSlip": 0.24,
+    "peakSlideAngleDeg": 0.73,
+    "headingTurnedDeg": 70.3,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 59.2,
+      "yawDegPerSecond": 19.6,
+      "lateralG": 0.57,
+      "shareOfGrip": 0.29,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 58.4,
+      "yawDegPerSecond": 52.5,
+      "lateralG": 1.52,
+      "shareOfGrip": 0.78,
+      "slip": 0.02,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 57.1,
+      "yawDegPerSecond": 66.8,
+      "lateralG": 1.89,
+      "shareOfGrip": 0.97,
+      "slip": 0.16,
+      "slideAngleDeg": 0.27,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 54.5,
+      "yawDegPerSecond": 72.9,
+      "lateralG": 1.97,
+      "shareOfGrip": 1.01,
+      "slip": 0.23,
+      "slideAngleDeg": 0.54,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 48.3,
+      "yawDegPerSecond": 81.2,
+      "lateralG": 1.94,
+      "shareOfGrip": 1.01,
+      "slip": 0.22,
+      "slideAngleDeg": 0.71,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 41.5,
+      "yawDegPerSecond": 81.3,
+      "lateralG": 1.67,
+      "shareOfGrip": 0.88,
+      "slip": 0,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 36.2,
+      "yawDegPerSecond": 70.9,
+      "lateralG": 1.27,
+      "shareOfGrip": 0.67,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 31.5,
+      "yawDegPerSecond": 61.8,
+      "lateralG": 0.96,
+      "shareOfGrip": 0.51,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 100,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.25,
+    "peakSlip": 0.26,
+    "peakSlideAngleDeg": 0.31,
+    "headingTurnedDeg": 126.7,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 106,
+      "yawDegPerSecond": 12.6,
+      "lateralG": 0.66,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 112,
+      "yawDegPerSecond": 31.9,
+      "lateralG": 1.76,
+      "shareOfGrip": 0.79,
+      "slip": 0.02,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 117.5,
+      "yawDegPerSecond": 38.6,
+      "lateralG": 2.24,
+      "shareOfGrip": 0.99,
+      "slip": 0.16,
+      "slideAngleDeg": 0.15,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 128.9,
+      "yawDegPerSecond": 38.2,
+      "lateralG": 2.43,
+      "shareOfGrip": 1.04,
+      "slip": 0.23,
+      "slideAngleDeg": 0.27,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 151.8,
+      "yawDegPerSecond": 34.9,
+      "lateralG": 2.61,
+      "shareOfGrip": 1.04,
+      "slip": 0.25,
+      "slideAngleDeg": 0.3,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 194.2,
+      "yawDegPerSecond": 31.6,
+      "lateralG": 3.02,
+      "shareOfGrip": 1.03,
+      "slip": 0.25,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 223,
+      "yawDegPerSecond": 30.6,
+      "lateralG": 3.37,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 246.7,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 3.7,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 100,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.33,
+    "peakSlip": 0.24,
+    "peakSlideAngleDeg": 0.75,
+    "headingTurnedDeg": 122.2,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 98.9,
+      "yawDegPerSecond": 13,
+      "lateralG": 0.64,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 97.8,
+      "yawDegPerSecond": 34.4,
+      "lateralG": 1.67,
+      "shareOfGrip": 0.78,
+      "slip": 0.02,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 96.2,
+      "yawDegPerSecond": 43.3,
+      "lateralG": 2.06,
+      "shareOfGrip": 0.97,
+      "slip": 0.16,
+      "slideAngleDeg": 0.17,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 93.1,
+      "yawDegPerSecond": 46.5,
+      "lateralG": 2.14,
+      "shareOfGrip": 1.02,
+      "slip": 0.23,
+      "slideAngleDeg": 0.34,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 85.5,
+      "yawDegPerSecond": 49.7,
+      "lateralG": 2.11,
+      "shareOfGrip": 1.02,
+      "slip": 0.24,
+      "slideAngleDeg": 0.46,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 69.9,
+      "yawDegPerSecond": 58.6,
+      "lateralG": 2.03,
+      "shareOfGrip": 1.02,
+      "slip": 0.24,
+      "slideAngleDeg": 0.55,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 56,
+      "yawDegPerSecond": 71.2,
+      "lateralG": 1.98,
+      "shareOfGrip": 1.01,
+      "slip": 0.24,
+      "slideAngleDeg": 0.67,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 45.1,
+      "yawDegPerSecond": 85.5,
+      "lateralG": 1.91,
+      "shareOfGrip": 1,
+      "slip": 0.06,
+      "slideAngleDeg": 0.32,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 150,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.28,
+    "peakSlip": 0.26,
+    "peakSlideAngleDeg": 0.28,
+    "headingTurnedDeg": 119.5,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 156.5,
+      "yawDegPerSecond": 10,
+      "lateralG": 0.77,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 162.6,
+      "yawDegPerSecond": 25.7,
+      "lateralG": 2.06,
+      "shareOfGrip": 0.79,
+      "slip": 0.02,
+      "slideAngleDeg": 0.01,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 168.1,
+      "yawDegPerSecond": 31.6,
+      "lateralG": 2.62,
+      "shareOfGrip": 0.98,
+      "slip": 0.16,
+      "slideAngleDeg": 0.12,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 177.1,
+      "yawDegPerSecond": 32.4,
+      "lateralG": 2.84,
+      "shareOfGrip": 1.03,
+      "slip": 0.23,
+      "slideAngleDeg": 0.23,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 193.7,
+      "yawDegPerSecond": 31.6,
+      "lateralG": 3.02,
+      "shareOfGrip": 1.03,
+      "slip": 0.25,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 222.7,
+      "yawDegPerSecond": 30.6,
+      "lateralG": 3.36,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 246.4,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 3.69,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 264.6,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 3.96,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 150,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.32,
+    "peakSlip": 0.25,
+    "peakSlideAngleDeg": 0.49,
+    "headingTurnedDeg": 161,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 148.4,
+      "yawDegPerSecond": 10.1,
+      "lateralG": 0.74,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 146.9,
+      "yawDegPerSecond": 26.7,
+      "lateralG": 1.94,
+      "shareOfGrip": 0.78,
+      "slip": 0.02,
+      "slideAngleDeg": 0.01,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 144.8,
+      "yawDegPerSecond": 33.4,
+      "lateralG": 2.4,
+      "shareOfGrip": 0.97,
+      "slip": 0.16,
+      "slideAngleDeg": 0.13,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 140.7,
+      "yawDegPerSecond": 35.5,
+      "lateralG": 2.48,
+      "shareOfGrip": 1.02,
+      "slip": 0.23,
+      "slideAngleDeg": 0.26,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 131.1,
+      "yawDegPerSecond": 37,
+      "lateralG": 2.4,
+      "shareOfGrip": 1.02,
+      "slip": 0.25,
+      "slideAngleDeg": 0.34,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 112.8,
+      "yawDegPerSecond": 40.6,
+      "lateralG": 2.27,
+      "shareOfGrip": 1.02,
+      "slip": 0.25,
+      "slideAngleDeg": 0.38,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 95.9,
+      "yawDegPerSecond": 45.6,
+      "lateralG": 2.16,
+      "shareOfGrip": 1.02,
+      "slip": 0.24,
+      "slideAngleDeg": 0.43,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 80.5,
+      "yawDegPerSecond": 52.2,
+      "lateralG": 2.08,
+      "shareOfGrip": 1.02,
+      "slip": 0.24,
+      "slideAngleDeg": 0.49,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 200,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.29,
+    "peakSlip": 0.26,
+    "peakSlideAngleDeg": 0.28,
+    "headingTurnedDeg": 117.3,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 204.3,
+      "yawDegPerSecond": 9.1,
+      "lateralG": 0.91,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 208.4,
+      "yawDegPerSecond": 23.7,
+      "lateralG": 2.43,
+      "shareOfGrip": 0.78,
+      "slip": 0.02,
+      "slideAngleDeg": 0.01,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 211.9,
+      "yawDegPerSecond": 29.4,
+      "lateralG": 3.08,
+      "shareOfGrip": 0.98,
+      "slip": 0.17,
+      "slideAngleDeg": 0.12,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 218.4,
+      "yawDegPerSecond": 30.7,
+      "lateralG": 3.31,
+      "shareOfGrip": 1.02,
+      "slip": 0.24,
+      "slideAngleDeg": 0.22,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 227.7,
+      "yawDegPerSecond": 30.5,
+      "lateralG": 3.43,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.27,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 250.3,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 3.75,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 267.3,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 4.01,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 275.2,
+      "yawDegPerSecond": 30.4,
+      "lateralG": 4.13,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 200,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.31,
+    "peakSlip": 0.25,
+    "peakSlideAngleDeg": 0.38,
+    "headingTurnedDeg": 133.9,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 197.9,
+      "yawDegPerSecond": 9.1,
+      "lateralG": 0.89,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 195.7,
+      "yawDegPerSecond": 23.9,
+      "lateralG": 2.32,
+      "shareOfGrip": 0.78,
+      "slip": 0.02,
+      "slideAngleDeg": 0.01,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 193.1,
+      "yawDegPerSecond": 29.9,
+      "lateralG": 2.86,
+      "shareOfGrip": 0.98,
+      "slip": 0.16,
+      "slideAngleDeg": 0.12,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 187.9,
+      "yawDegPerSecond": 31.6,
+      "lateralG": 2.94,
+      "shareOfGrip": 1.02,
+      "slip": 0.24,
+      "slideAngleDeg": 0.23,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 175.8,
+      "yawDegPerSecond": 32.3,
+      "lateralG": 2.81,
+      "shareOfGrip": 1.02,
+      "slip": 0.25,
+      "slideAngleDeg": 0.3,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 153.7,
+      "yawDegPerSecond": 34.1,
+      "lateralG": 2.59,
+      "shareOfGrip": 1.02,
+      "slip": 0.25,
+      "slideAngleDeg": 0.32,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 133.4,
+      "yawDegPerSecond": 36.7,
+      "lateralG": 2.42,
+      "shareOfGrip": 1.02,
+      "slip": 0.25,
+      "slideAngleDeg": 0.34,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 115,
+      "yawDegPerSecond": 40.1,
+      "lateralG": 2.28,
+      "shareOfGrip": 1.02,
+      "slip": 0.25,
+      "slideAngleDeg": 0.38,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 250,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.3,
+    "peakSlip": 0.27,
+    "peakSlideAngleDeg": 0.28,
+    "headingTurnedDeg": 117.2,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 252.5,
+      "yawDegPerSecond": 8.8,
+      "lateralG": 1.1,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 254.9,
+      "yawDegPerSecond": 23.2,
+      "lateralG": 2.92,
+      "shareOfGrip": 0.78,
+      "slip": 0.02,
+      "slideAngleDeg": 0.01,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 256.8,
+      "yawDegPerSecond": 28.9,
+      "lateralG": 3.66,
+      "shareOfGrip": 0.98,
+      "slip": 0.17,
+      "slideAngleDeg": 0.11,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 260.3,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 3.89,
+      "shareOfGrip": 1.02,
+      "slip": 0.24,
+      "slideAngleDeg": 0.22,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 267.9,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 4.02,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.27,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 275.6,
+      "yawDegPerSecond": 30.4,
+      "lateralG": 4.14,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 284.4,
+      "yawDegPerSecond": 30.5,
+      "lateralG": 4.29,
+      "shareOfGrip": 1.03,
+      "slip": 0.27,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 291.3,
+      "yawDegPerSecond": 30.6,
+      "lateralG": 4.4,
+      "shareOfGrip": 1.03,
+      "slip": 0.27,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "arcade",
+    "startKmh": 250,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.3,
+    "peakSlip": 0.26,
+    "peakSlideAngleDeg": 0.33,
+    "headingTurnedDeg": 122.8,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 247.1,
+      "yawDegPerSecond": 8.8,
+      "lateralG": 1.08,
+      "shareOfGrip": 0.3,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 244.3,
+      "yawDegPerSecond": 23.2,
+      "lateralG": 2.8,
+      "shareOfGrip": 0.79,
+      "slip": 0.02,
+      "slideAngleDeg": 0.01,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 241,
+      "yawDegPerSecond": 28.9,
+      "lateralG": 3.45,
+      "shareOfGrip": 0.98,
+      "slip": 0.17,
+      "slideAngleDeg": 0.12,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 234.6,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 3.52,
+      "shareOfGrip": 1.02,
+      "slip": 0.24,
+      "slideAngleDeg": 0.22,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 219.4,
+      "yawDegPerSecond": 30.6,
+      "lateralG": 3.32,
+      "shareOfGrip": 1.03,
+      "slip": 0.26,
+      "slideAngleDeg": 0.28,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 192.5,
+      "yawDegPerSecond": 31.4,
+      "lateralG": 2.99,
+      "shareOfGrip": 1.03,
+      "slip": 0.25,
+      "slideAngleDeg": 0.3,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 168.4,
+      "yawDegPerSecond": 32.8,
+      "lateralG": 2.73,
+      "shareOfGrip": 1.02,
+      "slip": 0.25,
+      "slideAngleDeg": 0.31,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 146.8,
+      "yawDegPerSecond": 34.9,
+      "lateralG": 2.53,
+      "shareOfGrip": 1.02,
+      "slip": 0.25,
+      "slideAngleDeg": 0.33,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 60,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.22,
+    "peakSlip": 2.21,
+    "peakSlideAngleDeg": 2.16,
+    "headingTurnedDeg": 154.7,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 65.2,
+      "yawDegPerSecond": 19.9,
+      "lateralG": 0.64,
+      "shareOfGrip": 0.35,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 70.1,
+      "yawDegPerSecond": 46.8,
+      "lateralG": 1.61,
+      "shareOfGrip": 0.87,
+      "slip": 0.11,
+      "slideAngleDeg": 0.11,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 74,
+      "yawDegPerSecond": 53.4,
+      "lateralG": 1.95,
+      "shareOfGrip": 1.04,
+      "slip": 0.42,
+      "slideAngleDeg": 0.52,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 81.5,
+      "yawDegPerSecond": 51.1,
+      "lateralG": 2.05,
+      "shareOfGrip": 1.08,
+      "slip": 0.65,
+      "slideAngleDeg": 0.97,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 93,
+      "yawDegPerSecond": 45.2,
+      "lateralG": 2.07,
+      "shareOfGrip": 1.06,
+      "slip": 0.93,
+      "slideAngleDeg": 1.46,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 120.3,
+      "yawDegPerSecond": 37.8,
+      "lateralG": 2.25,
+      "shareOfGrip": 1.07,
+      "slip": 1.45,
+      "slideAngleDeg": 1.9,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 135.1,
+      "yawDegPerSecond": 35.2,
+      "lateralG": 2.35,
+      "shareOfGrip": 1.06,
+      "slip": 1.78,
+      "slideAngleDeg": 2.11,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 157.4,
+      "yawDegPerSecond": 32.6,
+      "lateralG": 2.53,
+      "shareOfGrip": 1.06,
+      "slip": 2.21,
+      "slideAngleDeg": 1.94,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 60,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.35,
+    "peakSlip": 0.32,
+    "peakSlideAngleDeg": 0.81,
+    "headingTurnedDeg": 81.2,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 59.2,
+      "yawDegPerSecond": 20.2,
+      "lateralG": 0.59,
+      "shareOfGrip": 0.33,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 58.3,
+      "yawDegPerSecond": 51.5,
+      "lateralG": 1.49,
+      "shareOfGrip": 0.82,
+      "slip": 0.06,
+      "slideAngleDeg": 0.07,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 56.7,
+      "yawDegPerSecond": 63.3,
+      "lateralG": 1.78,
+      "shareOfGrip": 0.98,
+      "slip": 0.25,
+      "slideAngleDeg": 0.4,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 53.7,
+      "yawDegPerSecond": 68.9,
+      "lateralG": 1.83,
+      "shareOfGrip": 1.02,
+      "slip": 0.32,
+      "slideAngleDeg": 0.72,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 47.2,
+      "yawDegPerSecond": 77.2,
+      "lateralG": 1.8,
+      "shareOfGrip": 1.01,
+      "slip": 0.25,
+      "slideAngleDeg": 0.78,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 40.2,
+      "yawDegPerSecond": 78.7,
+      "lateralG": 1.57,
+      "shareOfGrip": 0.89,
+      "slip": 0,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 35,
+      "yawDegPerSecond": 68.7,
+      "lateralG": 1.19,
+      "shareOfGrip": 0.68,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 30.5,
+      "yawDegPerSecond": 59.7,
+      "lateralG": 0.9,
+      "shareOfGrip": 0.52,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 100,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.22,
+    "peakSlip": 2.63,
+    "peakSlideAngleDeg": 2.16,
+    "headingTurnedDeg": 133.3,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 105.5,
+      "yawDegPerSecond": 19.6,
+      "lateralG": 1.02,
+      "shareOfGrip": 0.5,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 109.8,
+      "yawDegPerSecond": 35.8,
+      "lateralG": 1.94,
+      "shareOfGrip": 0.95,
+      "slip": 0.43,
+      "slideAngleDeg": 0.35,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 112.4,
+      "yawDegPerSecond": 38.7,
+      "lateralG": 2.15,
+      "shareOfGrip": 1.05,
+      "slip": 0.99,
+      "slideAngleDeg": 0.94,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 117.3,
+      "yawDegPerSecond": 38.4,
+      "lateralG": 2.23,
+      "shareOfGrip": 1.07,
+      "slip": 1.33,
+      "slideAngleDeg": 1.56,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 128.2,
+      "yawDegPerSecond": 36.3,
+      "lateralG": 2.3,
+      "shareOfGrip": 1.07,
+      "slip": 1.62,
+      "slideAngleDeg": 2.04,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 143,
+      "yawDegPerSecond": 34.1,
+      "lateralG": 2.41,
+      "shareOfGrip": 1.06,
+      "slip": 1.93,
+      "slideAngleDeg": 2.04,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 166.1,
+      "yawDegPerSecond": 31.8,
+      "lateralG": 2.61,
+      "shareOfGrip": 1.06,
+      "slip": 2.39,
+      "slideAngleDeg": 1.9,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 176.6,
+      "yawDegPerSecond": 31,
+      "lateralG": 2.7,
+      "shareOfGrip": 1.06,
+      "slip": 2.62,
+      "slideAngleDeg": 1.88,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 100,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.35,
+    "peakSlip": 0.86,
+    "peakSlideAngleDeg": 1.45,
+    "headingTurnedDeg": 103,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 98.9,
+      "yawDegPerSecond": 19.4,
+      "lateralG": 0.95,
+      "shareOfGrip": 0.48,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 96.9,
+      "yawDegPerSecond": 38,
+      "lateralG": 1.82,
+      "shareOfGrip": 0.93,
+      "slip": 0.33,
+      "slideAngleDeg": 0.29,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 93.6,
+      "yawDegPerSecond": 43,
+      "lateralG": 1.99,
+      "shareOfGrip": 1.02,
+      "slip": 0.75,
+      "slideAngleDeg": 0.83,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 87.5,
+      "yawDegPerSecond": 46.3,
+      "lateralG": 2.01,
+      "shareOfGrip": 1.04,
+      "slip": 0.86,
+      "slideAngleDeg": 1.32,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 74.1,
+      "yawDegPerSecond": 53,
+      "lateralG": 1.95,
+      "shareOfGrip": 1.04,
+      "slip": 0.66,
+      "slideAngleDeg": 1.4,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 55,
+      "yawDegPerSecond": 67.6,
+      "lateralG": 1.84,
+      "shareOfGrip": 1.02,
+      "slip": 0.36,
+      "slideAngleDeg": 1,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 43.6,
+      "yawDegPerSecond": 81.9,
+      "lateralG": 1.77,
+      "shareOfGrip": 1,
+      "slip": 0.07,
+      "slideAngleDeg": 0.36,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 38,
+      "yawDegPerSecond": 74.5,
+      "lateralG": 1.4,
+      "shareOfGrip": 0.8,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 150,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.21,
+    "peakSlip": 3.05,
+    "peakSlideAngleDeg": 1.9,
+    "headingTurnedDeg": 120.1,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 155.9,
+      "yawDegPerSecond": 20.1,
+      "lateralG": 1.55,
+      "shareOfGrip": 0.65,
+      "slip": 0.08,
+      "slideAngleDeg": 0.04,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 159.3,
+      "yawDegPerSecond": 29.9,
+      "lateralG": 2.35,
+      "shareOfGrip": 0.98,
+      "slip": 0.98,
+      "slideAngleDeg": 0.63,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 161.7,
+      "yawDegPerSecond": 31.7,
+      "lateralG": 2.53,
+      "shareOfGrip": 1.05,
+      "slip": 1.85,
+      "slideAngleDeg": 1.14,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 166.3,
+      "yawDegPerSecond": 31.8,
+      "lateralG": 2.61,
+      "shareOfGrip": 1.06,
+      "slip": 2.32,
+      "slideAngleDeg": 1.62,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 175.9,
+      "yawDegPerSecond": 31.1,
+      "lateralG": 2.7,
+      "shareOfGrip": 1.06,
+      "slip": 2.59,
+      "slideAngleDeg": 1.84,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 182.1,
+      "yawDegPerSecond": 30.7,
+      "lateralG": 2.76,
+      "shareOfGrip": 1.06,
+      "slip": 2.73,
+      "slideAngleDeg": 1.85,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 191.4,
+      "yawDegPerSecond": 30.2,
+      "lateralG": 2.85,
+      "shareOfGrip": 1.06,
+      "slip": 2.91,
+      "slideAngleDeg": 1.83,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 198.3,
+      "yawDegPerSecond": 29.9,
+      "lateralG": 2.93,
+      "shareOfGrip": 1.06,
+      "slip": 3.05,
+      "slideAngleDeg": 1.81,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 150,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.32,
+    "peakSlip": 1.72,
+    "peakSlideAngleDeg": 2.16,
+    "headingTurnedDeg": 147.2,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 148.3,
+      "yawDegPerSecond": 20.2,
+      "lateralG": 1.48,
+      "shareOfGrip": 0.64,
+      "slip": 0.06,
+      "slideAngleDeg": 0.04,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 144.2,
+      "yawDegPerSecond": 30.9,
+      "lateralG": 2.21,
+      "shareOfGrip": 0.97,
+      "slip": 0.84,
+      "slideAngleDeg": 0.6,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 139,
+      "yawDegPerSecond": 33.5,
+      "lateralG": 2.31,
+      "shareOfGrip": 1.03,
+      "slip": 1.54,
+      "slideAngleDeg": 1.21,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 128.7,
+      "yawDegPerSecond": 35.4,
+      "lateralG": 2.26,
+      "shareOfGrip": 1.05,
+      "slip": 1.7,
+      "slideAngleDeg": 1.89,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 106.1,
+      "yawDegPerSecond": 40.1,
+      "lateralG": 2.11,
+      "shareOfGrip": 1.05,
+      "slip": 1.29,
+      "slideAngleDeg": 2.08,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 75.3,
+      "yawDegPerSecond": 52.3,
+      "lateralG": 1.95,
+      "shareOfGrip": 1.04,
+      "slip": 0.68,
+      "slideAngleDeg": 1.46,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 55.8,
+      "yawDegPerSecond": 66.8,
+      "lateralG": 1.85,
+      "shareOfGrip": 1.02,
+      "slip": 0.37,
+      "slideAngleDeg": 1.02,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 43.9,
+      "yawDegPerSecond": 81.4,
+      "lateralG": 1.77,
+      "shareOfGrip": 1,
+      "slip": 0.09,
+      "slideAngleDeg": 0.42,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 200,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.22,
+    "peakSlip": 3.35,
+    "peakSlideAngleDeg": 1.8,
+    "headingTurnedDeg": 115.6,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 203.7,
+      "yawDegPerSecond": 20.2,
+      "lateralG": 2.03,
+      "shareOfGrip": 0.72,
+      "slip": 0.22,
+      "slideAngleDeg": 0.12,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 204.4,
+      "yawDegPerSecond": 27.8,
+      "lateralG": 2.81,
+      "shareOfGrip": 0.99,
+      "slip": 1.49,
+      "slideAngleDeg": 0.74,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 204.8,
+      "yawDegPerSecond": 29.3,
+      "lateralG": 2.96,
+      "shareOfGrip": 1.05,
+      "slip": 2.6,
+      "slideAngleDeg": 1.16,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 205.6,
+      "yawDegPerSecond": 29.6,
+      "lateralG": 3.01,
+      "shareOfGrip": 1.06,
+      "slip": 3.1,
+      "slideAngleDeg": 1.57,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 207.5,
+      "yawDegPerSecond": 29.6,
+      "lateralG": 3.03,
+      "shareOfGrip": 1.06,
+      "slip": 3.22,
+      "slideAngleDeg": 1.78,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 210.4,
+      "yawDegPerSecond": 29.5,
+      "lateralG": 3.07,
+      "shareOfGrip": 1.06,
+      "slip": 3.28,
+      "slideAngleDeg": 1.79,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 212.7,
+      "yawDegPerSecond": 29.5,
+      "lateralG": 3.1,
+      "shareOfGrip": 1.06,
+      "slip": 3.33,
+      "slideAngleDeg": 1.79,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 214,
+      "yawDegPerSecond": 29.4,
+      "lateralG": 3.11,
+      "shareOfGrip": 1.06,
+      "slip": 3.35,
+      "slideAngleDeg": 1.79,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 200,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.26,
+    "peakSlip": 2.63,
+    "peakSlideAngleDeg": 2.3,
+    "headingTurnedDeg": 174.5,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 197.4,
+      "yawDegPerSecond": 20.2,
+      "lateralG": 1.98,
+      "shareOfGrip": 0.72,
+      "slip": 0.2,
+      "slideAngleDeg": 0.11,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 191.8,
+      "yawDegPerSecond": 28.1,
+      "lateralG": 2.67,
+      "shareOfGrip": 0.99,
+      "slip": 1.39,
+      "slideAngleDeg": 0.75,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 186,
+      "yawDegPerSecond": 29.9,
+      "lateralG": 2.75,
+      "shareOfGrip": 1.04,
+      "slip": 2.36,
+      "slideAngleDeg": 1.21,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 174.8,
+      "yawDegPerSecond": 30.8,
+      "lateralG": 2.67,
+      "shareOfGrip": 1.05,
+      "slip": 2.62,
+      "slideAngleDeg": 1.69,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 147.7,
+      "yawDegPerSecond": 33,
+      "lateralG": 2.42,
+      "shareOfGrip": 1.05,
+      "slip": 2.16,
+      "slideAngleDeg": 2.09,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 101,
+      "yawDegPerSecond": 41.5,
+      "lateralG": 2.08,
+      "shareOfGrip": 1.04,
+      "slip": 1.19,
+      "slideAngleDeg": 2.02,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 72.1,
+      "yawDegPerSecond": 54.3,
+      "lateralG": 1.94,
+      "shareOfGrip": 1.04,
+      "slip": 0.63,
+      "slideAngleDeg": 1.39,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 53.8,
+      "yawDegPerSecond": 68.9,
+      "lateralG": 1.84,
+      "shareOfGrip": 1.02,
+      "slip": 0.34,
+      "slideAngleDeg": 0.97,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 250,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.22,
+    "peakSlip": 3.88,
+    "peakSlideAngleDeg": 1.79,
+    "headingTurnedDeg": 114.1,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 251.6,
+      "yawDegPerSecond": 20.5,
+      "lateralG": 2.55,
+      "shareOfGrip": 0.75,
+      "slip": 0.36,
+      "slideAngleDeg": 0.2,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 250.4,
+      "yawDegPerSecond": 27.3,
+      "lateralG": 3.38,
+      "shareOfGrip": 1,
+      "slip": 1.96,
+      "slideAngleDeg": 0.81,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 249.1,
+      "yawDegPerSecond": 28.6,
+      "lateralG": 3.53,
+      "shareOfGrip": 1.05,
+      "slip": 3.29,
+      "slideAngleDeg": 1.19,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 246.8,
+      "yawDegPerSecond": 29,
+      "lateralG": 3.54,
+      "shareOfGrip": 1.06,
+      "slip": 3.84,
+      "slideAngleDeg": 1.56,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 241.3,
+      "yawDegPerSecond": 29,
+      "lateralG": 3.46,
+      "shareOfGrip": 1.06,
+      "slip": 3.84,
+      "slideAngleDeg": 1.77,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 232.4,
+      "yawDegPerSecond": 29.1,
+      "lateralG": 3.34,
+      "shareOfGrip": 1.06,
+      "slip": 3.69,
+      "slideAngleDeg": 1.79,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 225.5,
+      "yawDegPerSecond": 29.2,
+      "lateralG": 3.25,
+      "shareOfGrip": 1.06,
+      "slip": 3.57,
+      "slideAngleDeg": 1.79,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 220.1,
+      "yawDegPerSecond": 29.3,
+      "lateralG": 3.19,
+      "shareOfGrip": 1.06,
+      "slip": 3.47,
+      "slideAngleDeg": 1.79,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "racing",
+    "startKmh": 250,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.23,
+    "peakSlip": 3.48,
+    "peakSlideAngleDeg": 2.31,
+    "headingTurnedDeg": 148,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 246.2,
+      "yawDegPerSecond": 20.5,
+      "lateralG": 2.5,
+      "shareOfGrip": 0.75,
+      "slip": 0.35,
+      "slideAngleDeg": 0.19,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 239.7,
+      "yawDegPerSecond": 27.3,
+      "lateralG": 3.24,
+      "shareOfGrip": 1,
+      "slip": 1.89,
+      "slideAngleDeg": 0.82,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 233.3,
+      "yawDegPerSecond": 28.7,
+      "lateralG": 3.32,
+      "shareOfGrip": 1.05,
+      "slip": 3.11,
+      "slideAngleDeg": 1.22,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 220.8,
+      "yawDegPerSecond": 29.2,
+      "lateralG": 3.19,
+      "shareOfGrip": 1.06,
+      "slip": 3.48,
+      "slideAngleDeg": 1.63,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 191.2,
+      "yawDegPerSecond": 30,
+      "lateralG": 2.84,
+      "shareOfGrip": 1.06,
+      "slip": 3.03,
+      "slideAngleDeg": 1.9,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 136.6,
+      "yawDegPerSecond": 34.3,
+      "lateralG": 2.32,
+      "shareOfGrip": 1.05,
+      "slip": 1.94,
+      "slideAngleDeg": 2.2,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 93.8,
+      "yawDegPerSecond": 43.9,
+      "lateralG": 2.04,
+      "shareOfGrip": 1.04,
+      "slip": 1.04,
+      "slideAngleDeg": 1.87,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 67.5,
+      "yawDegPerSecond": 57.4,
+      "lateralG": 1.92,
+      "shareOfGrip": 1.04,
+      "slip": 0.55,
+      "slideAngleDeg": 1.29,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 60,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.22,
+    "peakSlip": 1.52,
+    "peakSlideAngleDeg": 1.63,
+    "headingTurnedDeg": 149.7,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 65.4,
+      "yawDegPerSecond": 19,
+      "lateralG": 0.61,
+      "shareOfGrip": 0.32,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 70.7,
+      "yawDegPerSecond": 46.4,
+      "lateralG": 1.61,
+      "shareOfGrip": 0.84,
+      "slip": 0.05,
+      "slideAngleDeg": 0.06,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 75.3,
+      "yawDegPerSecond": 53.8,
+      "lateralG": 1.99,
+      "shareOfGrip": 1.02,
+      "slip": 0.27,
+      "slideAngleDeg": 0.34,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 84.3,
+      "yawDegPerSecond": 51.4,
+      "lateralG": 2.13,
+      "shareOfGrip": 1.07,
+      "slip": 0.42,
+      "slideAngleDeg": 0.63,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 100.8,
+      "yawDegPerSecond": 45,
+      "lateralG": 2.23,
+      "shareOfGrip": 1.08,
+      "slip": 0.58,
+      "slideAngleDeg": 0.87,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 135.9,
+      "yawDegPerSecond": 36.5,
+      "lateralG": 2.45,
+      "shareOfGrip": 1.06,
+      "slip": 0.92,
+      "slideAngleDeg": 1.17,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 174.8,
+      "yawDegPerSecond": 32.5,
+      "lateralG": 2.8,
+      "shareOfGrip": 1.06,
+      "slip": 1.28,
+      "slideAngleDeg": 1.41,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 197.3,
+      "yawDegPerSecond": 31.2,
+      "lateralG": 3.04,
+      "shareOfGrip": 1.06,
+      "slip": 1.52,
+      "slideAngleDeg": 1.63,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 60,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.35,
+    "peakSlip": 0.26,
+    "peakSlideAngleDeg": 0.76,
+    "headingTurnedDeg": 75.6,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 59.2,
+      "yawDegPerSecond": 19.8,
+      "lateralG": 0.58,
+      "shareOfGrip": 0.31,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 58.3,
+      "yawDegPerSecond": 51.9,
+      "lateralG": 1.5,
+      "shareOfGrip": 0.8,
+      "slip": 0.03,
+      "slideAngleDeg": 0.04,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 56.9,
+      "yawDegPerSecond": 64.9,
+      "lateralG": 1.83,
+      "shareOfGrip": 0.97,
+      "slip": 0.2,
+      "slideAngleDeg": 0.32,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 54.2,
+      "yawDegPerSecond": 70.8,
+      "lateralG": 1.9,
+      "shareOfGrip": 1.02,
+      "slip": 0.26,
+      "slideAngleDeg": 0.61,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 47.9,
+      "yawDegPerSecond": 79.1,
+      "lateralG": 1.87,
+      "shareOfGrip": 1.01,
+      "slip": 0.24,
+      "slideAngleDeg": 0.75,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 40.9,
+      "yawDegPerSecond": 80.1,
+      "lateralG": 1.62,
+      "shareOfGrip": 0.88,
+      "slip": 0,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 35.7,
+      "yawDegPerSecond": 69.9,
+      "lateralG": 1.23,
+      "shareOfGrip": 0.68,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 31,
+      "yawDegPerSecond": 60.8,
+      "lateralG": 0.93,
+      "shareOfGrip": 0.51,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 100,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.23,
+    "peakSlip": 1.71,
+    "peakSlideAngleDeg": 1.81,
+    "headingTurnedDeg": 130.4,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 105.7,
+      "yawDegPerSecond": 15.7,
+      "lateralG": 0.82,
+      "shareOfGrip": 0.39,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 111.1,
+      "yawDegPerSecond": 34.9,
+      "lateralG": 1.91,
+      "shareOfGrip": 0.9,
+      "slip": 0.17,
+      "slideAngleDeg": 0.14,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 115.3,
+      "yawDegPerSecond": 39.4,
+      "lateralG": 2.24,
+      "shareOfGrip": 1.04,
+      "slip": 0.52,
+      "slideAngleDeg": 0.49,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 123.6,
+      "yawDegPerSecond": 38.9,
+      "lateralG": 2.37,
+      "shareOfGrip": 1.07,
+      "slip": 0.75,
+      "slideAngleDeg": 0.86,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 137.6,
+      "yawDegPerSecond": 36.3,
+      "lateralG": 2.46,
+      "shareOfGrip": 1.07,
+      "slip": 0.93,
+      "slideAngleDeg": 1.16,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 176.4,
+      "yawDegPerSecond": 32.4,
+      "lateralG": 2.82,
+      "shareOfGrip": 1.06,
+      "slip": 1.3,
+      "slideAngleDeg": 1.43,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 198.3,
+      "yawDegPerSecond": 31.2,
+      "lateralG": 3.05,
+      "shareOfGrip": 1.06,
+      "slip": 1.53,
+      "slideAngleDeg": 1.64,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 215.4,
+      "yawDegPerSecond": 30.6,
+      "lateralG": 3.25,
+      "shareOfGrip": 1.06,
+      "slip": 1.71,
+      "slideAngleDeg": 1.81,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 100,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.33,
+    "peakSlip": 0.52,
+    "peakSlideAngleDeg": 0.92,
+    "headingTurnedDeg": 108.9,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 98.9,
+      "yawDegPerSecond": 15.8,
+      "lateralG": 0.78,
+      "shareOfGrip": 0.38,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 97.5,
+      "yawDegPerSecond": 37,
+      "lateralG": 1.79,
+      "shareOfGrip": 0.87,
+      "slip": 0.13,
+      "slideAngleDeg": 0.11,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 95.2,
+      "yawDegPerSecond": 43.9,
+      "lateralG": 2.07,
+      "shareOfGrip": 1.01,
+      "slip": 0.41,
+      "slideAngleDeg": 0.45,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 90.7,
+      "yawDegPerSecond": 47,
+      "lateralG": 2.11,
+      "shareOfGrip": 1.05,
+      "slip": 0.52,
+      "slideAngleDeg": 0.78,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 80.2,
+      "yawDegPerSecond": 51.3,
+      "lateralG": 2.04,
+      "shareOfGrip": 1.04,
+      "slip": 0.46,
+      "slideAngleDeg": 0.92,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 62.1,
+      "yawDegPerSecond": 63,
+      "lateralG": 1.94,
+      "shareOfGrip": 1.02,
+      "slip": 0.33,
+      "slideAngleDeg": 0.83,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 48.4,
+      "yawDegPerSecond": 78.4,
+      "lateralG": 1.88,
+      "shareOfGrip": 1.01,
+      "slip": 0.25,
+      "slideAngleDeg": 0.78,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 41.2,
+      "yawDegPerSecond": 80.6,
+      "lateralG": 1.64,
+      "shareOfGrip": 0.89,
+      "slip": 0,
+      "slideAngleDeg": 0.03,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 150,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.23,
+    "peakSlip": 1.78,
+    "peakSlideAngleDeg": 1.88,
+    "headingTurnedDeg": 121.3,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 156.4,
+      "yawDegPerSecond": 15.7,
+      "lateralG": 1.21,
+      "shareOfGrip": 0.49,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 161.7,
+      "yawDegPerSecond": 29.6,
+      "lateralG": 2.36,
+      "shareOfGrip": 0.94,
+      "slip": 0.39,
+      "slideAngleDeg": 0.26,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 165.6,
+      "yawDegPerSecond": 32.4,
+      "lateralG": 2.65,
+      "shareOfGrip": 1.04,
+      "slip": 0.91,
+      "slideAngleDeg": 0.71,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 173.2,
+      "yawDegPerSecond": 32.6,
+      "lateralG": 2.78,
+      "shareOfGrip": 1.06,
+      "slip": 1.21,
+      "slideAngleDeg": 1.18,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 183.2,
+      "yawDegPerSecond": 31.9,
+      "lateralG": 2.88,
+      "shareOfGrip": 1.06,
+      "slip": 1.37,
+      "slideAngleDeg": 1.5,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 206.5,
+      "yawDegPerSecond": 30.8,
+      "lateralG": 3.15,
+      "shareOfGrip": 1.06,
+      "slip": 1.62,
+      "slideAngleDeg": 1.72,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 219.8,
+      "yawDegPerSecond": 30.5,
+      "lateralG": 3.31,
+      "shareOfGrip": 1.06,
+      "slip": 1.76,
+      "slideAngleDeg": 1.84,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 221.1,
+      "yawDegPerSecond": 30.5,
+      "lateralG": 3.33,
+      "shareOfGrip": 1.06,
+      "slip": 1.77,
+      "slideAngleDeg": 1.85,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 150,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.3,
+    "peakSlip": 0.92,
+    "peakSlideAngleDeg": 1.21,
+    "headingTurnedDeg": 172.4,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 148.4,
+      "yawDegPerSecond": 15.6,
+      "lateralG": 1.15,
+      "shareOfGrip": 0.48,
+      "slip": 0,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 146,
+      "yawDegPerSecond": 30.6,
+      "lateralG": 2.21,
+      "shareOfGrip": 0.93,
+      "slip": 0.33,
+      "slideAngleDeg": 0.23,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 142.2,
+      "yawDegPerSecond": 34.3,
+      "lateralG": 2.41,
+      "shareOfGrip": 1.03,
+      "slip": 0.76,
+      "slideAngleDeg": 0.66,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 135,
+      "yawDegPerSecond": 36,
+      "lateralG": 2.41,
+      "shareOfGrip": 1.05,
+      "slip": 0.92,
+      "slideAngleDeg": 1.07,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 119,
+      "yawDegPerSecond": 38.9,
+      "lateralG": 2.29,
+      "shareOfGrip": 1.05,
+      "slip": 0.81,
+      "slideAngleDeg": 1.2,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 92.5,
+      "yawDegPerSecond": 46.4,
+      "lateralG": 2.12,
+      "shareOfGrip": 1.05,
+      "slip": 0.56,
+      "slideAngleDeg": 1.02,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 72,
+      "yawDegPerSecond": 55.8,
+      "lateralG": 1.99,
+      "shareOfGrip": 1.03,
+      "slip": 0.4,
+      "slideAngleDeg": 0.89,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 56,
+      "yawDegPerSecond": 68.9,
+      "lateralG": 1.91,
+      "shareOfGrip": 1.02,
+      "slip": 0.29,
+      "slideAngleDeg": 0.8,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 200,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.24,
+    "peakSlip": 1.85,
+    "peakSlideAngleDeg": 1.88,
+    "headingTurnedDeg": 118.7,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 205.5,
+      "yawDegPerSecond": 16.8,
+      "lateralG": 1.7,
+      "shareOfGrip": 0.58,
+      "slip": 0.01,
+      "slideAngleDeg": 0.01,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 209,
+      "yawDegPerSecond": 27.9,
+      "lateralG": 2.88,
+      "shareOfGrip": 0.96,
+      "slip": 0.61,
+      "slideAngleDeg": 0.38,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 210.6,
+      "yawDegPerSecond": 30.1,
+      "lateralG": 3.13,
+      "shareOfGrip": 1.04,
+      "slip": 1.26,
+      "slideAngleDeg": 0.94,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 213.6,
+      "yawDegPerSecond": 30.6,
+      "lateralG": 3.23,
+      "shareOfGrip": 1.06,
+      "slip": 1.61,
+      "slideAngleDeg": 1.49,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 219.3,
+      "yawDegPerSecond": 30.5,
+      "lateralG": 3.3,
+      "shareOfGrip": 1.06,
+      "slip": 1.74,
+      "slideAngleDeg": 1.81,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 220.7,
+      "yawDegPerSecond": 30.5,
+      "lateralG": 3.32,
+      "shareOfGrip": 1.06,
+      "slip": 1.77,
+      "slideAngleDeg": 1.85,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 225.9,
+      "yawDegPerSecond": 30.4,
+      "lateralG": 3.39,
+      "shareOfGrip": 1.06,
+      "slip": 1.81,
+      "slideAngleDeg": 1.84,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 229.9,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 3.44,
+      "shareOfGrip": 1.06,
+      "slip": 1.85,
+      "slideAngleDeg": 1.84,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 200,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.27,
+    "peakSlip": 1.34,
+    "peakSlideAngleDeg": 1.54,
+    "headingTurnedDeg": 157,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 197.8,
+      "yawDegPerSecond": 16.7,
+      "lateralG": 1.64,
+      "shareOfGrip": 0.57,
+      "slip": 0.01,
+      "slideAngleDeg": 0,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 194.1,
+      "yawDegPerSecond": 28.2,
+      "lateralG": 2.71,
+      "shareOfGrip": 0.96,
+      "slip": 0.55,
+      "slideAngleDeg": 0.36,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 188.8,
+      "yawDegPerSecond": 30.7,
+      "lateralG": 2.88,
+      "shareOfGrip": 1.04,
+      "slip": 1.13,
+      "slideAngleDeg": 0.88,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 178.7,
+      "yawDegPerSecond": 31.8,
+      "lateralG": 2.82,
+      "shareOfGrip": 1.06,
+      "slip": 1.34,
+      "slideAngleDeg": 1.38,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 156.3,
+      "yawDegPerSecond": 33.5,
+      "lateralG": 2.6,
+      "shareOfGrip": 1.05,
+      "slip": 1.19,
+      "slideAngleDeg": 1.52,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 120.7,
+      "yawDegPerSecond": 38.5,
+      "lateralG": 2.3,
+      "shareOfGrip": 1.05,
+      "slip": 0.83,
+      "slideAngleDeg": 1.24,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 93.8,
+      "yawDegPerSecond": 45.9,
+      "lateralG": 2.13,
+      "shareOfGrip": 1.05,
+      "slip": 0.58,
+      "slideAngleDeg": 1.03,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 73.1,
+      "yawDegPerSecond": 55.2,
+      "lateralG": 2,
+      "shareOfGrip": 1.03,
+      "slip": 0.41,
+      "slideAngleDeg": 0.9,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 250,
+    "throttle": 1,
+    "yawSteadyAfterSeconds": 0.23,
+    "peakSlip": 2.02,
+    "peakSlideAngleDeg": 1.84,
+    "headingTurnedDeg": 117.7,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 253.4,
+      "yawDegPerSecond": 17.8,
+      "lateralG": 2.23,
+      "shareOfGrip": 0.63,
+      "slip": 0.04,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 254.4,
+      "yawDegPerSecond": 27.6,
+      "lateralG": 3.48,
+      "shareOfGrip": 0.97,
+      "slip": 0.8,
+      "slideAngleDeg": 0.5,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 254.1,
+      "yawDegPerSecond": 29.6,
+      "lateralG": 3.72,
+      "shareOfGrip": 1.04,
+      "slip": 1.56,
+      "slideAngleDeg": 1.03,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 253.4,
+      "yawDegPerSecond": 30.1,
+      "lateralG": 3.77,
+      "shareOfGrip": 1.06,
+      "slip": 1.94,
+      "slideAngleDeg": 1.54,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 251.9,
+      "yawDegPerSecond": 30.1,
+      "lateralG": 3.75,
+      "shareOfGrip": 1.06,
+      "slip": 2.02,
+      "slideAngleDeg": 1.82,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 249.5,
+      "yawDegPerSecond": 30.1,
+      "lateralG": 3.72,
+      "shareOfGrip": 1.06,
+      "slip": 2.01,
+      "slideAngleDeg": 1.84,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 247.7,
+      "yawDegPerSecond": 30.2,
+      "lateralG": 3.69,
+      "shareOfGrip": 1.06,
+      "slip": 1.99,
+      "slideAngleDeg": 1.84,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 246.3,
+      "yawDegPerSecond": 30.2,
+      "lateralG": 3.67,
+      "shareOfGrip": 1.06,
+      "slip": 1.98,
+      "slideAngleDeg": 1.84,
+      "state": 1
+     }
+    ]
+   },
+   {
+    "profile": "turbo",
+    "startKmh": 250,
+    "throttle": 0,
+    "yawSteadyAfterSeconds": 0.24,
+    "peakSlip": 1.75,
+    "peakSlideAngleDeg": 1.86,
+    "headingTurnedDeg": 140.6,
+    "spin": false,
+    "leftTheAsphalt": false,
+    "tyreSquealFromSlip": 0.22,
+    "tyreMarksFromSlip": 0.55,
+    "tyreSmokeFromSlip": 0.85,
+    "events": [
+     "shift",
+     "overtaken"
+    ],
+    "samples": [
+     {
+      "t": 0.1,
+      "steer": 0.46,
+      "speedKmh": 247,
+      "yawDegPerSecond": 17.7,
+      "lateralG": 2.17,
+      "shareOfGrip": 0.62,
+      "slip": 0.04,
+      "slideAngleDeg": 0.02,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "steer": 0.92,
+      "speedKmh": 241.9,
+      "yawDegPerSecond": 27.6,
+      "lateralG": 3.31,
+      "shareOfGrip": 0.97,
+      "slip": 0.76,
+      "slideAngleDeg": 0.48,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "steer": 1,
+      "speedKmh": 235.5,
+      "yawDegPerSecond": 29.7,
+      "lateralG": 3.46,
+      "shareOfGrip": 1.04,
+      "slip": 1.47,
+      "slideAngleDeg": 1.04,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "steer": 1,
+      "speedKmh": 222.9,
+      "yawDegPerSecond": 30.3,
+      "lateralG": 3.35,
+      "shareOfGrip": 1.06,
+      "slip": 1.75,
+      "slideAngleDeg": 1.6,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "steer": 1,
+      "speedKmh": 194,
+      "yawDegPerSecond": 31.1,
+      "lateralG": 2.99,
+      "shareOfGrip": 1.06,
+      "slip": 1.58,
+      "slideAngleDeg": 1.84,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "steer": 1,
+      "speedKmh": 148.1,
+      "yawDegPerSecond": 34.4,
+      "lateralG": 2.52,
+      "shareOfGrip": 1.05,
+      "slip": 1.11,
+      "slideAngleDeg": 1.48,
+      "state": 1
+     },
+     {
+      "t": 3,
+      "steer": 1,
+      "speedKmh": 114.5,
+      "yawDegPerSecond": 39.8,
+      "lateralG": 2.26,
+      "shareOfGrip": 1.05,
+      "slip": 0.77,
+      "slideAngleDeg": 1.2,
+      "state": 1
+     },
+     {
+      "t": 4,
+      "steer": 1,
+      "speedKmh": 89.4,
+      "yawDegPerSecond": 47.5,
+      "lateralG": 2.1,
+      "shareOfGrip": 1.05,
+      "slip": 0.54,
+      "slideAngleDeg": 1,
+      "state": 1
+     }
+    ]
+   }
+  ]
+ }
+}
