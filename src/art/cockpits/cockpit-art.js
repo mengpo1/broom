@@ -25,15 +25,18 @@ export const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };  
 /**
  * Left mirror as the driver sees it (centre and size in the units of the cockpit drawing); the
  * right one is its reflection. It is the projection of the mirror of the car model from the
- * driver's eye, so that the cockpit and the exterior views show the same car.
+ * driver's eye, so that the cockpit and the exterior views show the same car. Computed again by
+ * placeMirror() when the cockpit art is defined, in case another mount of the model was selected.
  */
-export const MIRROR = (() => {
+export const MIRROR = {};
+export function placeMirror() {
   const M = MIRROR_MOUNT, eye = CAR_DIMENSIONS.eye, k = COCKPIT_REF_FOCAL / (M.x - eye[0]);
-  return {
+  return Object.assign(MIRROR, {
     x: -M.y * k, y: (eye[2] - M.z) * k, w: (M.width + 0.012) * k, h: (M.height + 0.01) * k, glassInset: 14,
     armX: -M.arm[1] * k, armY: (eye[2] - M.arm[2]) * k,          // where the arm meets the side of the cockpit
-  };
-})();
+  });
+}
+placeMirror();
 const INK = '#16161f';
 const COCKPIT_INK = 4.2;
 const BOTTOM_LIMIT = 900;                      // nothing is needed further below the horizon than this
@@ -298,6 +301,7 @@ function paintSteeringWheel(ctx, S, glove, suit, accent, hands = true) {
  * @returns layout used by the compositor (see compositing/cockpit-layer.js)
  */
 export function defineCockpitArt(art, players) {
+  placeMirror();                                 // (the mount of the mirrors may have been chosen since this module was loaded)
   const eye = CAR_DIMENSIONS.eye, focal = COCKPIT_REF_FOCAL;
   const half = COCKPIT_REF_WIDTH / 2;
   const model = buildCarModel({ detail: 1 });

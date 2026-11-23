@@ -46,17 +46,25 @@ par le rasteriseur logiciel SwiftShader).
   (`work/reviews/collision-review.md`) ; ce qui n'a pas été traité est listé dans
   `collisions.md` § 9, et les corrections n'ont pas été revues à leur tour.
 - **Saut récupérable** : choix de gameplay original (rien de tel dans la vidéo de référence),
-  ajouté à la demande du joueur. Ses seuils et son dosage sont des réglages de départ, jamais
-  essayés au volant ; il se teste avec le banc d'essai (`collision-test-bench.md`). Les
-  voitures de l'ordinateur sautent aussi (1 à 5 fois par course de 16 voitures sur six courses
-  d'essai) : trop ou trop peu, c'est au joueur de le dire. Un second critique indépendant a
-  relevé 3 défauts moyens et 13 mineurs sur le saut, les roues et les rétroviseurs
-  (`work/reviews/second-test-review.md`) ; les suites sont dans `collisions.md` § 10, et la
-  contre-vérification des corrections au § 11. Restent notamment : la vitesse du saut est
-  toujours perdue d'un coup (76 km/h en une image), maintenant à l'instant du choc et non
-  plus à l'atterrissage ; la vue cockpit ne roule pas pendant le saut alors que la vue extérieure penche
+  ajouté à la demande du joueur ; il se teste avec le banc d'essai
+  (`collision-test-bench.md`). Jugé trop fréquent au troisième essai, il a été resserré à un
+  vrai contact roue avant derrière roue arrière, avec plus d'énergie : 0,3 saut par course de
+  16 voitures sur 108 courses d'essai, contre 1,9 (`collisions.md` § 12). **Si c'est le bon
+  niveau, c'est au joueur de le dire.** Son dosage (hauteur, vitesse perdue, perturbation de
+  la direction) n'a pas changé. Deux critiques indépendants ont examiné la version précédente
+  (`collisions.md` § 10 et 11) ; **le resserrement lui-même n'a été revu par aucun critique**.
+  Restent notamment : la vitesse du saut est perdue d'un coup à l'instant du choc (76 km/h en
+  une image) ; la vue cockpit ne roule pas pendant le saut alors que la vue extérieure penche
   la voiture ; le dessin de la voiture de devant change de vue pendant une image à l'instant
   du choc.
+- **Rétroviseurs** : jugés encore trop éloignés au troisième essai. La position du jeu est
+  inchangée ; quatre propositions plus rapprochées attendent le choix du joueur
+  (`wheels-and-mirrors.md` § 2 ter). Elles n'ont été ni revues par un critique ni essayées.
+- **Braquage maintenu** : en tenant une touche de direction, la direction arrive en butée en
+  0,225 s et plus rien ne change ensuite — ni mouvement supplémentaire du volant, ni virage
+  plus serré, ni dérapage. C'est mesuré et analysé (`steering-study.md`) mais **rien n'est
+  corrigé** : la solution dépend de la vidéo de référence que le joueur doit fournir, et toute
+  modification de la physique se fera dans une variante expérimentale séparée.
 - **Perte de roue** : demandée, **non implémentée**. La vidéo analysée n'en montre pas ; ce
   qu'il faudrait pour la définir est listé dans `collisions.md` § 6.
 - **Roues** : seules les roues avant de la vue cockpit suivent la vitesse (marques

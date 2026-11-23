@@ -10,16 +10,22 @@ import { Race, RACE_PHASE, SIM_DT } from '../../src/gameplay/race.js';
 import { RULE_PRESETS } from '../../src/gameplay/rules.js';
 import { DRIVERS, PLAYER_DRIVERS } from '../../src/vehicles/liveries.js';
 import { placeCar, CAR_STATE, LANDING, hopSteerKick, startHop } from '../../src/physics/car-physics.js';
+import { wheelBehindWheel } from '../../src/physics/collisions.js';
+import { CAR_DIMENSIONS } from '../../src/art/vehicles/car-model.js';
 import { COLLISION_TUNING as T } from '../../src/physics/collision-tuning.js';
 import { crashPitch, crashPitchDuration, CRASH_CAMERA as C } from '../../src/rendering/compositing/crash-camera.js';
 import { twoCars, run, KMH } from './collision-helpers.mjs';
 
 const track = buildTrack(getCircuit('kestrel-fields'));
 
-/** The reference hop of these tests: 200 km/h onto the rear wheel of a car doing 150 km/h, half a car width apart. */
-const rearHop = (options = {}) => twoCars(track, { gap: 2, lateral: 0.93, speedA: 200 / KMH, speedB: 150 / KMH, straight: 700, ...options });
-/** Side by side: the car behind drifts into the car ahead with its front wheel beside the rear wheel. */
-const sideHop = (options = {}) => twoCars(track, { gap: 1.2, lateral: 2.1, speedA: 200 / KMH, speedB: 150 / KMH, headingA: 0.02, straight: 700, ...options });
+// (After the third human test the hop was found far too frequent. It now needs the real geometry of a front wheel
+// behind a rear wheel - the cars offset by about a track width - and more energy. The two set-ups below were moved
+// accordingly: they used to be half a car width apart (0.93 m: nose on the wheel, now a bump or the accident E3), and
+// side by side with the front wheel BESIDE the rear wheel (now the wheel contact E2).)
+/** The reference hop of these tests: 200 km/h onto a car doing 150 km/h, offset by 1.7 m: the front tyre right behind the rear tyre. */
+const rearHop = (options = {}) => twoCars(track, { gap: 2, lateral: 1.7, speedA: 200 / KMH, speedB: 150 / KMH, straight: 700, ...options });
+/** From the side: the car behind drifts into the car ahead when its nose is only just alongside the tail: its front wheel is still behind the rear wheel. */
+const sideHop = (options = {}) => twoCars(track, { gap: -0.3, lateral: 1.95, speedA: 200 / KMH, speedB: 150 / KMH, headingA: 0.05, straight: 700, ...options });
 const first = (log, type) => log.events.find((e) => e.type === type);
 
 /** Overlap (m) of the boxes of two cars, 0 when they are apart: separating axis test, as in the game. */
@@ -108,10 +114,10 @@ test('the speed of a hop is lost where its cause is seen: at the shock and durin
   // the car is never sped up by a hop: when the car ahead is the faster one over the ground, nothing is added
   const car = { ...a, state: CAR_STATE.RACING, velX: 40, velZ: 0, speed: 40, clock: 100, rearmClock: -10 };
   startHop(car, null, 1, 1, 3, 80);
-  assert.equal(Math.hypot(car.velX, car.velZ), 40);
+  assert.ok(Math.abs(Math.hypot(car.velX, car.velZ) - 40) < 1e-9);
 });
 
-test('recoverable hop from the side: front wheel beside rear wheel; fully alongside, the wheels only rub (E2)', () => {
+test('recoverable hop from the side: a front wheel still behind the rear wheel is lifted; wheels side by side only rub (E2)', () => {
   const side = sideHop();
   const log = run(side.race, 1.5, { throttleA: 0.8, throttleB: 0.6 });
   const hop = first(log, 'hop'), landing = first(log, 'landing');
@@ -121,11 +127,14 @@ test('recoverable hop from the side: front wheel beside rear wheel; fully alongs
   // thrown clear: after the landing the two are apart and do not come together again
   const end = log.frames.at(-1);
   assert.ok(Math.abs(end.a.d - end.b.d) > side.a.params.halfWidth + side.b.params.halfWidth + 0.3, `apart by ${Math.abs(end.a.d - end.b.d).toFixed(2)} m at the end`);
-  // the same arrival fully alongside is the validated wheel contact, whatever the closing speed
-  const alongside = twoCars(track, { gap: -3.2, lateral: 2.1, speedA: 200 / KMH, speedB: 150 / KMH, headingA: 0.03, straight: 700 });
-  const rub = run(alongside.race, 1, { throttleA: 0.8, throttleB: 0.6 });
-  assert.ok(first(rub, 'wheel') && !first(rub, 'launch'), 'alongside: wheel contact, no flight');
-  assert.ok(Math.abs(first(rub, 'wheel').value * KMH - 96) < 3, 'with its validated penalty');
+  // the same arrival with the front wheel beside the rear wheel (it used to hop), or fully alongside, is the validated
+  // wheel contact, whatever the closing speed
+  for (const gap of [-1.5, -3.2]) {
+    const alongside = twoCars(track, { gap, lateral: 2.1, speedA: 200 / KMH, speedB: 150 / KMH, headingA: 0.03, straight: 700 });
+    const rub = run(alongside.race, 1, { throttleA: 0.8, throttleB: 0.6 });
+    assert.ok(first(rub, 'wheel') && !first(rub, 'launch'), `${-gap} m alongside: wheel contact, no flight`);
+    assert.ok(Math.abs(first(rub, 'wheel').value * KMH - 96) < 3, 'with its validated penalty');
+  }
 });
 
 test('after a hop the driver has the car back: the steering swings once and settles, then answers as on any car', () => {
@@ -181,36 +190,128 @@ test('a hop never stops the car: no standstill, no explosion, no repositioning, 
   assert.equal(a.resets, 0);
 });
 
-test('what triggers a hop is the wheel: tyre against tyre at the edge of the cars lifts the car, nose in the gearbox does not', () => {
-  // (the first recorded scene had the cars overlapping by half their width; the independent review asked for proof that
-  // a strict wheel-to-wheel alignment hops and that an in-line contact does not)
-  const width = (lateral) => { const { a, b } = rearHop({ lateral }); return (a.params.halfWidth + b.params.halfWidth - lateral) / (2 * Math.min(a.params.halfWidth, b.params.halfWidth)); };
-  for (const lateral of [0.5, 0.93, 1.2, 1.4, 1.6, 1.75]) {
+test('what triggers a hop is a front wheel behind a rear wheel: neither the nose on a wheel nor the nose in the gearbox', () => {
+  // (Rewritten after the third human test. This test used to accept a hop for any sideways offset from 0.5 to 1.75 m.
+  // Only the offsets where at least half of the front tyre stands behind the rear tyre hop now: from about 1.5 m, the
+  // nose passing outside the rear wheel. Closer to the axis the nose or the wing meets the wheel: bump, or accident E3.)
+  const tyreShare = (lateral) => { const out = []; const { a, b } = rearHop({ lateral }); wheelBehindWheel(a, b, out); return out[0]; };
+  for (const lateral of [1.55, 1.7, 1.8]) {
     const { race, a } = rearHop({ lateral });
     const log = run(race, 1.5, { throttleA: 1, throttleB: 0.6 });
     const landing = first(log, 'landing');
-    assert.ok(first(log, 'hop') && landing && landing.value === LANDING.RECOVERABLE, `offset ${lateral} m (${(width(lateral) * 100).toFixed(0)} % of the width overlapped): hop`);
+    assert.ok(tyreShare(lateral) >= T.hopTyreOverlapMin, `offset ${lateral} m: ${(tyreShare(lateral) * 100).toFixed(0)} % of the front tyre behind the rear tyre`);
+    assert.ok(first(log, 'hop') && landing && landing.value === LANDING.RECOVERABLE, `offset ${lateral} m: hop`);
     assert.ok(log.events.every((e) => e.type !== 'bump' && e.type !== 'wheel' && e.type !== 'crash'), `offset ${lateral} m: nothing but the hop`);
     assert.equal(a.state, CAR_STATE.RACING);
   }
-  assert.ok(width(1.6) < T.launchOverlapMin && width(1.75) < T.launchOverlapMin, 'the last two are tyre against tyre only: less overlap than the accident needs');
-  for (const lateral of [0, 0.3]) {
-    const { race } = rearHop({ lateral });
+  for (const lateral of [0, 0.3, 0.5, 0.93, 1.2, 1.4]) {
+    const { race, a, b } = rearHop({ lateral });
     const log = run(race, 1.5, { throttleA: 1, throttleB: 0.6 });
-    assert.ok(first(log, 'bump') && !first(log, 'launch'), `offset ${lateral} m (${(width(lateral) * 100).toFixed(0)} % overlapped, above ${T.launchOverlapMax * 100} %): bump, no flight`);
+    const bump = first(log, 'bump');
+    assert.ok(tyreShare(lateral) < T.hopTyreOverlapMin || lateral < 0.5, `offset ${lateral} m: the tyres are not one behind the other`);
+    assert.ok(bump && !first(log, 'launch'), `offset ${lateral} m: bump, no flight`);
+    assert.ok(Math.abs(log.atEvent(bump).b.speed - log.frames[bump.frame].a.speed - T.bumpSeparation) < 0.5, `offset ${lateral} m: the validated bump (48 km/h slower than the car ahead)`);
+    assert.equal(a.state, CAR_STATE.RACING); assert.equal(b.state, CAR_STATE.RACING);
   }
-  // with the energy of the accident the same edge contact is a hop too, not the accident: E3 keeps its own window
-  const edge = twoCars(track, { gap: 2, lateral: 1.6, speedA: 262 / KMH, speedB: 188 / KMH, straight: 700 });
-  const log = run(edge.race, 1.5, { throttleA: 1, throttleB: 0.7 });
-  assert.ok(first(log, 'hop') && first(log, 'landing').value === LANDING.RECOVERABLE && !first(log, 'crash'), 'tyre against tyre at high energy: hop, no wreck');
+  // with the energy of the accident: E3 in its own window (untouched), a hop where the tyres are one behind the other
+  for (const [lateral, outcome] of [[0.93, 'accident'], [1.2, 'accident'], [1.7, 'hop']]) {
+    const { race, a } = twoCars(track, { gap: 2, lateral, speedA: 262 / KMH, speedB: 188 / KMH, straight: 700 });
+    const log = run(race, 1.5, { throttleA: 1, throttleB: 0.7 });
+    assert.ok(first(log, 'launch'), `offset ${lateral} m at high energy: launch`);
+    assert.equal(!!first(log, 'hop'), outcome === 'hop', `offset ${lateral} m at high energy: ${outcome}`);
+    assert.equal(a.airKind, outcome === 'hop' ? LANDING.RECOVERABLE : LANDING.HARD);
+  }
   // and without any overlap there is no contact at all
   const clear = rearHop({ lateral: 2.0 });
   assert.equal(run(clear.race, 1.5, { throttleA: 1, throttleB: 0.6 }).events.filter((e) => ['bump', 'wheel', 'launch'].includes(e.type)).length, 0);
 });
 
+test('wheel geometry: the test of a front wheel behind a rear wheel uses the dimensions of the car model', () => {
+  const W = T.wheels, D = CAR_DIMENSIONS;
+  assert.deepEqual([W.frontAxle, W.rearAxle, W.frontTrack, W.rearTrack, W.frontTyreWidth, W.rearTyreWidth, W.frontTyreRadius, W.rearTyreRadius],
+    [D.frontAxleX, D.rearAxleX, D.frontTrack, D.rearTrack, D.frontTyre.width, D.rearTyre.width, D.frontTyre.radius, D.rearTyre.radius]);
+  assert.ok(Math.abs(T.hopAxleGapMin - (W.frontTyreRadius + W.rearTyreRadius)) < 0.01, 'one tyre behind the other: the axles are at least two tyre radii apart');
+  // two cars side by side on a straight line, the car behind `back` metres behind and `side` metres to the side
+  const pose = (back, side, heading = 0) => [{ x: -back, z: side, heading }, { x: 0, z: 0, heading: 0 }];
+  const measure = (back, side, heading) => { const out = []; const [f, l] = pose(back, side, heading); const ok = wheelBehindWheel(f, l, out); return { ok, share: out[0], gap: out[1] }; };
+  // nose to tail (4.2 m between the centres): the share of the front tyre in line with the rear tyre, by offset
+  assert.equal(measure(4.2, 0).share, 0, 'in line: the wheel compared is on the other side of the car, nothing in line');
+  assert.ok(Math.abs(measure(4.2, 1.72).share - 1) < 1e-9, 'offset by the sum of the two half tracks: the whole front tyre is behind the rear tyre');
+  assert.ok(Math.abs(measure(4.2, 1.51).share - 0.5) < 0.01 && measure(4.2, 1.52).ok && !measure(4.2, 1.5).ok, 'the hop starts where half of the front tyre is behind the rear tyre (1.51 m)');
+  assert.ok(Math.abs(measure(4.2, 0.93).share) < 1e-9 && !measure(4.2, 0.93).ok, 'half a car width apart (the staging of E3): the nose is on the wheel, no tyre behind a tyre');
+  assert.ok(Math.abs(measure(4.2, 1.7).gap - (4.2 - W.frontAxle + W.rearAxle)) < 1e-9, 'nose to tail the front wheel is 1.3 m behind the rear axle');
+  // the same on either side
+  assert.deepEqual(measure(4.2, -1.7), measure(4.2, 1.7));
+  // side by side (1.87 m between the axes): it depends on how far the nose is alongside the tail
+  assert.ok(measure(3.6, 1.87).ok, 'nose 0.6 m alongside the tail: the front wheel is still behind the rear wheel');
+  assert.ok(!measure(3.5, 1.87).ok && measure(3.5, 1.87).share > 0.5, 'nose 0.7 m alongside: the tyres begin to be side by side');
+  assert.ok(!measure(2.9, 1.87).ok && Math.abs(measure(2.9, 1.87).gap) < 1e-9, 'front axle level with the rear axle: wheels side by side');
+  assert.ok(!measure(0, 1.87).ok, 'fully alongside');
+  // the car behind turned toward the car ahead: its wheel is measured where it really is
+  assert.ok(measure(4.2, 1.9, -0.1).share > measure(4.2, 1.9).share - 0.6 && Number.isFinite(measure(4.2, 1.9, -0.1).gap));
+});
+
+test('no series of hops behind one car: for a while after the landing, a new contact with the same car is an ordinary bump', () => {
+  // the driver stays flat out in the same lane behind the car it has just hopped over (kept slower by the test)
+  // (left alone, the car is moved half a metre away by the steering disturbance and goes past: here its driver steers back)
+  const { race, a, b } = rearHop();
+  const lane = a.d;
+  let landedAt = -1;
+  const backInLane = () => Math.max(-0.4, Math.min(0.4, (lane - a.d) * 0.3 - a.headingError * 2.2));
+  const events = stepThrough({ race }, 6, { throttleA: 1, throttleB: 0.25, steerA: backInLane }, (i, t) => { if (landedAt < 0 && a.landKind === LANDING.RECOVERABLE && a.state === CAR_STATE.RACING) landedAt = t; });
+  const mine = events.filter((e) => e.car === a.index && ['hop', 'bump', 'wheel', 'launch', 'crash'].includes(e.type));
+  assert.equal(mine.filter((e) => e.type === 'hop').length, 1, 'one hop only');
+  // (at the very edge of the cars the same arrival is read as nose to tail or as side by side: bump or wheel contact, both validated)
+  const again = mine.filter((e) => e.type === 'bump' || e.type === 'wheel');
+  assert.ok(again.length >= 1, 'it caught the car again');
+  for (const e of again) assert.ok(e.tick * SIM_DT - landedAt < T.hopSamePairTime, 'inside the time during which it cannot hop over that car again');
+  assert.ok(mine.every((e) => e.type !== 'crash') && mine.filter((e) => e.type === 'launch').length === 1, 'and no accident: the tyres are one behind the other, outside the window of E3');
+  assert.equal(a.state, CAR_STATE.RACING); assert.equal(b.state, CAR_STATE.RACING);
+  assert.ok(T.hopSamePairTime > T.hopRearmTime);
+  // over another car it can hop again once re-armed: the memory is for the same car only
+  const car = { ...a, landKind: LANDING.RECOVERABLE, launchOther: b.index, clock: 100, rearmClock: 100 - T.hopRearmTime - 0.1, speed: 60 };
+  assert.ok(car.clock - car.rearmClock < T.hopSamePairTime && car.clock - car.rearmClock >= T.hopRearmTime);
+});
+
+test('frequency: in full races the hop is occasional, and every one of them is a front wheel behind a rear wheel with enough energy', () => {
+  // Four complete computer-driven races of 16 cars and 3 laps (two circuits, arcade and competition rules), always the
+  // same: with the first rules they gave 10 hops (5, 3, 1 and 1); the statistics over 108 races are in
+  // work/benchmarks/hop-frequency-*.json. The budget below is a guard against the hop becoming frequent again.
+  let total = 0;
+  const perRace = [];
+  for (const [circuit, rules] of [['hazelbrook', RULE_PRESETS.arcade], ['meridian-docks', RULE_PRESETS.arcade], ['hazelbrook', RULE_PRESETS.racing], ['meridian-docks', RULE_PRESETS.racing]]) {
+    const entries = DRIVERS.slice(0, 15).map((driver) => ({ driver }));
+    entries.push({ driver: PLAYER_DRIVERS[0], human: true, playerIndex: 0, autoDrive: true });
+    const race = new Race({ track: buildTrack(getCircuit(circuit)), laps: 3, entries, rules, difficulty: 'pro', seed: 11 });
+    const speeds = race.cars.map(() => 0), lastHop = race.cars.map(() => -1e9), out = [];
+    let hops = 0, steps = 0;
+    while (race.phase !== RACE_PHASE.FINISHED && steps++ < 120 * 60 * 20) {
+      for (let i = 0; i < race.cars.length; i++) speeds[i] = race.cars[i].speed;
+      race.step(SIM_DT);
+      for (let e = 0; e < race.eventCount; e++) {
+        const ev = race.events[e];
+        if (ev.type !== 'hop') continue;
+        hops++;
+        const f = race.cars[ev.car], l = race.cars[ev.other];
+        wheelBehindWheel(f, l, out);
+        assert.ok(out[0] >= T.hopTyreOverlapMin - 0.1 && out[1] >= T.hopAxleGapMin - 0.1, `${circuit}: hop with ${(out[0] * 100).toFixed(0)} % of the front tyre behind the rear tyre, ${out[1].toFixed(2)} m behind its axle`);
+        assert.ok(speeds[ev.car] - speeds[ev.other] >= T.hopClosingSpeed - 0.01 && speeds[ev.car] >= T.hopMinSpeed - 0.01, `${circuit}: hop at ${(speeds[ev.car] * KMH).toFixed(0)} km/h, ${((speeds[ev.car] - speeds[ev.other]) * KMH).toFixed(0)} km/h faster than the car ahead`);
+        assert.ok(race.time - lastHop[ev.car] > 10, `${circuit}: not a series of hops of the same car`);
+        lastHop[ev.car] = race.time;
+      }
+      race.eventCount = 0;
+    }
+    assert.equal(race.phase, RACE_PHASE.FINISHED);
+    perRace.push(hops); total += hops;
+  }
+  assert.ok(total <= 4, `hops in the four races: ${perRace.join(', ')} (at most one per race on average)`);
+  assert.ok(perRace.every((n) => n <= 2), `never more than two in a race: ${perRace.join(', ')}`);
+});
+
 test('low energy: below the hop thresholds nothing changes, the validated contacts keep their outcome', () => {
-  // wheel over wheel from behind, closing too slowly: the validated bump (the car ahead's speed less 48 km/h)
-  const slowClosing = twoCars(track, { gap: 2, lateral: 0.93, speedA: 160 / KMH, speedB: 140 / KMH, straight: 700 });
+  // (the sideways offsets of this test follow the new geometry of the hop: 1.7 m, tyre behind tyre)
+  // wheel behind wheel, closing too slowly: the validated bump (the car ahead's speed less 48 km/h)
+  const slowClosing = twoCars(track, { gap: 2, lateral: 1.7, speedA: 160 / KMH, speedB: 140 / KMH, straight: 700 });
   const log1 = run(slowClosing.race, 1.2, { throttleA: 0.6, throttleB: 0.5 });
   const bump = first(log1, 'bump');
   assert.ok(bump && !first(log1, 'launch'), 'bump, no flight');
@@ -218,10 +319,21 @@ test('low energy: below the hop thresholds nothing changes, the validated contac
   assert.ok(at.a.speed - at.b.speed < T.hopClosingSpeed, 'below the closing speed of a hop');
   assert.ok(Math.abs(at.b.speed - log1.frames[bump.frame].a.speed - T.bumpSeparation) < 0.5, 'the bump rule is unchanged');
   // fast enough in closing speed, but too slow a car
-  const slowCar = twoCars(track, { gap: 2, lateral: 0.93, speedA: 110 / KMH, speedB: 60 / KMH, straight: 700 });
+  const slowCar = twoCars(track, { gap: 2, lateral: 1.7, speedA: 110 / KMH, speedB: 60 / KMH, straight: 700 });
   const log2 = run(slowCar.race, 1, { throttleA: 0.5, throttleB: 0.3 });
   assert.ok(first(log2, 'bump') && !first(log2, 'launch'), 'too slow: bump, no flight');
   assert.ok(log2.atEvent(first(log2, 'bump')).a.speed < T.hopMinSpeed);
+  // the energies that gave a hop before the thresholds were raised (40 km/h of closing speed; 140 km/h): bumps now
+  for (const [speedA, speedB, why] of [[192, 150, 'closing speed'], [140, 90, 'speed']]) {
+    const before = twoCars(track, { gap: 2, lateral: 1.7, speedA: speedA / KMH, speedB: speedB / KMH, straight: 700 });
+    const log = run(before.race, 1.2, { throttleA: 0.45, throttleB: 0.45 });
+    const hit = first(log, 'bump');
+    assert.ok(hit && !first(log, 'launch'), `${speedA} km/h onto ${speedB}: bump, no flight (${why})`);
+    const at2 = log.atEvent(hit), closing = (at2.a.speed - at2.b.speed) * KMH;
+    assert.ok(closing > 36 && at2.a.speed * KMH > 119, `it would have hopped with the first thresholds (${closing.toFixed(0)} km/h of closing speed at ${(at2.a.speed * KMH).toFixed(0)} km/h)`);
+    assert.ok(why === 'closing speed' ? at2.a.speed - at2.b.speed < T.hopClosingSpeed : at2.a.speed < T.hopMinSpeed);
+  }
+  assert.ok(T.hopClosingSpeed * KMH >= 45 && T.hopMinSpeed * KMH >= 150, 'above the two validated reference contacts (E2: about 25 km/h of closing speed; E4: about 41)');
   // hop energy but nose to tail in line: no wheel to ride over
   const inLine = twoCars(track, { gap: 2, lateral: 0, speedA: 200 / KMH, speedB: 150 / KMH, straight: 700 });
   const log3 = run(inLine.race, 1, { throttleA: 1, throttleB: 0.6 });

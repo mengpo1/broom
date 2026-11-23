@@ -1,8 +1,9 @@
 {
- "note": "window: launchOverlapMin..launchOverlapMax of the width overlapped",
+ "note": "hop: at least hopTyreOverlapMin of the front tyre behind the rear tyre; accident E3: launchOverlapMin..launchOverlapMax of the car width overlapped",
+ "hopTyreOverlapMin": 0.5,
  "launchOverlapMin": 0.2,
  "launchOverlapMax": 0.8,
- "hopClosingSpeedKmh": 36,
+ "hopClosingSpeedKmh": 45,
  "launchClosingSpeedKmh": 54,
  "rows": [
   {
@@ -11,6 +12,7 @@
    "speedAhead": 150,
    "offset": 0,
    "widthOverlapped": 1,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 22.1,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -20,6 +22,7 @@
    "speedAhead": 150,
    "offset": 0.3,
    "widthOverlapped": 0.84,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 21.9,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -29,6 +32,7 @@
    "speedAhead": 150,
    "offset": 0.5,
    "widthOverlapped": 0.73,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 21.8,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -38,6 +42,7 @@
    "speedAhead": 150,
    "offset": 0.93,
    "widthOverlapped": 0.5,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 21.7,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -47,6 +52,7 @@
    "speedAhead": 150,
    "offset": 1.2,
    "widthOverlapped": 0.35,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 21.5,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -56,6 +62,7 @@
    "speedAhead": 150,
    "offset": 1.4,
    "widthOverlapped": 0.25,
+   "frontTyreBehindRearTyre": 0.12,
    "closingAtContact": 21.4,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -63,8 +70,29 @@
    "arrival": "faible energie",
    "speedBehind": 170,
    "speedAhead": 150,
-   "offset": 1.6,
-   "widthOverlapped": 0.14,
+   "offset": 1.5,
+   "widthOverlapped": 0.19,
+   "frontTyreBehindRearTyre": 0.47,
+   "closingAtContact": 21.4,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 1.55,
+   "widthOverlapped": 0.17,
+   "frontTyreBehindRearTyre": 0.64,
+   "closingAtContact": 21.4,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "faible energie",
+   "speedBehind": 170,
+   "speedAhead": 150,
+   "offset": 1.7,
+   "widthOverlapped": 0.09,
+   "frontTyreBehindRearTyre": 1,
    "closingAtContact": 21.3,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -74,6 +102,7 @@
    "speedAhead": 150,
    "offset": 1.8,
    "widthOverlapped": 0.03,
+   "frontTyreBehindRearTyre": 0.95,
    "closingAtContact": 21.4,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -83,6 +112,7 @@
    "speedAhead": 150,
    "offset": 2,
    "widthOverlapped": 0,
+   "frontTyreBehindRearTyre": 0.26,
    "closingAtContact": null,
    "outcome": "aucun contact"
   },
@@ -92,6 +122,7 @@
    "speedAhead": 150,
    "offset": 0,
    "widthOverlapped": 1,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 51.8,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -101,6 +132,7 @@
    "speedAhead": 150,
    "offset": 0.3,
    "widthOverlapped": 0.84,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 51.8,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -110,8 +142,9 @@
    "speedAhead": 150,
    "offset": 0.5,
    "widthOverlapped": 0.73,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 51.7,
-   "outcome": "saut recuperable"
+   "outcome": "tamponnage (sans decollage)"
   },
   {
    "arrival": "energie moyenne",
@@ -119,8 +152,9 @@
    "speedAhead": 150,
    "offset": 0.93,
    "widthOverlapped": 0.5,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 51.6,
-   "outcome": "saut recuperable"
+   "outcome": "tamponnage (sans decollage)"
   },
   {
    "arrival": "energie moyenne",
@@ -128,8 +162,9 @@
    "speedAhead": 150,
    "offset": 1.2,
    "widthOverlapped": 0.35,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 51.5,
-   "outcome": "saut recuperable"
+   "outcome": "tamponnage (sans decollage)"
   },
   {
    "arrival": "energie moyenne",
@@ -137,6 +172,27 @@
    "speedAhead": 150,
    "offset": 1.4,
    "widthOverlapped": 0.25,
+   "frontTyreBehindRearTyre": 0.12,
+   "closingAtContact": 51.5,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 1.5,
+   "widthOverlapped": 0.19,
+   "frontTyreBehindRearTyre": 0.47,
+   "closingAtContact": 51.5,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "energie moyenne",
+   "speedBehind": 200,
+   "speedAhead": 150,
+   "offset": 1.55,
+   "widthOverlapped": 0.17,
+   "frontTyreBehindRearTyre": 0.64,
    "closingAtContact": 51.5,
    "outcome": "saut recuperable"
   },
@@ -144,8 +200,9 @@
    "arrival": "energie moyenne",
    "speedBehind": 200,
    "speedAhead": 150,
-   "offset": 1.6,
-   "widthOverlapped": 0.14,
+   "offset": 1.7,
+   "widthOverlapped": 0.09,
+   "frontTyreBehindRearTyre": 1,
    "closingAtContact": 51.5,
    "outcome": "saut recuperable"
   },
@@ -155,6 +212,7 @@
    "speedAhead": 150,
    "offset": 1.8,
    "widthOverlapped": 0.03,
+   "frontTyreBehindRearTyre": 0.95,
    "closingAtContact": 51.5,
    "outcome": "saut recuperable"
   },
@@ -164,6 +222,7 @@
    "speedAhead": 150,
    "offset": 2,
    "widthOverlapped": 0,
+   "frontTyreBehindRearTyre": 0.26,
    "closingAtContact": null,
    "outcome": "aucun contact"
   },
@@ -173,6 +232,7 @@
    "speedAhead": 188,
    "offset": 0,
    "widthOverlapped": 1,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 74.5,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -182,6 +242,7 @@
    "speedAhead": 188,
    "offset": 0.3,
    "widthOverlapped": 0.84,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 74.4,
    "outcome": "tamponnage (sans decollage)"
   },
@@ -191,6 +252,7 @@
    "speedAhead": 188,
    "offset": 0.5,
    "widthOverlapped": 0.73,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 74.3,
    "outcome": "accident violent (E3)"
   },
@@ -200,6 +262,7 @@
    "speedAhead": 188,
    "offset": 0.93,
    "widthOverlapped": 0.5,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 74.2,
    "outcome": "accident violent (E3)"
   },
@@ -209,6 +272,7 @@
    "speedAhead": 188,
    "offset": 1.2,
    "widthOverlapped": 0.35,
+   "frontTyreBehindRearTyre": 0,
    "closingAtContact": 74.1,
    "outcome": "accident violent (E3)"
   },
@@ -218,6 +282,7 @@
    "speedAhead": 188,
    "offset": 1.4,
    "widthOverlapped": 0.25,
+   "frontTyreBehindRearTyre": 0.12,
    "closingAtContact": 74,
    "outcome": "accident violent (E3)"
   },
@@ -225,8 +290,29 @@
    "arrival": "forte energie",
    "speedBehind": 262,
    "speedAhead": 188,
-   "offset": 1.6,
-   "widthOverlapped": 0.14,
+   "offset": 1.5,
+   "widthOverlapped": 0.19,
+   "frontTyreBehindRearTyre": 0.47,
+   "closingAtContact": 74,
+   "outcome": "tamponnage (sans decollage)"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 1.55,
+   "widthOverlapped": 0.17,
+   "frontTyreBehindRearTyre": 0.64,
+   "closingAtContact": 74,
+   "outcome": "saut recuperable"
+  },
+  {
+   "arrival": "forte energie",
+   "speedBehind": 262,
+   "speedAhead": 188,
+   "offset": 1.7,
+   "widthOverlapped": 0.09,
+   "frontTyreBehindRearTyre": 1,
    "closingAtContact": 74,
    "outcome": "saut recuperable"
   },
@@ -236,6 +322,7 @@
    "speedAhead": 188,
    "offset": 1.8,
    "widthOverlapped": 0.03,
+   "frontTyreBehindRearTyre": 0.95,
    "closingAtContact": 73.9,
    "outcome": "saut recuperable"
   },
@@ -245,6 +332,7 @@
    "speedAhead": 188,
    "offset": 2,
    "widthOverlapped": 0,
+   "frontTyreBehindRearTyre": 0.26,
    "closingAtContact": null,
    "outcome": "aucun contact"
   }

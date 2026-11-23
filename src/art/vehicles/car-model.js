@@ -23,11 +23,38 @@ export const CAR_DIMENSIONS = {
  * Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side.
  * The right one is its reflection. Every view is drawn from this single definition: the car model seen
  * from outside, and the cockpit drawing, which projects it from the driver's eye.
- * (y: 2.5 cm closer to the centre line than at first, and the foot of the arm brought onto the rim of the
- * cockpit, which it used to miss by a few centimetres: a proposal after a player found the mirrors slightly
- * too far apart; see work/renders/comparison/mirror-variants.jpg.)
+ *
+ * `b` is the mount of the game. After a second player's remark ("still too far apart") the others are
+ * PROPOSALS, closer and closer to the centre line, waiting for the player's choice: none of them is the
+ * default. They can be tried in the real game with the launch option #mirrors=d (or e, f, g) and are
+ * compared on work/renders/comparison/mirror-proposals.jpg.
+ * What was adapted for the proposals, beside the distance to the centre line (y):
+ * - the housing stands 1.2 cm higher (z): seen from the cockpit it then covers the hub of the front wheel
+ *   instead of leaving a thin strip of it above its upper edge (the defect of the first closer variant);
+ * - closer than the side of the cockpit allows beside it, the housing stands ABOVE the shoulder of the
+ *   monocoque, on a stalk whose foot is on that shoulder (arm);
+ * - the closest one (g) has a smaller housing, to stay clear of the driver's hands.
  */
-export const MIRROR_MOUNT = { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };
+export const MIRROR_PRESETS = {
+  b: { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] },     // the game: 39.5 cm from the centre line
+  d: { x: 0.4, y: 0.37, z: 0.687, width: 0.14, height: 0.075, arm: [0.4, 0.27, 0.52] },       // proposal: 37 cm
+  e: { x: 0.4, y: 0.35, z: 0.687, width: 0.14, height: 0.075, arm: [0.4, 0.26, 0.535] },      // proposal: 35 cm
+  f: { x: 0.4, y: 0.33, z: 0.687, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.545] },      // proposal: 33 cm
+  g: { x: 0.4, y: 0.31, z: 0.687, width: 0.11, height: 0.066, arm: [0.4, 0.24, 0.555] },      // proposal: 31 cm, smaller housing
+};
+export const MIRROR_DEFAULT = 'b';
+export const MIRROR_MOUNT = { ...MIRROR_PRESETS[MIRROR_DEFAULT] };
+
+/**
+ * Use another mirror mount (a key of MIRROR_PRESETS) for the drawings made from now on. To be called
+ * before the art is generated; returns false, and changes nothing, for an unknown name.
+ */
+export function selectMirrorPreset(name) {
+  const preset = MIRROR_PRESETS[String(name || '').toLowerCase()];
+  if (!preset) return false;
+  Object.assign(MIRROR_MOUNT, preset, { arm: [...preset.arm] });
+  return true;
+}
 
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
 

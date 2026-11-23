@@ -1,9 +1,15 @@
 # Roues avant et rétroviseurs de la vue cockpit
 
-Corrections d'image faites après le travail sur les collisions (`collisions.md`), en deux
-lots : rotation des roues et position des rétroviseurs (§ 1, § 2), puis, après le second essai
-du joueur, roues près de la vitesse maximale et entraxe des rétroviseurs (§ 1 bis, § 2 bis).
-Elles ne touchent ni la simulation ni la conduite.
+Corrections d'image faites après le travail sur les collisions (`collisions.md`), en trois
+temps : rotation des roues et position des rétroviseurs (§ 1, § 2) ; après le second essai du
+joueur, roues près de la vitesse maximale et entraxe des rétroviseurs (§ 1 bis, § 2 bis) ;
+après le troisième, nouvelles propositions de rétroviseurs (§ 2 ter). Elles ne touchent ni la
+simulation ni la conduite.
+
+**État des validations par le joueur (troisième essai)** : l'animation des roues à grande
+vitesse est jugée satisfaisante et **validée pour ce lot** — elle n'a plus été modifiée (les
+fichiers `cockpit-layer.js` et les dessins de pneus de `car-model.js` sont inchangés, ses
+tests passent). Les rétroviseurs restent à choisir.
 
 ## 1. Rotation des roues avant
 
@@ -224,6 +230,78 @@ sur B, non traitées et laissées au jugement du joueur :
   en A) ;
 - C-3 (la vue arrière de la planche ne montrait pas les rétroviseurs) : corrigé.
 
+## 2 ter. Troisième essai : « toujours trop éloignés » — quatre propositions plus rapprochées
+
+Au troisième essai le joueur a jugé les rétroviseurs (39,5 cm de l'axe) encore trop éloignés.
+**La position du jeu n'a pas été changée** : quatre propositions plus rapprochées sont
+préparées, et c'est au joueur de choisir sur image, puis en jeu. Aucune n'est la position par
+défaut.
+
+Elles ne reprennent pas la variante C écartée plus haut (37 cm avec la même géométrie, qui
+laissait un liseré du bloc de moyeu au-dessus du rétroviseur et frôlait le flanc du cockpit).
+Ce qui a été adapté, en plus de la distance à l'axe :
+
+- **le boîtier est 1,2 cm plus haut** : vu du cockpit il recouvre alors franchement le moyeu de
+  la roue avant, au lieu d'en laisser dépasser un liseré clair au-dessus de son bord ;
+- **le support** : plus près que ne le permet le flanc du cockpit, le boîtier n'est plus à côté
+  de la coque au bout d'un bras, mais **au-dessus de son épaulement, sur une tige** dont le pied
+  est posé sur cet épaulement (4 cm au moins entre le dessous du boîtier et la coque) ;
+- **le boîtier de la plus rapprochée** est plus petit (11 × 6,6 cm au lieu de 14 × 7,5 cm), pour
+  rester à l'écart du volant et des mains.
+
+| Proposition | Centre du rétroviseur | Boîtier | Déplacement à l'image (vue cockpit, 1280×720) | Remarques |
+|---|---|---|---|---|
+| **B — position actuelle (dans le jeu)** | 39,5 cm de l'axe | 14 × 7,5 cm, centre à 67,5 cm du sol | — | bras latéral ; le bloc de moyeu se voit à son bord intérieur |
+| D | 37,0 cm (−2,5 cm de chaque côté) | 14 × 7,5 cm, à 68,7 cm | 30 px vers le centre (2,3 % de la largeur) | sur tige ; couvre le moyeu |
+| E | 35,0 cm (−4,5 cm) | 14 × 7,5 cm, à 68,7 cm | 53 px (4,2 %) | sur tige ; couvre le moyeu et le départ des triangles |
+| F | 33,0 cm (−6,5 cm) | 14 × 7,5 cm, à 68,7 cm | 77 px (6,0 %) | sur tige ; la position la plus rapprochée possible avec ce boîtier |
+| G | 31,0 cm (−8,5 cm) | 11 × 6,6 cm, à 68,7 cm | 101 px (7,9 %) | sur tige, boîtier réduit : miroir un cinquième moins large |
+
+**À regarder** : `work/renders/comparison/mirror-proposals.jpg` — même scène et mêmes caméras
+pour les cinq montages : vue cockpit, coin inférieur gauche agrandi, le même coin volant braqué
+à fond (là où le bras du pilote passe au plus près), vue de face, vue de trois quarts arrière.
+La vue cockpit de chaque montage est aussi fournie en pleine taille :
+`work/renders/comparison/mirror-proposal-{b,d,e,f,g}-cockpit.jpg`.
+
+**À essayer en jeu** : chaque proposition s'ouvre avec une option de lancement, sans rien
+changer au jeu normal (option de développement, comme le banc d'essai) :
+
+```bash
+chromium --enable-features=Vulkan "file://$PWD/index.html#mirrors=d"
+```
+
+(`d`, `e`, `f` ou `g` ; sans l'option, ou avec un nom inconnu, la position actuelle.)
+
+Source géométrique commune : les cinq montages sont des entrées de `MIRROR_PRESETS` dans
+`src/art/vehicles/car-model.js` ; le modèle de la voiture (vues extérieures) et le dessin du
+cockpit (projection depuis l'œil du pilote) sont tous deux tirés du montage choisi. La planche
+est faite en ouvrant le vrai jeu avec chaque option
+(`node work/scripts/compare-mirror-proposals.mjs`).
+
+Vérifications :
+
+- **symétrie** : pour D, E, F et G, les colonnes de l'image qui changent par rapport à la
+  position actuelle sont exactement le reflet l'une de l'autre à gauche et à droite (0 px
+  d'écart) ;
+- **cohérence cockpit / extérieur** : le même rapprochement se voit en vue de face et en vue de
+  trois quarts arrière (repère en pointillé au bord du rétroviseur actuel) ;
+- **pas de pièce dans une autre** (test « mirror proposals… ») : boîtier au-dessus de la coque,
+  pied de la tige posé sur la coque, boîtier à l'intérieur de la roue avant, bord intérieur du
+  boîtier à plus de 25 cm de l'axe ;
+- **mains** : volant droit, il reste 93, 69, 46 et 40 px entre le miroir et le gant (ou la
+  bande rouge de la carrosserie juste derrière) pour D, E, F et G, contre 123 px aujourd'hui ;
+  volant braqué à fond, le bras passe en dessous du rétroviseur sans le toucher dans les
+  quatre cas (troisième ligne de la planche).
+
+Ce qu'il faut savoir avant de choisir :
+
+- plus le rétroviseur est près de l'axe, plus il cache le moyeu et les triangles de suspension
+  — et moins il cache le pneu, dont l'animation est mieux visible ;
+- en vue de face, le boîtier de D affleure l'épaule du pilote ; ceux de E, F et G passent
+  franchement devant (ils sont plus de 30 cm en avant des épaules : c'est une superposition
+  de perspective, pas un contact) ;
+- ces propositions n'ont été vues par aucun critique indépendant ni essayées au volant.
+
 ## 3. Séquences comparatives
 
 | Fichier | Contenu |
@@ -238,10 +316,13 @@ Pour le lot « roues à très haute vitesse, rétroviseurs rapprochés » :
 |---|---|
 | `work/renders/comparison/wheels-high-speed-before-after.mp4` | Le bas de la vue cockpit à 40, 120, 200, 250, 300 et 322 km/h (1,6 s chacun), puis une accélération continue de 0 à 322 km/h en 8 s, à 60 images par seconde : état de la PR précédente en haut, état actuel en bas, tel qu'en jeu (vibrations du cockpit comprises) |
 | `work/renders/comparison/mirror-variants.jpg` | Les trois positions des rétroviseurs (§ 2 bis) |
+| `work/renders/comparison/mirror-proposals.jpg`, `mirror-proposal-*-cockpit.jpg` | La position actuelle et les quatre propositions plus rapprochées (§ 2 ter) |
 
 Reproduire : `node work/scripts/compare-wheels-video.mjs <avant.html> index.html <sortie.mp4>`
 (options `--speeds`, `--ramp de:à:secondes`, `--fps`, `--only after`, `--steady` pour couper la
-vibration du cockpit, `--reuse-before`) et `node work/scripts/compare-mirror-variants.mjs`.
+vibration du cockpit, `--reuse-before`) et `node work/scripts/compare-mirror-proposals.mjs`
+(la planche des trois premières positions A, B, C avait été faite par une version antérieure de
+ce script).
 
 Pour le lot précédent (il faut un build de l'état précédent, par exemple celui du commit « Lot 2 ») :
 `node work/scripts/compare-wheels-mirrors.mjs <avant.html> index.html` et

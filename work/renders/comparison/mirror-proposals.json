@@ -1,0 +1,172 @@
+{
+ "scene": "kestrel-fields, 150 km/h, one car behind on the right, one ahead on the left",
+ "width": 1280,
+ "height": 720,
+ "inTheGame": "b",
+ "variants": [
+  {
+   "id": "b",
+   "x": 0.4,
+   "y": 0.395,
+   "z": 0.675,
+   "width": 0.14,
+   "height": 0.075,
+   "arm": [
+    0.4,
+    0.25,
+    0.585
+   ],
+   "inTheGame": true,
+   "measured": {
+    "glass_columns_left_mirror": [
+     91,
+     253
+    ],
+    "moved_toward_the_centre_px": 0,
+    "moved_share_of_picture_width": 0.0,
+    "centre_moved_toward_the_centre_px": 0.0,
+    "room_between_glass_and_the_red_of_glove_or_livery_px": 123
+   }
+  },
+  {
+   "id": "d",
+   "x": 0.4,
+   "y": 0.37,
+   "z": 0.687,
+   "width": 0.14,
+   "height": 0.075,
+   "arm": [
+    0.4,
+    0.27,
+    0.52
+   ],
+   "inTheGame": false,
+   "measured": {
+    "glass_columns_left_mirror": [
+     121,
+     283
+    ],
+    "moved_toward_the_centre_px": 30,
+    "moved_share_of_picture_width": 0.0234,
+    "centre_moved_toward_the_centre_px": 30.0,
+    "room_between_glass_and_the_red_of_glove_or_livery_px": 93,
+    "symmetry": {
+     "left_columns": [
+      84,
+      290
+     ],
+     "right_columns_reflected": [
+      84,
+      290
+     ],
+     "largest_difference_px": 0
+    }
+   }
+  },
+  {
+   "id": "e",
+   "x": 0.4,
+   "y": 0.35,
+   "z": 0.687,
+   "width": 0.14,
+   "height": 0.075,
+   "arm": [
+    0.4,
+    0.26,
+    0.535
+   ],
+   "inTheGame": false,
+   "measured": {
+    "glass_columns_left_mirror": [
+     144,
+     307
+    ],
+    "moved_toward_the_centre_px": 53,
+    "moved_share_of_picture_width": 0.0414,
+    "centre_moved_toward_the_centre_px": 53.5,
+    "room_between_glass_and_the_red_of_glove_or_livery_px": 69,
+    "symmetry": {
+     "left_columns": [
+      84,
+      314
+     ],
+     "right_columns_reflected": [
+      84,
+      314
+     ],
+     "largest_difference_px": 0
+    }
+   }
+  },
+  {
+   "id": "f",
+   "x": 0.4,
+   "y": 0.33,
+   "z": 0.687,
+   "width": 0.14,
+   "height": 0.075,
+   "arm": [
+    0.4,
+    0.25,
+    0.545
+   ],
+   "inTheGame": false,
+   "measured": {
+    "glass_columns_left_mirror": [
+     168,
+     330
+    ],
+    "moved_toward_the_centre_px": 77,
+    "moved_share_of_picture_width": 0.0602,
+    "centre_moved_toward_the_centre_px": 77.0,
+    "room_between_glass_and_the_red_of_glove_or_livery_px": 46,
+    "symmetry": {
+     "left_columns": [
+      84,
+      340
+     ],
+     "right_columns_reflected": [
+      84,
+      340
+     ],
+     "largest_difference_px": 0
+    }
+   }
+  },
+  {
+   "id": "g",
+   "x": 0.4,
+   "y": 0.31,
+   "z": 0.687,
+   "width": 0.11,
+   "height": 0.066,
+   "arm": [
+    0.4,
+    0.24,
+    0.555
+   ],
+   "inTheGame": false,
+   "measured": {
+    "glass_columns_left_mirror": [
+     210,
+     336
+    ],
+    "moved_toward_the_centre_px": 119,
+    "moved_share_of_picture_width": 0.093,
+    "centre_moved_toward_the_centre_px": 101.0,
+    "room_between_glass_and_the_red_of_glove_or_livery_px": 40,
+    "symmetry": {
+     "left_columns": [
+      84,
+      345
+     ],
+     "right_columns_reflected": [
+      84,
+      345
+     ],
+     "largest_difference_px": 0
+    }
+   }
+  }
+ ]
+}

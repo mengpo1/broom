@@ -32,7 +32,7 @@ qu'elle ne donne pas sont des **choix de conception**, étiquetés comme tels da
 | **Collision simple** | Contact entre deux voitures qui ne roulent pas dans le même sens (plus de 37° d'écart), ou dont l'une n'est pas en course | Réponse par impulsion, inchangée ; tête-à-queue si le choc est très violent |
 | **Tamponnage arrière** | Même sens, voitures séparées dans l'axe (nez contre arrière), celle de derrière plus rapide | La voiture du joueur qui percute repart **48 km/h moins vite que celle qu'elle a touchée** : elle perd donc 48 km/h plus la vitesse à laquelle elle arrivait. Les deux voitures se séparent aussitôt. Celle de devant n'est pas perturbée. Aucun changement de cap |
 | **Contact latéral roue contre roue** | Même sens, voitures séparées en travers (côte à côte) | La plus rapide perd **≈ 96 km/h** ; les deux sont écartées une fois (1,2 m/s) ; aucune n'est tournée. L'autre voiture ne paie pas à son tour tant qu'elles restent côte à côte |
-| **Saut récupérable** (choix de gameplay original, voir § 2 bis) | Roue sur roue (jusqu'à 80 % de la largeur en recouvrement), vitesse relative ≥ 10 m/s (36 km/h), vitesse de la voiture de derrière ≥ 33 m/s (120 km/h), caps à moins de 20° l'un de l'autre, et conditions de l'accident ci-dessous non réunies | La voiture de derrière est ralentie au choc (25 km/h de moins que l'autre), fait un saut court (0,45 s, 0,55 m), retombe sur ses roues 48 km/h moins vite que n'allait l'autre au choc, sa direction se dandine 0,7 s, et elle continue ; celle de devant n'est pas perturbée |
+| **Saut récupérable** (choix de gameplay original, occasionnel, voir § 2 bis) | Une roue avant **derrière** une roue arrière (voitures décalées d'environ une voie : au moins la moitié du pneu avant dans l'alignement du pneu arrière, deux rayons de pneu derrière son essieu), vitesse relative ≥ 12,5 m/s (45 km/h), vitesse de la voiture de derrière ≥ 41,7 m/s (150 km/h), caps à moins de 20° l'un de l'autre, pas déjà sauté sur la même voiture depuis moins de 8 s | La voiture de derrière est ralentie au choc (25 km/h de moins que l'autre), fait un saut court (0,45 s, 0,55 m), retombe sur ses roues 48 km/h moins vite que n'allait l'autre au choc, sa direction se dandine 0,7 s, et elle continue ; celle de devant n'est pas perturbée |
 | **Contact provoquant un accident violent** | Tamponnage avec recouvrement latéral **partiel** (20 à 80 % de la largeur : roue sur roue), vitesse relative ≥ 15 m/s (54 km/h), vitesse de la voiture de derrière ≥ 50 m/s (180 km/h) | La voiture de derrière passe à l'état `AIRBORNE` (0,85 s, 1,3 m) et retombe en atterrissage violent ; celle de devant n'est pas perturbée |
 | **Obstacle ponctuel** | Voiture hors de l'asphalte dont la boîte recouvre un panneau | Le panneau est couché pour le reste de la course. Sous 40 m/s : la voiture garde 60 % de sa vitesse. Au-dessus : `AIRBORNE` (0,6 s) |
 | **Atterrissage léger** | Fin d'un vol déclenché par un obstacle | Vitesse conservée ; glissade hors de contrôle (rotation lente vers la piste, décélération faible puis forte) ; à l'arrêt la voiture est rendue à son pilote **là où elle s'est arrêtée**, en première |
@@ -60,52 +60,87 @@ Règles communes :
   L'atterrissage, l'explosion et les panneaux n'ajoutent rien : choix de conception (la
   voiture repart intacte, comme dans la référence).
 
-## 2 bis. Le saut récupérable — trois niveaux pour un même contact
+## 2 bis. Le saut récupérable — occasionnel, pour un vrai contact roue avant contre roue arrière
 
 **C'est un choix de gameplay original.** La vidéo de référence ne montre que l'accident violent
 (E3) et le décollage sur un obstacle (E5) ; rien n'y confirme l'existence d'un saut après lequel
 la voiture continue. Il a été ajouté à la demande du joueur. Tous ses paramètres sont des choix
 de conception (`hop…` dans `collision-tuning.js`), à régler par des essais.
 
-Le contact concerné est toujours le même : **une roue qui monte sur une roue**, la roue avant
-de la voiture de derrière contre la roue arrière de celle de devant. Il se présente de deux
-façons :
+**Au troisième essai le joueur l'a trouvé beaucoup trop fréquent.** Il a été resserré (§ 12) :
+il lui faut maintenant la géométrie d'une roue avant qui arrive **derrière** une roue arrière,
+plus d'énergie, et il ne se répète pas sur la même voiture. Tout autre contact garde son issue
+validée : tamponnage, contact de roues, ou accident violent E3.
 
-- par l'arrière, voitures décalées : du simple pneu contre pneu au bord des voitures jusqu'à
-  80 % de la largeur en recouvrement. Au-delà (nez dans la boîte de vitesses), il n'y a pas de
-  roue à escalader : c'est un tamponnage ;
-- côte à côte, quand les voitures se chevauchent sur la moitié de leur longueur au plus (la
-  roue avant de l'une à hauteur de la roue arrière de l'autre). Complètement côte à côte, les
-  roues ne font que frotter : c'est le contact E2, inchangé.
+### Géométrie : une roue avant derrière une roue arrière
 
-Trois niveaux de conséquence, selon l'énergie du contact (tout est explicite et déterministe,
-aucun tirage au sort) :
+Le test (`wheelBehindWheel`, `collisions.js`) compare la roue avant de la voiture de derrière
+qui est du côté de la voiture de devant, et la roue arrière de la voiture de devant qui est du
+côté de la voiture de derrière. Les positions des roues sont celles du modèle de la voiture
+(voies 0,90 m à l'avant et 0,82 m à l'arrière, pneus de 29 et 42 cm de large, essieux à +1,55
+et −1,35 m ; un test maintient l'accord). Il faut à la fois :
 
-| Niveau | Vitesse relative | Vitesse de la voiture de derrière | Conséquence |
-|---|---|---|---|
-| Sans décollage | moins de 36 km/h | — | mécanisme validé, inchangé : tamponnage par l'arrière, contact de roues côte à côte |
-| **Saut récupérable** | 36 km/h au moins | 120 km/h au moins | saut court, la course continue |
-| Accident violent (E3) | 54 km/h au moins, **par l'arrière**, 20 à 80 % de la largeur en recouvrement | 180 km/h au moins | inchangé : vol de 0,85 s, explosion, arrêt, redémarrage |
+- **au moins la moitié de la largeur du pneu avant dans l'alignement du pneu arrière**
+  (`hopTyreOverlapMin`) ;
+- **la roue avant à 0,65 m au moins derrière l'essieu arrière** de l'autre voiture, soit deux
+  rayons de pneu (`hopAxleGapMin`) : un pneu derrière l'autre. Plus près, les roues sont côte à
+  côte et ne font que frotter.
 
-Autres conditions du saut : les deux voitures roulent dans le même sens à moins de 20° près ;
-la règle des accidents est active (elle l'est dans tous les modes) ; la voiture n'a pas
-elle-même atterri d'un saut depuis moins de 1,5 s. Avec l'écart de vitesse de l'accident mais
-sans ses autres conditions (trop lentement : 170 km/h sur une voiture à 100 ; ou pneu contre
-pneu au bord des voitures, moins de 20 % de recouvrement), le contact donne un saut. Côte à
-côte, il n'y a jamais d'accident violent : au plus un saut.
+Ce que cela donne selon la façon d'arriver :
+
+- **par l'arrière** : seulement quand les voitures sont décalées d'environ une voie, de 1,5 m à
+  1,86 m (au-delà elles ne se touchent plus). Le nez passe alors à l'extérieur de la roue
+  arrière. Plus près de l'axe — un demi-décalage, comme dans la mise en place d'E3 — c'est le nez
+  ou l'aileron qui rencontre la roue : tamponnage, ou accident violent avec son énergie. En
+  ligne : tamponnage ;
+- **par le côté** : seulement quand le nez n'est engagé que de 0,65 m au plus le long de la
+  queue de l'autre voiture : la roue avant est encore derrière la roue arrière, dans sa voie
+  (les boîtes de collision sont un peu plus étroites que les pneus). Dès que les roues sont
+  côte à côte, c'est le contact de roues E2, inchangé.
+
+### Énergie
+
+| Niveau | Vitesse relative | Vitesse de la voiture de derrière | Géométrie | Conséquence |
+|---|---|---|---|---|
+| Sans décollage | moins de 45 km/h, ou | moins de 150 km/h, ou | toute autre géométrie | mécanisme validé, inchangé : tamponnage par l'arrière, contact de roues côte à côte |
+| **Saut récupérable** | 45 km/h au moins | 150 km/h au moins | roue avant derrière roue arrière | saut court, la course continue |
+| Accident violent (E3) | 54 km/h au moins, **par l'arrière** | 180 km/h au moins | 20 à 80 % de la largeur des voitures en recouvrement | inchangé : vol de 0,85 s, explosion, arrêt, redémarrage |
+
+Les seuils du saut (`hopClosingSpeed`, `hopMinSpeed`) sont au-dessus de l'énergie des deux
+contacts de référence validés (contact de roues E2 : environ 25 km/h d'écart ; tamponnage E4 :
+environ 41 km/h). Autres conditions : les deux voitures roulent dans le même sens à moins de
+20° près ; la règle des accidents est active (elle l'est dans tous les modes) ; la voiture n'a
+pas elle-même atterri d'un saut depuis moins de 1,5 s. Tout est explicite et déterministe :
+aucun tirage au sort.
+
+Les deux fenêtres ne se recouvrent pas : la géométrie du saut correspond à moins de 19 % de la
+largeur des voitures en recouvrement, celle de l'accident à 20 % au moins. Avec l'énergie de
+l'accident, un contact pneu derrière pneu reste donc un saut.
 
 Ce qui déclenche quoi, par l'arrière, selon le décalage latéral entre les deux voitures
 (`node work/scripts/hop-trigger-table.mjs`, résultats dans
 `work/benchmarks/hop-trigger-table.json` ; simulation seule) :
 
-| Décalage (largeur en recouvrement) | 170 km/h sur 150 | 200 km/h sur 150 | 262 km/h sur 188 |
-|---|---|---|---|
-| 0 m et 0,3 m (100 % et 84 %) : en ligne | tamponnage | tamponnage | tamponnage |
-| 0,5 m à 1,4 m (73 % à 25 %) : roues engrenées | tamponnage | **saut** | accident violent (E3) |
-| 1,6 m et 1,8 m (14 % et 3 %) : pneu contre pneu | tamponnage | **saut** | **saut** |
-| 2,0 m : plus de recouvrement | aucun contact | aucun contact | aucun contact |
+| Décalage | Largeur des voitures en recouvrement | Pneu avant derrière le pneu arrière | 170 km/h sur 150 | 200 km/h sur 150 | 262 km/h sur 188 |
+|---|---|---|---|---|---|
+| 0 m, 0,3 m : en ligne | 100 %, 84 % | 0 % | tamponnage | tamponnage | tamponnage |
+| 0,5 m à 1,2 m : nez sur la roue | 73 % à 35 % | 0 % | tamponnage | tamponnage | accident violent (E3) |
+| 1,4 m | 25 % | 12 % | tamponnage | tamponnage | accident violent (E3) |
+| 1,5 m | 19 % | 47 % | tamponnage | tamponnage | tamponnage |
+| 1,55 m, 1,7 m, 1,8 m : pneu derrière pneu | 17 %, 9 %, 3 % | 64 %, 100 %, 95 % | tamponnage | **saut** | **saut** |
+| 2,0 m | 0 % | — | aucun contact | aucun contact | aucun contact |
 
-Déroulement :
+### Après l'atterrissage : pas de série de sauts
+
+Pendant 8 s après l'atterrissage (`hopSamePairTime`), la voiture ne peut plus sauter sur **la
+même** voiture : un nouveau contact avec elle est un contact ordinaire (tamponnage ou contact
+de roues, avec leurs pénalités validées). Laissée à elle-même, la voiture qui vient de sauter
+est d'ailleurs écartée d'un demi-mètre par la perturbation de sa direction et repasse à côté
+de l'autre sans la toucher ; c'est seulement si son pilote revient dans la même voie, à pleine
+charge, qu'il la heurte de nouveau (test « no series of hops behind one car »). Sur une autre
+voiture, un nouveau saut reste possible passé 1,5 s.
+
+### Déroulement
 
 1. **Choc** : la voiture est ralentie d'un coup à 25 km/h de moins que celle dont elle escalade
    la roue (jamais accélérée). C'est là que le saut coûte le plus, à l'instant où la cause se
@@ -127,24 +162,18 @@ Déroulement :
 5. Ensuite la voiture répond exactement comme avant (vérifié contre une voiture qui n'a pas
    sauté, à la même vitesse).
 
-Mesuré dans la simulation (`collision-comparison.json`, entrée `HOP`) : 206 km/h sur une
-voiture à 154 → 129 km/h après le choc (−77), 22,5 km/h perdus pendant les 0,45 s de vol,
-0,4 km/h dans le pas de l'atterrissage (la décélération du vol, rien de plus), posée à
-107 km/h ; 202 km/h deux secondes plus tard à pleine charge ; écart latéral 0,45 m ; cap
-retrouvé à 0,2° près.
+Mesuré dans la simulation (`collision-comparison.json`, entrée `HOP`, voitures décalées de
+1,7 m) : 206 km/h sur une voiture à 155 → 129 km/h après le choc (−77), 22,5 km/h perdus
+pendant les 0,45 s de vol, 0,4 km/h dans le pas de l'atterrissage (la décélération du vol, rien
+de plus), posée à 107 km/h ; 202 km/h deux secondes plus tard à pleine charge ; écart latéral
+0,45 m ; cap retrouvé à 0,2° près.
 
-Première version et correction : la perte de vitesse était d'abord appliquée **à
-l'atterrissage** (la vitesse tombait de 180 à 103 km/h en une image, sans cause visible), et
-la voiture était retenue derrière l'autre pendant le vol alors que son compteur indiquait
-30 à 50 km/h de plus. Le second critique indépendant a relevé les deux (§ 10). La vitesse
-d'arrivée au sol est la même qu'avant ; seul le moment où elle est perdue a changé.
-
-Ce que cela change pour les contacts validés : rien en dessous de 36 km/h de vitesse relative,
-rien en ligne. Le contact roue contre roue de référence (E2, environ 25 km/h d'écart) et les
-tamponnages d'E4 (en ligne, donc sans roue à escalader) donnent exactement la même télémétrie
-qu'avant, image par image. Un cas change de nature : par l'arrière, pneu contre pneu au bord
-des voitures (moins de 20 % de recouvrement) à plus de 36 km/h d'écart, le contact était un
-tamponnage et devient un saut — c'est le contact « roue contre roue » au sens strict.
+Ce que cela change pour les contacts validés : rien. Le contact roue contre roue de référence
+(E2), les tamponnages d'E4, l'accident E3 et le panneau E5 donnent exactement la même
+télémétrie qu'avant, image par image. Les contacts qui donnaient un saut dans la version
+précédente et n'en donnent plus (nez sur la roue par l'arrière ; roues côte à côte ; énergie
+insuffisante) sont redevenus ce qu'ils étaient avant que le saut existe : un tamponnage ou un
+contact de roues.
 
 ## 3. Mise en scène
 
@@ -237,17 +266,11 @@ Scénarios rejoués dans la simulation par `node work/scripts/collision-comparis
   qui atteint la barrière est retenue sans effet visible (elle y perd quelques km/h).
 - **Seuils de décollage** : choix de conception. Un seul exemple de chaque cas dans la vidéo.
 - **Saut récupérable** : choix de gameplay original, sans référence. Ses seuils et son dosage
-  (hauteur, vitesse perdue, perturbation de la direction) n'ont été essayés par personne. Le
-  bas de la bande est proche du contact E2 de référence (36 km/h d'écart contre 25 environ) :
-  si des contacts ordinaires déclenchent trop souvent un saut, c'est `hopClosingSpeed` qu'il
-  faut relever ; `hopOverlapMin` à 0,2 retire les sauts pneu contre pneu au bord des voitures
-  (ils redeviennent des tamponnages). Les voitures de l'ordinateur sautent aussi : 1 à 5 fois
-  par course sur les six courses ci-dessous.
-  Qui rattrape de nouveau la voiture qu'il vient d'escalader, sans déboîter ni lever le pied,
-  la heurte une seconde fois : passé le délai de 1,5 s, ce second contact peut être un saut ou,
-  si l'écart de vitesse a eu le temps de dépasser 54 km/h à plus de 180 km/h, l'accident
-  violent. C'est arrivé au pilote du banc d'essai pendant sa mise au point, en restant une
-  seconde à pleine charge derrière l'autre voiture.
+  (hauteur, vitesse perdue, perturbation de la direction) restent des réglages à juger au
+  volant. Sa **fréquence** a été fortement réduite après le troisième essai (§ 12) : 0,3 saut
+  par course de 16 voitures en moyenne sur 108 courses d'essai, contre 1,9. C'est au joueur de
+  dire si c'est le bon niveau ; les réglages qui la commandent sont `hopClosingSpeed`,
+  `hopMinSpeed` et `hopTyreOverlapMin`.
 - **Voitures de l'ordinateur** : pénalité réduite à 30 %. Effet sur trois courses de 3 tours
   à 16 voitures, toutes conduites par l'ordinateur (`work/scripts/race-contact-stats.mjs`,
   options `--legacy` pour l'ancien modèle et `--racing` pour les règles de compétition ;
@@ -288,6 +311,22 @@ Scénarios rejoués dans la simulation par `node work/scripts/collision-comparis
   place d'un tamponnage déplace toutes les rencontres suivantes), sans tendance nette : le
   peloton ne finit pas plus tard. 16 sauts en six courses de 16 voitures. Même réserve : ce
   n'est pas une mesure d'équilibrage.
+
+  Les mêmes six courses après le resserrement du saut (troisième essai, § 12 ; « avant » = le
+  tableau juste au-dessus) :
+
+  | Course | Vainqueur | Meilleur tour | Contacts simples / tamponnages / roues | Sauts | Accidents violents | Barrières | Têtes-à-queue |
+  |---|---|---|---|---|---|---|---|
+  | hazelbrook (arcade) | 155,27 s | 50,58 s | 32 / 5 / 29 → 27 / 7 / 26 | 5 → 0 | 0 → 0 | 7 → 7 | 0 → 0 |
+  | porto-sereno (arcade) | 175,12 s | 57,17 s | 61 / 12 / 61 → 62 / 14 / 62 | 2 → 0 | 0 → 0 | 14 → 14 | 0 → 0 |
+  | meridian-docks (arcade) | 221,93 s | 72,75 s | 86 / 19 / 84 → 98 / 23 / 88 | 3 → 1 | 0 → 1 | 8 → 6 | 0 → 0 |
+  | hazelbrook (compétition) | 161,77 s | 52,69 s | 38 / 6 / 38 → 38 / 6 / 36 | 1 → 0 | 1 → 2 | 5 → 7 | 0 → 1 |
+  | porto-sereno (compétition) | 182,05 s | 59,46 s | 42 / 6 / 41 → 46 / 7 / 57 | 4 → 0 | 2 → 0 | 8 → 17 | 0 → 0 |
+  | meridian-docks (compétition) | 230,27 s | 75,46 s | 73 / 14 / 70 → 59 / 11 / 63 | 1 → 1 | 0 → 0 | 8 → 13 | 0 → 0 |
+
+  16 sauts → 2. Dans les quatre courses où plus aucun saut ne se produit, tous les chiffres
+  sont redevenus **exactement ceux de la PR des collisions validées** (premier tableau) : sans
+  saut, les règles sont les mêmes. Temps du vainqueur et meilleur tour inchangés partout.
 - **Épave** : elle reste traversable par un autre joueur (elle ne peut pas être heurtée) ;
   elle est dessinée plus pâle une fois arrêtée.
 - **Vues extérieures pendant un vol** : vue de dos ou de face, le tangage ne peut pas être
@@ -345,7 +384,7 @@ marqué ; les rétroviseurs, déplacés ; l'animation des roues avant (ces deux 
 | Fichier | Contenu |
 |---|---|
 | `work/renders/collisions/E2.mp4`, `E3.mp4`, `E3x.mp4`, `E4.mp4`, `E5.mp4` | Les scénarios rejoués dans le vrai jeu, 60 images par seconde (deux pas de simulation par image), 960×540. `E3x` : le décollage vu de derrière (8 s : jusqu'au redémarrage) |
-| `work/renders/collisions/HOP.mp4`, `HOPx.mp4` | Le saut récupérable, vue cockpit et vue arrière (8 s chacune) : même mise en place que E3 (même circuit, même voiture devant, même décalage, contact au même instant), avec moins de vitesse. Après l'atterrissage le pilote du banc garde sa ligne 0,8 s (ce que fait alors la direction est la perturbation du jeu), puis déboîte en 1,2 s et dépasse |
+| `work/renders/collisions/HOP.mp4`, `HOPx.mp4` | Le saut récupérable, vue cockpit et vue arrière (8 s chacune) : la mise en place d'E3 (même circuit, même voiture devant, contact au même instant) avec moins de vitesse et les voitures décalées de 1,7 m au lieu de 0,93 m — une roue avant derrière une roue arrière, là où E3 a le nez sur la roue. Après l'atterrissage le pilote du banc garde sa ligne 0,8 s (ce que fait alors la direction est la perturbation du jeu), puis déboîte en 1,2 s et dépasse |
 | `work/renders/collisions/hop-vs-accident.mp4` | Les deux décollages côte à côte, synchronisés, 8 s : saut récupérable à gauche, accident violent à droite ; vue cockpit en haut, vue arrière en bas |
 | `work/renders/collisions/*-sheet.jpg` | Planches des étapes du mouvement (une image toutes les 0,07 à 0,1 s) |
 | `work/renders/collisions/*.json` | Télémétrie de chaque image : vitesse, état, position latérale, hauteur, tangage de la vue, événements, vitesse de l'autre voiture et distance qui en sépare ; direction : commande du pilote (`steerAsked`), perturbation ajoutée par le jeu après un saut (`steerDisturbance`), position des roues (`steer`), cap par rapport à la route (`headingToRoad`, degrés) |
@@ -360,7 +399,7 @@ Ce que montrent les séquences du jeu (journal de l'enregistrement) :
 | Séquence | Événements relevés |
 |---|---|
 | E2 | 1,03 s : contact de roues, 148 → 53 km/h, étoile sur la roue avant droite, « TCHAK ! » |
-| HOP | 1,63 s : choc à 202 km/h sur une voiture à 151, étoile sur la roue avant droite, « HOP ! » ; le compteur tombe à 126 km/h **à cette image** ; vol de 0,45 s, 126 → 104 km/h, la voiture de devant s'éloigne de 4,2 à 8,8 m ; 2,08 s : atterrissage sur les roues à 103 km/h (0,8 km/h de moins qu'à l'image précédente) ; direction perturbée 0,68 s (jusqu'à 23 % de la course ; le pilote corrige jusqu'à 16 %), la voiture reste à 0,17 m de sa ligne ; puis elle déboîte de 2 m sans louvoyer (cap à 2° de la route au plus), retrouve ses 202 km/h 2,05 s après l'atterrissage, est à hauteur de l'autre voiture à 4,62 s, et tient une ligne stable de 5,23 s à la fin (286 km/h, 100 m devant). Aucun autre contact |
+| HOP | Les voitures sont décalées de 1,7 m : la roue avant droite du joueur est derrière la roue arrière gauche de l'autre voiture. 1,65 s : choc à 202 km/h sur une voiture à 151, étoile sur la roue avant droite, « HOP ! » ; le compteur tombe à 125 km/h **à cette image** ; vol de 0,45 s, 125 → 104 km/h, la voiture de devant s'éloigne de 4,3 à 8,7 m ; 2,10 s : atterrissage sur les roues à 103 km/h (0,5 km/h de moins qu'à l'image précédente) ; direction perturbée 0,70 s (jusqu'à 23 % de la course ; le pilote corrige jusqu'à 16 %), la voiture reste à 0,17 m de sa ligne ; puis elle déboîte de 1,4 m sans louvoyer (cap à 1,4° de la route au plus), retrouve ses 202 km/h 2,05 s après l'atterrissage, est à hauteur de l'autre voiture à 4,63 s, et tient une ligne stable de 5,17 s à la fin (286 km/h, 99 m devant). Aucun autre contact |
 | E3 | 1,67 s : décollage à 262 km/h, étoile sur la roue qui monte ; 2,53 s : atterrissage violent derrière la voiture heurtée, 32 km/h, explosion ; 6,58 s : redémarrage |
 | E3x | le même accident en vue arrière : la voiture monte sur l'autre en se penchant, son ombre reste au sol, elle retombe derrière, explose |
 | E4 | 1,03 s : premier tamponnage, 146 → 59 km/h (voiture de devant à 107) ; puis le pilote revient doucement (5 km/h de plus que la voiture de devant) : 5,37 s et 9,32 s, 116 → 59 km/h |
@@ -447,3 +486,87 @@ Le critique rappelle aussi qu'E3 garde le défaut A-3 (voiture retenue derrière
 son vol alors que son compteur indique davantage) : E3 est validé et n'a pas été touché.
 
 Les corrections R-3 et R-4 et la retouche des roues (B-1) n'ont pas été revues à leur tour.
+
+## 12. Troisième essai : le saut récupérable rendu occasionnel
+
+Retour du joueur sur la version précédente : **sauts trop nombreux**. Le travail a consisté à
+mesurer, à comprendre, puis à resserrer, sans mécanisme aléatoire et sans toucher aux contacts
+validés ni aux conditions de l'accident E3.
+
+### Mesure de la fréquence
+
+`node work/scripts/hop-frequency.mjs <sortie.json> --seeds 11,23,37` joue **108 courses
+complètes** de l'ordinateur : les 18 circuits, en règles arcade et de compétition, trois
+graines, 16 voitures, 3 tours (la voiture du joueur est conduite par l'ordinateur elle aussi).
+Les mêmes circuits, règles et graines servent à toutes les versions. Pour chaque saut sont
+relevés l'énergie du contact, sa géométrie (calculée d'après les dimensions du modèle,
+indépendamment des règles), s'il est isolé ou fait partie d'une série (la même voiture saute de
+nouveau dans les 10 s), et ce qui suit l'atterrissage (un nouveau contact des deux mêmes
+voitures dans les 5 s).
+
+| | Version précédente | Géométrie seule (seuils précédents) | **Version actuelle** | Seuils de l'accident |
+|---|---|---|---|---|
+| Vitesse relative / vitesse minimales | 36 / 120 km/h | 36 / 120 km/h | **45 / 150 km/h** | 54 / 180 km/h |
+| Sauts sur 108 courses | 205 | 44 | **32** | 15 |
+| Par course | 1,90 | 0,41 | **0,30** | 0,14 |
+| dont règles arcade / compétition | 117 / 88 | 16 / 28 | 12 / 20 | 6 / 9 |
+| Courses sans aucun saut | 25 | 76 | **82** | 95 |
+| Maximum dans une course | 7 | 3 | 3 | 3 |
+| Sauts isolés / en série | 199 / 6 | 44 / 0 | **32 / 0** | 15 / 0 |
+| Suivis d'un nouveau contact des deux mêmes voitures | 3 (contacts de roues) | 0 | **0** | 0 |
+| Sauts de la voiture du joueur | 27 | 7 | 7 | 4 |
+| Accidents violents E3 | 46 | 42 | 40 | 35 |
+| Tamponnages / contacts de roues | 883 / 5 731 | 924 / 5 868 | 919 / 5 846 | 937 / 5 901 |
+
+Répartition par course : version précédente, 25 courses sans saut, 32 avec un, 16 avec deux,
+35 avec trois à sept ; version actuelle, 82 sans saut, 21 avec un, 4 avec deux, 1 avec trois.
+Le temps du vainqueur est **identique dans les 108 courses**, le meilleur tour dans 99.
+(Les colonnes « géométrie seule » et « seuils de l'accident » sont des variantes de réglage,
+données pour situer l'effet de chaque levier : fichiers `hop-frequency-geometry-only.json` et
+`hop-frequency-stricter.json` ; les deux autres sont `hop-frequency-before.json` et
+`hop-frequency-after.json`, dans `work/benchmarks/`.)
+
+### Ce qui déclenchait trop de sauts
+
+Sur les 205 sauts de la version précédente :
+
+- **122 (60 %) partaient d'un contact côte à côte.** La règle acceptait tout chevauchement en
+  longueur jusqu'à la moitié des voitures : dans 64 cas la roue avant était à côté ou en avant
+  de la roue arrière (un frottement de flancs, pas une roue qui en escalade une autre), et 20
+  seulement avaient la roue avant derrière la roue arrière, dans sa voie ;
+- **83 arrivaient par l'arrière**, dont 61 avec le nez ou l'aileron sur la roue (moins de la
+  moitié du pneu avant derrière le pneu arrière). La règle acceptait tout décalage latéral
+  entre 0 et 80 % de recouvrement ;
+- **52 (25 %) avaient peu d'énergie** : moins de 45 km/h d'écart ou moins de 150 km/h ;
+- au total **42 sur 205 (un sur cinq)** étaient un vrai contact roue avant contre roue
+  arrière, et 32 l'étaient avec assez d'énergie.
+
+### Ce qui a été resserré
+
+1. **La géométrie** : le test d'une roue avant derrière une roue arrière (§ 2 bis) remplace à
+   la fois la fenêtre de recouvrement par l'arrière et la limite de chevauchement par le côté.
+   C'est le levier principal : 205 → 44 à seuils égaux.
+2. **L'énergie** : 45 km/h d'écart au lieu de 36, 150 km/h au lieu de 120 : 44 → 32.
+3. **Après l'atterrissage** : pas de second saut sur la même voiture pendant 8 s. Les six sauts
+   en série de la version précédente (trois paires de sauts de la même voiture à quelques
+   secondes d'intervalle) ont disparu, ainsi que les trois contacts de roues qui suivaient un
+   atterrissage ; dans les 108 courses actuelles, aucun saut n'est suivi d'un nouveau contact
+   des deux mêmes voitures.
+
+Rien d'aléatoire : les trois conditions sont des comparaisons explicites, et deux courses de
+même graine donnent les mêmes sauts aux mêmes instants.
+
+### Ce qui est conservé
+
+- Le banc d'essai garde son cas `#lab=hop`, déplacé sur la nouvelle géométrie (voitures
+  décalées de 1,7 m au lieu de 0,93 m) ; les autres cas sont inchangés.
+- E2, E3, E3x, E4, E5 : télémétrie identique image par image à la PR des collisions validées.
+- Tests : géométrie des roues comparée au modèle, issue par décalage latéral, pas de second
+  saut sur la même voiture, seuils d'énergie, et un garde-fou de fréquence sur quatre courses
+  complètes (`tests/gameplay/hop.test.mjs`).
+
+**La fréquence finale est à juger par le joueur.** Si elle est encore trop élevée, la colonne
+« seuils de l'accident » montre ce que donne un relèvement des deux seuils d'énergie (deux
+fois moins de sauts) ; si elle est trop basse, `hopTyreOverlapMin` plus petit élargit la bande
+de décalage qui donne un saut.
+

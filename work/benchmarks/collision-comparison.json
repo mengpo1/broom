@@ -1,5 +1,5 @@
 {
- "date": "2026-11-22T17:44:48.035Z",
+ "date": "2026-11-23T12:48:11.506Z",
  "note": "reference values are approximate measurements on 25 fps footage (see the analysis report)",
  "E1": {
   "reference": {
@@ -152,38 +152,36 @@
  "HOP": {
   "reference": "none: the recoverable hop is an original gameplay choice, not shown by the footage",
   "thresholds": {
-   "closingKmh": 36,
-   "minSpeedKmh": 118.8,
+   "closingKmh": 45,
+   "minSpeedKmh": 150.1,
    "alignedWithinDegrees": 19.9,
-   "lateralOverlapFromBehind": [
-    0,
-    0.8
-   ],
+   "shareOfFrontTyreBehindRearTyreMin": 0.5,
+   "frontWheelBehindRearAxleMinMetres": 0.65,
+   "noSecondHopOverTheSameCarSeconds": 8,
    "lateralOverlapOfTheAccident": [
     0.2,
     0.8
    ],
-   "lengthwiseOverlapSideBySideMax": 0.5,
    "accidentFromClosingKmh": 54,
    "accidentFromSpeedKmh": 180
   },
   "game": {
    "fromBehind200onto150": {
     "hop": true,
-    "speedBefore": 205.9,
-    "carAhead": 154.3,
-    "closingKmh": 51.6,
+    "speedBefore": 206.1,
+    "carAhead": 154.6,
+    "closingKmh": 51.5,
     "flightSeconds": 0.45,
     "peakHeightMetres": 0.55,
-    "speedAfterTheShock": 129.1,
-    "speedAtLanding": 106.6,
-    "lostAtTheShockKmh": 76.8,
+    "speedAfterTheShock": 129.4,
+    "speedAtLanding": 106.9,
+    "lostAtTheShockKmh": 76.7,
     "lostInTheAirKmh": 22.5,
     "changeInTheLandingStepKmh": 0.42,
     "slowerThanCarAheadWasAtTheShockKmh": 47.7,
     "slowerThanCarAheadKmh": 61.5,
-    "slowestAfterLandingKmh": 106.1,
-    "speedTwoSecondsLaterKmh": 201.7,
+    "slowestAfterLandingKmh": 106.3,
+    "speedTwoSecondsLaterKmh": 201.5,
     "sidewaysMetres": 0.45,
     "headingBackWithinDegrees": 0.2,
     "statesSeen": [
@@ -194,24 +192,24 @@
     "repositioned": false,
     "carAheadDisturbed": false
    },
-   "fromBehind170onto100": {
+   "fromBehind262onto188": {
     "hop": true,
-    "speedBefore": 175.8,
-    "carAhead": 104.2,
-    "closingKmh": 71.5,
+    "speedBefore": 263.8,
+    "carAhead": 190.4,
+    "closingKmh": 73.4,
     "flightSeconds": 0.45,
     "peakHeightMetres": 0.55,
-    "speedAfterTheShock": 79.1,
-    "speedAtLanding": 56.6,
-    "lostAtTheShockKmh": 96.7,
+    "speedAfterTheShock": 165.2,
+    "speedAtLanding": 142.7,
+    "lostAtTheShockKmh": 98.6,
     "lostInTheAirKmh": 22.5,
     "changeInTheLandingStepKmh": 0.42,
-    "slowerThanCarAheadWasAtTheShockKmh": 47.6,
-    "slowerThanCarAheadKmh": 65.7,
-    "slowestAfterLandingKmh": 56.3,
-    "speedTwoSecondsLaterKmh": 157.9,
-    "sidewaysMetres": 0.49,
-    "headingBackWithinDegrees": 0.63,
+    "slowerThanCarAheadWasAtTheShockKmh": 47.8,
+    "slowerThanCarAheadKmh": 59.1,
+    "slowestAfterLandingKmh": 141.4,
+    "speedTwoSecondsLaterKmh": 221.5,
+    "sidewaysMetres": 0.46,
+    "headingBackWithinDegrees": 0.1,
     "statesSeen": [
      1,
      6
@@ -220,24 +218,24 @@
     "repositioned": false,
     "carAheadDisturbed": false
    },
-   "sideBySide200beside150": {
+   "arrivingFromTheSideBehindTheRearWheel": {
     "hop": true,
-    "speedBefore": 205.2,
-    "carAhead": 155.7,
-    "closingKmh": 49.6,
+    "speedBefore": 200.8,
+    "carAhead": 150.8,
+    "closingKmh": 49.9,
     "flightSeconds": 0.45,
     "peakHeightMetres": 0.55,
-    "speedAfterTheShock": 130.5,
-    "speedAtLanding": 108,
-    "lostAtTheShockKmh": 74.8,
-    "lostInTheAirKmh": 22.4,
+    "speedAfterTheShock": 125.6,
+    "speedAtLanding": 103.1,
+    "lostAtTheShockKmh": 75.1,
+    "lostInTheAirKmh": 22.5,
     "changeInTheLandingStepKmh": 0.42,
-    "slowerThanCarAheadWasAtTheShockKmh": 47.6,
-    "slowerThanCarAheadKmh": 61.3,
-    "slowestAfterLandingKmh": 107.3,
-    "speedTwoSecondsLaterKmh": 187.4,
-    "sidewaysMetres": 1.9,
-    "headingBackWithinDegrees": 0.19,
+    "slowerThanCarAheadWasAtTheShockKmh": 47.7,
+    "slowerThanCarAheadKmh": 61.9,
+    "slowestAfterLandingKmh": 102.5,
+    "speedTwoSecondsLaterKmh": 181.9,
+    "sidewaysMetres": 2.96,
+    "headingBackWithinDegrees": 0.21,
     "statesSeen": [
      1,
      6
@@ -246,7 +244,7 @@
     "repositioned": false,
     "carAheadDisturbed": false
    },
-   "belowTheClosingSpeed160onto140": {
+   "belowTheClosingSpeed192onto150": {
     "hop": false,
     "events": [
      "bump",
@@ -254,7 +252,33 @@
      "shift"
     ]
    },
-   "aboveIt262onto190isTheAccident": {
+   "belowTheSpeed140onto90": {
+    "hop": false,
+    "events": [
+     "shift",
+     "bump",
+     "contact"
+    ]
+   },
+   "noseOnTheWheel200onto150": {
+    "hop": false,
+    "events": [
+     "bump",
+     "contact",
+     "shift",
+     "overtake",
+     "overtaken"
+    ]
+   },
+   "wheelsSideBySide200beside150": {
+    "hop": false,
+    "events": [
+     "wheel",
+     "contact",
+     "shift"
+    ]
+   },
+   "noseOnTheWheel262onto190isTheAccident": {
     "hop": false,
     "events": [
      "launch",

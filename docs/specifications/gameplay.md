@@ -43,10 +43,11 @@ Aucune source consultée ne donne de valeur chiffrée du comportement routier de
 - **Collisions et accidents** (détail et comparaison chiffrée : `collisions.md`) : la voiture
   qui en tamponne une autre repart 48 km/h moins vite qu'elle, sans la déranger ; un contact
   roue contre roue coûte environ 96 km/h à la plus rapide ; ni l'un ni l'autre ne change le
-  cap. Roue sur roue avec au moins 36 km/h d'écart, la voiture de derrière fait un **saut
-  récupérable** : ralentie au choc, court envol, retombée sur les roues 48 km/h moins vite
-  que l'autre, direction perturbée un instant, et la course continue **[choix de gameplay
-  original, sans référence]**. Roue sur roue par
+  cap. Occasionnellement, quand une roue avant arrive **derrière** une roue arrière (voitures
+  décalées d'environ une voie) avec au moins 45 km/h d'écart et 150 km/h, la voiture de
+  derrière fait un **saut récupérable** : ralentie au choc, court envol, retombée sur les
+  roues 48 km/h moins vite que l'autre, direction perturbée un instant, et la course continue
+  **[choix de gameplay original, sans référence]**. Roue sur roue par
   l'arrière à grande vitesse (180 km/h et 54 km/h d'écart au moins), elle décolle, retombe
   derrière l'autre, explose et repart après 3,2 s d'arrêt. Un panneau de freinage heurté à grande
   vitesse fait décoller la voiture, qui retombe sans exploser, glisse hors de contrôle et
