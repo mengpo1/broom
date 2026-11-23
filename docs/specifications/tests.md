@@ -8,32 +8,44 @@ l'image, pas la vitesse.
 
 ## 0. Dernière exécution complète — rapport de non-régression
 
-Sur le build final (`index.html`, 1 073 723 octets), le 23 novembre 2026, après les corrections
-du troisième essai du joueur (saut récupérable rendu occasionnel, propositions de
-rétroviseurs, diagnostic du braquage maintenu) :
+Sur le build final (`index.html`, 1 112 050 octets), le 23 novembre 2026, après le lot
+« analyse vidéo du braquage prolongé » (prototype expérimental de direction en deux phases,
+banc de direction ; **conduite par défaut inchangée**) :
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Simulation et logique | `npm test` | 96 / 96 (les 91 précédents, dont 8 adaptés à la nouvelle géométrie du saut — § 1 ter ; 5 nouveaux) |
+| Simulation et logique | `npm test` | 108 / 108 (les 96 précédents, inchangés ; 12 nouveaux : variantes expérimentales et banc de direction) |
 | Navigateur (WebGPU) | `node tests/rendering/smoke.browser.mjs` | 13 / 13 |
 | Modes de jeu de bout en bout | `node work/scripts/flow-check.mjs` | réussi (5 parcours) |
 | Pages, pause, caméras, souris | `node work/scripts/pages-check.mjs` | 14 / 14 |
 | Audio | `node work/scripts/audio-check.mjs` | 80 / 80 |
-| Banc d'essai des collisions | `node work/scripts/lab-check.mjs` | 19 / 19 (le cas `#lab=hop` produit toujours un saut) |
+| Banc d'essai des collisions | `node work/scripts/lab-check.mjs` | 19 / 19 |
+| Banc de direction et option expérimentale | `node work/scripts/steerlab-check.mjs` | 31 / 31 (§ 5 ter) |
 
 Ce qui devait être conservé, et comment c'est vérifié :
 
 | Élément validé | Vérification | Résultat |
 |---|---|---|
-| Accélération, freinage, adhérence, direction de référence | `node work/scripts/driving-report.mjs` comparé à la PR des collisions validées | **165 valeurs identiques** ; `car-spec.js` non modifié ; test « steering reference » (paramètres et comportement de la direction) |
-| Tamponnage arrière (E4), contact roue contre roue (E2), panneau (E5), accident violent (E3, E3x) | `node work/scripts/collision-sequences.mjs all` : télémétrie de chaque image comparée à celle de la PR des collisions validées | **identique image par image** pour les cinq séquences (192, 570, 252, 600 et 390 images) |
-| Mêmes contacts, en simulation | `node work/scripts/collision-comparison.mjs` | 129 valeurs chiffrées E1–E5 identiques |
-| Courses complètes de l'ordinateur | `node work/scripts/hop-frequency.mjs` (108 courses), `node work/scripts/race-contact-table.mjs` (6 courses) | temps du vainqueur identique dans les 108 courses avant / après ; dans les courses sans saut, tous les compteurs de contacts sont ceux de la PR des collisions validées |
-| Animation des roues à grande vitesse (validée au troisième essai) | fichiers `cockpit-layer.js` et dessins de pneus de `car-model.js` inchangés depuis la PR précédente ; tests d'animation | inchangée ; 13 / 13 tests d'animation |
-| Position des rétroviseurs du jeu | test « mirror proposals » : sans option, le montage du jeu (39,5 cm) | inchangée ; les propositions ne s'activent que par l'option `#mirrors=…` |
-| Conditions de l'accident E3 | code inchangé ; test *the hard accident E3 is kept* ; tableau par décalage (`collisions.md` § 2 bis) | inchangées |
+| Conduite par défaut strictement identique à la PR #4 | `node work/scripts/driving-trace.mjs <src>` : empreinte SHA-256 de quatre courses complètes (8 voitures, 9000 pas, un joueur au clavier scripté ; position, cap, vitesse, direction, glissade, lacet, glissement, état de chaque voiture à chaque pas), calculée sur les sources de la PR #4, de la PR #5 et de cette branche | **quatre empreintes identiques** pour les trois sources (`work/benchmarks/driving-trace.txt`) |
+| Accélération, freinage, adhérence, direction de référence | `node work/scripts/driving-report.mjs` comparé à la PR des collisions validées et à la PR #4 | **165 valeurs identiques** ; `car-spec.js` non modifié ; test « steering reference » inchangé et réussi |
+| Variante absente, `a` ou nom inconnu | test *unset, the name of the reference or an unknown name, a race is the validated driving to the last bit* | identique au bit près ; aucun état expérimental n'est touché |
+| Tamponnage arrière (E4), contact roue contre roue (E2), panneau (E5), accident violent (E3, E3x) | `node work/scripts/collision-sequences.mjs all` : télémétrie de chaque image comparée à celle de la PR des collisions validées et aux fichiers du dépôt | **identique image par image** : E2 192, E3 570, E3x 252, E4 600, E5 390 images (et les 480 images de E3x, HOP et HOPx du dépôt) |
+| Mêmes contacts, en simulation | `node work/scripts/collision-comparison.mjs` | toutes les valeurs chiffrées E1–E5 identiques |
+| Animation des roues à grande vitesse (validée au troisième essai) | dans `cockpit-layer.js`, seuls le choix du dessin de braquage et l'angle du volant passent par une branche réservée aux variantes ; les fonctions de rotation des roues et les dessins de pneus sont inchangés ; tests d'animation | inchangée ; 13 / 13 tests d'animation |
+| Sauts récupérables, rétroviseurs (PR #5) | code inchangé ; tests du saut et « mirror proposals » | inchangés |
+| Affichage du braquage de la conduite validée | test *the cockpit shows the lock that is simulated, never more* ; contrôle navigateur sans option | inchangé : butée, 54° de volant, rien de plus |
 
-Exécutions précédentes : 22 novembre (build de 1 068 261 octets, lot « saut récupérable, roues
+Mesures du prototype, tenues à part des références validées : `work/benchmarks/held-steering.json`,
+`work/renders/steering/telemetry-*.json` (`held-steering.md`).
+
+Pendant ce lot, le contrôle du banc de direction a d'abord donné 29 / 31 : son point « touche
+tenue dans une course normale » braquait à fond dès le départ arrêté, et la voiture finissait
+dans le mur des stands avant d'avoir roulé. Le point attend maintenant 110 km/h en ligne
+droite avant de braquer ; le jeu n'était pas en cause.
+
+Exécutions précédentes : 23 novembre, lot du troisième essai (build de 1 073 723 octets, saut
+récupérable rendu occasionnel, propositions de rétroviseurs, diagnostic du braquage) : 96 / 96,
+13 / 13, 5 parcours, 14 / 14, 80 / 80, 19 / 19, 165 valeurs identiques. 22 novembre (build de 1 068 261 octets, lot « saut récupérable, roues
 à très haute vitesse, rétroviseurs rapprochés ») : 91 / 91, 13 / 13, 5 parcours, 14 / 14,
 80 / 80, 19 / 19, 165 valeurs identiques. 21 novembre (build de 1 035 351 octets, travail sur
 les collisions) : 76 / 76, 13 / 13, 5 parcours, 14 / 14, 80 / 80, 165 valeurs identiques ; le
@@ -48,11 +60,11 @@ longer exists »), d'où des captures à refaire. Le chien de garde graphique du
 automatisé est coupé (`--disable-gpu-watchdog`, `lib-browser.mjs`) et les scripts de capture
 attendent après chaque image. Le jeu n'est pas concerné.
 
-## 1. Tests de simulation et de logique (Node) — 96 / 96 réussis
+## 1. Tests de simulation et de logique (Node) — 108 / 108 réussis
 
-Dernière exécution : `npm test` → 96 tests, 96 réussis, 0 échec (environ 7 s) : les 91 tests
-du lot précédent (dont huit adaptés à la nouvelle géométrie du saut, voir § 1 ter) et cinq
-nouveaux.
+Dernière exécution : `npm test` → 108 tests, 108 réussis, 0 échec (environ 7 s) : les 96 tests
+du lot précédent, inchangés, et douze nouveaux (variantes expérimentales de direction, banc de
+direction).
 
 ### Conduite — `tests/unit/physics.test.mjs`
 
@@ -157,6 +169,24 @@ Le garde-fou de fréquence joue quatre courses complètes de 16 voitures (deux c
 jeux de règles, toujours les mêmes) : avec les premières règles elles donnaient 10 sauts ; le
 test en accepte quatre au plus, deux au plus par course, et vérifie pour chacun la géométrie et
 l'énergie. Aujourd'hui elles en donnent deux.
+
+### Variantes expérimentales de direction et banc — `tests/gameplay/steering-variants.test.mjs`
+
+Tous nouveaux. Ils gardent les deux côtés : la conduite validée reste exactement ce qu'elle
+était quoi qu'on demande par erreur, et les variantes font ce que disent leurs réglages.
+
+- ✅ steering variants: the reference has no parameters; names, copies with other settings, unknown names
+- ✅ steering variants: unset, the name of the reference or an unknown name, a race is the validated driving to the last bit
+- ✅ steering variants: for the cars a player drives only; changed and removed during a race
+- ✅ steering variants: the same manoeuvre gives the same result every time
+- ✅ steering variants: two phases at the instants their numbers give
+- ✅ steering variants: B2 and B3 are today's steering until phase 2 starts; B1 never exceeds today's lock
+- ✅ steering variants: what phase 2 does - scrub for B2, a slide that ends in a spin for B3, recovery when released in time
+- ✅ steering variants: nothing at low speed, where the lock is the mechanical one, and nothing below the hold threshold
+- ✅ steering variants: road curvature - phase 2 of B3 builds up faster in a bend that asks for more than the car can give
+- ✅ steering variants: the cockpit shows the lock that is simulated, never more
+- ✅ steering bench: a development circuit outside the catalogue, bends of several radii both ways, demonstrations on real bends
+- ✅ steering bench: the circuit of the reference passage - the validated car, driven with the keys assumed from the footage, follows it
 
 ### Multijoueur — `tests/integration/multiplayer.test.mjs`
 
@@ -347,6 +377,31 @@ meilleur tour identiques à la PR précédente dans les six ; 16 sauts au total
 (ce lot : 0 grave, 3 moyens, 13 mineurs ; suites dans `collisions.md` § 10) ;
 `work/reviews/second-test-recheck.md` (contre-vérification des corrections du saut et de la
 planche des rétroviseurs : 4 confirmées, 2 partielles, 0 grave, 0 moyen ; `collisions.md` § 11).
+
+## 5 ter. Braquage prolongé : banc de direction et mesures
+
+**Dans le vrai jeu** : `node work/scripts/steerlab-check.mjs` ouvre `index.html#steerlab=b2`,
+laisse tourner la boucle en temps réel et passe par le vrai clavier — 31 contrôles : le banc
+s'ouvre seul en piste sur son circuit avec la variante demandée ; touche tenue, la phase 2
+arrive et les chiffres affichés suivent ; relâchée, elle est rendue ; touches 1 à 4 (changement
+de conduite sans repartir), 5 (démonstration), 6 (passage de la vidéo de référence), Entrée ;
+`#steering=b3&phase2Delay=0.6` applique la variante et le réglage dans une course ordinaire,
+pour la voiture du joueur seulement ; sans option ou avec un nom inconnu : ni banc, ni
+variante, et une touche tenue 5 s en course ne laisse aucun état expérimental.
+
+**Indépendance de la cadence d'affichage** : la démonstration jouée par la boucle du
+navigateur (quelques images par seconde, irrégulières, avec le rasteriseur logiciel) donne
+les mêmes instants, au millième, que la mesure faite par la simulation seule (butée 0,225 s,
+crissement 0,417 s, début de phase 2 0,517 s, traces 0,950 s, fumée 1,283 s, fin de phase 2
+1,517 s).
+
+**Mesures** : `node work/scripts/held-steering.mjs` (direction tenue à quatre vitesses et
+dans six virages, pour les quatre conduites, plus une ligne par profil de conduite →
+`work/benchmarks/held-steering.json`) ; `node work/scripts/reference-passage-track.mjs`
+(la piste ajustée sur le passage de la vidéo : la voiture validée y reste à 2,6 m de l'axe au
+plus ; `--fit` refait l'ajustement) ; `node work/scripts/steering-sequences.mjs` (vidéos et
+télémétrie des manœuvres) ; `python3 work/scripts/reference-steering-comparison.py` (vidéo de
+référence et Virage GP côte à côte). Tout est décrit dans `held-steering.md`.
 
 ## 6. Ce que les tests ont trouvé
 

@@ -35,6 +35,17 @@ s'essaie de la même façon (`d`, `e`, `f` ou `g` ; `docs/specifications/wheels-
 chromium --enable-features=Vulkan "file://$PWD/index.html#mirrors=d"
 ```
 
+**Expérimental — braquage prolongé.** Trois variantes de direction en deux phases (`b1`, `b2`,
+`b3`) sont proposées à côté de la conduite validée (`a`), sans qu'aucune soit retenue. Un banc
+de direction de développement permet de passer de l'une à l'autre en roulant (touches 1 à 4 ;
+5 et 6 : démonstrations ; Entrée : repartir). Sans option, le jeu est la conduite validée
+(`docs/specifications/held-steering.md`) :
+
+```bash
+chromium --enable-features=Vulkan "file://$PWD/index.html#steerlab=b2"   # banc de direction
+chromium --enable-features=Vulkan "file://$PWD/index.html#steering=b2"   # la variante dans le jeu normal
+```
+
 | | Joueur 1 | Joueur 2 | Manette |
 |---|---|---|---|
 | Direction | ← → | A D | stick gauche ou croix |
@@ -53,7 +64,7 @@ en écran partagé (haut/bas ou gauche/droite). 18 circuits originaux, 16 advers
 ## Contenu du dépôt
 
 ```
-index.html            le jeu autonome (construit depuis src/), 1 073 723 octets
+index.html            le jeu autonome (construit depuis src/), 1 112 050 octets
 race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s (enregistrée avant le travail sur les collisions)
 src/                  sources (voir docs/architecture/overview.md)
 tests/                tests automatisés (Node et navigateur)
@@ -138,6 +149,7 @@ résultats à l'écran et dans `window.virageBenchmark`).
 | Rotation des roues avant et rétroviseurs du cockpit (avant / après) | `docs/specifications/wheels-and-mirrors.md` |
 | Tester les décollages à la main (banc d'essai, option `#lab=…`) | `docs/specifications/collision-test-bench.md` |
 | Braquage maintenu : diagnostic de la direction actuelle, sans modification | `docs/specifications/steering-study.md` |
+| Braquage prolongé : analyse de la vidéo, mesures, prototype expérimental en deux phases, banc A/B | `docs/specifications/held-steering.md` |
 | Résultats des tests | `docs/specifications/tests.md` |
 | Rapport de performances | `docs/specifications/performance.md` |
 | Compatibilité Linux | `docs/specifications/linux-compatibility.md` |

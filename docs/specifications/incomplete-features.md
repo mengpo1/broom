@@ -60,11 +60,16 @@ par le rasteriseur logiciel SwiftShader).
 - **Rétroviseurs** : jugés encore trop éloignés au troisième essai. La position du jeu est
   inchangée ; quatre propositions plus rapprochées attendent le choix du joueur
   (`wheels-and-mirrors.md` § 2 ter). Elles n'ont été ni revues par un critique ni essayées.
-- **Braquage maintenu** : en tenant une touche de direction, la direction arrive en butée en
-  0,225 s et plus rien ne change ensuite — ni mouvement supplémentaire du volant, ni virage
-  plus serré, ni dérapage. C'est mesuré et analysé (`steering-study.md`) mais **rien n'est
-  corrigé** : la solution dépend de la vidéo de référence que le joueur doit fournir, et toute
-  modification de la physique se fera dans une variante expérimentale séparée.
+- **Braquage prolongé** : dans la conduite validée, la direction arrive en butée en 0,225 s
+  et plus rien ne change ensuite. **C'est toujours le cas par défaut : rien n'est adopté.**
+  Un prototype expérimental en deux phases (trois variantes, `held-steering.md`) s'essaie par
+  l'option `#steerlab=…` ou `#steering=…`. Réserves : la vidéo de 13 min 38 s annoncée, sa
+  planche et son extrait **n'ont pas été reçus** — l'analyse porte sur l'enregistrement de
+  1991 ; les commandes n'y sont pas visibles (les appuis de la comparaison sont une
+  hypothèse) et elle ne montre ni dérapage ni perte de vitesse au troisième cran (les
+  variantes B2 et B3 vont au-delà de ce qu'elle établit) ; **les sensations n'ont été jugées
+  par personne** ; les variantes ne sont réglées que pour le profil arcade ; aucun critique
+  indépendant n'a revu ce lot ; les sept dessins de roues étudiés ne sont pas réalisés.
 - **Perte de roue** : demandée, **non implémentée**. La vidéo analysée n'en montre pas ; ce
   qu'il faudrait pour la définir est listé dans `collisions.md` § 6.
 - **Roues** : seules les roues avant de la vue cockpit suivent la vitesse (marques

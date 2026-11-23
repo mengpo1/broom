@@ -8,6 +8,10 @@ Ce document **mesure le jeu tel qu'il est** et sépare trois explications possib
 été modifié** : ni la direction, ni l'adhérence, ni le lacet, ni le glissement, ni les dessins.
 La solution reste à arrêter quand le joueur aura fourni sa vidéo de référence (§ 6).
 
+**Suite** : l'analyse de la vidéo, l'instrumentation par vitesse et par courbure et un
+prototype expérimental en deux phases sont dans `held-steering.md`. La conduite décrite ici
+reste la conduite par défaut.
+
 Fichiers examinés : `src/input/input-manager.js`, `src/physics/car-physics.js`,
 `src/vehicles/car-spec.js`, `src/rendering/compositing/cockpit-layer.js`,
 `src/art/cockpits/cockpit-art.js`.
