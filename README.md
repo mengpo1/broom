@@ -28,6 +28,13 @@ lancement ; touches 1 à 5 pour choisir un cas, Entrée pour rejouer
 chromium --enable-features=Vulkan "file://$PWD/index.html#lab=hop"
 ```
 
+Quatre positions plus rapprochées des rétroviseurs sont proposées sans être retenues ; chacune
+s'essaie de la même façon (`d`, `e`, `f` ou `g` ; `docs/specifications/wheels-and-mirrors.md`) :
+
+```bash
+chromium --enable-features=Vulkan "file://$PWD/index.html#mirrors=d"
+```
+
 | | Joueur 1 | Joueur 2 | Manette |
 |---|---|---|---|
 | Direction | ← → | A D | stick gauche ou croix |
@@ -46,7 +53,7 @@ en écran partagé (haut/bas ou gauche/droite). 18 circuits originaux, 16 advers
 ## Contenu du dépôt
 
 ```
-index.html            le jeu autonome (construit depuis src/), 1 068 261 octets
+index.html            le jeu autonome (construit depuis src/), 1 073 723 octets
 race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s (enregistrée avant le travail sur les collisions)
 src/                  sources (voir docs/architecture/overview.md)
 tests/                tests automatisés (Node et navigateur)
@@ -60,7 +67,9 @@ work/
   renders/            captures de référence (final/ : les 20 captures 2560x1440 de la revue artistique, en JPEG)
     collisions/       scénarios de collision joués dans le jeu : vidéos 60 i/s, planches, télémétrie, images clés ;
                       saut récupérable et accident violent côte à côte (hop-vs-accident.mp4)
-    comparison/       roues (avant / après, jusqu'à la vitesse maximale) et trois positions des rétroviseurs
+    comparison/       roues (avant / après, jusqu'à la vitesse maximale) ; rétroviseurs : trois premières positions, puis
+                      la position actuelle et quatre propositions plus rapprochées (mirror-proposals.jpg)
+    steering/         toutes les positions de direction que le cockpit sait afficher
   benchmarks/         résultats bruts (JSON)
   reviews/            comptes rendus des critiques (revue artistique, revue des séquences de collision)
 references/           volontairement vide : aucune image de référence n'est embarquée par le jeu
@@ -128,6 +137,7 @@ résultats à l'écran et dans `window.virageBenchmark`).
 | Collisions, décollages, accidents ; comparaison avec l'analyse vidéo ; non-régression de la conduite | `docs/specifications/collisions.md` |
 | Rotation des roues avant et rétroviseurs du cockpit (avant / après) | `docs/specifications/wheels-and-mirrors.md` |
 | Tester les décollages à la main (banc d'essai, option `#lab=…`) | `docs/specifications/collision-test-bench.md` |
+| Braquage maintenu : diagnostic de la direction actuelle, sans modification | `docs/specifications/steering-study.md` |
 | Résultats des tests | `docs/specifications/tests.md` |
 | Rapport de performances | `docs/specifications/performance.md` |
 | Compatibilité Linux | `docs/specifications/linux-compatibility.md` |
