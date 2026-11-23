@@ -22,8 +22,12 @@ Extraits de la vidéo analysée dans `docs/research/vroom-gameplay-analysis.md`.
 | `E3-launch-over-car-and-explosion_1m58s/` | Décollage sur une voiture, atterrissage, explosion, arrêt, redémarrage |
 | `E4-rear-end-bumps_2m07s-2m20s/` | Six tamponnages par l'arrière |
 | `E5-launch-on-roadside-board_3m01s/` | Choc contre un panneau, décollage, glissade dans le sable |
+| `S-steering-hold_1m47s-1m56s/` | Braquage prolongé : les sept dessins du volant et des mains (`hand-positions.jpg`), le passage image par image (`passage-strip.jpg`, `passage-views.jpg`), l'afficheur de vitesse agrandi (`speed-readout.png`), le relevé complet (`timeline.json`) et les scripts du relevé (`method/`) |
 | `P-perspective-and-layout/` | Images isolées agrandies ×2 : lignes droites, côtes, portiques, structure couverte, tunnel, second circuit |
 | `measurements.json` | Relevés bruts : vitesses lues à l'œil, ligne d'horizon image par image, largeur de route |
+
+La vidéo comparative `work/renders/steering/reference-vs-a.mp4` reprend, au même titre
+(analyse uniquement), 9,7 s de la vue 3D de cette vidéo à côté de Virage GP.
 
 Les planches `sheet-*.jpg` ne montrent que la vue 3D (lignes 122 à 360) ; les planches
 `speed-readout*.png` agrandissent l'afficheur de vitesse du volant.
