@@ -45,6 +45,8 @@ export function createCarState(index) {
     airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
     landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
     airKind: 0, airPeak: 0, landKind: 0, launchAlong: 0, hopLanded: false, rearmClock: -10,
+    // experimental steering variants only (vehicles/steering-variants.js); `steering` is null for the validated driving
+    steering: null, steerHold: 0, steerExtra: 0, steerShown: 0, driftYaw: 0,
   };
 }
 
@@ -62,6 +64,7 @@ export function placeCar(car, track, s, d) {
   car.segIndex = i; car.s = f * track.ds; car.d = d;
   car.speed = 0; car.vLat = 0; car.yawRate = 0; car.velX = 0; car.velZ = 0; car.steer = 0;
   car.gear = 1; car.reverse = false; car.slip = 0; car.wheelspin = 0;
+  car.steerHold = 0; car.steerExtra = 0; car.steerShown = 0; car.driftYaw = 0;
   car.prevX = car.x; car.prevY = car.y; car.prevZ = car.z; car.prevHeading = car.heading; car.prevPitch = car.pitch;
   car.headingError = 0;
 }
@@ -231,6 +234,68 @@ export function steeringLock(params, absV, aMax) {
   return lock;
 }
 
+/**
+ * EXPERIMENTAL (car.steering set, see vehicles/steering-variants.js): steering lock of a two-phase
+ * steering. Phase 1 is the ordinary steering; while the request is held at full lock, phase 2 turns
+ * the wheels further. Keeps the progress of phase 2 in car.steerExtra (0..1) and, for the drawings,
+ * the steering really applied as a multiple of the reference full lock in car.steerShown.
+ */
+function heldSteeringLock(car, params, absV, aMax, dt, track) {
+  const sv = car.steering, spec = params.spec;
+  // held: the request is at the end of the travel (a key, or a stick or a mouse pushed to at least `holdThreshold`)
+  // and the steering has reached the position asked for, on the same side
+  const asked = Math.min(1, Math.abs(car.inSteer));
+  const held = asked >= sv.holdThreshold && Math.abs(car.steer) >= asked - 1e-9 && car.inSteer * car.steer > 0;
+  if (held) {
+    car.steerHold += dt;
+    if (car.steerHold >= sv.phase2Delay) {
+      let rate = sv.phase2Rate;
+      if (sv.curvatureGain > 0 && car.segIndex >= 0) {
+        // a bend that asks for more than the car can give, in the direction steered (positive steering and
+        // positive curvature both turn the heading the same way)
+        const need = clamp((track.kappa[car.segIndex] * Math.sign(car.steer) * absV * absV) / aMax, 0, 1.5);
+        rate *= 1 + sv.curvatureGain * need;
+      }
+      car.steerExtra = Math.min(1, car.steerExtra + rate * dt);
+    }
+  } else {
+    car.steerHold = 0;
+    car.steerExtra = Math.max(0, car.steerExtra - sv.phase2Return * dt);
+  }
+  const allowance = sv.phase1Allowance + (sv.phase2Allowance - sv.phase1Allowance) * car.steerExtra;
+  let lock = spec.steerLock;
+  if (absV > 6) {
+    const gripLock = Math.atan((params.wheelbase * aMax * allowance) / (absV * absV));
+    lock = lerp(lock, Math.min(lock, gripLock), params.profile.steerAssist);
+  }
+  car.steerShown = (car.steer * lock) / steeringLock(params, absV, aMax);
+  return lock;
+}
+
+/**
+ * EXPERIMENTAL: slide of the rear in phase 2 of a held steering. The car turns in faster than its
+ * path: its heading gains `driftYaw`, and the same rotation is taken out of its velocity as a
+ * sideways slide, which the tyres then win back (more slowly than usual: driftRecovery).
+ */
+function heldSteeringDrift(car, params, v, aMax, slip, sGrip, dt, emit) {
+  const sv = car.steering;
+  if (!(sv.driftGain > 0)) return;
+  const target = car.steerExtra > 0 && slip > 0
+    ? Math.sign(car.steer) * sv.driftGain * car.steerExtra * Math.min(slip, sv.driftSlipCap) * (aMax / Math.max(Math.abs(v), 8))
+    : 0;
+  car.driftYaw = damp(car.driftYaw, target, sv.driftResponse, dt);
+  if (target === 0 && Math.abs(car.driftYaw) < 1e-4) car.driftYaw = 0;          // (dies out for good instead of fading forever)
+  if (car.driftYaw === 0) return;
+  car.heading = wrapAngle(car.heading + car.driftYaw * dt);
+  car.vLat -= v * car.driftYaw * dt;
+  // the tyres are saturated: the slide is won back more slowly while phase 2 lasts
+  car.vLat *= Math.exp(params.spec.lateralRecovery * sGrip * dt * (1 - sv.driftRecovery) * car.steerExtra);
+  if (sv.spinAngle > 0 && Math.abs(car.vLat) > Math.tan(sv.spinAngle) * Math.max(Math.abs(v), 8)) {
+    car.steerExtra = 0; car.steerHold = 0; car.driftYaw = 0;
+    startSpin(car, Math.abs(car.vLat), Math.sign(car.yawRate) || 1, emit);
+  }
+}
+
 function surfaceGrip(surface, profile) {
   switch (surface) {
     case SURFACE.KERB: return 0.94;
@@ -373,7 +438,7 @@ function stepDrive(car, track, dt, rules, emit) {
   const steerTarget = clamp(car.inSteer, -1, 1);
   const towardCentre = Math.abs(steerTarget) < Math.abs(car.steer) || steerTarget * car.steer < 0;
   car.steer = moveToward(car.steer, steerTarget, (towardCentre ? spec.steerReturnRate : spec.steerRate) * dt);
-  const lock = steeringLock(p, absV, aMax);
+  const lock = car.steering ? heldSteeringLock(car, p, absV, aMax, dt, track) : steeringLock(p, absV, aMax);
   const yawWanted = (v * Math.tan(car.steer * lock)) / p.wheelbase;
   const latWanted = Math.abs(v * yawWanted);
   let slip = latWanted > aMax ? latWanted / aMax - 1 : 0;
@@ -471,6 +536,7 @@ function stepDrive(car, track, dt, rules, emit) {
   if (slip > 0) car.vLat -= Math.sign(car.yawRate) * Math.min(slip, 1.5) * aMax * 0.22 * dt;
   car.vLat *= Math.exp(-spec.lateralRecovery * sGrip * dt);
   car.slip = damp(car.slip, slip + Math.abs(car.vLat) * 0.12, 12, dt);
+  if (car.steering) heldSteeringDrift(car, p, v, aMax, slip, sGrip, dt, emit);
 
   // ---- integrate position
   const ch = Math.cos(car.heading), sh = Math.sin(car.heading);

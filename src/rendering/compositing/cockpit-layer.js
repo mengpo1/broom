@@ -83,6 +83,22 @@ export function advanceStreak(turn, distance, speed) {
   return mod(turn + distance * streakCyclesPerMetre(speed), 1);
 }
 
+/**
+ * EXPERIMENTAL steering variants (vehicles/steering-variants.js). `shown` is the steering really applied
+ * as a multiple of the reference full lock: 1 at the stop of the validated steering, more while a held key
+ * winds on extra lock. The drawings never show more than the simulation applies.
+ * Steering wheel: one to one up to the reference full lock (54 degrees), then 45 % of the extra (the arms
+ * are crossed; about 80 degrees for twice the reference lock).
+ */
+export function heldSteeringWheelTurn(shown) {
+  const a = Math.abs(shown);
+  return a <= 1 ? shown : Math.sign(shown) * (1 + (a - 1) * 0.45);
+}
+/** By how much the steering of a variant is divided before choosing a front wheel drawing: the last drawing is for the top of its range. */
+export function heldSteeringSpan(variant) {
+  return Math.sqrt(Math.max(1, variant.phase2Allowance / BASE_CAR_SPEC.overSteerAllowance));
+}
+
 /** Steering frame (0 = full right ... STEER_FRAMES-1 = full left) of the LEFT wheel for a steering value in -1..1 (+ = right). */
 export function steerFrame(steer, lock) {
   const angle = clamp(-steer * lock, -MAX_DRAWN_STEER, MAX_DRAWN_STEER);
@@ -247,7 +263,9 @@ export class CockpitLayer {
 
     // front wheels: steering frame and rolling variant
     const lock = BASE_CAR_SPEC.steerLock * (0.45 + 0.55 / (1 + Math.abs(car.speed) / 28));
-    const frame = steerFrame(car.steer, lock);
+    // (experimental steering variants: the drawings follow the steering really applied, which can go beyond
+    // the reference full lock while a key is held; the last drawing is then kept for that extra)
+    const frame = car.steering ? steerFrame(clamp(car.steerShown / heldSteeringSpan(car.steering), -1, 1), lock) : steerFrame(car.steer, lock);
     // streaks cycle with the distance travelled, not with the images drawn: same motion at any display rate
     const vi = view.index, travelled = car.odometer - this.lastOdometer[vi];
     if (Number.isFinite(travelled) && Math.abs(travelled) < 30) this.streakTurn[vi] = advanceStreak(this.streakTurn[vi], travelled, car.speed);
@@ -289,7 +307,7 @@ export class CockpitLayer {
     // out of control (spin or slide): the driver has let go of the wheel, which turns on its own
     const loose = car.state === CAR_STATE.SPIN;
     const sp = loose ? this.steeringFree[p] : this.steering[p];
-    const angle = loose ? Math.sin(car.clock * 9) * 0.5 : car.steer * 0.95;
+    const angle = loose ? Math.sin(car.clock * 9) * 0.5 : car.steering ? heldSteeringWheelTurn(car.steerShown) * 0.95 : car.steer * 0.95;
     const s = STEERING.size * k * 0.5;
     const cx = ox + STEERING.x * k + view.shakeX * 0.4, cy = oy + STEERING.y * k + view.shakeY * 0.6;
     const co = Math.cos(angle), si = Math.sin(angle), q = STEERING.squash;

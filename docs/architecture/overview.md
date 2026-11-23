@@ -21,12 +21,15 @@ Aucune bibliothèque externe, aucun moteur de jeu, aucun moteur 3D ou physique t
 ```
 src/
   core/           boucle (game-app), maths, aléa, configuration, benchmark, banc d'essai des collisions (collision-lab,
-                  outil de développement activé par l'option de lancement #lab=…)
+                  outil de développement activé par l'option de lancement #lab=…), banc de direction (steering-bench,
+                  outil de développement activé par #steerlab=… : compare la conduite validée et les variantes
+                  expérimentales de braquage prolongé)
   tracks/         définition des 18 circuits, construction (courbure, relief, stands), trajectoire idéale,
                   thèmes logiques, disposition logique des décors (scenery-layout)
   physics/        dynamique arcade d'une monoplace ; contacts voiture-voiture classés (tamponnage, roue contre roue,
                   saut récupérable, accident), panneaux solides, vol et atterrissages ; réglages des collisions (collision-tuning)
-  vehicles/       paramètres de la voiture (car-spec), écuries et pilotes fictifs (liveries)
+  vehicles/       paramètres de la voiture (car-spec), écuries et pilotes fictifs (liveries), variantes EXPÉRIMENTALES
+                  de direction en deux phases (steering-variants : absentes sans l'option #steering=… ou #steerlab=…)
   ai/             pilote ordinateur (mêmes commandes et même physique que le joueur), profil de vitesse
   gameplay/       course (départ, tours, classement, stands), règles, championnat, sessions (modes de jeu)
   multiplayer/    découpage de l'écran

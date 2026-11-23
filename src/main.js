@@ -24,6 +24,8 @@ import { GameFlow } from './ui/game-flow.js';
 import { t, setLanguage } from './localization/i18n.js';
 import { runBenchmark, describeEnvironment, measureRefreshRate, BENCHMARK_SCENARIOS } from './core/benchmark.js';
 import { CollisionLab, attachLabControls } from './core/collision-lab.js';
+import { SteeringBench, attachSteeringBenchControls } from './core/steering-bench.js';
+import { steeringVariant, STEERING_VARIANTS, STEERING_REFERENCE } from './vehicles/steering-variants.js';
 
 function parseParams() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -45,6 +47,13 @@ async function boot() {
   // Mirror proposals awaiting the player's choice (index.html#mirrors=d, e, f or g): a development option, not a setting.
   // Without it, or with an unknown name, the mount of the game is used.
   const mirrors = params.mirrors && selectMirrorPreset(params.mirrors) ? String(params.mirrors).toLowerCase() : MIRROR_DEFAULT;
+  // EXPERIMENTAL steering variants awaiting the player's verdict (vehicles/steering-variants.js), a development option:
+  // index.html#steering=b1, b2 or b3 applies one to the cars the players drive, in any race; its parameters can be
+  // given by hand (#steering=b2&phase2Delay=0.5&phase2Allowance=1.8). The steering bench (#steerlab=...) takes the
+  // same names and parameters. Without either, with `a` or with an unknown name: the validated driving, untouched.
+  const steeringName = String(params.steering || params.steerlab || STEERING_REFERENCE).toLowerCase();
+  const steering = steeringVariant(steeringName, params) || null;
+  app.steeringVariant = steering || undefined;
   try {
     const text = new TextPainter();
     let cockpitLayout = null;
@@ -104,6 +113,7 @@ async function boot() {
       rules: { ...RULE_PRESETS[options.rules || 'racing'], ...(options.rulesOverride || {}) },
       difficulty: options.difficulty || 'pro', seed: options.seed ?? 1,
       views: humans.map((h) => entries.indexOf(h)), cameras: options.cameras,
+      ...(options.steering !== undefined ? { steering: options.steering } : {}),      // experimental steering variant (name or object); unset: the launch option, if any
     });
   };
   /** Benchmarks (index.html#benchmark=solo|grid|split|all&seconds=60): results on screen and in window.virageBenchmark. */
@@ -132,13 +142,24 @@ async function boot() {
    * an automation script. Nothing in the menus or in a normal race creates it.
    */
   const createLab = () => { if (!app.lab) app.lab = new CollisionLab(app, quickRace); return app.lab; };
+  /** Steering bench, a development tool (core/steering-bench.js): created by the launch option index.html#steerlab=..., or by an automation script. */
+  const createSteeringBench = () => {
+    if (!app.steerLab) { app.steerLab = new SteeringBench(app, quickRace); if (steering && steering.custom) app.steerLab.custom = steering; }
+    return app.steerLab;
+  };
   // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick, mirrors, mirrorPresets: Object.keys(MIRROR_PRESETS) } };
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, createSteeringBench,
+    debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick, mirrors, mirrorPresets: Object.keys(MIRROR_PRESETS), steering: steering ? steering.id : STEERING_REFERENCE, steeringVariants: Object.keys(STEERING_VARIANTS) } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
   if (params.lab) {
     const lab = createLab();
     attachLabControls(lab, t);
     lab.start(CollisionLab.resolve(params.lab) || 'hop');
+  }
+  if (params.steerlab) {
+    const bench = createSteeringBench();
+    attachSteeringBenchControls(bench, t);
+    bench.start({ variant: steering ? steering.id : STEERING_REFERENCE });
   }
   if (!params.manual) app.start();
   if (params.benchmark) benchmark(params.benchmark === 'all' ? Object.keys(BENCHMARK_SCENARIOS) : params.benchmark.split(','), +(params.seconds || 60));

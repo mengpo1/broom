@@ -80,4 +80,12 @@ export const EN = {
   'lab.case.wheel': '1 · wheel to wheel, no flight', 'lab.case.hop': '2 · recoverable hop', 'lab.case.crash': '3 · hard accident (E3)',
   'lab.case.board': '4 · roadside board (E5)', 'lab.case.bump': '5 · rear-end bumps',
   'lab.keys': 'Keys 1 to 5: choose a case · Enter: replay · C: change camera',
+  'steerlab.title': 'STEERING BENCH (DEVELOPMENT)', 'steerlab.yours': 'your turn to drive', 'steerlab.stopped': 'stopped', 'steerlab.custom': 'modified settings',
+  'steerlab.variant.a': 'A · validated driving', 'steerlab.variant.b1': 'B1 · EXPERIMENTAL, two-stage steering asking for no more grip',
+  'steerlab.variant.b2': 'B2 · EXPERIMENTAL, extra lock: the tyres scrub, the car slows down and tightens its line', 'steerlab.variant.b3': 'B3 · EXPERIMENTAL, extra lock with a slide of the rear',
+  'steerlab.keys': 'Keys 1 to 4: A, B1, B2, B3 · 5: demonstration · 6: reference passage · Enter: start again · C: camera',
+  'steerlab.passage': 'passage of the reference footage: keys assumed from the hands, entered at {kmh} km/h', 'steerlab.passageDone': 'reference passage over, your turn to drive',
+  'steerlab.demo': 'demonstration: bend {bend} to the {side} (radius {radius} m), entered at {kmh} km/h, steering held for {seconds} s', 'steerlab.demoDone': 'demonstration over (bend {bend})',
+  'steerlab.decimal': '.', 'steerlab.right': 'right', 'steerlab.left': 'left',
+  'steerlab.figures': 'held {hold} s · lock ×{applied} · phase 2: {phase2} % · slide {slide}° · tyre scrub {slip} · {kmh} km/h',
 };

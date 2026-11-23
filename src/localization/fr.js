@@ -85,4 +85,12 @@ export const FR = {
   'lab.case.wheel': '1 · roue contre roue, sans décollage', 'lab.case.hop': '2 · saut récupérable', 'lab.case.crash': '3 · accident violent (E3)',
   'lab.case.board': '4 · panneau de bord de piste (E5)', 'lab.case.bump': '5 · tamponnages',
   'lab.keys': 'Touches 1 à 5 : choisir un cas · Entrée : rejouer · C : changer de caméra',
+  'steerlab.title': 'BANC DE DIRECTION (DÉVELOPPEMENT)', 'steerlab.yours': 'à vous de conduire', 'steerlab.stopped': 'arrêté', 'steerlab.custom': 'réglages modifiés',
+  'steerlab.variant.a': 'A · conduite validée', 'steerlab.variant.b1': 'B1 · EXPÉRIMENTAL, braquage en deux temps sans demander plus d\'adhérence',
+  'steerlab.variant.b2': 'B2 · EXPÉRIMENTAL, surbraquage : les pneus frottent, la voiture ralentit et resserre', 'steerlab.variant.b3': 'B3 · EXPÉRIMENTAL, surbraquage avec glissade de l\'arrière',
+  'steerlab.keys': 'Touches 1 à 4 : A, B1, B2, B3 · 5 : démonstration · 6 : passage de référence · Entrée : repartir · C : caméra',
+  'steerlab.passage': 'passage de la vidéo de référence : appuis supposés d\'après les mains, entrée à {kmh} km/h', 'steerlab.passageDone': 'passage de référence terminé, à vous de conduire',
+  'steerlab.demo': 'démonstration : virage {bend} à {side} (rayon {radius} m), abordé à {kmh} km/h, direction maintenue {seconds} s', 'steerlab.demoDone': 'démonstration terminée (virage {bend})',
+  'steerlab.decimal': ',', 'steerlab.right': 'droite', 'steerlab.left': 'gauche',
+  'steerlab.figures': 'maintien {hold} s · braquage ×{applied} · phase 2 : {phase2} % · glissade {slide}° · frottement des pneus {slip} · {kmh} km/h',
 };
