@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { carViewFrame } from '../../src/rendering/drawing/scene-builder.js';
 import { wheelVariant, rollingVariant, streakVariant, streakBlend, fastVariant, fastBlend, steerFrame, streakCyclesPerMetre, advanceStreak, WHEEL_SYNC_SPEED, WHEEL_BLEND_SPEED, WHEEL_FAST_START, WHEEL_FAST_FULL } from '../../src/rendering/compositing/cockpit-layer.js';
-import { STEER_FRAMES, WHEEL_VARIANTS, MIRROR, COCKPIT_REF_FOCAL } from '../../src/art/cockpits/cockpit-art.js';
-import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, STREAK_BANDS, FAST_PHASES, FAST_RINGS, MIRROR_MOUNT, buildCarModel, buildFrontWheelModel } from '../../src/art/vehicles/car-model.js';
+import { STEER_FRAMES, WHEEL_VARIANTS, MIRROR, COCKPIT_REF_FOCAL, placeMirror } from '../../src/art/cockpits/cockpit-art.js';
+import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, STREAK_BANDS, FAST_PHASES, FAST_RINGS, MIRROR_MOUNT, MIRROR_PRESETS, MIRROR_DEFAULT, selectMirrorPreset, buildCarModel, buildFrontWheelModel } from '../../src/art/vehicles/car-model.js';
 import { BASE_CAR_SPEC } from '../../src/vehicles/car-spec.js';
 import { CAR_ANGLES } from '../../src/art/art-library.js';
 import { RaceView, CAMERA } from '../../src/rendering/compositing/race-view.js';
@@ -233,6 +233,60 @@ test('mirrors: the cockpit shows the mirrors of the car model where the driver w
   assert.ok(MIRROR_MOUNT.z - MIRROR_MOUNT.height / 2 > MIRROR_MOUNT.arm[2], 'and rises to the housing');
   // it sits outside the cockpit side and inside the front wheel, as on the model
   assert.ok(MIRROR_MOUNT.y > Math.abs(MIRROR_MOUNT.arm[1]) && MIRROR_MOUNT.y + MIRROR_MOUNT.width / 2 < CAR_DIMENSIONS.frontTrack - CAR_DIMENSIONS.frontTyre.width / 2, 'between the cockpit side and the inner face of the wheel');
+});
+
+test('mirror proposals: closer mounts are available on request only, each one drawn from the same definition in every view', () => {
+  // (Added after the third human test: the mirrors were still found too far apart. The mount of the game is unchanged;
+  // closer ones wait for the player's choice and can be tried with the launch option #mirrors=...)
+  assert.equal(MIRROR_DEFAULT, 'b');
+  assert.deepEqual(MIRROR_MOUNT, MIRROR_PRESETS.b, 'without the option, the mount of the game');
+  assert.equal(MIRROR_PRESETS.b.y, 0.395, 'which is the one the player tested');
+  assert.equal(selectMirrorPreset('zzz'), false); assert.equal(selectMirrorPreset(undefined), false);
+  assert.deepEqual(MIRROR_MOUNT, MIRROR_PRESETS.b, 'an unknown name changes nothing');
+  const keys = Object.keys(MIRROR_PRESETS);
+  assert.ok(keys.length >= 4, 'several proposals');
+  const eye = CAR_DIMENSIONS.eye;
+  let previous = Infinity;
+  try {
+    for (const key of keys) {
+      assert.equal(selectMirrorPreset(key.toUpperCase()), true, `preset ${key}`);
+      const M = MIRROR_MOUNT;
+      assert.deepEqual({ ...M }, { ...MIRROR_PRESETS[key] });
+      assert.ok(M.y < previous, `${key}: closer to the centre line than the one before (${M.y} m)`);
+      previous = M.y;
+      // the exterior views: the model carries the two housings at that place, mirrored
+      const parts = buildCarModel().parts;
+      const box = (part) => { const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]; for (let i = 0; i < part.pos.length; i += 3) for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], part.pos[i + a]); hi[a] = Math.max(hi[a], part.pos[i + a]); } return { lo, hi }; };
+      const left = box(parts.find((p) => p.name === 'mirror.left')), right = box(parts.find((p) => p.name === 'mirror.right'));
+      assert.ok(Math.abs((left.lo[1] + left.hi[1]) / 2 - M.y) < 0.01 && Math.abs((left.lo[2] + left.hi[2]) / 2 - M.z) < 0.01, `${key}: left housing of the model at its mount`);
+      assert.ok(Math.abs(left.hi[1] - left.lo[1] - M.width) < 0.01 && Math.abs(left.hi[2] - left.lo[2] - M.height) < 0.01, `${key}: size of the housing`);
+      assert.ok(Math.abs(left.lo[1] + right.hi[1]) < 1e-9 && Math.abs(left.hi[1] + right.lo[1]) < 1e-9 && Math.abs(left.lo[2] - right.lo[2]) < 1e-9, `${key}: the right mirror is the reflection of the left one`);
+      // the cockpit: the projection of the same mount from the driver's eye
+      const scale = COCKPIT_REF_FOCAL / (M.x - eye[0]);
+      const placed = placeMirror();
+      assert.equal(placed, MIRROR);
+      assert.ok(Math.abs(MIRROR.x + M.y * scale) < 1e-6 && Math.abs(MIRROR.y - (eye[2] - M.z) * scale) < 1e-6, `${key}: place in the cockpit drawing`);
+      assert.ok(Math.abs(MIRROR.w - (M.width + 0.012) * scale) < 1e-6 && Math.abs(MIRROR.armX + M.arm[1] * scale) < 1e-6, `${key}: size and arm in the cockpit drawing`);
+      // no part runs into another: the housing is above the monocoque wherever it stands over it, its stalk starts on the
+      // monocoque, under it; and it stays inside the front wheel
+      const tub = parts.find((p) => p.name === 'tub');
+      let under = 0, near = Infinity;
+      for (let i = 0; i < tub.pos.length; i += 3) {
+        const x = tub.pos[i], y = Math.abs(tub.pos[i + 1]), z = tub.pos[i + 2];
+        if (Math.abs(x - M.x) < 0.08 && y > M.y - M.width / 2 - 0.02 && y < M.y + M.width / 2 + 0.02) under = Math.max(under, z);
+        near = Math.min(near, Math.hypot(x - M.arm[0], y - M.arm[1], z - M.arm[2]));
+      }
+      assert.ok(M.z - M.height / 2 > under + 0.02, `${key}: the housing is at least 2 cm above the monocoque under it (${(M.z - M.height / 2).toFixed(3)} m against ${under.toFixed(3)} m)`);
+      assert.ok(near < 0.06, `${key}: the foot of the stalk is on the monocoque (${near.toFixed(3)} m from its skin)`);
+      assert.ok(M.arm[2] < M.z - M.height / 2 && M.arm[1] < M.y, `${key}: the stalk rises outward to the housing`);
+      assert.ok(M.y + M.width / 2 < CAR_DIMENSIONS.frontTrack - CAR_DIMENSIONS.frontTyre.width / 2, `${key}: inside the front wheel`);
+      assert.ok(M.y - M.width / 2 > 0.25, `${key}: the housing stays outside the steering wheel and the hands (inner edge ${(M.y - M.width / 2).toFixed(3)} m from the centre line)`);
+    }
+  } finally {
+    assert.equal(selectMirrorPreset(MIRROR_DEFAULT), true);
+    placeMirror();
+  }
+  assert.deepEqual(MIRROR_MOUNT, MIRROR_PRESETS.b, 'the mount of the game is back');
 });
 
 test('front wheels: steering frames are symmetric and monotonic', () => {

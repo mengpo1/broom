@@ -7904,11 +7904,38 @@ const CAR_DIMENSIONS = {
  * Left mirror of the car: centre of the housing, its size, and where its arm meets the cockpit side.
  * The right one is its reflection. Every view is drawn from this single definition: the car model seen
  * from outside, and the cockpit drawing, which projects it from the driver's eye.
- * (y: 2.5 cm closer to the centre line than at first, and the foot of the arm brought onto the rim of the
- * cockpit, which it used to miss by a few centimetres: a proposal after a player found the mirrors slightly
- * too far apart; see work/renders/comparison/mirror-variants.jpg.)
+ *
+ * `b` is the mount of the game. After a second player's remark ("still too far apart") the others are
+ * PROPOSALS, closer and closer to the centre line, waiting for the player's choice: none of them is the
+ * default. They can be tried in the real game with the launch option #mirrors=d (or e, f, g) and are
+ * compared on work/renders/comparison/mirror-proposals.jpg.
+ * What was adapted for the proposals, beside the distance to the centre line (y):
+ * - the housing stands 1.2 cm higher (z): seen from the cockpit it then covers the hub of the front wheel
+ *   instead of leaving a thin strip of it above its upper edge (the defect of the first closer variant);
+ * - closer than the side of the cockpit allows beside it, the housing stands ABOVE the shoulder of the
+ *   monocoque, on a stalk whose foot is on that shoulder (arm);
+ * - the closest one (g) has a smaller housing, to stay clear of the driver's hands.
  */
-const MIRROR_MOUNT = { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };
+const MIRROR_PRESETS = {
+  b: { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] },     // the game: 39.5 cm from the centre line
+  d: { x: 0.4, y: 0.37, z: 0.687, width: 0.14, height: 0.075, arm: [0.4, 0.27, 0.52] },       // proposal: 37 cm
+  e: { x: 0.4, y: 0.35, z: 0.687, width: 0.14, height: 0.075, arm: [0.4, 0.26, 0.535] },      // proposal: 35 cm
+  f: { x: 0.4, y: 0.33, z: 0.687, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.545] },      // proposal: 33 cm
+  g: { x: 0.4, y: 0.31, z: 0.687, width: 0.11, height: 0.066, arm: [0.4, 0.24, 0.555] },      // proposal: 31 cm, smaller housing
+};
+const MIRROR_DEFAULT = 'b';
+const MIRROR_MOUNT = { ...MIRROR_PRESETS[MIRROR_DEFAULT] };
+
+/**
+ * Use another mirror mount (a key of MIRROR_PRESETS) for the drawings made from now on. To be called
+ * before the art is generated; returns false, and changes nothing, for an unknown name.
+ */
+function selectMirrorPreset(name) {
+  const preset = MIRROR_PRESETS[String(name || '').toLowerCase()];
+  if (!preset) return false;
+  Object.assign(MIRROR_MOUNT, preset, { arm: [...preset.arm] });
+  return true;
+}
 
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
 
@@ -8635,7 +8662,7 @@ function finishPart(p) {
   return { name: p.name, ink: p.ink, bias: p.bias, gloss: p.gloss, outward: p.outward, pos, nor, faces, edges, rods: p.rods, lines: p.lines };
 }
 
-__modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, MIRROR_MOUNT, buildCarModel, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES, STREAK_BANDS, FAST_PHASES, FAST_RINGS, buildFrontWheelModel };
+__modules["src/art/vehicles/car-model.js"] = { ROLE, CAR_DIMENSIONS, MIRROR_PRESETS, MIRROR_DEFAULT, MIRROR_MOUNT, selectMirrorPreset, buildCarModel, TREAD_MARKS, TREAD_PHASES, STREAK_PHASES, STREAK_BANDS, FAST_PHASES, FAST_RINGS, buildFrontWheelModel };
 })();
 // ---- src/art/vehicles/car-illustrator.js
 (function () {
@@ -12445,15 +12472,18 @@ const STEERING = { x: 0, y: 872, size: 800, squash: 0.9, extra: 0.55 };   // ext
 /**
  * Left mirror as the driver sees it (centre and size in the units of the cockpit drawing); the
  * right one is its reflection. It is the projection of the mirror of the car model from the
- * driver's eye, so that the cockpit and the exterior views show the same car.
+ * driver's eye, so that the cockpit and the exterior views show the same car. Computed again by
+ * placeMirror() when the cockpit art is defined, in case another mount of the model was selected.
  */
-const MIRROR = (() => {
+const MIRROR = {};
+function placeMirror() {
   const M = MIRROR_MOUNT, eye = CAR_DIMENSIONS.eye, k = COCKPIT_REF_FOCAL / (M.x - eye[0]);
-  return {
+  return Object.assign(MIRROR, {
     x: -M.y * k, y: (eye[2] - M.z) * k, w: (M.width + 0.012) * k, h: (M.height + 0.01) * k, glassInset: 14,
     armX: -M.arm[1] * k, armY: (eye[2] - M.arm[2]) * k,          // where the arm meets the side of the cockpit
-  };
-})();
+  });
+}
+placeMirror();
 const INK = '#16161f';
 const COCKPIT_INK = 4.2;
 const BOTTOM_LIMIT = 900;                      // nothing is needed further below the horizon than this
@@ -12718,6 +12748,7 @@ function paintSteeringWheel(ctx, S, glove, suit, accent, hands = true) {
  * @returns layout used by the compositor (see compositing/cockpit-layer.js)
  */
 function defineCockpitArt(art, players) {
+  placeMirror();                                 // (the mount of the mirrors may have been chosen since this module was loaded)
   const eye = CAR_DIMENSIONS.eye, focal = COCKPIT_REF_FOCAL;
   const half = COCKPIT_REF_WIDTH / 2;
   const model = buildCarModel({ detail: 1 });
@@ -12790,7 +12821,7 @@ function playerCockpitColors(colors) {
   return { colors, glove: mixHex(colors[2], '#d5302a', 0.0), suit: lightHex(colors[0], 0.1) };
 }
 
-__modules["src/art/cockpits/cockpit-art.js"] = { COCKPIT_REF_WIDTH, COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, WHEEL_VARIANTS, DIAL, STEERING, MIRROR, defineCockpitArt, playerCockpitColors };
+__modules["src/art/cockpits/cockpit-art.js"] = { COCKPIT_REF_WIDTH, COCKPIT_REF_FOCAL, STEER_FRAMES, MAX_DRAWN_STEER, WHEEL_VARIANTS, DIAL, STEERING, MIRROR, placeMirror, defineCockpitArt, playerCockpitColors };
 })();
 // ---- src/rendering/compositing/cockpit-layer.js
 (function () {
@@ -18110,6 +18141,7 @@ const { PLAYER_TEAMS } = __modules["src/vehicles/liveries.js"];
 const { liveryColors } = __modules["src/art/art-library.js"];
 const { rgbToHex } = __modules["src/art/palettes/palettes.js"];
 const { defineCockpitArt } = __modules["src/art/cockpits/cockpit-art.js"];
+const { selectMirrorPreset, MIRROR_DEFAULT, MIRROR_PRESETS } = __modules["src/art/vehicles/car-model.js"];
 const { CockpitLayer } = __modules["src/rendering/compositing/cockpit-layer.js"];
 const { TextPainter } = __modules["src/ui/text-painter.js"];
 const { Hud, defineHudArt, trackMapSprite } = __modules["src/ui/hud.js"];
@@ -18139,6 +18171,9 @@ async function boot() {
   notice.hidden = false;
   notice.textContent = `${t('game.title')} — ${t('game.loading')}`;
   await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  // Mirror proposals awaiting the player's choice (index.html#mirrors=d, e, f or g): a development option, not a setting.
+  // Without it, or with an unknown name, the mount of the game is used.
+  const mirrors = params.mirrors && selectMirrorPreset(params.mirrors) ? String(params.mirrors).toLowerCase() : MIRROR_DEFAULT;
   try {
     const text = new TextPainter();
     let cockpitLayout = null;
@@ -18227,7 +18262,7 @@ async function boot() {
    */
   const createLab = () => { if (!app.lab) app.lab = new CollisionLab(app, quickRace); return app.lab; };
   // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick } };
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick, mirrors, mirrorPresets: Object.keys(MIRROR_PRESETS) } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
   if (params.lab) {
     const lab = createLab();
