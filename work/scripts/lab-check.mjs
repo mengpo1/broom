@@ -74,5 +74,45 @@ const state = (page) => page.evaluate(() => {
   check('nor during a normal race', !racing.lab && racing.cars === 4, JSON.stringify(racing));
   await close();
 }
+// ---- the trackside cases of the bench: breakable board, then the keys of the other new cases
+{
+  const { page, logs, close } = await openGame({ width: 960, height: 540, hash: 'lab=sign&quality=medium' });
+  const s0 = await state(page);
+  const info = () => page.evaluate(() => { const lab = window.virage.app.lab, race = lab.race; return { circuit: race.track.id, objects: race.objects.length, down: [...race.objectState].filter((v) => v === 1).length, scenery: window.virage.debug.trackside.scenery, interactions: window.virage.debug.trackside.interactions, air: lab.me.airHeight || 0 }; });
+  const i0 = await info();
+  check('#lab=sign opens the object bench: its own circuit, where objects can be hit', !!s0 && s0.name === 'sign' && i0.circuit === 'banc-objets' && i0.objects > 10 && /panneau destructible \(EXPÉRIMENTAL\)/.test(s0.panel), JSON.stringify(i0));
+  check('the experimental interactions are on for that circuit only, not for the game', i0.interactions === false && i0.scenery === 'enriched');
+  const released = await waitFor(page, () => window.virage.app.lab.released);
+  const s1 = await state(page), i1 = await info();
+  check('the board is knocked down by the real rules, without any flight, and the car is handed back', released && s1.events.includes('object') && !s1.events.includes('launch') && !s1.events.includes('hop') && !s1.events.includes('crash') && i1.down === 1 && i1.air === 0 && s1.state === 1, `${s1.events.join(' ')}; ${i1.down} down; ${s1.speed} km/h`);
+  await page.screenshot({ path: `${root}/work/renders/trackside/lab-sign-handed-back.png` });
+  for (const [key, name, circuit, text] of [['Digit7', 'rock', 'banc-objets', /obstacle rigide/], ['Digit8', 'gantry', 'banc-objets', /portique/], ['Digit9', 'pillar', 'banc-objets', /support de portique/],
+    ['Digit0', 'tunnel', 'banc-objets', /tunnel/], ['KeyO', 'offtrack', 'banc-accotements', /accotements ouverts/], ['KeyK', 'close', 'kestrel-fields', /contact rapproché/], ['Digit6', 'sign', 'banc-objets', /panneau destructible/]]) {
+    await page.keyboard.press(key);
+    const s = await state(page), i = await info();
+    check(`key ${key.replace('Digit', '').replace('Key', '')} starts the case "${name}" on ${circuit}`, s.name === name && s.active && !s.released && i.circuit === circuit && text.test(s.panel), s.panel.split('\n')[0]);
+  }
+  // the tunnel case, played in real time to its end: no contact
+  await page.keyboard.press('Digit0');
+  const through = await waitFor(page, () => window.virage.app.lab.released, null, 120);
+  const s2 = await state(page);
+  check('the tunnel is driven through without any contact, then the car is handed back', through && s2.events.length === 0 && s2.state === 1, `events: ${s2.events.join(' ') || 'none'}`);
+  const errors = logs.filter((l) => l.startsWith('[error]') || l.startsWith('[pageerror]'));
+  check('no console error', errors.length === 0, errors.slice(0, 3).join(' | '));
+  await close();
+}
+// ---- the scenery options: by default no object can be hit in a race; #scenery=classic and #objects=interactive do what they say
+for (const [hash, want] of [['quality=medium', { scenery: 'enriched', interactions: false, objects: 0, tunnels: 1 }], ['scenery=classic&quality=medium', { scenery: 'classic', interactions: false, objects: 0, tunnels: 0 }], ['objects=interactive&quality=medium', { scenery: 'enriched', interactions: true, objects: 1, tunnels: 1 }]]) {
+  const { page, logs, close } = await openGame({ width: 960, height: 540, hash });
+  const got = await page.evaluate(() => {
+    const { quickRace, debug } = window.virage;
+    const race = quickRace({ circuit: 'montclair', opponents: 3 });
+    const L = race.track.sceneryLayout;
+    return { scenery: debug.trackside.scenery, interactions: debug.trackside.interactions, objects: race.objects.length, tunnels: L.trackside.tunnels.length, obstacles: race.obstacles.length, lab: !!window.virage.app.lab };
+  });
+  check(`[#${hash}] ${want.scenery} scenery, ${want.interactions ? 'objects that can be hit' : 'no object that can be hit'}`, got.scenery === want.scenery && got.interactions === want.interactions && (got.objects > 0) === (want.objects > 0) && got.tunnels === want.tunnels && got.obstacles === 9 && !got.lab, JSON.stringify(got));
+  check(`[#${hash}] no console error`, logs.filter((l) => l.startsWith('[error]') || l.startsWith('[pageerror]')).length === 0);
+  await close();
+}
 console.log(failed ? `${failed} check(s) FAILED` : 'LAB OK');
 process.exit(failed ? 1 : 0);

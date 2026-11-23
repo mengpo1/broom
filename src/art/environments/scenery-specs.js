@@ -44,6 +44,27 @@ export const SCENERY_SPECS = [
   { id: 'strip.forest', kind: 'strip', w: 768, h: 576, tile: 8, worldH: 15 },
   { id: 'strip.cliff', kind: 'strip', w: 640, h: 576, tile: 8, worldH: 18 },
   { id: 'strip.facade', kind: 'strip', w: 768, h: 576, tile: 8, worldH: 15 },
+  // ---- trackside objects added by tracks/trackside-objects.js (drawings: trackside-objects-art.js)
+  { id: 'sign.chevron', kind: 'prop', w: 176, h: 192, worldW: 2.8, worldH: 3.05 },
+  { id: 'sign.turn', kind: 'prop', w: 128, h: 208, worldW: 1.75, worldH: 2.85 },
+  { id: 'sign.advert.low', variants: 3, kind: 'prop', w: 416, h: 192, worldW: 5.2, worldH: 2.4 },
+  { id: 'sign.advert.high', variants: 2, kind: 'prop', w: 352, h: 400, worldW: 5.7, worldH: 6.5 },
+  { id: 'gantry.banner', variants: 2, kind: 'prop', w: 1408, h: 440, worldW: 24, worldH: 7.5 },
+  { id: 'tunnel.portal', kind: 'prop', w: 1536, h: 496, worldW: 34, worldH: 11 },
+  { id: 'tunnel.arch', kind: 'prop', w: 768, h: 248, worldW: 34, worldH: 11 },
+  { id: 'tree.oak', kind: 'prop', w: 448, h: 448, worldW: 12, worldH: 12 },
+  { id: 'tree.poplar', kind: 'prop', w: 144, h: 464, worldW: 4.3, worldH: 14 },
+  { id: 'cactus', variants: 2, kind: 'prop', w: 144, h: 256, worldW: 2.4, worldH: 4.2 },
+  { id: 'boulder', variants: 2, kind: 'prop', w: 256, h: 176, worldW: 2.8, worldH: 1.9 },
+  { id: 'stones', variants: 2, kind: 'prop', w: 160, h: 56, worldW: 1.4, worldH: 0.5 },
+  { id: 'cone', kind: 'prop', w: 56, h: 88, worldW: 0.5, worldH: 0.78 },
+  { id: 'marker.post', kind: 'prop', w: 40, h: 104, worldW: 0.42, worldH: 1.1 },
+  { id: 'tyrestack', kind: 'prop', w: 136, h: 120, worldW: 1.4, worldH: 1.25 },
+  { id: 'haybale', kind: 'prop', w: 176, h: 96, worldW: 1.8, worldH: 0.98 },
+  { id: 'barrel', kind: 'prop', w: 88, h: 112, worldW: 0.85, worldH: 1.1 },
+  { id: 'strip.tufts', kind: 'strip', w: 512, h: 72, tile: 4, worldH: 0.55 },
+  { id: 'strip.sandbank', kind: 'strip', w: 512, h: 72, tile: 4, worldH: 0.55 },
+  { id: 'strip.tunnelwall', kind: 'strip', w: 512, h: 416, tile: 8, worldH: 13 },
 ];
 
 /** Expand families into individual entries: [{ id, family, variant, ...spec }]. */

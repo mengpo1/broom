@@ -23,6 +23,7 @@ import { GameFlow } from './ui/game-flow.js';
 import { t, setLanguage } from './localization/i18n.js';
 import { runBenchmark, describeEnvironment, measureRefreshRate, BENCHMARK_SCENARIOS } from './core/benchmark.js';
 import { CollisionLab, attachLabControls } from './core/collision-lab.js';
+import { configureTrackside, TRACKSIDE, TRACKSIDE_OBJECTS } from './tracks/trackside-objects.js';
 
 function parseParams() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -41,6 +42,11 @@ async function boot() {
   notice.hidden = false;
   notice.textContent = `${t('game.title')} — ${t('game.loading')}`;
   await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  // Trackside objects (tracks/trackside-objects.js), development options, read before any circuit is built:
+  //   index.html#scenery=classic        the scenery as it was before these objects (for comparisons)
+  //   index.html#objects=interactive    EXPERIMENTAL: objects on the verges that cars can hit, supports of gantries as volumes
+  // Without them: the enriched, purely decorative scenery; the simulation is the validated one.
+  configureTrackside({ scenery: params.scenery === 'classic' ? 'classic' : 'enriched', interactions: params.objects === 'interactive' });
   try {
     const text = new TextPainter();
     let cockpitLayout = null;
@@ -129,7 +135,7 @@ async function boot() {
    */
   const createLab = () => { if (!app.lab) app.lab = new CollisionLab(app, quickRace); return app.lab; };
   // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick } };
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick, trackside: TRACKSIDE, tracksideObjects: Object.keys(TRACKSIDE_OBJECTS) } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
   if (params.lab) {
     const lab = createLab();

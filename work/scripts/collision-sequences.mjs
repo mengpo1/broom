@@ -4,7 +4,7 @@
 // (src/core/collision-lab.js, the same that a person opens with index.html#lab=...): two real cars
 // are placed and driven with ordinary controls until they meet; everything else is the game.
 // E2 to E5 are the events of the analysis report; HOP is the recoverable hop (original gameplay).
-// node work/scripts/collision-sequences.mjs [E2,HOP,HOPx,E3,E3x,E4,E5|all] [--width 1280] [--height 720] [--out work/renders/collisions]
+// node work/scripts/collision-sequences.mjs [E2,HOP,HOPx,E3,E3x,E4,E5|all|trackside|SIGN,ROCK,GANTRY,PILLAR,TUNNEL,OFFTRACK,CLOSE] [--width 1280] [--height 720] [--out work/renders/collisions]
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { openGame, root } from './lib-browser.mjs';
@@ -23,6 +23,17 @@ const SCENARIOS = {
   E3x: { title: 'the same launch seen from behind', lab: 'crash', seconds: 8, camera: 'CHASE' },
   E4: { title: 'repeated rear-end bumps', lab: 'bump', seconds: 10, camera: 'COCKPIT' },
   E5: { title: 'launch on a roadside board, light landing, slide', lab: 'board', seconds: 6.5, camera: 'COCKPIT' },
+  // ---- trackside objects (EXPERIMENTAL interactions, bench circuits only). Not part of `all`: ask for `trackside` or for a name.
+  SIGN: { group: 'trackside', title: 'breakable advertising board on the verge: knocked down, the car drives on', lab: 'sign', seconds: 6.5, camera: 'COCKPIT' },
+  SIGNx: { group: 'trackside', title: 'the same board seen from behind', lab: 'sign', seconds: 6.5, camera: 'CHASE' },
+  ROCK: { group: 'trackside', title: 'rigid obstacle (boulder) on the verge: the car is stopped and spins', lab: 'rock', seconds: 7.5, camera: 'COCKPIT' },
+  ROCKx: { group: 'trackside', title: 'the same boulder seen from behind', lab: 'rock', seconds: 7.5, camera: 'CHASE' },
+  GANTRY: { group: 'trackside', title: 'under a gantry at 250 km/h: no contact', lab: 'gantry', seconds: 7, camera: 'COCKPIT' },
+  PILLAR: { group: 'trackside', title: 'support of a gantry, reachable on the verge: rigid', lab: 'pillar', seconds: 7.5, camera: 'COCKPIT' },
+  TUNNEL: { group: 'trackside', title: 'through a tunnel at 220 km/h: no contact, the light changes', lab: 'tunnel', seconds: 9, camera: 'COCKPIT' },
+  OFFTRACK: { group: 'trackside', title: 'open verges (prototype): the car drives beyond the usual barrier line and comes back', lab: 'offtrack', seconds: 11, camera: 'COCKPIT' },
+  OFFTRACKx: { group: 'trackside', title: 'the same excursion seen from behind', lab: 'offtrack', seconds: 11, camera: 'CHASE' },
+  CLOSE: { group: 'trackside', title: 'close contact between two cars side by side (validated rules)', lab: 'close', seconds: 5, camera: 'COCKPIT' },
 };
 
 /** Runs in the page: starts the case on the test bench (which keeps driving after the event) and defines the per-image step. */
@@ -53,8 +64,8 @@ const setup = ([sc, width, height]) => {
 
 const { page, logs, close } = await openGame({ width, height, hash: 'manual=1&quality=medium' });
 for (const name of Object.keys(SCENARIOS)) {
-  if (!wanted.includes('all') && !wanted.includes(name)) continue;
   const sc = SCENARIOS[name], total = Math.round(sc.seconds * 60);
+  if (!wanted.includes(name) && !(sc.group ? wanted.includes(sc.group) : wanted.includes('all'))) continue;
   console.log(name, sc.title, JSON.stringify(await page.evaluate(setup, [sc, width, height])));
   const file = `${root}/${outDir}/${name}.mp4`;
   const ffmpeg = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', '60', '-c:v', 'mjpeg', '-i', '-',
@@ -79,7 +90,7 @@ for (const name of Object.keys(SCENARIOS)) {
   await new Promise((resolve) => ffmpeg.on('close', resolve));
   writeFileSync(`${root}/${outDir}/${name}.json`, JSON.stringify({ scenario: name, ...sc, fps: 60, width, height, frames: telemetry }));
   // contact sheet: every sixth image (0.1 s apart) around the event
-  const first = telemetry.findIndex((f) => f.events.some((e) => ['wheel', 'bump', 'launch', 'obstacle'].includes(e.type)));
+  const first = telemetry.findIndex((f) => f.events.some((e) => ['wheel', 'bump', 'launch', 'obstacle', 'object'].includes(e.type)));
   const start = Math.max(0, first - 12), step = name === 'E3' || name === 'E5' || name === 'HOP' ? 6 : 4, cols = 6, rows = name === 'E3' ? 6 : 4;
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', file, '-vf', `select='gte(n\\,${start})*not(mod(n-${start}\\,${step}))',scale=480:-1,tile=${cols}x${rows}`, '-frames:v', '1', '-q:v', '3', `${root}/${outDir}/${name}-sheet.jpg`]);
   console.log(`  -> ${outDir}/${name}.mp4 (${total} images), sheet from image ${start} every ${step}`);

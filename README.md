@@ -28,6 +28,18 @@ lancement ; touches 1 à 5 pour choisir un cas, Entrée pour rejouer
 chromium --enable-features=Vulkan "file://$PWD/index.html#lab=hop"
 ```
 
+**Objets de bord de piste.** Les circuits ont de nouveaux décors (chevrons, signalisation,
+panneaux publicitaires, portiques, tunnels, arbres isolés, rochers, accessoires) ; ils sont
+décoratifs et ne changent rien à la conduite. Le banc d'essai a sept cas de plus (touches 6 à
+0, O et K). Deux choses restent **expérimentales** et inactives par défaut : les objets que
+l'on peut heurter, et les accotements ouverts (`docs/specifications/trackside-objects.md`) :
+
+```bash
+chromium --enable-features=Vulkan "file://$PWD/index.html#lab=sign"            # banc : panneau destructible
+chromium --enable-features=Vulkan "file://$PWD/index.html#scenery=classic"     # le décor d'avant, pour comparer
+chromium --enable-features=Vulkan "file://$PWD/index.html#objects=interactive" # expérimental : objets à heurter en course
+```
+
 | | Joueur 1 | Joueur 2 | Manette |
 |---|---|---|---|
 | Direction | ← → | A D | stick gauche ou croix |
@@ -46,7 +58,7 @@ en écran partagé (haut/bas ou gauche/droite). 18 circuits originaux, 16 advers
 ## Contenu du dépôt
 
 ```
-index.html            le jeu autonome (construit depuis src/), 1 068 261 octets
+index.html            le jeu autonome (construit depuis src/), 1 159 973 octets
 race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s (enregistrée avant le travail sur les collisions)
 src/                  sources (voir docs/architecture/overview.md)
 tests/                tests automatisés (Node et navigateur)
@@ -128,6 +140,7 @@ résultats à l'écran et dans `window.virageBenchmark`).
 | Collisions, décollages, accidents ; comparaison avec l'analyse vidéo ; non-régression de la conduite | `docs/specifications/collisions.md` |
 | Rotation des roues avant et rétroviseurs du cockpit (avant / après) | `docs/specifications/wheels-and-mirrors.md` |
 | Tester les décollages à la main (banc d'essai, option `#lab=…`) | `docs/specifications/collision-test-bench.md` |
+| Objets de bord de piste : observations vidéo, catalogue, profils d'interaction, accotements ouverts, banc | `docs/specifications/trackside-objects.md`, `docs/research/trackside-objects-observations.md` |
 | Résultats des tests | `docs/specifications/tests.md` |
 | Rapport de performances | `docs/specifications/performance.md` |
 | Compatibilité Linux | `docs/specifications/linux-compatibility.md` |

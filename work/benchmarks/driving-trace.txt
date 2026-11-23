@@ -1,0 +1,5 @@
+# node work/scripts/driving-trace.mjs  (default game, enriched scenery: identical to the source of PR #4, 97252a5)
+hazelbrook racing seed 3: 9000 steps, 8 cars, 605a655b6cc1d19ff69f81063a877fdf61f60b7e04e27be4f2ea6bc03b4b8e7e
+kestrel-fields arcade seed 7: 9000 steps, 8 cars, 064a7ff7c2d2adb23a22d2281d0776d1af2bf8697d17e124f3f937ccd8771a74
+hazelbrook turbo seed 11: 9000 steps, 8 cars, 18a8798f525cc60fa6feb22c7daf881db4f462a9fd6d132cc93f4f0e8428572f
+kestrel-fields training seed 5: 9000 steps, 8 cars, 2bb63c5ecc4f94147aa1ea063cad4d6392a45857a1cc0345bbd2bbd4d0dc12f0

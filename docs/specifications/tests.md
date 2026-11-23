@@ -6,7 +6,83 @@ Dans le conteneur de développement, WebGPU est exécuté par le rasteriseur log
 SwiftShader derrière un serveur X virtuel (Xvfb) : les tests vérifient le comportement et
 l'image, pas la vitesse.
 
-## 0. Dernière exécution complète
+## 0. Dernière exécution complète — lot « objets de bord de piste »
+
+Sur le build final (`index.html`, 1 159 973 octets), le 23 novembre 2026. Les nouveaux décors
+sont actifs par défaut et **la simulation est celle de la PR #4** ; les contacts avec les
+objets et les accotements ouverts sont expérimentaux et inactifs par défaut
+(`trackside-objects.md`).
+
+| Contrôle | Commande | Résultat |
+|---|---|---|
+| Tests de simulation | `npm test` | 105 / 105 : les 91 existants (un seul adapté : les tunnels enjambent la route) et 14 nouveaux |
+| Décor d'origine conservé | `node work/scripts/scenery-fingerprint.mjs src classic` | empreintes des 18 circuits identiques à celles de la source de la PR #4 |
+| Simulation par défaut inchangée | `node work/scripts/driving-trace.mjs` | quatre courses complètes (8 voitures, 9000 pas) : empreintes identiques à la source de la PR #4 |
+| Conduite | `node work/scripts/driving-report.mjs` | 165 valeurs identiques à la PR #4 |
+| E2, E3, E3x, E4, E5, saut | `node work/scripts/collision-sequences.mjs all` | télémétrie identique image par image aux fichiers de la PR #4 et à la référence validée (192, 570, 252, 600, 390 images) |
+| Contacts en simulation | `node work/scripts/collision-comparison.mjs` | valeurs identiques |
+| Navigateur | rendu, pages, audio, parcours des modes | 13 / 13, 14 / 14, 80 / 80, 5 parcours |
+| Banc d'essai dans le vrai jeu, au clavier | `node work/scripts/lab-check.mjs` | 37 / 37 (19 existants, 18 nouveaux) |
+
+Points de la partie I :
+
+| Exigence | Vérification |
+|---|---|
+| Déterminisme à 120 Hz | chaque cas du banc rejoué deux fois donne la même trace ; aucun tirage au sort dans les contacts ; placement refait à l'identique |
+| Mêmes collisions pour toutes les voitures | même contact, même résultat pour une voiture de joueur et une voiture de l'ordinateur |
+| Pas de collision avec un décor lointain ou inaccessible | aucun objet derrière une barrière n'a de volume ; tout objet interactif est entre la route et la barrière |
+| Pas de double collision après destruction | repasser sur un panneau couché ne produit rien ; un objet rigide n'est signalé qu'une fois par contact |
+| Positions graphiques et physiques cohérentes | le volume est à la place du dessin et tient dans sa largeur ; les supports sont sous les extrémités de leur portique |
+| Visibilité et profondeur | les objets passent par l'ordre de dessin existant ; scènes avant / après et vidéos contrôlées à l'œil, sans mesure automatique |
+| Performances à 16 voitures | voir ci-dessous |
+| Rien ne change quand les objets sont désactivés | décor de la PR #4 à l'objet près ; liste d'objets vide ; course identique avec et sans décors |
+
+**Performances** (17 voitures, Grand Zenith — le circuit le plus chargé —, 1280×720, qualité
+haute, rasteriseur logiciel SwiftShader : les valeurs absolues ne disent rien d'un vrai
+processeur graphique, seul l'écart compte) :
+
+| | Décor d'avant | Décors enrichis | Avec objets interactifs |
+|---|---|---|---|
+| Quadrilatères par image | 1681 | 1864 (+11 %) | 1864 |
+| Temps processeur par image | 1,5 ms | 2,1 ms | 2,3 ms |
+| Passe graphique (logicielle) | 395 ms | 405 ms (+2,6 %) | 403 ms |
+
+Simulation seule, 16 voitures : 30 à 47 ms pour 1000 pas quel que soit le mode, soit moins
+de 0,05 ms par pas pour 8,3 ms disponibles ; l'écart entre modes est inférieur au bruit de
+mesure. Le décor de chaque circuit tient dans les quatre couches d'atlas existantes (test).
+**Non mesuré sur un vrai processeur graphique.**
+
+Test existant adapté : *scenery layout: deterministic, every object has a drawing, objects
+stay off the road* admet désormais les portails et nervures de tunnel parmi les objets qui
+enjambent la route (comme le portique de départ et les passerelles). Rien d'autre n'y change.
+
+### Objets de bord de piste — `tests/gameplay/trackside.test.mjs` (tous nouveaux)
+
+Les cas de contact passent par le vrai banc d'essai et le vrai moteur
+(`tests/gameplay/lab-helpers.mjs` ne remplace que la page).
+
+- ✅ trackside: defaults - enriched scenery, no interaction; the catalogue names a profile, a volume and a reaction for every object
+- ✅ trackside: with the objects switched off the scenery of the 18 circuits is the one of PR #4, to the last object
+- ✅ trackside: the enriched scenery only adds - every original object, strip and solid board is where it was; nothing new can be reached
+- ✅ trackside: the simulation does not know the decorative objects - same race with and without them
+- ✅ trackside: every circuit fits the texture atlas, with and without the experimental objects
+- ✅ trackside (experimental): interactive objects stand where cars can reach them, never on the road nor behind a barrier; the same every time
+- ✅ trackside (experimental): a structure over the road is passed under - clearance above the highest flight of the game
+- ✅ trackside bench: every new case has a command, and plays through the real simulation the same way every time
+- ✅ trackside bench: breakable board - knocked down once, stays down, the car drives on; no second contact
+- ✅ trackside bench: rigid obstacle and gantry support - the car is stopped outside the volume, the object stays, the contact is reported once
+- ✅ trackside bench: gantry and tunnel are driven through without any contact; the light changes in the tunnel only
+- ✅ trackside bench: close contact between two cars uses the validated rules and nothing else
+- ✅ trackside (experimental): the same contact for every car, driven by a player or by the computer
+- ✅ trackside (experimental): open verges are a copy of a circuit - same road, limits moved outward away from the pits, grip untouched
+
+Pendant ce lot, quatre de ces tests ont d'abord échoué et ont fait corriger le code : un
+panneau interactif dépassait la ligne de barrière ; la ligne de barrière « habituelle » du
+circuit à accotements ouverts ne suivait pas l'entrée des stands ; le cas « sortie de piste »
+partait d'un virage faute de ligne droite retenue. Le quatrième tenait au banc sans
+navigateur, qui ne transmettait pas l'objet touché.
+
+## 0 bis. Exécution précédente (lot « saut récupérable, roues, rétroviseurs »)
 
 Sur le build final (`index.html`, 1 068 261 octets), le 22 novembre 2026, après le lot « saut
 récupérable, roues à très haute vitesse, rétroviseurs rapprochés » et les corrections qui ont
@@ -37,7 +113,7 @@ exists »), d'où des captures à refaire. Le chien de garde graphique du naviga
 est maintenant coupé (`--disable-gpu-watchdog`, `lib-browser.mjs`) et le script des
 rétroviseurs attend après chaque image. Le jeu n'est pas concerné.
 
-## 1. Tests de simulation et de logique (Node) — 91 / 91 réussis
+## 1. Tests de simulation et de logique (Node) — 105 / 105 réussis (91 décrits ci-dessous, 14 au § 0)
 
 Dernière exécution : `npm test` → 91 tests, 91 réussis, 0 échec (environ 10 s) : les 76 tests
 précédents (dont quatre modifiés, voir § 1 bis) et 15 nouveaux.

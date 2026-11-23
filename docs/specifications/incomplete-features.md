@@ -57,6 +57,16 @@ par le rasteriseur logiciel SwiftShader).
   plus à l'atterrissage ; la vue cockpit ne roule pas pendant le saut alors que la vue extérieure penche
   la voiture ; le dessin de la voiture de devant change de vue pendant une image à l'instant
   du choc.
+- **Objets de bord de piste** (`trackside-objects.md`) : la vidéo de 1993 sur laquelle le lot
+  devait s'appuyer **n'a pas été reçue** ; aucune de ses six séquences n'est étudiée, et le
+  relevé porte sur l'enregistrement de 1991. Les nouveaux décors sont actifs par défaut et
+  purement décoratifs ; ils n'ont été revus par aucun critique indépendant. Les supports
+  des portiques se trouvent sur les accotements sans volume, comme ceux du portique de
+  départ et des passerelles d'origine. Sont **expérimentaux, inactifs par défaut et jugés
+  par personne** : les objets que l'on peut heurter (toutes les réactions sont des
+  propositions, aucune ne vient de la vidéo) et les accotements ouverts (sur un seul circuit
+  de développement). L'ordinateur ne connaît pas ces objets. Le poste de pilotage n'est pas
+  assombri dans les tunnels.
 - **Perte de roue** : demandée, **non implémentée**. La vidéo analysée n'en montre pas ; ce
   qu'il faudrait pour la définir est listé dans `collisions.md` § 6.
 - **Roues** : seules les roues avant de la vue cockpit suivent la vitesse (marques

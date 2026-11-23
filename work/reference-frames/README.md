@@ -22,6 +22,7 @@ Extraits de la vidéo analysée dans `docs/research/vroom-gameplay-analysis.md`.
 | `E3-launch-over-car-and-explosion_1m58s/` | Décollage sur une voiture, atterrissage, explosion, arrêt, redémarrage |
 | `E4-rear-end-bumps_2m07s-2m20s/` | Six tamponnages par l'arrière |
 | `E5-launch-on-roadside-board_3m01s/` | Choc contre un panneau, décollage, glissade dans le sable |
+| `T-trackside-objects/` | Objets de bord de piste : 40 images de la vue 3D classées par catégorie (chevrons, panneaux, portiques, tunnel et structure couverte, végétation, rochers, bas-côtés, tribunes) et 9 planches `sheet-*.jpg` ; relevé horodaté dans `docs/research/trackside-objects-observations.md` |
 | `P-perspective-and-layout/` | Images isolées agrandies ×2 : lignes droites, côtes, portiques, structure couverte, tunnel, second circuit |
 | `measurements.json` | Relevés bruts : vitesses lues à l'œil, ligne d'horizon image par image, largeur de route |
 

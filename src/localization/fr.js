@@ -84,5 +84,8 @@ export const FR = {
   'lab.title': 'BANC D\'ESSAI (DÉVELOPPEMENT)', 'lab.auto': 'pilote automatique jusqu\'au contact', 'lab.yours': 'À VOUS DE CONDUIRE', 'lab.stopped': 'arrêté',
   'lab.case.wheel': '1 · roue contre roue, sans décollage', 'lab.case.hop': '2 · saut récupérable', 'lab.case.crash': '3 · accident violent (E3)',
   'lab.case.board': '4 · panneau de bord de piste (E5)', 'lab.case.bump': '5 · tamponnages',
-  'lab.keys': 'Touches 1 à 5 : choisir un cas · Entrée : rejouer · C : changer de caméra',
+  'lab.case.sign': '6 · panneau destructible (EXPÉRIMENTAL)', 'lab.case.rock': '7 · obstacle rigide (EXPÉRIMENTAL)', 'lab.case.gantry': '8 · passage sous un portique',
+  'lab.case.pillar': '9 · support de portique (EXPÉRIMENTAL)', 'lab.case.tunnel': '0 · passage dans un tunnel', 'lab.case.offtrack': 'O · sortie de piste, accotements ouverts (EXPÉRIMENTAL)',
+  'lab.case.close': 'K · contact rapproché entre deux voitures',
+  'lab.keys': 'Touches 1 à 0, O, K : choisir un cas · Entrée : rejouer · C : changer de caméra',
 };

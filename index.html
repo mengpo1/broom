@@ -457,6 +457,13 @@ function buildTrack(def) {
   };
   layoutEdges(track, def);
   layoutPit(track, def);
+  if (track.openVerges) {
+    // (experimental open verges: where nothing was opened, around the pits, the usual barrier line is the barrier itself)
+    for (let i = 0; i < n; i++) {
+      if (track.barrierR[i] < track.closedBarrierR[i] || Math.min(i, n - i) * ds < (def.openVerges.pitMargin ?? 380)) track.closedBarrierR[i] = track.barrierR[i];
+      if (track.barrierL[i] < track.closedBarrierL[i] || Math.min(i, n - i) * ds < (def.openVerges.pitMargin ?? 380)) track.closedBarrierL[i] = track.barrierL[i];
+    }
+  }
   const line = computeRacingLine(track);
   track.line = line.offset;
   track.lineKappa = line.kappa;
@@ -534,6 +541,32 @@ function layoutEdges(track, def) {
   }
   if (track.minClearance < 2 * minBarrier + 1) {
     track.warnings.push(`layout too tight: clearance ${track.minClearance.toFixed(1)} m`);
+  }
+  // EXPERIMENTAL prototype (development circuits only: def.openVerges = { extra: metres }): the limits are moved
+  // outward away from the pits, so that the ground beyond the usual barrier line can be driven on. The usual line is
+  // kept in closedBarrierL/R (where the scenery used to start). No existing circuit asks for this; grip is untouched.
+  if (def.openVerges) {
+    const extra = def.openVerges.extra ?? 30, keep = around(def.openVerges.pitMargin ?? 380);
+    track.closedBarrierR = Float32Array.from(track.barrierR); track.closedBarrierL = Float32Array.from(track.barrierL);
+    const openR = new Float32Array(n), openL = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const fromLine = Math.min(i, n - i);                       // samples from the start line (the pits are around it)
+      const share = smoothstep(keep, keep + around(120), fromLine);
+      const radius = 1 / Math.max(absK[i], 1e-5);
+      const foldR = kappa[i] > 0 ? radius * 0.72 : 1e9, foldL = kappa[i] < 0 ? radius * 0.72 : 1e9;
+      openR[i] = Math.max(track.closedBarrierR[i], Math.min(track.closedBarrierR[i] + extra * share, clearR[i] / 2 - 0.6, foldR));
+      openL[i] = Math.max(track.closedBarrierL[i], Math.min(track.closedBarrierL[i] + extra * share, clearL[i] / 2 - 0.6, foldL));
+    }
+    const hardR = Float32Array.from(openR), hardL = Float32Array.from(openL);
+    for (let pass = 0; pass < 3; pass++) {
+      closedSmooth(openR, 6); closedSmooth(openL, 6);
+      for (let i = 0; i < n; i++) {
+        openR[i] = Math.max(track.closedBarrierR[i], Math.min(openR[i], hardR[i]));
+        openL[i] = Math.max(track.closedBarrierL[i], Math.min(openL[i], hardL[i]));
+      }
+    }
+    track.barrierR = openR; track.barrierL = openL;
+    track.openVerges = { extra };
   }
 }
 
@@ -1650,6 +1683,7 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
   let kwEnd = kw * smoothstep(0.0, 1.0, kerb);        // a kerb narrows to a point at its ends instead of stopping square
   let barrier = select(aa.z, aa.w, right);
   let verge = select(b0.x, b0.y, right);
+  let cover = mix(b0.w, b1.w, fr);                    // shade over the ground: 1 inside a tunnel, less under a bridge, 0 in the open
   var sRel = s; if (sRel > len * 0.5) { sRel = sRel - len; }
   let detail = clamp(1.0 - z / 420.0, 0.0, 1.0) * view.sky.w;
   let inkW = clamp(0.085 / mpp, 0.0, 3.2) * mpp;      // ink line half-width: thinner with distance
@@ -1733,7 +1767,13 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     // ---------------------------------------------------------------- verge
     let vEdge = hw + kwEnd;
     let gravel = verge > 0.5 && verge < 1.5 && ad > hw + 3.0;
-    if (gravel) {
+    if (cover > 0.9) {
+      // inside a tunnel the verge is a concrete apron, with joints across it
+      c = col(C_PIT);
+      let joint = abs(fract(s / 6.0) - 0.5) * 6.0;
+      c = mix(c, mix(c, ink, 0.45), (1.0 - aastep(0.05, joint, mpr)) * clamp(0.2 / mpr, 0.0, 1.0) * detail);
+      c = mix(c, ink, (1.0 - aastep(inkW, ad - vEdge, mpp)) * inkA * 0.85);
+    } else if (gravel) {
       c = col(C_GRAVEL_A);
       // raked furrows: thin, wavering, broken lines along the trap
       let rakeRow = floor(d / 1.15 + 0.5);
@@ -1772,6 +1812,9 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     let farDash = dashField(s, d, 2.2, 19.0, 0.12, 0.25, mpp, mpr, 33.0);
     c = mix(c, col(C_GRASS_DARK), farDash.x * 0.5 * detail);
   }
+
+  // shade of what spans the road (0 everywhere on a circuit without such objects: the colour is untouched)
+  c = mix(c, c * 0.4 + ink * 0.06, clamp(cover, 0.0, 1.0) * 0.8);
 
   // crest contour: ink where the next row up belongs to much farther ground
   if (ri > 0u) {
@@ -3024,17 +3067,20 @@ __modules["src/rendering/compositing/race-view.js"] = { CAMERA, RaceView };
 // ---- src/rendering/drawing/track-attributes.js
 (function () {
 // Per-sample track attributes uploaded once per circuit for the ground shader:
-//   [kerbL, kerbR, barrierL, barrierR] [vergeL, vergeR, racing line offset, 0]
+//   [kerbL, kerbR, barrierL, barrierR] [vergeL, vergeR, racing line offset, cover]
+// cover: shade over the road from what spans it (tracks/trackside-objects.js): 1 inside a tunnel, less
+// under a bridge or a gantry, 0 elsewhere and everywhere when those objects are not placed.
 
 function buildTrackAttributes(track, capacity) {
   if (track.n > capacity) throw new Error(`Track has ${track.n} samples, renderer supports ${capacity}`);
   const data = new Float32Array(capacity * 8);
+  const cover = track.sceneryLayout && track.sceneryLayout.trackside ? track.sceneryLayout.trackside.cover : null;
   for (let i = 0; i < track.n; i++) {
     const o = i * 8;
     data[o] = track.kerbL[i]; data[o + 1] = track.kerbR[i];
     data[o + 2] = track.barrierL[i]; data[o + 3] = track.barrierR[i];
     data[o + 4] = track.vergeL[i]; data[o + 5] = track.vergeR[i];
-    data[o + 6] = track.line ? track.line[i] : 0; data[o + 7] = 0;
+    data[o + 6] = track.line ? track.line[i] : 0; data[o + 7] = cover ? cover[i] : 0;
   }
   return data;
 }
@@ -3518,6 +3564,604 @@ function collideObstacles(cars, track, obstacles, down, emit) {
 
 __modules["src/physics/obstacles.js"] = { collideObstacles };
 })();
+// ---- src/physics/trackside-tuning.js
+(function () {
+// EXPERIMENTAL parameters of the contacts with the trackside objects of tracks/trackside-objects.js.
+// Kept apart from collision-tuning.js on purpose: nothing here is validated, and nothing here is
+// read unless a circuit is built with interactions on (launch option #objects=interactive, or the
+// collision test bench). The validated braking boards do not use this file.
+//
+// A reaction never throws a car in the air: the only launches of the game remain the validated
+// ones (wheel over wheel, and the braking boards above their launch speed).
+
+const TRACKSIDE_TUNING = {
+  /** m, height of a car above the road: what must fit under an OVERHEAD structure, added to the height of a flight. */
+  carHeight: 1.05,
+  /** s, a car pressed against a rigid object is not reported again before this delay (the contact itself is always resolved). */
+  repeatDelay: 0.6,
+  /** m/s, below this speed a contact with a rigid object is resolved silently (parking against it). */
+  quietSpeed: 1.5,
+  /**
+   * Reactions, by the `reaction` key of the catalogue.
+   * BREAKABLE objects (kind: 'break'): the object goes down and stays down for the race.
+   *   speedKeep  share of its speed the car keeps
+   *   jolt       0..1, shake felt by the driver (the bump of the existing contacts)
+   * SOLID objects (kind: 'solid'): the object does not move.
+   *   stopKeep     share of its speed the car keeps when it hits the object squarely
+   *   glanceKeep   share kept when it only catches it with a corner (overlap below glanceOverlap, m)
+   *   spinSpeed    m/s of impact above which a square hit sends the car into the existing spin
+   * word: comic sound word shown to the driver (a key of the effects layer), or null
+   * sound: { gain 0..1, weight 4..20 (dull to sharp), hard: metallic or not } for the impact sound
+   */
+  reactions: {
+    cone: { kind: 'break', speedKeep: 0.985, jolt: 0.12, word: null, sound: { gain: 0.35, weight: 4, hard: false } },
+    lightSign: { kind: 'break', speedKeep: 0.92, jolt: 0.5, word: 'CRAC', sound: { gain: 0.7, weight: 9, hard: true } },
+    board: { kind: 'break', speedKeep: 0.84, jolt: 0.8, word: 'CRAC', sound: { gain: 0.9, weight: 12, hard: true } },
+    bale: { kind: 'break', speedKeep: 0.78, jolt: 0.7, word: 'CRAC', sound: { gain: 0.6, weight: 6, hard: false } },
+    tyres: { kind: 'break', speedKeep: 0.6, jolt: 1, word: 'BANG', sound: { gain: 0.8, weight: 7, hard: false } },
+    bush: { kind: 'break', speedKeep: 0.88, jolt: 0.45, word: null, sound: { gain: 0.45, weight: 5, hard: false } },
+    barrel: { kind: 'solid', stopKeep: 0.3, glanceKeep: 0.8, glanceOverlap: 0.5, spinSpeed: 30, word: 'BANG', sound: { gain: 0.9, weight: 14, hard: true } },
+    trunk: { kind: 'solid', stopKeep: 0.1, glanceKeep: 0.7, glanceOverlap: 0.45, spinSpeed: 20, word: 'BANG', sound: { gain: 1, weight: 16, hard: false } },
+    rock: { kind: 'solid', stopKeep: 0.08, glanceKeep: 0.65, glanceOverlap: 0.45, spinSpeed: 18, word: 'BANG', sound: { gain: 1, weight: 18, hard: true } },
+    pillar: { kind: 'solid', stopKeep: 0.08, glanceKeep: 0.65, glanceOverlap: 0.4, spinSpeed: 18, word: 'BANG', sound: { gain: 1, weight: 18, hard: true } },
+  },
+};
+
+__modules["src/physics/trackside-tuning.js"] = { TRACKSIDE_TUNING };
+})();
+// ---- src/tracks/trackside-objects.js
+(function () {
+// Trackside objects added on top of the original scenery: their catalogue, how a car may interact
+// with each of them, and where they stand. This EXTENDS the scenery layout (scenery-layout.js calls
+// placeTracksideObjects after its own placements): same props, same strips, same logical ids
+// resolved by the art library, so every drawing stays replaceable.
+//
+// Three independent switches (TRACKSIDE, changed by launch options or per track, never by the menus):
+//   scenery       'enriched' (default): the new decorative objects are placed. They stand behind the
+//                 barriers, span the road well above the cars or line the foot of the barriers: no
+//                 car can touch them, the simulation does not know them.
+//                 'classic': nothing of this file is placed; the layout is the previous one, to the
+//                 last object.
+//   interactions  false (default) / true, EXPERIMENTAL: a second set of objects is placed on the
+//                 verges, in front of the barriers, where cars can reach them, with a collision
+//                 volume and a reaction (physics/trackside-contacts.js, values in
+//                 physics/trackside-tuning.js). The validated braking boards are not part of it
+//                 and keep their own code.
+//   openVerges    false (default) / true, EXPERIMENTAL prototype handled by the track builder for
+//                 circuits that ask for it (tracks/track-builder.js: def.openVerges).
+//
+// Interaction profiles. A profile is given to an object by its catalogue entry, never deduced from
+// what it looks like:
+//   DECORATIVE  no contact, ever
+//   OVERHEAD    spans the road; cars pass under it as long as `clearance` is above them. Its
+//               supports are separate volumes, solid only where the circuit lets a car reach them
+//   BREAKABLE   a point obstacle that a car knocks down (it stays down for the rest of the race)
+//   SOLID       a rigid obstacle with a collision volume
+
+const { Random, hashString } = __modules["src/core/random.js"];
+const { mod } = __modules["src/core/math.js"];
+const { VERGE } = __modules["src/tracks/track-builder.js"];
+
+const INTERACTION = { DECORATIVE: 'decorative', OVERHEAD: 'overhead', BREAKABLE: 'breakable', SOLID: 'solid' };
+
+/** Current settings (see the top of the file). A track may carry its own in `track.trackside`. */
+const TRACKSIDE = { scenery: 'enriched', interactions: false };
+
+function configureTrackside(options = {}) {
+  if (options.scenery === 'classic' || options.scenery === 'enriched') TRACKSIDE.scenery = options.scenery;
+  if (options.interactions !== undefined) TRACKSIDE.interactions = !!options.interactions;
+  return TRACKSIDE;
+}
+
+/** Settings that apply to a track: its own (a development circuit, or a test), else the current ones. */
+function tracksideSettings(track) {
+  return { ...TRACKSIDE, ...((track.def && track.def.trackside) || {}), ...(track.trackside || {}) };
+}
+
+/**
+ * Catalogue. One entry per family of objects (the art library draws `family` or `family.N`).
+ *   category   for the documentation and the tests
+ *   profile    what the object is when it stands where a car can reach it AND interactions are on;
+ *              everywhere else it is decorative, whatever this says
+ *   halfWidth, halfDepth  collision volume on the ground (m): across and along the road
+ *   height     of the object (m), for the documentation and the drawings
+ *   clearance  OVERHEAD only: free height under the span (m)
+ *   supports   OVERHEAD only: lateral positions of the supports from the centre of the object (m),
+ *              with their own volume (supportHalfWidth, supportHalfDepth)
+ *   reaction   key of the reaction in physics/trackside-tuning.js (BREAKABLE and SOLID)
+ *   variants   number of drawings
+ */
+const TRACKSIDE_OBJECTS = {
+  // ---- direction arrows and signs before the bends
+  'sign.chevron': { category: 'chevrons', profile: INTERACTION.BREAKABLE, halfWidth: 1.05, halfDepth: 0.3, height: 3.05, reaction: 'lightSign' },
+  'sign.turn': { category: 'signals', profile: INTERACTION.BREAKABLE, halfWidth: 0.75, halfDepth: 0.3, height: 2.85, reaction: 'lightSign' },
+  // ---- advertising boards of the fictional sponsors of the game, on low or tall supports
+  'sign.advert.low': { category: 'adverts', profile: INTERACTION.BREAKABLE, halfWidth: 2.2, halfDepth: 0.35, height: 2.2, reaction: 'board', variants: 3 },
+  'sign.advert.high': { category: 'adverts', profile: INTERACTION.DECORATIVE, halfWidth: 0, halfDepth: 0, height: 6.6, variants: 2 },
+  // ---- structures over the road
+  'gantry.banner': { category: 'gantries', profile: INTERACTION.OVERHEAD, clearance: 5.3, height: 7.5, supports: [-10.6, 10.6], supportHalfWidth: 0.45, supportHalfDepth: 0.45, reaction: 'pillar', variants: 2 },
+  // (the start gantry and the footbridges of the original scenery: their drawings and places are unchanged; listed here
+  // so that, with interactions on, their supports are volumes like those of the new gantries)
+  'gantry.start': { category: 'gantries', profile: INTERACTION.OVERHEAD, clearance: 6.5, height: 8.5, supports: [-10.9, 10.9], supportHalfWidth: 0.9, supportHalfDepth: 0.9, reaction: 'pillar', original: true },
+  bridge: { category: 'gantries', profile: INTERACTION.OVERHEAD, clearance: 5.6, height: 9, supports: [-12.85, 12.85], supportHalfWidth: 1.6, supportHalfDepth: 1.6, reaction: 'pillar', variants: 2, original: true },
+  // (a tunnel is sized to its place: the feet of its mouth stand on the barriers, 14.2 m from the middle at scale 1)
+  'tunnel.portal': { category: 'tunnels', profile: INTERACTION.OVERHEAD, clearance: 5.8, height: 11, supports: [], reaction: null },
+  'tunnel.arch': { category: 'tunnels', profile: INTERACTION.OVERHEAD, clearance: 5.8, height: 11, supports: [], reaction: null },
+  // ---- lone trees and plants of each environment
+  'tree.oak': { category: 'vegetation', profile: INTERACTION.SOLID, halfWidth: 0.55, halfDepth: 0.55, height: 12, reaction: 'trunk' },
+  'tree.poplar': { category: 'vegetation', profile: INTERACTION.SOLID, halfWidth: 0.35, halfDepth: 0.35, height: 14, reaction: 'trunk' },
+  cactus: { category: 'vegetation', profile: INTERACTION.SOLID, halfWidth: 0.4, halfDepth: 0.4, height: 4.2, reaction: 'trunk', variants: 2 },
+  // ---- rocks and small natural objects
+  boulder: { category: 'rocks', profile: INTERACTION.SOLID, halfWidth: 1.1, halfDepth: 0.9, height: 1.9, reaction: 'rock', variants: 2 },
+  stones: { category: 'rocks', profile: INTERACTION.DECORATIVE, halfWidth: 0, halfDepth: 0, height: 0.4, variants: 2 },
+  // ---- trackside accessories
+  cone: { category: 'accessories', profile: INTERACTION.BREAKABLE, halfWidth: 0.25, halfDepth: 0.25, height: 0.75, reaction: 'cone' },
+  'marker.post': { category: 'accessories', profile: INTERACTION.BREAKABLE, halfWidth: 0.12, halfDepth: 0.12, height: 1.1, reaction: 'cone' },
+  tyrestack: { category: 'accessories', profile: INTERACTION.BREAKABLE, halfWidth: 0.7, halfDepth: 0.7, height: 1.2, reaction: 'tyres' },
+  haybale: { category: 'accessories', profile: INTERACTION.BREAKABLE, halfWidth: 0.9, halfDepth: 0.5, height: 0.9, reaction: 'bale' },
+  barrel: { category: 'accessories', profile: INTERACTION.SOLID, halfWidth: 0.4, halfDepth: 0.4, height: 1.1, reaction: 'barrel' },
+  // ---- trees, bushes and rocks of the original scenery. Where they stand today no car can reach them; they get a
+  // volume only on the experimental circuits with open verges, where the ground they stand on can be driven on
+  'tree.broadleaf': { category: 'vegetation', profile: INTERACTION.SOLID, halfWidth: 0.5, halfDepth: 0.5, height: 11, reaction: 'trunk', variants: 3, original: true },
+  'tree.pine': { category: 'vegetation', profile: INTERACTION.SOLID, halfWidth: 0.4, halfDepth: 0.4, height: 13, reaction: 'trunk', variants: 2, original: true },
+  'tree.palm': { category: 'vegetation', profile: INTERACTION.SOLID, halfWidth: 0.35, halfDepth: 0.35, height: 10, reaction: 'trunk', variants: 2, original: true },
+  'tree.cypress': { category: 'vegetation', profile: INTERACTION.SOLID, halfWidth: 0.45, halfDepth: 0.45, height: 11, reaction: 'trunk', variants: 1, original: true },
+  rock: { category: 'rocks', profile: INTERACTION.SOLID, halfWidth: 1.4, halfDepth: 1.1, height: 2.6, reaction: 'rock', variants: 2, original: true },
+  bush: { category: 'vegetation', profile: INTERACTION.BREAKABLE, halfWidth: 1.2, halfDepth: 0.9, height: 2.2, reaction: 'bush', variants: 2, original: true },
+};
+
+/** Catalogue entry of a prop id (`sign.advert.low.2` -> the entry of `sign.advert.low`), or null. */
+function tracksideObject(id) {
+  if (TRACKSIDE_OBJECTS[id]) return TRACKSIDE_OBJECTS[id];
+  const family = id.replace(/\.\d+$/, '');
+  return TRACKSIDE_OBJECTS[family] || null;
+}
+
+/**
+ * What each environment plants and sets up, in the new families (the original recipe of the theme,
+ * tracks/themes.js, is untouched). Densities are per 100 m of road and per side unless noted.
+ *   lone: [[family, weight]...] lone trees and plants behind the barriers; loneDensity
+ *   boulders, stones: density of rocks behind the barriers / at their foot
+ *   adverts: boards per km on straights; foot: strip at the foot of the barriers; accessories
+ */
+const THEME_TRACKSIDE = {
+  forest: { lone: [['tree.oak', 1]], loneDensity: 0.5, boulders: 0.1, stones: 0.5, adverts: 4, foot: 'strip.tufts', accessories: ['haybale', 'tyrestack'] },
+  taiga: { lone: [['tree.oak', 1]], loneDensity: 0.2, boulders: 0.4, stones: 0.9, adverts: 3, foot: 'strip.tufts', accessories: ['tyrestack'] },
+  coast: { lone: [['tree.poplar', 1]], loneDensity: 0.25, boulders: 0.5, stones: 0.8, adverts: 5, foot: 'strip.sandbank', accessories: ['barrel', 'tyrestack'] },
+  lake: { lone: [['tree.poplar', 0.7], ['tree.oak', 0.3]], loneDensity: 0.7, boulders: 0.3, stones: 0.7, adverts: 4, foot: 'strip.tufts', accessories: ['haybale', 'tyrestack'] },
+  alpine: { lone: [['tree.oak', 1]], loneDensity: 0.15, boulders: 1.1, stones: 1.2, adverts: 3, foot: 'strip.tufts', accessories: ['haybale', 'tyrestack'] },
+  highland: { lone: [['tree.oak', 1]], loneDensity: 0.3, boulders: 1.3, stones: 1.4, adverts: 2, foot: 'strip.tufts', accessories: ['haybale'] },
+  desert: { lone: [['cactus', 1]], loneDensity: 1.5, boulders: 0.9, stones: 1.3, adverts: 4, foot: 'strip.sandbank', accessories: ['barrel', 'tyrestack'] },
+  canyon: { lone: [['cactus', 1]], loneDensity: 1.1, boulders: 1.6, stones: 1.6, adverts: 2, foot: 'strip.sandbank', accessories: ['barrel'] },
+  plains: { lone: [['tree.poplar', 0.75], ['tree.oak', 0.25]], loneDensity: 0.9, boulders: 0, stones: 0.3, adverts: 6, foot: 'strip.tufts', accessories: ['haybale', 'tyrestack'] },
+  park: { lone: [['tree.poplar', 0.5], ['tree.oak', 0.5]], loneDensity: 0.6, boulders: 0, stones: 0.2, adverts: 7, foot: 'strip.tufts', accessories: ['tyrestack'] },
+  docks: { lone: [], loneDensity: 0, boulders: 0, stones: 0.3, adverts: 6, foot: null, accessories: ['barrel', 'tyrestack'] },
+  dusk: { lone: [['tree.oak', 0.6], ['tree.poplar', 0.4]], loneDensity: 0.5, boulders: 0.2, stones: 0.5, adverts: 4, foot: 'strip.tufts', accessories: ['haybale', 'tyrestack'] },
+  zenith: { lone: [['tree.poplar', 1]], loneDensity: 0.4, boulders: 0.2, stones: 0.4, adverts: 8, foot: 'strip.tufts', accessories: ['tyrestack'] },
+};
+
+/**
+ * Explicit placements, for the characteristic places of a circuit (the rules below do the rest).
+ *   { type: 'tunnel', at: share of the lap (0..1), length: m }
+ *   { type: 'gantry', at, id }      { type: 'object', at, id, d: metres from the centre line (+ right), flip }
+ *   (`s`, in metres from the line, may be given instead of `at`)
+ * A circuit definition may carry its own list in `features` (development circuits).
+ */
+const CIRCUIT_FEATURES = {
+  'porto-sereno': [{ type: 'tunnel', at: 0.46, length: 190 }],
+  montclair: [{ type: 'tunnel', at: 0.58, length: 150 }],
+  'meridian-docks': [{ type: 'tunnel', at: 0.37, length: 130 }, { type: 'gantry', at: 0.7, id: 'gantry.banner.1' }],
+  'roca-alta': [{ type: 'tunnel', at: 0.52, length: 110 }],
+  'grand-zenith': [{ type: 'gantry', at: 0.33, id: 'gantry.banner.0' }, { type: 'gantry', at: 0.66, id: 'gantry.banner.1' }],
+};
+
+/** Tunnels: spacing of the ribs of the vault (m), half width of the mouth at scale 1 (m), shade under a footbridge (0..1) and its length (m). */
+const TUNNEL = { archSpacing: 9, mouthHalfWidth: 14.2, bridgeShade: 0.45, bridgeShadeLength: 7 };
+
+function weighted(rng, table) {
+  let total = 0;
+  for (const [, w] of table) total += w;
+  let r = rng.next() * total;
+  for (const [id, w] of table) { r -= w; if (r <= 0) return id; }
+  return table[table.length - 1][0];
+}
+
+/** Bends of a track: [{ from, to, apex (samples), sign (+1 right), radius (m, tightest), turn (rad) }]. */
+function trackBends(track, gentlerThan = 1 / 420) {
+  const { n, ds, kappa } = track, bends = [];
+  let start = 0;
+  while (start < n && Math.abs(kappa[start]) > gentlerThan) start++;         // begin on a straight
+  if (start === n) return bends;
+  for (let q = 0; q < n;) {
+    const i = (start + q) % n;
+    if (Math.abs(kappa[i]) <= gentlerThan) { q++; continue; }
+    const sign = Math.sign(kappa[i]);
+    let len = 0, peak = 0, apex = i, turn = 0;
+    while (q + len < n) {
+      const j = (start + q + len) % n, k = kappa[j];
+      if (Math.abs(k) <= gentlerThan || Math.sign(k) !== sign) break;
+      if (Math.abs(k) > peak) { peak = Math.abs(k); apex = j; }
+      turn += Math.abs(k) * ds; len++;
+    }
+    bends.push({ from: i, to: (i + len) % n, count: len, apex, sign, radius: 1 / peak, turn });
+    q += len;
+  }
+  return bends;
+}
+
+/**
+ * Place the objects of this file. `L` is what the scenery layout lends: { track, theme, addProp,
+ * addStrip, barrierOf, vergeOf, inPitWall, blocked, tall }. Uses its own random sequence, so the
+ * original placements are the same with or without these objects.
+ * Returns { tunnels: [{ from, to (m), length }], gantries: [...] } for the renderer and the tests.
+ */
+function placeTracksideObjects(L, settings) {
+  const { track, addProp, addStrip, barrierOf, vergeOf, inPitWall, blocked, tall } = L;
+  const { n, ds, length, halfWidth, kappa, pit } = track;
+  const recipe = THEME_TRACKSIDE[track.theme] || THEME_TRACKSIDE.forest;
+  const rng = new Random(hashString(`trackside:${track.id}`));
+  const side01 = (side) => (side > 0 ? 1 : 0);
+  const rel = (i) => { const s = i * ds; return s > length / 2 ? s - length : s; };
+  const nearPits = (i, margin = 60) => { const r = rel(i); return r > pit.entryS - margin && r < pit.exitS + margin; };
+  const straightAround = (i, before, after, limit = 1 / 600) => {
+    for (let k = -Math.round(before / ds); k <= Math.round(after / ds); k++) if (Math.abs(kappa[mod(i + k, n)]) > limit) return false;
+    return true;
+  };
+  // cover: shade over the road per sample, for the ground and the cars (1 inside a tunnel, less under a footbridge)
+  const info = { tunnels: [], gantries: [], cover: new Float32Array(n) };
+  const overhead = [];                                   // samples already taken by something that spans the road
+  for (const prop of L.props) if (/^(bridge|gantry)\./.test(prop.id)) overhead.push(prop.sample);
+  const clearOfOverhead = (i, metres) => overhead.every((o) => Math.min(mod(o - i, n), mod(i - o, n)) * ds > metres);
+  const inTunnel = (i) => info.tunnels.some((t) => mod(i - t.fromSample, n) <= t.count);
+  const decor = (id, s, d, opt) => addProp(id, s, d, opt);
+  const features = [...(CIRCUIT_FEATURES[track.id] || []), ...((track.def && track.def.features) || []), ...(track.features || [])];
+
+  // ---- tunnels (explicit only): two portals, arches between them, walls along the barriers
+  for (const f of features) {
+    if (f.type !== 'tunnel') continue;
+    let from = mod(Math.round((f.at * length) / ds), n);
+    const count = Math.round(f.length / ds);
+    // slide along the lap to the first stretch clear of the pits, of the start and of the other structures
+    // (a tunnel needs barriers at a constant distance: no run-off area widens inside it)
+    const evenBarriers = (i0) => {
+      let lo = Infinity, hi = 0;
+      for (let k = -2; k <= count + 2; k++) for (const side of [-1, 1]) { const b = barrierOf(side, mod(i0 + k, n)); lo = Math.min(lo, b); hi = Math.max(hi, b); }
+      return hi - lo < 1.2;
+    };
+    let ok = false;
+    for (let tries = 0; tries < 160 && !ok; tries++) {
+      ok = !nearPits(from, 120) && !nearPits(mod(from + count, n), 120) && Math.abs(rel(from)) > 380 && Math.abs(rel(mod(from + count, n))) > 380
+        && clearOfOverhead(from, 160) && clearOfOverhead(mod(from + count, n), 160) && evenBarriers(from);
+      if (!ok) from = mod(from + Math.round(25 / ds), n);
+    }
+    if (!ok) continue;
+    const scaleAt = (i) => (Math.max(barrierOf(1, i), barrierOf(-1, i)) + 0.9) / TUNNEL.mouthHalfWidth;
+    const tunnel = { from: from * ds, to: mod(from + count, n) * ds, length: count * ds, fromSample: from, count, scale: scaleAt(from) };
+    info.tunnels.push(tunnel);
+    for (let k = 0; k <= count; k++) info.cover[mod(from + k, n)] = 1;
+    // (a wall up to the vault on each side, then rock: tall enough to hide whatever stood behind the barrier)
+    for (const side of [-1, 1]) addStrip('strip.tunnelwall', side, from, count, { offset: 0.25, height: 13, tile: 8, tall: true, block: true });
+    decor('tunnel.portal', from * ds, 0, { reach: 1300, scale: tunnel.scale });
+    decor('tunnel.portal', (from + count) * ds, 0, { reach: 1300, scale: scaleAt(mod(from + count, n)) });
+    for (let s = TUNNEL.archSpacing; s < count * ds - 2; s += TUNNEL.archSpacing) decor('tunnel.arch', from * ds + s, 0, { reach: 420, scale: scaleAt(mod(from + Math.round(s / ds), n)) });
+    overhead.push(from, mod(from + count, n));
+  }
+
+  // ---- gantries: explicit ones, then one by rule on the longest free straight
+  // (like the start gantry and the footbridges of the original scenery, a gantry stands with its supports on the
+  // verges: decorative by default, volumes only with interactions on)
+  const addGantry = (id, i) => {
+    decor(id, i * ds, 0, { reach: 1300 });
+    overhead.push(i);
+    info.gantries.push({ id, s: i * ds, sample: i, scale: 1 });
+  };
+  for (const f of features) {
+    if (f.type !== 'gantry') continue;
+    let i = mod(Math.round((f.s !== undefined ? f.s : f.at * length) / ds), n), ok = false;
+    for (let tries = 0; tries < 80 && !ok; tries++) {
+      ok = !nearPits(i, 80) && Math.abs(rel(i)) > 300 && clearOfOverhead(i, 220) && straightAround(i, 60, 60, 1 / 350) && !inTunnel(i);
+      if (!ok) i = mod(i + Math.round(30 / ds), n);
+    }
+    if (ok) addGantry(f.id, i);
+  }
+  if (!info.gantries.length) {
+    for (let tries = 0; tries < 80; tries++) {
+      const i = rng.int(0, n - 1);
+      if (nearPits(i, 80) || Math.abs(rel(i)) < 300 || !clearOfOverhead(i, 260) || !straightAround(i, 70, 70) || inTunnel(i)) continue;
+      addGantry(`gantry.banner.${rng.int(0, 1)}`, i);
+      break;
+    }
+  }
+
+  // shade on the road under the footbridges (those of the original scenery): a deck casts one, the thin beam of a
+  // gantry does not (in the reference footage too the picture darkens under bridges and roofs, not under gantries)
+  const shadeSamples = Math.max(1, Math.round(TUNNEL.bridgeShadeLength / 2 / ds));
+  for (const prop of L.props) {
+    if (!/^bridge\./.test(prop.id)) continue;
+    for (let k = -shadeSamples; k <= shadeSamples; k++) { const i = mod(prop.sample + k, n); if (info.cover[i] < TUNNEL.bridgeShade) info.cover[i] = TUNNEL.bridgeShade; }
+  }
+
+  // ---- chevrons on the outside of the bends, a direction sign before them
+  const bends = trackBends(track);
+  for (const b of bends) {
+    if (b.radius > 230 || b.turn < 0.6) continue;
+    const outside = -b.sign, flip = b.sign < 0;                      // the drawing points to the right
+    const span = mod(b.apex - b.from, n) + Math.round(12 / ds);
+    const boards = Math.max(3, Math.min(6, Math.round((span * ds) / 16)));
+    for (let k = 0; k < boards; k++) {
+      const i = mod(b.from + Math.round((k + 0.5) * span / boards), n);
+      if (inTunnel(i) || (outside === pit.side && inPitWall(i))) continue;
+      decor('sign.chevron', i * ds, outside * (barrierOf(outside, i) + 1.25), { reach: 700, flip });
+    }
+    // direction sign on the inside, 150 m before the bend when a straight leads to it, 60 m otherwise
+    const before = straightAround(b.from, 170, 0, 1 / 320) ? 150 : 60;
+    const j = mod(b.from - Math.round(before / ds), n);
+    if (!inTunnel(j) && !(b.sign === pit.side && inPitWall(j)) && Math.abs(kappa[j]) < 1 / 250) {
+      decor('sign.turn', j * ds, b.sign * (barrierOf(b.sign, j) + 1.4), { reach: 600, flip });
+    }
+  }
+
+  // ---- advertising boards behind the barriers of the straights: low ones near, tall ones further back
+  const boards = Math.round((recipe.adverts * length) / 1000);
+  for (let k = 0, tries = 0; k < boards && tries < boards * 12; tries++) {
+    const i = rng.int(0, n - 1), side = rng.chance(0.5) ? 1 : -1;
+    if (blocked[side01(side)][i] || tall[side01(side)][i] || inTunnel(i) || (side === pit.side && nearPits(i, 30)) || !straightAround(i, 25, 25, 1 / 260)) continue;
+    const high = rng.chance(0.4);
+    if (high) decor(`sign.advert.high.${rng.int(0, 1)}`, i * ds, side * (barrierOf(side, i) + 7 + rng.next() * 6), { reach: 1100 });
+    else decor(`sign.advert.low.${rng.int(0, 2)}`, i * ds, side * (barrierOf(side, i) + 2.6 + rng.next() * 1.6), { reach: 800 });
+    k++;
+  }
+
+  // ---- lone trees and plants, boulders, stones: behind the barriers
+  const scatter = (perHundred, make) => {
+    const p = (perHundred * ds) / 100;
+    for (let i = 0; i < n; i++) for (const side of [-1, 1]) if (rng.next() < p) make(i, side);
+  };
+  if (recipe.lone.length) {
+    scatter(recipe.loneDensity, (i, side) => {
+      if (blocked[side01(side)][i] || tall[side01(side)][i] || inTunnel(i)) return;
+      const family = weighted(rng, recipe.lone), entry = TRACKSIDE_OBJECTS[family];
+      const id = entry.variants ? `${family}.${rng.int(0, entry.variants - 1)}` : family;
+      decor(id, (i + rng.next()) * ds, side * (barrierOf(side, i) + 6 + rng.next() * rng.next() * 45), { scale: rng.range(0.85, 1.2), flip: rng.chance(0.5), reach: 1300 });
+    });
+  }
+  scatter(recipe.boulders, (i, side) => {
+    if (blocked[side01(side)][i] || inTunnel(i)) return;
+    decor(`boulder.${rng.int(0, 1)}`, (i + rng.next()) * ds, side * (barrierOf(side, i) + 3 + rng.next() * 22), { scale: rng.range(0.7, 1.5), flip: rng.chance(0.5), reach: 700 });
+  });
+  scatter(recipe.stones, (i, side) => {
+    if (blocked[side01(side)][i] || inTunnel(i)) return;
+    decor(`stones.${rng.int(0, 1)}`, (i + rng.next()) * ds, side * (barrierOf(side, i) + 1 + rng.next() * 5), { scale: rng.range(0.8, 1.3), flip: rng.chance(0.5), reach: 300 });
+  });
+
+  // ---- accessories behind the barriers: tyre stacks and bales on the outside of the slow bends, barrels and posts
+  for (const b of bends) {
+    if (b.radius > 120 || !recipe.accessories.length) continue;
+    const outside = -b.sign, family = rng.pick(recipe.accessories);
+    if (blocked[side01(outside)][b.apex] || inTunnel(b.apex)) continue;
+    const count = family === 'barrel' ? 3 : 4;
+    for (let k = 0; k < count; k++) {
+      const i = mod(b.apex + Math.round(((k - count / 2) * 2.4) / ds), n);
+      decor(family, i * ds + rng.next() * 1.5, outside * (barrierOf(outside, i) + 1.1 + (family === 'haybale' ? 0 : rng.next() * 0.6)), { reach: 450, flip: rng.chance(0.5) });
+    }
+  }
+  // reflector posts along the long straights, both sides, every 50 m
+  for (let i = 0; i < n; i += Math.round(50 / ds)) {
+    if (!straightAround(i, 120, 120) || inTunnel(i)) continue;
+    for (const side of [-1, 1]) {
+      if (side === pit.side && nearPits(i, 20)) continue;
+      decor('marker.post', i * ds, side * (barrierOf(side, i) + 0.55), { reach: 260 });
+    }
+  }
+
+  // ---- foot of the barriers: tufts of grass or a bank of sand, in runs (terrain transition)
+  if (recipe.foot) {
+    for (const side of [-1, 1]) {
+      let i = rng.int(0, 40);
+      while (i < n) {
+        const count = Math.floor(rng.range(40, 160) / ds / 4) * 4;
+        const gravel = vergeOf(side, i) === VERGE.GRAVEL;
+        if (rng.chance(0.55) && !(side === pit.side && (nearPits(i, 10) || nearPits(mod(i + count, n), 10))) && !inTunnel(i) && !inTunnel(mod(i + count, n))) {
+          addStrip(gravel ? 'strip.sandbank' : recipe.foot, side, i, Math.min(count, n - i), { offset: -0.45, height: 0.55, tile: 4 });
+        }
+        i += count + rng.int(6, 40);
+      }
+    }
+  }
+
+  // ---- EXPERIMENTAL: objects standing on the verges, in front of the barriers, where a car can reach them
+  if (settings.interactions) {
+    const verge = (side, i) => barrierOf(side, i) - halfWidth;
+    const reachable = (id, s, d, opt = {}) => addProp(id, s, d, { ...opt, interactive: true });
+    // the three tightest bends get chevron boards on the verge itself
+    const tight = bends.filter((b) => b.radius < 160 && b.turn > 0.6).sort((a, b) => a.radius - b.radius).slice(0, 3);
+    for (const b of tight) {
+      const outside = -b.sign;
+      for (let k = 0; k < 3; k++) {
+        const i = mod(b.apex + Math.round(((k - 1) * 14) / ds), n);
+        if ((outside === pit.side && nearPits(i, 20)) || verge(outside, i) < 3.4 || inTunnel(i)) continue;
+        reachable('sign.chevron', i * ds, outside * (barrierOf(outside, i) - 1.4), { reach: 700, flip: b.sign < 0 });
+      }
+      // a rock or a tyre stack at the end of a gravel trap, a lone plant on a wide grass verge
+      const j = mod(b.apex + Math.round(30 / ds), n);
+      if (vergeOf(outside, j) === VERGE.GRAVEL && verge(outside, j) > 9 && recipe.boulders > 0.3) reachable(`boulder.${rng.int(0, 1)}`, j * ds, outside * (barrierOf(outside, j) - 1.8), { reach: 700 });
+      else if (verge(outside, j) > 6) reachable('tyrestack', j * ds, outside * (barrierOf(outside, j) - 1.0), { reach: 450 });
+    }
+    // a low advertising board on the verge of two straights
+    for (let placed = 0, tries = 0; placed < 2 && tries < 60; tries++) {
+      const i = rng.int(0, n - 1), side = rng.chance(0.5) ? 1 : -1;
+      if (nearPits(i, 60) || !straightAround(i, 60, 60) || verge(side, i) < 6 || inTunnel(i)) continue;
+      reachable(`sign.advert.low.${rng.int(0, 2)}`, i * ds, side * (barrierOf(side, i) - 2.8), { reach: 800 });
+      placed++;
+    }
+    if (recipe.lone.length) {
+      for (let placed = 0, tries = 0; placed < 2 && tries < 80; tries++) {
+        const i = rng.int(0, n - 1), side = rng.chance(0.5) ? 1 : -1;
+        if (nearPits(i, 60) || verge(side, i) < 8 || vergeOf(side, i) !== VERGE.GRASS || inTunnel(i)) continue;
+        const family = weighted(rng, recipe.lone), entry = TRACKSIDE_OBJECTS[family];
+        reachable(entry.variants ? `${family}.${rng.int(0, entry.variants - 1)}` : family, i * ds, side * (barrierOf(side, i) - 2.2), { reach: 1300 });
+        placed++;
+      }
+    }
+  }
+  // ---- EXPERIMENTAL open verges (track builder: def.openVerges): the ground between the usual barrier line and the
+  // moved limits is planted like the surroundings of the circuit, and what stands there can be reached
+  if (track.openVerges) {
+    const veg = L.theme.trees, closed = (side, i) => (side > 0 ? track.closedBarrierR[i] : track.closedBarrierL[i]);
+    scatter(2.4, (i, side) => {
+      const inner = closed(side, i) + 2, outer = barrierOf(side, i) - 2.5;
+      if (outer - inner < 4) return;
+      const roll = rng.next();
+      let id;
+      if (roll < 0.5) { const family = weighted(rng, veg); id = `${family}.${rng.int(0, (TRACKSIDE_OBJECTS[family] ? TRACKSIDE_OBJECTS[family].variants : 1) - 1)}`; }
+      else if (roll < 0.75) id = `bush.${rng.int(0, 1)}`;
+      else if (roll < 0.9) id = `rock.${rng.int(0, 1)}`;
+      else id = `boulder.${rng.int(0, 1)}`;
+      addProp(id, (i + rng.next()) * ds, side * (inner + rng.next() * (outer - inner)), { reach: 1300, flip: rng.chance(0.5), interactive: settings.interactions });
+    });
+  }
+
+  // explicit single objects (development circuits and characteristic places); reachable ones only with interactions on
+  for (const f of features) {
+    if (f.type !== 'object') continue;
+    const s = f.s !== undefined ? f.s : f.at * length, i = mod(Math.round(s / ds), n), side = f.d > 0 ? 1 : -1;
+    const within = Math.abs(f.d) < barrierOf(side, i);
+    if (within && !settings.interactions && tracksideObject(f.id) && tracksideObject(f.id).profile !== INTERACTION.OVERHEAD) continue;
+    addProp(f.id, s, f.d, { reach: f.reach ?? 900, flip: !!f.flip, scale: f.scale ?? 1, interactive: within && settings.interactions });
+    if (/^gantry\./.test(f.id)) info.gantries.push({ id: f.id, s, sample: i, scale: f.scale ?? 1 });
+  }
+  return info;
+}
+
+/**
+ * The objects a car can run into (EXPERIMENTAL list, empty unless interactions are on): the props
+ * marked interactive, and the supports of the overhead structures that stand inside the barriers.
+ * Each: { index, prop, id, family, profile, reaction, s, d, halfWidth, halfDepth, support }.
+ */
+function collectInteractiveObjects(track, props, settings) {
+  const objects = [];
+  if (!settings.interactions) return objects;
+  const { n, ds } = track;
+  props.forEach((prop, index) => {
+    const entry = tracksideObject(prop.id);
+    if (!entry) return;
+    const i = Math.floor(prop.s / ds) % n;
+    const add = (o) => { const object = { index: objects.length, prop: index, id: prop.id, family: prop.id.replace(/\.\d+$/, ''), s: prop.s, ...o }; objects.push(object); return object; };
+    if (entry.profile === INTERACTION.OVERHEAD) {
+      // the span is passed under (clearance); a support is a volume only where a car can get to it
+      for (const x of entry.supports || []) {
+        const d = prop.d + x * prop.scale, side = d > 0 ? 1 : -1, barrier = side > 0 ? track.barrierR[i] : track.barrierL[i];
+        const hw = entry.supportHalfWidth * prop.scale;
+        if (Math.abs(d) + hw >= barrier || Math.abs(d) - hw <= track.halfWidth) continue;
+        add({ profile: INTERACTION.SOLID, reaction: entry.reaction, d, halfWidth: hw, halfDepth: entry.supportHalfDepth * prop.scale, support: true, clearance: entry.clearance * prop.scale });
+      }
+      return;
+    }
+    if (!prop.interactive || entry.profile === INTERACTION.DECORATIVE) return;
+    const object = add({ profile: entry.profile, reaction: entry.reaction, d: prop.d, halfWidth: entry.halfWidth * prop.scale, halfDepth: entry.halfDepth * prop.scale, support: false });
+    prop.object = object.index;
+  });
+  return objects;
+}
+
+__modules["src/tracks/trackside-objects.js"] = { INTERACTION, TRACKSIDE, configureTrackside, tracksideSettings, TRACKSIDE_OBJECTS, tracksideObject, THEME_TRACKSIDE, CIRCUIT_FEATURES, TUNNEL, trackBends, placeTracksideObjects, collectInteractiveObjects };
+})();
+// ---- src/physics/trackside-contacts.js
+(function () {
+// EXPERIMENTAL contacts between cars and the interactive trackside objects (tracks/trackside-objects.js).
+// Called by the race only when its circuit has such objects, i.e. never in the normal game: the list
+// is empty unless interactions are switched on. The validated braking boards keep their own code
+// (obstacles.js) and are not in this list.
+//
+// The same rules for every car, driven by a player or by the computer. Deterministic: no random
+// number, nothing but the state of the cars and of the objects.
+//   BREAKABLE  the object goes down for the rest of the race, the car loses part of its speed
+//   SOLID      the object stays; the car is stopped against it, or pushed aside when it only
+//              catches it with a corner; a hard square hit ends in the existing spin
+// No reaction throws a car in the air.
+
+const { CAR_STATE, startSpin } = __modules["src/physics/car-physics.js"];
+const { TRACKSIDE_TUNING } = __modules["src/physics/trackside-tuning.js"];
+const { INTERACTION } = __modules["src/tracks/trackside-objects.js"];
+
+/** Move a car by (along, across) metres in the frame of the road where it is, world position included. */
+function shiftCar(car, track, along, across) {
+  const i = car.segIndex;
+  car.x += track.tx[i] * along + track.nx[i] * across;
+  car.z += track.tz[i] * along + track.nz[i] * across;
+  car.s += along; car.d += across;
+}
+
+/** True when a car, wheels on the ground or in flight, fits under a structure with this clearance (m). */
+function passesUnder(clearance, car) {
+  return (car.airHeight || 0) + TRACKSIDE_TUNING.carHeight < clearance;
+}
+
+/**
+ * @param state     Uint8Array, one per object: 1 = knocked down in this race
+ * @param cooldown  Float32Array, one per car: seconds before a rigid contact of that car is reported again
+ * @param emit      function(type, carIndex, value, otherIndex): 'object' carries the impact speed and the object index
+ * @returns number of contacts reported during this step
+ */
+function collideTracksideObjects(cars, track, objects, state, cooldown, dt, emit) {
+  const T = TRACKSIDE_TUNING, half = track.length / 2;
+  let hits = 0;
+  for (let i = 0; i < cars.length; i++) {
+    const car = cars[i];
+    if (cooldown[i] > 0) cooldown[i] -= dt;
+    if (car.removed || car.inPit || (car.state !== CAR_STATE.RACING && car.state !== CAR_STATE.SPIN)) continue;
+    if (Math.abs(car.d) < track.halfWidth - car.params.halfWidth) continue;       // nothing stands on the asphalt
+    const hw = car.params.halfWidth, hl = car.params.halfLength;
+    for (let k = 0; k < objects.length; k++) {
+      if (state[k]) continue;
+      const o = objects[k];
+      const across = o.d - car.d, overlapAcross = hw + o.halfWidth - Math.abs(across);
+      if (overlapAcross <= 0) continue;
+      let along = o.s - car.s;
+      if (along > half) along -= track.length; else if (along < -half) along += track.length;
+      const overlapAlong = hl + o.halfDepth - Math.abs(along);
+      if (overlapAlong <= 0) continue;
+      const r = T.reactions[o.reaction];
+      if (!r) continue;
+      const spinning = car.state === CAR_STATE.SPIN;
+      const impact = spinning ? Math.hypot(car.velX, car.velZ) : Math.abs(car.speed);
+      if (r.kind === 'break' && o.profile === INTERACTION.BREAKABLE) {
+        state[k] = 1; hits++;
+        if (emit) emit('object', car.index, impact, k);
+        if (spinning) { car.velX *= r.speedKeep; car.velZ *= r.speedKeep; }
+        else { car.speed *= r.speedKeep; car.bumpClock = car.clock; car.bumpStrength = r.jolt; }
+        continue;
+      }
+      // ---- rigid object: take the car out of the volume, by the shorter way
+      const glancing = overlapAcross < r.glanceOverlap;
+      const loud = impact > T.quietSpeed && cooldown[i] <= 0;
+      if (glancing) {
+        shiftCar(car, track, 0, -Math.sign(across || 1) * overlapAcross);
+        if (spinning) { car.velX *= r.glanceKeep; car.velZ *= r.glanceKeep; }
+        else if (loud) { car.speed *= r.glanceKeep; car.vLat = -Math.sign(across || 1) * Math.min(3, impact * 0.08); car.bumpClock = car.clock; car.bumpStrength = 0.7; }
+        if (loud) { hits++; cooldown[i] = T.repeatDelay; if (emit) emit('object', car.index, impact * 0.5, k); }
+        continue;
+      }
+      // square hit: back to the face of the object, most of the speed lost
+      const forward = spinning ? Math.sign(along || 1) : Math.sign(car.speed || 1) * Math.sign(Math.cos(car.headingError) || 1);
+      shiftCar(car, track, -Math.sign(along || forward) * overlapAlong, 0);
+      if (spinning) { car.velX *= r.stopKeep; car.velZ *= r.stopKeep; }
+      else {
+        car.speed *= r.stopKeep; car.yawRate *= 0.3;
+        if (loud) { car.bumpClock = car.clock; car.bumpStrength = 1; }
+      }
+      if (loud) {
+        hits++; cooldown[i] = T.repeatDelay;
+        if (emit) emit('object', car.index, impact, k);
+        if (!spinning && impact >= r.spinSpeed) startSpin(car, impact * 0.35, across >= 0 ? -1 : 1, emit);
+      }
+    }
+  }
+  return hits;
+}
+
+__modules["src/physics/trackside-contacts.js"] = { passesUnder, collideTracksideObjects };
+})();
 // ---- src/tracks/themes.js
 (function () {
 // Circuit themes: the *logical* scenery recipe of each environment (which kinds of trees,
@@ -3573,6 +4217,7 @@ const { Random, hashString } = __modules["src/core/random.js"];
 const { mod } = __modules["src/core/math.js"];
 const { VERGE } = __modules["src/tracks/track-builder.js"];
 const { getTheme } = __modules["src/tracks/themes.js"];
+const { placeTracksideObjects, collectInteractiveObjects, tracksideSettings } = __modules["src/tracks/trackside-objects.js"];
 
 /** Variants available per logical family (the art library provides `${family}.${index}`). */
 const VARIANTS = {
@@ -3593,8 +4238,10 @@ function pickWeighted(rng, table) {
  *   strips: object[], stripsAt: number[][], props: object[], propStart: Int32Array,
  *   theme: object }}
  * strip: { id, side, from, count, offset, absolute, base, height, tile, phase }
- * prop:  { id, s, d, sample, scale, flip, reach, solidHalfWidth, obstacle }  (reach: draw distance in metres;
- *         obstacle: index in `obstacles` when the object is solid, else -1)
+ * prop:  { id, s, d, sample, scale, flip, reach, solidHalfWidth, obstacle, interactive, object }  (reach: draw
+ *         distance in metres; obstacle: index in `obstacles` when the object is a validated solid board, else -1;
+ *         object: index in `objects`, the EXPERIMENTAL interactive objects of trackside-objects.js, else -1)
+ * Also returned: obstacles (validated boards), objects (experimental, empty by default), trackside (tunnels, gantries).
  */
 function buildSceneryLayout(track) {
   const theme = getTheme(track.theme);
@@ -3622,7 +4269,7 @@ function buildSceneryLayout(track) {
   };
   const addProp = (id, s, d, opt = {}) => {
     props.push({ id, s: mod(s, length), d, sample: Math.floor(mod(s, length) / ds) % n, scale: opt.scale ?? 1, flip: !!opt.flip, reach: opt.reach ?? 1300,
-      solidHalfWidth: opt.solidHalfWidth ?? 0, obstacle: -1 });
+      solidHalfWidth: opt.solidHalfWidth ?? 0, obstacle: -1, interactive: !!opt.interactive, object: -1 });
   };
   const barrierOf = (side, i) => (side > 0 ? track.barrierR[i] : track.barrierL[i]);
   const vergeOf = (side, i) => (side > 0 ? track.vergeR[i] : track.vergeL[i]);
@@ -3802,6 +4449,11 @@ function buildSceneryLayout(track) {
     addProp(`crowd.group.${rng.int(0, VARIANTS['crowd.group'] - 1)}`, i * ds, side * (barrierOf(side, i) + 2.2 + rng.next() * 2), { flip: rng.chance(0.5), reach: 400 });
   });
 
+  // ---- trackside objects added on top of the above (trackside-objects.js): own random sequence, nothing above moves
+  const settings = tracksideSettings(track);
+  const trackside = settings.scenery === 'classic' ? { tunnels: [], gantries: [], cover: null }
+    : placeTracksideObjects({ track, theme, props, addProp, addStrip, barrierOf, vergeOf, inPitWall, blocked, tall }, settings);
+
   // ---- index props by sample (sorted along the track inside each sample)
   props.sort((a, b) => a.sample - b.sample || a.s - b.s);
   const propStart = new Int32Array(n + 1);
@@ -3814,7 +4466,9 @@ function buildSceneryLayout(track) {
     prop.obstacle = obstacles.length;
     obstacles.push({ index: obstacles.length, prop: index, s: prop.s, d: prop.d, halfWidth: prop.solidHalfWidth });
   });
-  return { strips, stripsAt, props, propStart, theme, obstacles };
+  // EXPERIMENTAL interactive objects (none unless asked for): a separate list with its own reactions
+  const objects = settings.scenery === 'classic' ? [] : collectInteractiveObjects(track, props, settings);
+  return { strips, stripsAt, props, propStart, theme, obstacles, objects, trackside };
 }
 
 /** Layout of a track, built once (the race and the renderer must see the same objects). */
@@ -4160,6 +4814,7 @@ const { BASE_CAR_SPEC, DRIVING_PROFILES, deriveCarParams, sanitizeSetup } = __mo
 const { CAR_STATE, createCarState, placeCar, stepCar } = __modules["src/physics/car-physics.js"];
 const { resolveCarContacts, updateDrafts } = __modules["src/physics/collisions.js"];
 const { collideObstacles } = __modules["src/physics/obstacles.js"];
+const { collideTracksideObjects } = __modules["src/physics/trackside-contacts.js"];
 const { getSceneryLayout } = __modules["src/tracks/scenery-layout.js"];
 const { gridSlot, pitBox, relativeS } = __modules["src/tracks/track-builder.js"];
 const { DIFFICULTY_LEVELS, makeAiSkill } = __modules["src/ai/driver-profiles.js"];
@@ -4210,6 +4865,10 @@ class Race {
     // solid roadside objects of this track, and which ones have been knocked down in this race
     this.obstacles = getSceneryLayout(this.track).obstacles;
     this.obstacleDown = new Uint8Array(this.obstacles.length);
+    // EXPERIMENTAL interactive trackside objects (tracks/trackside-objects.js): none unless the circuit was built with them
+    this.objects = getSceneryLayout(this.track).objects || [];
+    this.objectState = new Uint8Array(this.objects.length);
+    this.objectCooldown = new Float32Array(config.entries.length);
     this.events = Array.from({ length: MAX_EVENTS }, () => ({ type: '', car: 0, value: 0, other: -1 }));
     this.eventCount = 0;
     this.emit = (type, car, value = 0, other = -1) => {
@@ -4285,6 +4944,7 @@ class Race {
     for (let i = 0; i < n; i++) if (!cars[i].removed) stepCar(cars[i], this.track, dt, this.rules, this.emit);
     resolveCarContacts(cars, this.rules, this.time, this.emit);
     if (this.obstacles.length) collideObstacles(cars, this.track, this.obstacles, this.obstacleDown, this.emit);
+    if (this.objects.length) collideTracksideObjects(cars, this.track, this.objects, this.objectState, this.objectCooldown, dt, this.emit);
     for (let i = 0; i < n; i++) {
       const car = cars[i];
       if (car.removed) continue;
@@ -7538,6 +8198,9 @@ class SceneBuilder {
   reset(race, track, layout, palette) {
     this.track = track; this.layout = layout;
     this.obstacleDown = race.obstacleDown || null;
+    // trackside objects (tracks/trackside-objects.js): state of the experimental interactive ones, shade over the road
+    this.objectState = race.objectState || null;
+    this.cover = layout.trackside ? layout.trackside.cover : null;
     // light of the place over the cars and the cockpit; colours of the rear view in the mirrors
     this.ambient = hexToRgb(palette.ambient);
     this.mirror = {
@@ -7559,6 +8222,7 @@ class SceneBuilder {
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
       prop.lights = prop.id === 'gantry.start';
+      prop.spans = /^tunnel\./.test(prop.id);            // a tunnel mouth or rib is drawn right up to the camera
     }
     // order the strips of every sample from the farthest from the road to the nearest
     const dist = (s, i) => (s.absolute ? s.offset - (s.side > 0 ? track.barrierR[i] : track.barrierL[i]) : s.offset);
@@ -7760,16 +8424,19 @@ class SceneBuilder {
     for (let q = start; q !== end; q += inc) {
       const prop = layout.props[q];
       if (prop.slot !== slot || (prop.obstacle >= 0 && this.obstacleDown && this.obstacleDown[prop.obstacle])) continue;
+      if (prop.object >= 0 && this.objectState && this.objectState[prop.object] === 2) continue;      // (taken away by the test bench)
       const z = depthOf(p, prop.s);
       const reach = prop.reach < reachLimit ? prop.reach : reachLimit;
       if (z < 1.2 || z > reach * detail) continue;
       if (!projectAtDepth(p, z, prop.d, 0, pt)) continue;
       const sp = prop.sprite;
-      const w = sp.worldW * prop.scale * pt.scale, h = sp.worldH * prop.scale * pt.scale;
+      let w = sp.worldW * prop.scale * pt.scale, h = sp.worldH * prop.scale * pt.scale;
+      // an experimental object that was knocked down stays where it fell, lying flat
+      if (prop.object >= 0 && this.objectState && this.objectState[prop.object] === 1) { h *= 0.2; w *= 1.08; }
       if (h < 3 || pt.x + w * 0.5 < 0 || pt.x - w * 0.5 > W) continue;
       // fade in at the limit of the draw distance instead of popping; an object the camera is right
       // against would be drawn far above the size it was inked at, so it is left out
-      if (h > (sp.h || h) * 2.4) continue;                 // (dropped outright: a half-faded object reads as a ghost)
+      if (h > (sp.h || h) * 2.4 && !prop.spans) continue;   // (dropped outright: a half-faded object reads as a ghost; what spans the road is kept: the car passes under it)
       const fade = z > reach * detail - 60 ? (reach * detail - z) / 60 : 1;
       quads.sprite(sp, pt.x - w * 0.5, pt.y - h, w, h, 1, 1, 1, fade, z, prop.flip);
       if (prop.lights && this.lamps && z < 400) {
@@ -7804,6 +8471,9 @@ class SceneBuilder {
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
     const clipZ = z > 3.4 ? z - 2.9 : 0.5;                 // clip test at the car's near end: the drawing extends in front of its centre
     const att = flightAttitude(car, attitude);
+    // a car under a bridge or in a tunnel is in the shade (no such place: the light is untouched)
+    const lit = this.cover && car.segIndex >= 0 ? 1 - this.cover[car.segIndex] * 0.5 : 1;
+    const ambR = this.ambient[0] * lit, ambG = this.ambient[1] * lit, ambB = this.ambient[2] * lit;
     if (car.airHeight > 0.02 || att.squash !== 1 || att.pitch !== 0) {
       // a car in an accident: its shadow stays on the road under it, and the drawing takes the attitude
       // of the flight (nose up then down, the side that was hit lifted, flattened as it lands)
@@ -7822,11 +8492,11 @@ class SceneBuilder {
       const x0 = left - ax, x1 = left + w - ax, y0 = (top - ay) * tall, y1 = (top + h - ay) * tall;
       quads.quad(ax + x0 * cosP + y0 * sinP, ay - x0 * sinP + y0 * cosP, 1, ax + x1 * cosP + y0 * sinP, ay - x1 * sinP + y0 * cosP, 1,
         ax + x0 * cosP + y1 * sinP, ay - x0 * sinP + y1 * cosP, 1, ax + x1 * cosP + y1 * sinP, ay - x1 * sinP + y1 * cosP, 1,
-        u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, clipZ);
+        u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, ambR, ambG, ambB, ghost, clipZ);
       return;
     }
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
-      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, clipZ);
+      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, ambR, ambG, ambB, ghost, clipZ);
   }
 
   /** Cockpit and other per-view foreground drawings. */
@@ -9090,6 +9760,27 @@ const SCENERY_SPECS = [
   { id: 'strip.forest', kind: 'strip', w: 768, h: 576, tile: 8, worldH: 15 },
   { id: 'strip.cliff', kind: 'strip', w: 640, h: 576, tile: 8, worldH: 18 },
   { id: 'strip.facade', kind: 'strip', w: 768, h: 576, tile: 8, worldH: 15 },
+  // ---- trackside objects added by tracks/trackside-objects.js (drawings: trackside-objects-art.js)
+  { id: 'sign.chevron', kind: 'prop', w: 176, h: 192, worldW: 2.8, worldH: 3.05 },
+  { id: 'sign.turn', kind: 'prop', w: 128, h: 208, worldW: 1.75, worldH: 2.85 },
+  { id: 'sign.advert.low', variants: 3, kind: 'prop', w: 416, h: 192, worldW: 5.2, worldH: 2.4 },
+  { id: 'sign.advert.high', variants: 2, kind: 'prop', w: 352, h: 400, worldW: 5.7, worldH: 6.5 },
+  { id: 'gantry.banner', variants: 2, kind: 'prop', w: 1408, h: 440, worldW: 24, worldH: 7.5 },
+  { id: 'tunnel.portal', kind: 'prop', w: 1536, h: 496, worldW: 34, worldH: 11 },
+  { id: 'tunnel.arch', kind: 'prop', w: 768, h: 248, worldW: 34, worldH: 11 },
+  { id: 'tree.oak', kind: 'prop', w: 448, h: 448, worldW: 12, worldH: 12 },
+  { id: 'tree.poplar', kind: 'prop', w: 144, h: 464, worldW: 4.3, worldH: 14 },
+  { id: 'cactus', variants: 2, kind: 'prop', w: 144, h: 256, worldW: 2.4, worldH: 4.2 },
+  { id: 'boulder', variants: 2, kind: 'prop', w: 256, h: 176, worldW: 2.8, worldH: 1.9 },
+  { id: 'stones', variants: 2, kind: 'prop', w: 160, h: 56, worldW: 1.4, worldH: 0.5 },
+  { id: 'cone', kind: 'prop', w: 56, h: 88, worldW: 0.5, worldH: 0.78 },
+  { id: 'marker.post', kind: 'prop', w: 40, h: 104, worldW: 0.42, worldH: 1.1 },
+  { id: 'tyrestack', kind: 'prop', w: 136, h: 120, worldW: 1.4, worldH: 1.25 },
+  { id: 'haybale', kind: 'prop', w: 176, h: 96, worldW: 1.8, worldH: 0.98 },
+  { id: 'barrel', kind: 'prop', w: 88, h: 112, worldW: 0.85, worldH: 1.1 },
+  { id: 'strip.tufts', kind: 'strip', w: 512, h: 72, tile: 4, worldH: 0.55 },
+  { id: 'strip.sandbank', kind: 'strip', w: 512, h: 72, tile: 4, worldH: 0.55 },
+  { id: 'strip.tunnelwall', kind: 'strip', w: 512, h: 416, tile: 8, worldH: 13 },
 ];
 
 /** Expand families into individual entries: [{ id, family, variant, ...spec }]. */
@@ -10762,6 +11453,445 @@ const BUILDING_PAINTERS = {
 
 __modules["src/art/environments/buildings.js"] = { BUILDING_PAINTERS };
 })();
+// ---- src/art/environments/trackside-objects-art.js
+(function () {
+// Drawings of the trackside objects of tracks/trackside-objects.js: direction boards, advertising
+// boards of the fictional sponsors of the game, gantries, tunnel portal and vault, lone trees and
+// plants, rocks, small accessories, and the strips at the foot of the barriers.
+// Same rules as trackside.js: painters have the signature (ctx, w, h, P, rnd, variant, spec), props
+// stand on the bottom edge, light comes from the upper left, ink contour under flat colours.
+// Every drawing is original; nothing here copies a sign, a brand or an illustration of another game.
+// To replace one, register another painter for the same family (scenery-painters.js).
+
+const { LINE, tracePolygon, clipped, brushStroke } = __modules["src/art/styles/ink.js"];
+const { mixHex, shadeHex, lightHex } = __modules["src/art/palettes/palettes.js"];
+const { groundShadow, foliageMass, grassTuft, ringPoints, inkUnion, trunk } = __modules["src/art/environments/vegetation.js"];
+const { inkGroup, inkTubes, contour, fillRect, fillPoly, fillTrace, fillEllipse, inkLine, label, sponsorPanel, roundRectPath, latticeMembers, drawLattice, wrapped } = __modules["src/art/environments/trackside.js"];
+
+const jit = (rnd, amount) => (rnd() - 0.5) * 2 * amount;
+const steelPosts = (ctx, P, k, xs, y0, y1, width = 7) => inkTubes(ctx, P, [{ paths: xs.map((x) => [[x, y0], [x, y1]]), width: width * k, fill: P.metal, light: P.metalLight, shade: P.metalShade }], LINE.form * k, 'butt');
+const strokePath = (ctx, trace, color, width) => { ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.beginPath(); trace(ctx); ctx.stroke(); };
+
+/** Board with two chevrons pointing to the right (drawn mirrored for a left-hand bend), on two posts. */
+function chevronSign(ctx, w, h, P) {
+  const k = w / 176, ground = h - 6 * k, bx = 8 * k, by = 8 * k, bw = 160 * k, bh = 116 * k, red = P.banners[0];
+  groundShadow(ctx, w / 2 + 8 * k, ground, 70 * k, 5 * k);
+  steelPosts(ctx, P, k, [44 * k, 132 * k], by + bh - 6 * k, ground - 2 * k);
+  const face = (g) => roundRectPath(g, bx, by, bw, bh, 8 * k);
+  contour(ctx, face, P.ink, LINE.silhouette * k, 1, 'round');
+  fillTrace(ctx, face, P.paint);
+  clipped(ctx, face, () => {
+    fillPoly(ctx, [[bx + bw * 0.45, by + bh], [bx + bw, by + bh * 0.45], [bx + bw, by + bh]], shadeHex(P.paint, 0.14));
+    for (const x0 of [18, 82]) {
+      const x = bx + x0 * k, y = by + 16 * k, a = 34 * k, t = 30 * k, hh = bh - 32 * k;
+      const arrow = [[x, y], [x + t, y], [x + t + a, y + hh / 2], [x + t, y + hh], [x, y + hh], [x + a, y + hh / 2]];
+      fillPoly(ctx, arrow, red);
+      fillPoly(ctx, [[x + a, y + hh / 2], [x + t + a, y + hh / 2], [x + t, y + hh], [x, y + hh]], shadeHex(red, 0.24));
+      strokePath(ctx, (g) => tracePolygon(g, arrow), P.ink, LINE.detail * k);
+    }
+  });
+  strokePath(ctx, (g) => roundRectPath(g, bx + 5 * k, by + 5 * k, bw - 10 * k, bh - 10 * k, 5 * k), P.ink, LINE.hair * k * 1.4);
+  for (const x of [44 * k, 132 * k]) for (const y of [by + 5 * k, by + bh - 5 * k]) fillEllipse(ctx, x, y, 1.7 * k, 1.7 * k, P.ink);
+}
+
+/** Direction sign before a bend: blue panel, white arrow bending to the right, on one post. */
+function turnSign(ctx, w, h, P) {
+  const k = w / 128, ground = h - 6 * k, bx = 10 * k, by = 8 * k, bw = 108 * k, bh = 116 * k, blue = P.banners[2];
+  groundShadow(ctx, w / 2 + 6 * k, ground, 34 * k, 4.5 * k);
+  steelPosts(ctx, P, k, [w / 2], by + bh - 6 * k, ground - 2 * k, 8);
+  inkGroup(ctx, P, [{ r: [w / 2 - 11 * k, ground - 5 * k, 22 * k, 5 * k], fill: P.metalShade }], LINE.detail * k);
+  const face = (g) => roundRectPath(g, bx, by, bw, bh, 12 * k);
+  contour(ctx, face, P.ink, LINE.silhouette * k, 1, 'round');
+  fillTrace(ctx, face, blue);
+  clipped(ctx, face, () => {
+    fillPoly(ctx, [[bx + bw * 0.4, by + bh], [bx + bw, by + bh * 0.5], [bx + bw, by + bh]], shadeHex(blue, 0.26));
+    fillRect(ctx, bx, by, bw, 3 * k, lightHex(blue, 0.3));
+  });
+  // the arrow: a stem coming up, bending to the right, with a head
+  const stem = [[bx + 34 * k, by + bh - 16 * k], [bx + 34 * k, by + 52 * k], [bx + 44 * k, by + 40 * k], [bx + 66 * k, by + 40 * k]];
+  for (const [color, width] of [[P.ink, 19 * k], [P.paint, 14 * k]]) {
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.moveTo(stem[0][0], stem[0][1]); for (const p of stem.slice(1)) ctx.lineTo(p[0], p[1]); ctx.stroke();
+  }
+  const head = [[bx + 62 * k, by + 20 * k], [bx + 94 * k, by + 40 * k], [bx + 62 * k, by + 60 * k]];
+  inkGroup(ctx, P, [{ p: head, fill: P.paint }], LINE.detail * k, 0, 'round');
+  strokePath(ctx, (g) => roundRectPath(g, bx + 6 * k, by + 6 * k, bw - 12 * k, bh - 12 * k, 8 * k), P.paint, LINE.detail * k * 1.6);
+}
+
+const LOW_BOARDS = [['orvane', 'gommex'], ['keltor'], ['nitral', 'solgane']];
+/** Advertising board on short posts: one or two panels of fictional sponsors in a galvanised frame. */
+function advertLow(ctx, w, h, P, rnd, variant) {
+  const k = w / 416, ground = h - 6 * k, bx = 8 * k, by = 14 * k, bw = 400 * k, bh = 118 * k, names = LOW_BOARDS[variant % LOW_BOARDS.length];
+  groundShadow(ctx, w / 2 + 12 * k, ground, 190 * k, 6 * k);
+  const posts = [52 * k, w / 2, w - 52 * k];
+  steelPosts(ctx, P, k, posts, by + bh - 4 * k, ground - 2 * k, 8);
+  // raking struts behind
+  inkTubes(ctx, P, [{ paths: [[[posts[0], by + bh + 6 * k], [posts[0] + 26 * k, ground - 3 * k]], [[posts[2], by + bh + 6 * k], [posts[2] - 26 * k, ground - 3 * k]]], width: 4 * k, fill: P.metalShade }], LINE.detail * k, 'butt');
+  inkGroup(ctx, P, [{ r: [bx, by, bw, bh], fill: P.metal }], LINE.silhouette * k);
+  const pw = (bw - 12 * k) / names.length;
+  names.forEach((id, i) => {
+    const x = bx + 6 * k + i * pw;
+    sponsorPanel(ctx, P, id, x, by + 6 * k, pw - (i < names.length - 1 ? 4 * k : 0), bh - 12 * k);
+    strokePath(ctx, (g) => g.rect(x, by + 6 * k, pw - (i < names.length - 1 ? 4 * k : 0), bh - 12 * k), P.ink, LINE.detail * k);
+  });
+  fillRect(ctx, bx, by, bw, 2.5 * k, P.metalLight);
+}
+
+const HIGH_BOARDS = ['brizal', 'montevo'];
+/** Advertising board on tall lattice posts, seen from far over the barriers. */
+function advertHigh(ctx, w, h, P, rnd, variant) {
+  const k = w / 352, ground = h - 6 * k, bx = 8 * k, by = 10 * k, bw = 336 * k, bh = 150 * k;
+  groundShadow(ctx, w / 2 + 14 * k, ground, 150 * k, 6 * k);
+  const legs = [[70 * k, 96 * k], [256 * k, 282 * k]].map(([x0, x1]) => latticeMembers([x0, ground - 4 * k], [x0, by + bh - 2 * k], [x1, ground - 4 * k], [x1, by + bh - 2 * k], 6, 'x'));
+  drawLattice(ctx, P, legs, 6 * k, 3 * k, null, LINE.form * k);
+  for (const x of [64 * k, 250 * k]) { inkGroup(ctx, P, [{ r: [x, ground - 9 * k, 38 * k, 9 * k], fill: P.concrete }], LINE.form * k); fillRect(ctx, x, ground - 9 * k, 38 * k, 2.4 * k, P.concreteLight); }
+  inkGroup(ctx, P, [{ r: [bx, by, bw, bh], fill: P.metal }], LINE.silhouette * k);
+  sponsorPanel(ctx, P, HIGH_BOARDS[variant % HIGH_BOARDS.length], bx + 7 * k, by + 7 * k, bw - 14 * k, bh - 14 * k, { size: 0.42 });
+  strokePath(ctx, (g) => g.rect(bx + 7 * k, by + 7 * k, bw - 14 * k, bh - 14 * k), P.ink, LINE.detail * k);
+  fillPoly(ctx, [[bx + bw * 0.6, by + bh - 7 * k], [bx + bw - 7 * k, by + bh * 0.55], [bx + bw - 7 * k, by + bh - 7 * k]], 'rgba(22,22,36,0.16)');
+  // lamps on brackets above the board
+  for (const x of [bx + bw * 0.25, bx + bw * 0.5, bx + bw * 0.75]) { inkLine(ctx, x, by, x + 6 * k, by - 7 * k, LINE.detail * k, P.ink); fillEllipse(ctx, x + 8 * k, by - 7 * k, 4 * k, 2.6 * k, P.ink); }
+}
+
+const GANTRY_SPONSORS = [['virage', 'turbal', 'freinor'], ['pistona', 'korvex']];
+/**
+ * Race gantry over the road. 0: box truss on two lattice towers carrying three boards.
+ * 1: a gate of fat painted tubes with a banner. Towers centred 10.6 m from the middle, 5.3 m of clearance.
+ */
+function bannerGantry(ctx, w, h, P, rnd, variant) {
+  const k = w / 1408, ground = h - 6 * k, tw = 52 * k, xl = 56 * k, xr = w - 56 * k - tw, beamTop = 22 * k, beamBot = 123 * k;
+  for (const x of [xl, xr]) groundShadow(ctx, x + tw / 2 + 12 * k, ground, 60 * k, 6 * k);
+  const names = GANTRY_SPONSORS[variant % 2];
+  if (variant % 2 === 0) {
+    const towers = [xl, xr].map((x) => latticeMembers([x, ground - 16 * k], [x, beamBot], [x + tw, ground - 16 * k], [x + tw, beamBot], 5, 'x'));
+    drawLattice(ctx, P, towers, 8 * k, 3.6 * k, null, LINE.form * k);
+    const beam = latticeMembers([xl - 6 * k, beamTop], [xr + tw + 6 * k, beamTop], [xl - 6 * k, beamBot], [xr + tw + 6 * k, beamBot], 18, 'zig');
+    drawLattice(ctx, P, [beam], 9 * k, 4.4 * k, null, LINE.form * k);
+    for (const x of [xl, xr]) {
+      inkGroup(ctx, P, [{ r: [x - 12 * k, ground - 18 * k, tw + 24 * k, 18 * k], fill: P.concrete }], LINE.silhouette * k);
+      fillRect(ctx, x - 12 * k, ground - 18 * k, tw + 24 * k, 4 * k, P.concreteLight);
+      for (let i = 0; i < 4; i++) fillRect(ctx, x - 12 * k + (i * (tw + 24 * k)) / 4, ground - 14 * k, (tw + 24 * k) / 4, 6 * k, i % 2 ? P.kerbB : P.kerbA);
+    }
+    const bx = 190 * k, bw = (w - 380 * k) / names.length, by = beamTop + 8 * k, bh = beamBot - beamTop - 16 * k;
+    names.forEach((id, i) => {
+      const x = bx + i * bw + 8 * k;
+      inkGroup(ctx, P, [{ r: [x, by, bw - 16 * k, bh], fill: P.paint }], LINE.form * k);
+      sponsorPanel(ctx, P, id, x + 3 * k, by + 3 * k, bw - 22 * k, bh - 6 * k);
+    });
+  } else {
+    // two legs and a lintel made of one fat tube, striped at the feet
+    const tube = paintTonesOf(P.banners[1]), r = 26 * k, y = beamTop + 30 * k;
+    const gate = (g) => { g.moveTo(xl + tw / 2, ground - 4 * k); g.lineTo(xl + tw / 2, y + 60 * k); g.quadraticCurveTo(xl + tw / 2, y, xl + tw / 2 + 70 * k, y); g.lineTo(xr + tw / 2 - 70 * k, y); g.quadraticCurveTo(xr + tw / 2, y, xr + tw / 2, y + 60 * k); g.lineTo(xr + tw / 2, ground - 4 * k); };
+    for (const [color, width, dy] of [[P.ink, 2 * r + LINE.silhouette * 2 * k, 0], [P.ink, 2 * r + LINE.silhouette * 2 * k, 2.4 * k], [tube.base, 2 * r, 0]]) {
+      ctx.save(); ctx.translate(dy * 0.4, dy); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.lineCap = 'butt'; ctx.beginPath(); gate(ctx); ctx.stroke(); ctx.restore();
+    }
+    ctx.save(); ctx.translate(-r * 0.42, -r * 0.42); ctx.strokeStyle = tube.light; ctx.lineWidth = r * 0.36; ctx.beginPath(); gate(ctx); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.translate(r * 0.46, r * 0.46); ctx.strokeStyle = tube.shade; ctx.lineWidth = r * 0.4; ctx.beginPath(); gate(ctx); ctx.stroke(); ctx.restore();
+    for (const x of [xl + tw / 2, xr + tw / 2]) {
+      for (let i = 0; i < 4; i++) { fillRect(ctx, x - r, ground - 4 * k - (i + 1) * 26 * k, 2 * r, 13 * k, P.ink); }
+      inkGroup(ctx, P, [{ r: [x - r - 10 * k, ground - 10 * k, 2 * r + 20 * k, 10 * k], fill: P.concreteShade }], LINE.form * k);
+    }
+    // banner hung under the lintel
+    const bx = 250 * k, bw = w - 500 * k, by = y + r + 6 * k, bh = beamBot - by - 2 * k + 14 * k;
+    ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.detail * k; ctx.beginPath();
+    for (const x of [bx + 20 * k, bx + bw / 2, bx + bw - 20 * k]) { ctx.moveTo(x, y + r - 2 * k); ctx.lineTo(x, by + 2 * k); }
+    ctx.stroke();
+    inkGroup(ctx, P, [{ r: [bx, by, bw, bh], fill: P.paint }], LINE.form * k);
+    const pw = bw / names.length;
+    names.forEach((id, i) => sponsorPanel(ctx, P, id, bx + i * pw + 3 * k, by + 3 * k, pw - 6 * k, bh - 6 * k));
+    inkLine(ctx, bx + pw, by, bx + pw, by + bh, LINE.detail * k, P.ink);
+  }
+}
+function paintTonesOf(hex) { return { light: lightHex(hex, 0.32), base: hex, shade: shadeHex(hex, 0.3) }; }
+
+/** Shape of the opening of a tunnel (world: 28.4 m wide, 5.8 m high, flat vault with rounded haunches). */
+function tunnelOpening(g, w, h, k, ground) {
+  const x0 = w / 2 - 14.2 * 45.18 * k, x1 = w / 2 + 14.2 * 45.18 * k, top = ground - 5.8 * 45.18 * k, r = 60 * k;
+  g.moveTo(x0, ground + 4 * k); g.lineTo(x0, top + r); g.quadraticCurveTo(x0, top, x0 + r, top); g.lineTo(x1 - r, top); g.quadraticCurveTo(x1, top, x1, top + r); g.lineTo(x1, ground + 4 * k); g.closePath();
+}
+
+/** Tunnel mouth: concrete face with a striped arch ring, set in a bank of rock and grass. The opening is empty. */
+function tunnelPortal(ctx, w, h, P, rnd) {
+  const k = w / 1536, ground = h - 4 * k;
+  const face = (g) => { g.rect(0, 30 * k, w, ground - 30 * k); };
+  const ring = (g) => { const s = 1.07; g.save?.(); tunnelOpening(g, w, h, k, ground); };
+  const stone = paintTonesOf(P.concrete), bank = [P.rockShade, P.rock, P.rockLight];
+  // the bank: an irregular top edge
+  const crest = [[0, 64 * k]];
+  for (let x = 0; x <= w; x += 96 * k) crest.push([x + jit(rnd, 20 * k), (30 + rnd() * 34) * k]);
+  crest.push([w, 64 * k], [w, ground], [0, ground]);
+  ctx.save();
+  ctx.beginPath(); tracePolygon(ctx, crest); tunnelOpening(ctx, w, h, k, ground); ctx.clip('evenodd');
+  ctx.fillStyle = bank[1]; ctx.fillRect(0, 0, w, h);
+  // strata and grass on top
+  for (let i = 0; i < 9; i++) { const y = (70 + i * 22 + jit(rnd, 5)) * k; brushStroke(ctx, [[jit(rnd, 30 * k), y], [w * 0.33, y + jit(rnd, 9 * k)], [w * 0.66, y + jit(rnd, 9 * k)], [w, y + jit(rnd, 6 * k)]], LINE.detail * k * 1.2, { color: i % 3 ? P.rockShade : P.rockDeep, taper: 0.1, swell: 0.3, seed: i }); }
+  ctx.fillStyle = P.grassDark; ctx.beginPath(); tracePolygon(ctx, crest.slice(0, crest.length - 2).concat([[w, 84 * k], [0, 84 * k]])); ctx.fill();
+  ctx.fillStyle = P.grassA; ctx.beginPath(); tracePolygon(ctx, crest.slice(0, crest.length - 2).concat([[w, 70 * k], [0, 70 * k]])); ctx.fill();
+  // concrete face around the opening
+  const fx0 = w / 2 - 16.6 * 45.18 * k, fx1 = w / 2 + 16.6 * 45.18 * k, ftop = ground - 8.3 * 45.18 * k;
+  fillRect(ctx, fx0, ftop, fx1 - fx0, ground - ftop, stone.base);
+  fillRect(ctx, fx0, ftop, fx1 - fx0, 8 * k, stone.light);
+  fillPoly(ctx, [[fx0 + (fx1 - fx0) * 0.5, ground], [fx1, ftop + 40 * k], [fx1, ground]], stone.shade);
+  for (let x = fx0 + 80 * k; x < fx1 - 20 * k; x += 118 * k) inkLine(ctx, x, ftop + 8 * k, x, ground, LINE.hair * k * 1.3, P.concreteShade);
+  inkLine(ctx, fx0, ftop + 52 * k, fx1, ftop + 52 * k, LINE.detail * k, P.ink);
+  strokePath(ctx, (g) => g.rect(fx0, ftop, fx1 - fx0, ground - ftop + 8 * k), P.ink, LINE.silhouette * k);
+  ctx.restore();
+  // arch ring in warning stripes, then the ink edge of the opening
+  ctx.save();
+  ctx.beginPath(); tunnelOpening(ctx, w, h, k, ground); ctx.lineWidth = 40 * k; ctx.strokeStyle = P.ink; ctx.stroke();
+  ctx.lineWidth = 32 * k; ctx.strokeStyle = P.banners[1]; ctx.setLineDash([34 * k, 34 * k]); ctx.stroke();
+  ctx.restore();
+  // what is behind the ring inside the mouth stays empty: punch the opening out again, keeping the inner ink line
+  ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); tunnelOpening(ctx, w, h, k, ground); ctx.fill(); ctx.restore();
+  strokePath(ctx, (g) => tunnelOpening(g, w, h, k, ground), P.ink, LINE.silhouette * k * 1.5);
+  // a lamp row on the lintel and the name plate of the tunnel
+  const top = ground - 5.8 * 45.18 * k;
+  inkGroup(ctx, P, [{ r: [w / 2 - 150 * k, top - 92 * k, 300 * k, 46 * k], fill: P.paint }], LINE.form * k);
+  label(ctx, 'TUNNEL', w / 2, top - 69 * k, 270 * k, 30 * k, { weight: 1.2, color: P.ink, slant: 0.06, seed: 5 });
+  void face; void ring; void bank;
+}
+
+/** One rib of the vault inside a tunnel: piers and a ceiling in shadow, lamps along the edge. The opening is empty. */
+function tunnelArch(ctx, w, h, P) {
+  const k = w / 1536, ground = h - 4 * k, dark = mixHex(P.concreteShade, P.ink, 0.55), darker = mixHex(P.concreteShade, P.ink, 0.74);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, w, ground + 4 * k); tunnelOpening(ctx, w, h, k, ground); ctx.clip('evenodd');
+  ctx.fillStyle = darker; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = dark; ctx.fillRect(0, ground - 6.6 * 45.18 * k, w, 0.8 * 45.18 * k);
+  ctx.restore();
+  strokePath(ctx, (g) => tunnelOpening(g, w, h, k, ground), P.ink, LINE.silhouette * k * 2);
+  const top = ground - 5.8 * 45.18 * k;
+  for (let i = -5; i <= 5; i++) { const x = w / 2 + i * 104 * k; fillEllipse(ctx, x, top - 12 * k, 15 * k, 7 * k, P.ink); fillEllipse(ctx, x, top - 12 * k, 11 * k, 4.5 * k, P.paintYellow || '#f0c330'); }
+}
+
+/** Wall of a tunnel, seen from the road: plinth, tiled wall with a lit band, then the dark of the vault. Tiles seamlessly. */
+function tunnelWall(ctx, w, h, P) {
+  const lit = (5.8 / 13) * h, y0 = h - lit, dark = mixHex(P.concreteShade, P.ink, 0.7), wall = mixHex(P.concrete, P.ink, 0.42), light = mixHex(P.concreteLight, P.ink, 0.2);
+  fillRect(ctx, 0, 0, w, y0 + 2, dark);
+  fillRect(ctx, 0, y0, w, lit, wall);
+  fillRect(ctx, 0, y0 + lit * 0.22, w, lit * 0.16, light);
+  fillRect(ctx, 0, y0 + lit * 0.22, w, 2, P.ink); fillRect(ctx, 0, y0 + lit * 0.38, w, 2, P.ink);
+  for (let x = 0; x < w; x += w / 8) { fillRect(ctx, x, y0, 1.6, lit * 0.78, mixHex(wall, P.ink, 0.5)); fillEllipse(ctx, x + w / 16, y0 + lit * 0.3, 14, 5, P.paintYellow || '#f0c330'); }
+  fillRect(ctx, 0, h - lit * 0.2, w, lit * 0.2, mixHex(P.concreteShade, P.ink, 0.35));
+  for (let x = 0; x < w; x += w / 8) fillRect(ctx, x, h - lit * 0.2, w / 16, lit * 0.07, mixHex(P.kerbA, P.ink, 0.3));
+  fillRect(ctx, 0, y0, w, 3, P.ink); fillRect(ctx, 0, h - lit * 0.2, w, 2, P.ink);
+}
+
+/** Lone oak: a short heavy trunk under a broad crown. */
+function oak(ctx, w, h, P, rnd) {
+  const k = w / 448, cx = w * 0.5, ground = h - 7 * k;
+  groundShadow(ctx, cx + 14 * k, ground, 170 * k, 9 * k);
+  trunk(ctx, cx, ground, h * 0.5, 30 * k, 22 * k, P, k, rnd, 4 * k);
+  inkTubes(ctx, P, [{ paths: [[[cx - 6 * k, h * 0.56], [cx - 70 * k, h * 0.4]], [[cx + 8 * k, h * 0.54], [cx + 78 * k, h * 0.42]]], width: 11 * k, fill: P.trunk, shade: P.trunkShade }], LINE.form * k);
+  const clumps = [[-0.52, 0.4, 0.36, 1], [0.5, 0.42, 0.38, 1], [0, 0.42, 0.44, 1], [-0.34, 0.24, 0.4], [0.32, 0.26, 0.42], [-0.62, 0.34, 0.26], [0.64, 0.33, 0.27], [0, 0.17, 0.4], [-0.14, 0.32, 0.36], [0.2, 0.36, 0.3]]
+    .map(([x, y, r, dark]) => ({ x: cx + (x + jit(rnd, 0.03)) * w * 0.5, y: (y + jit(rnd, 0.02)) * h, r: r * w * 0.5 * (0.95 + rnd() * 0.1), squash: 0.82, dark: !!dark }));
+  foliageMass(ctx, clumps, { ink: P.ink, shade: P.leafShade, base: P.leaf, light: P.leafLight, deep: P.leafDeep }, k, rnd, { density: 1.1 });
+  for (const x of [-0.3, 0.26]) grassTuft(ctx, cx + x * w * 0.5, h - 4 * k, 13 * k, P.ink, k, rnd);
+}
+
+/** Poplar: a tall narrow column of foliage on a thin trunk. */
+function poplar(ctx, w, h, P, rnd) {
+  const k = w / 144, cx = w * 0.5, ground = h - 6 * k;
+  groundShadow(ctx, cx + 8 * k, ground, 46 * k, 5.5 * k);
+  trunk(ctx, cx, ground, h * 0.72, 9 * k, 6 * k, P, k, rnd, 0);
+  const clumps = [];
+  for (let i = 0; i < 9; i++) {
+    const t = i / 8, y = h * (0.8 - t * 0.72), r = w * (0.36 - Math.abs(t - 0.38) * 0.2 - t * 0.1);
+    clumps.push({ x: cx + jit(rnd, 5 * k) + (i % 2 ? 7 : -7) * k, y, r: Math.max(12 * k, r), squash: 1.25, dark: i < 3 });
+  }
+  foliageMass(ctx, clumps, { ink: P.ink, shade: P.cypressShade, base: P.leaf, light: P.leafLight, deep: P.leafDeep }, k, rnd, { density: 1.2 });
+}
+
+/** Cactus. 0: a column with two arms; 1: a clump of flat pads with flowers. */
+function cactus(ctx, w, h, P, rnd, variant) {
+  const k = w / 144, cx = w * 0.5, ground = h - 6 * k, tones = { light: P.palmLight, base: P.palm, shade: P.palmShade };
+  groundShadow(ctx, cx + 8 * k, ground, 46 * k, 5.5 * k);
+  const ribs = (x, y0, y1, half) => { for (const dx of [-0.45, 0.1, 0.55]) brushStroke(ctx, [[x + dx * half, y0], [x + dx * half + k, (y0 + y1) / 2], [x + dx * half, y1]], LINE.hair * k * 1.5, { color: P.ink, taper: 0.35 }); };
+  if (variant % 2 === 0) {
+    const limb = (pts, width) => {
+      for (const [color, wd, dx] of [[P.ink, width + LINE.silhouette * 2 * k, 0], [tones.base, width, 0], [tones.light, width * 0.3, -width * 0.27], [tones.shade, width * 0.34, width * 0.3]]) {
+        ctx.save(); ctx.translate(dx, 0); ctx.strokeStyle = color; ctx.lineWidth = wd; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) ctx.lineTo(p[0], p[1]); ctx.stroke(); ctx.restore();
+      }
+    };
+    limb([[cx - 4 * k, h * 0.62], [cx - 40 * k, h * 0.62], [cx - 40 * k, h * 0.36]], 18 * k);
+    limb([[cx + 4 * k, h * 0.5], [cx + 42 * k, h * 0.5], [cx + 42 * k, h * 0.22]], 17 * k);
+    limb([[cx, ground - 2 * k], [cx, h * 0.1]], 30 * k);
+    ribs(cx, h * 0.16, ground - 10 * k, 15 * k); ribs(cx - 40 * k, h * 0.38, h * 0.58, 9 * k); ribs(cx + 42 * k, h * 0.26, h * 0.46, 8.5 * k);
+  } else {
+    const pads = [[0, 0.78, 30, 38], [-0.42, 0.6, 24, 30], [0.4, 0.58, 26, 32], [-0.1, 0.4, 24, 30], [0.5, 0.34, 18, 22], [-0.56, 0.36, 16, 20]];
+    const shapes = pads.map(([x, y, rx, ry]) => ringPoints(cx + x * w * 0.5, y * h, rx * k, ry * k, 12, 0.05, rnd));
+    inkUnion(ctx, (g) => { for (const s of shapes) tracePolygon(g, s); }, P.ink, LINE.silhouette, k);
+    shapes.forEach((s, i) => {
+      const [x, y, rx, ry] = pads[i], px = cx + x * w * 0.5, py = y * h;
+      ctx.beginPath(); tracePolygon(ctx, s); ctx.fillStyle = tones.base; ctx.fill();
+      clipped(ctx, (g) => tracePolygon(g, s), () => { fillEllipse(ctx, px - rx * k * 0.3, py - ry * k * 0.3, rx * k * 0.7, ry * k * 0.7, tones.light); fillEllipse(ctx, px + rx * k * 0.55, py + ry * k * 0.5, rx * k * 0.8, ry * k * 0.8, tones.shade); });
+      strokePath(ctx, (g) => tracePolygon(g, s), P.ink, LINE.detail * k);
+      for (let q = 0; q < 5; q++) fillEllipse(ctx, px + jit(rnd, rx * k * 0.6), py + jit(rnd, ry * k * 0.6), 1.1 * k, 1.1 * k, P.ink);
+      if (i > 2) { fillEllipse(ctx, px, py - ry * k, 5.5 * k, 5.5 * k, P.ink); fillEllipse(ctx, px, py - ry * k, 3.6 * k, 3.6 * k, P.banners[i % 2 ? 0 : 1]); }
+    });
+  }
+  for (const x of [-0.5, 0.44]) grassTuft(ctx, cx + x * w * 0.5, h - 4 * k, 9 * k, P.ink, k, rnd, P.dry);
+}
+
+const BOULDERS = [
+  { outline: [[14, 168], [8, 118], [40, 60], [104, 26], [176, 36], [232, 86], [246, 140], [236, 168]], light: [[40, 60], [104, 26], [176, 36], [150, 78], [70, 92]], shade: [[176, 36], [232, 86], [246, 140], [236, 168], [150, 168], [150, 78]] },
+  { outline: [[10, 168], [22, 104], [70, 50], [130, 58], [168, 30], [220, 70], [248, 132], [240, 168]], light: [[22, 104], [70, 50], [130, 58], [110, 104], [50, 120]], shade: [[168, 30], [220, 70], [248, 132], [240, 168], [164, 168], [140, 96], [130, 58]] },
+];
+/** Boulder: a faceted block with a lit top and a shaded flank. */
+function boulder(ctx, w, h, P, rnd, variant) {
+  const k = w / 256, b = BOULDERS[variant % 2], at = ([x, y]) => [x * k, h - (176 - y - 8) * k + 0];
+  const move = new Map(), pt = (p) => { const key = p.join(','); if (!move.has(key)) move.set(key, p[1] >= 160 ? at(p) : at([p[0] + jit(rnd, 5), p[1] + jit(rnd, 4)])); return move.get(key); };
+  groundShadow(ctx, w * 0.54, h - 7 * k, w * 0.46, 7 * k);
+  const outline = b.outline.map(pt);
+  inkUnion(ctx, (g) => tracePolygon(g, outline), P.ink, LINE.silhouette, k);
+  ctx.beginPath(); tracePolygon(ctx, outline); ctx.fillStyle = P.rock; ctx.fill();
+  clipped(ctx, (g) => tracePolygon(g, outline), () => {
+    fillPoly(ctx, b.light.map(pt), P.rockLight); fillPoly(ctx, b.shade.map(pt), P.rockShade);
+    for (let i = 0; i < 3; i++) { const p = pt(b.light[(i + 1) % b.light.length]); brushStroke(ctx, [p, [p[0] + (20 + rnd() * 30) * k, p[1] + (26 + rnd() * 30) * k]], LINE.detail * k * 1.1, { color: P.ink, taperStart: 0.1, taperEnd: 0.6, seed: i }); }
+  });
+  strokePath(ctx, (g) => tracePolygon(g, outline), P.ink, LINE.form * k);
+  for (const x of [30, 128, 218]) grassTuft(ctx, (x + jit(rnd, 8)) * k, h - 4 * k, (11 + rnd() * 5) * k, mixHex(P.ink, P.grassDark, 0.15), k, rnd, P.grassDark);
+}
+
+/** A few stones and a tuft: small things at the foot of the barriers. */
+function stones(ctx, w, h, P, rnd, variant) {
+  const k = w / 160, ground = h - 4 * k;
+  const list = variant % 2 ? [[34, 16, 12], [86, 22, 15], [128, 12, 9]] : [[26, 13, 10], [62, 9, 7], [104, 20, 14], [140, 10, 8]];
+  const shapes = list.map(([x, rx, ry]) => ringPoints(x * k, ground - ry * k * 0.7, rx * k, ry * k, 7, 0.14, rnd));
+  inkUnion(ctx, (g) => { for (const s of shapes) tracePolygon(g, s); }, P.ink, LINE.form, k);
+  shapes.forEach((s, i) => {
+    ctx.beginPath(); tracePolygon(ctx, s); ctx.fillStyle = P.rock; ctx.fill();
+    clipped(ctx, (g) => tracePolygon(g, s), () => { fillEllipse(ctx, list[i][0] * k - 3 * k, ground - list[i][2] * k * 1.2, list[i][1] * k * 0.7, list[i][2] * k * 0.6, P.rockLight); fillRect(ctx, list[i][0] * k + list[i][1] * k * 0.3, 0, w, h, P.rockShade); });
+  });
+  grassTuft(ctx, (variant % 2 ? 60 : 82) * k, h - 3 * k, 12 * k, mixHex(P.ink, P.grassDark, 0.15), k, rnd, P.grassDark);
+}
+
+/** Traffic cone on its square base. */
+function cone(ctx, w, h, P) {
+  const k = w / 56, ground = h - 4 * k, cx = w / 2, orange = paintTonesOf(P.banners[5]);
+  groundShadow(ctx, cx + 4 * k, ground, 24 * k, 3.5 * k);
+  const body = [[cx - 6 * k, 8 * k], [cx + 6 * k, 8 * k], [cx + 17 * k, ground - 7 * k], [cx - 17 * k, ground - 7 * k]];
+  inkGroup(ctx, P, [{ p: body, fill: orange.base }, { r: [cx - 23 * k, ground - 8 * k, 46 * k, 8 * k], fill: orange.shade }], LINE.form * k, 1, 'round');
+  clipped(ctx, (g) => tracePolygon(g, body), () => {
+    fillRect(ctx, cx + 2 * k, 0, w, h, orange.shade);
+    fillRect(ctx, 0, 30 * k, w, 12 * k, P.paint); fillRect(ctx, 0, 54 * k, w, 9 * k, P.paint);
+    fillRect(ctx, cx + 2 * k, 30 * k, w, 12 * k, shadeHex(P.paint, 0.18)); fillRect(ctx, cx + 2 * k, 54 * k, w, 9 * k, shadeHex(P.paint, 0.18));
+  });
+}
+
+/** Reflector post: a white stake with a dark band and a red reflector. */
+function markerPost(ctx, w, h, P) {
+  const k = w / 40, ground = h - 4 * k, cx = w / 2;
+  groundShadow(ctx, cx + 3 * k, ground, 14 * k, 2.6 * k);
+  const body = [[cx - 7 * k, ground], [cx - 7 * k, 12 * k], [cx + 7 * k, 6 * k], [cx + 7 * k, ground]];
+  inkGroup(ctx, P, [{ p: body, fill: P.paint }], LINE.form * k, 1, 'round');
+  clipped(ctx, (g) => tracePolygon(g, body), () => { fillRect(ctx, cx + 2 * k, 0, w, h, shadeHex(P.paint, 0.2)); fillPoly(ctx, [[0, 30 * k], [w, 22 * k], [w, 46 * k], [0, 54 * k]], P.ink); });
+  fillRect(ctx, cx - 4 * k, 31 * k, 8 * k, 12 * k, P.banners[0]);
+}
+
+/** Stack of tyres strapped together. */
+function tyreStack(ctx, w, h, P) {
+  const k = w / 136, ground = h - 5 * k, black = { light: lightHex(P.tyreLight, 0.22), base: P.tyreLight, shade: P.tyre };
+  groundShadow(ctx, w / 2 + 6 * k, ground, 62 * k, 5 * k);
+  const cols = [[36 * k, 4], [98 * k, 4], [67 * k, 3]];
+  for (const [cx, count] of cols) {
+    for (let i = 0; i < count; i++) {
+      const y = ground - (i + 0.5) * 25 * k - (count === 3 ? 4 * k : 0), rx = 31 * k, ry = 13.5 * k;
+      const tyre = (g) => { g.ellipse(cx, y, rx, ry, 0, 0, Math.PI * 2); };
+      contour(ctx, tyre, P.ink, LINE.form * k, 1, 'round');
+      fillEllipse(ctx, cx, y, rx, ry, black.base);
+      fillEllipse(ctx, cx - 3 * k, y - 4 * k, rx * 0.86, ry * 0.5, black.light);
+      fillEllipse(ctx, cx, y - 3 * k, rx * 0.5, ry * 0.42, P.ink);
+      fillEllipse(ctx, cx + 9 * k, y + 5 * k, rx * 0.6, ry * 0.4, black.shade);
+    }
+  }
+  fillRect(ctx, 30 * k, ground - 100 * k, 5 * k, 96 * k, P.banners[1]); fillRect(ctx, 96 * k, ground - 100 * k, 5 * k, 96 * k, P.banners[1]);
+}
+
+/** Bale of straw bound with two strings. */
+function hayBale(ctx, w, h, P, rnd) {
+  const k = w / 176, ground = h - 5 * k, straw = { light: P.dryLight, base: P.dry, shade: P.dryShade };
+  groundShadow(ctx, w / 2 + 8 * k, ground, 84 * k, 5 * k);
+  const front = [[10 * k, ground], [10 * k, 26 * k], [132 * k, 26 * k], [132 * k, ground]], side = [[132 * k, ground], [132 * k, 26 * k], [166 * k, 12 * k], [166 * k, ground - 12 * k]], top = [[10 * k, 26 * k], [44 * k, 12 * k], [166 * k, 12 * k], [132 * k, 26 * k]];
+  inkGroup(ctx, P, [{ p: front, fill: straw.base }, { p: side, fill: straw.shade }, { p: top, fill: straw.light }], LINE.form * k, 1, 'round');
+  for (const p of [front, side, top]) strokePath(ctx, (g) => tracePolygon(g, p), P.ink, LINE.detail * k);
+  for (let i = 0; i < 16; i++) { const x = (14 + rnd() * 114) * k, y = (32 + rnd() * 44) * k; brushStroke(ctx, [[x, y], [x + (8 + rnd() * 10) * k, y + jit(rnd, 3 * k)]], LINE.hair * k * 1.3, { color: straw.shade, taper: 0.4 }); }
+  for (const x of [46 * k, 98 * k]) { inkLine(ctx, x, 26 * k, x, ground, LINE.detail * k, P.ink); inkLine(ctx, x, 26 * k, x + 34 * k, 12 * k, LINE.detail * k, P.ink); }
+  for (let i = 0; i < 5; i++) { const x = (6 + rnd() * 130) * k; brushStroke(ctx, [[x, ground], [x + jit(rnd, 6 * k), ground + 3 * k]], LINE.detail * k, { color: straw.base, taper: 0.5 }); }
+}
+
+/** Oil drum painted in two colours. */
+function barrel(ctx, w, h, P) {
+  const k = w / 88, ground = h - 5 * k, cx = w / 2, tones = paintTonesOf(P.banners[2]);
+  groundShadow(ctx, cx + 5 * k, ground, 38 * k, 4.5 * k);
+  const body = (g) => { g.moveTo(cx - 30 * k, 16 * k); g.lineTo(cx - 30 * k, ground - 8 * k); g.quadraticCurveTo(cx, ground + 6 * k, cx + 30 * k, ground - 8 * k); g.lineTo(cx + 30 * k, 16 * k); g.quadraticCurveTo(cx, 2 * k, cx - 30 * k, 16 * k); g.closePath(); };
+  contour(ctx, body, P.ink, LINE.form * k, 1, 'round');
+  fillTrace(ctx, body, tones.base);
+  clipped(ctx, body, () => {
+    fillRect(ctx, cx + 8 * k, 0, w, h, tones.shade); fillRect(ctx, cx - 26 * k, 0, 8 * k, h, tones.light);
+    fillRect(ctx, 0, 44 * k, w, 22 * k, P.banners[1]); fillRect(ctx, cx + 8 * k, 44 * k, w, 22 * k, shadeHex(P.banners[1], 0.24));
+    for (const y of [40 * k, 68 * k]) fillRect(ctx, 0, y, w, 3 * k, P.ink);
+  });
+  fillEllipse(ctx, cx, 17 * k, 30 * k, 9 * k, P.ink); fillEllipse(ctx, cx, 16.5 * k, 27 * k, 7 * k, tones.light);
+  fillEllipse(ctx, cx + 10 * k, 16 * k, 4 * k, 2 * k, P.ink);
+}
+
+/** Foot of a barrier in a green country: tufts of grass and a few flowers. Tiles seamlessly; mostly empty. */
+function tuftStrip(ctx, w, h, P, rnd) {
+  const k = h / 72, ink = mixHex(P.ink, P.grassDark, 0.2);
+  wrapped(ctx, w, rnd, (r) => {
+    for (let i = 0; i < 14; i++) {
+      const x = ((i + r() * 0.8) / 14) * w, size = (20 + r() * 30) * k;
+      grassTuft(ctx, x, h - 2 * k, size, ink, k, r, r() < 0.5 ? P.grassDark : P.leaf);
+      if (r() < 0.3) { const fx = x + jit(r, 8 * k), fy = h - size * 0.8; fillEllipse(ctx, fx, fy, 3.4 * k, 3.4 * k, P.ink); fillEllipse(ctx, fx, fy, 2.2 * k, 2.2 * k, P.banners[r() < 0.5 ? 1 : 3]); }
+    }
+  });
+}
+
+/** Foot of a barrier in sand or gravel: a low drift with pebbles and dry tufts. Tiles seamlessly. */
+function sandStrip(ctx, w, h, P, rnd) {
+  const k = h / 72;
+  wrapped(ctx, w, rnd, (r) => {
+    // (the same height at both ends of the tile, so that the drift runs on without a step)
+    const heights = [];
+    for (let i = 0; i < 12; i++) heights.push((10 + r() * 22 + (i % 3 === 1 ? 14 : 0)) * k);
+    heights.push(heights[0]);
+    const crest = [[0, h]];
+    for (let i = 0; i <= 12; i++) crest.push([(i / 12) * w, h - heights[i]]);
+    crest.push([w, h]);
+    ctx.beginPath(); tracePolygon(ctx, crest); ctx.strokeStyle = P.ink; ctx.lineWidth = LINE.form * k * 2; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.fillStyle = P.gravelA; ctx.fill();
+    clipped(ctx, (g) => tracePolygon(g, crest), () => { for (let i = 0; i < 12; i++) { const x = r() * w, y = h - r() * 16 * k; fillEllipse(ctx, x, y, (3 + r() * 5) * k, (2 + r() * 2) * k, P.gravelB); } fillRect(ctx, 0, h - 5 * k, w, 5 * k, P.gravelB); });
+    for (let i = 0; i < 5; i++) grassTuft(ctx, r() * w, h - 3 * k, (14 + r() * 16) * k, mixHex(P.ink, P.dryShade, 0.25), k, r, P.dry);
+  });
+}
+
+const TRACKSIDE_OBJECT_PAINTERS = {
+  'sign.chevron': chevronSign,
+  'sign.turn': turnSign,
+  'sign.advert.low': advertLow,
+  'sign.advert.high': advertHigh,
+  'gantry.banner': bannerGantry,
+  'tunnel.portal': tunnelPortal,
+  'tunnel.arch': tunnelArch,
+  'strip.tunnelwall': tunnelWall,
+  'tree.oak': oak,
+  'tree.poplar': poplar,
+  cactus,
+  boulder,
+  stones,
+  cone,
+  'marker.post': markerPost,
+  tyrestack: tyreStack,
+  haybale: hayBale,
+  barrel,
+  'strip.tufts': tuftStrip,
+  'strip.sandbank': sandStrip,
+};
+
+__modules["src/art/environments/trackside-objects-art.js"] = { TRACKSIDE_OBJECT_PAINTERS };
+})();
 // ---- src/art/environments/scenery-painters.js
 (function () {
 // Registry of scenery painters: logical family -> drawing function. This is the single place
@@ -10772,9 +11902,10 @@ const { VEGETATION_PAINTERS } = __modules["src/art/environments/vegetation.js"];
 const { TRACKSIDE_PAINTERS } = __modules["src/art/environments/trackside.js"];
 const { TERRAIN_STRIP_PAINTERS } = __modules["src/art/environments/terrain-strips.js"];
 const { BUILDING_PAINTERS } = __modules["src/art/environments/buildings.js"];
+const { TRACKSIDE_OBJECT_PAINTERS } = __modules["src/art/environments/trackside-objects-art.js"];
 const { LINE } = __modules["src/art/styles/ink.js"];
 
-const PAINTERS = { ...VEGETATION_PAINTERS, ...TRACKSIDE_PAINTERS, ...TERRAIN_STRIP_PAINTERS, ...BUILDING_PAINTERS };
+const PAINTERS = { ...VEGETATION_PAINTERS, ...TRACKSIDE_PAINTERS, ...TERRAIN_STRIP_PAINTERS, ...BUILDING_PAINTERS, ...TRACKSIDE_OBJECT_PAINTERS };
 
 /** Neutral stand-in used when a family has no painter yet: an inked blank panel. */
 function placeholder(ctx, w, h, P) {
@@ -12090,7 +13221,37 @@ const CIRCUITS = [
   },
 ];
 
-const BY_ID = new Map(CIRCUITS.map((c) => [c.id, c]));
+/**
+ * Development circuits: not part of any season, never listed in the menus, reachable only through the collision
+ * test bench (core/collision-lab.js). They carry their own trackside settings (tracks/trackside-objects.js).
+ * `banc-objets`: a flat rectangle with long straights. Its objects are placed by hand (`features`) and can be hit:
+ *   EXPERIMENTAL interactions are on for this circuit only.
+ * `banc-accotements`: EXPERIMENTAL copy of Kestrel Fields with open verges (the limits moved 30 m outward away from
+ *   the pits), to study driving on the ground beyond the usual barrier line. Kestrel Fields itself is unchanged.
+ */
+const DEV_CIRCUITS = [
+  {
+    id: 'banc-objets', name: 'Banc des objets', region: 'Piste d\'essai', theme: 'plains', pitSide: -1, width: 14, laps: 3,
+    corners: [[1500, 0, 140], [1500, 650, 140], [0, 650, 140], [0, 0, 140]],
+    trackside: { scenery: 'enriched', interactions: true },
+    // (first straight: 170 m after the line to the first bend at 890 m; back straight: 1700 to 2920 m)
+    features: [
+      { type: 'object', s: 330, id: 'sign.advert.low.0', d: 10.5 },
+      { type: 'object', s: 384, id: 'cone', d: 9.2 }, { type: 'object', s: 388, id: 'cone', d: 9.9 }, { type: 'object', s: 392, id: 'cone', d: 10.6 },
+      { type: 'object', s: 520, id: 'boulder.0', d: -10.5 },
+      { type: 'object', s: 600, id: 'tyrestack', d: 10.5 },
+      { type: 'object', s: 660, id: 'tree.oak', d: 11.5 },
+      { type: 'gantry', s: 760, id: 'gantry.banner.0' },
+      { type: 'tunnel', at: 0.56, length: 170 },
+    ],
+  },
+  {
+    ...CIRCUITS.find((c) => c.id === 'kestrel-fields'), id: 'banc-accotements', name: 'Banc des accotements ouverts', region: 'Piste d\'essai',
+    openVerges: { extra: 30 }, trackside: { scenery: 'enriched', interactions: true },
+  },
+];
+
+const BY_ID = new Map([...CIRCUITS, ...DEV_CIRCUITS].map((c) => [c.id, c]));
 
 function getCircuit(id) {
   const def = BY_ID.get(id);
@@ -12102,7 +13263,7 @@ function seasonOf(circuitId) {
   return SEASONS.find((s) => s.circuits.includes(circuitId)) || null;
 }
 
-__modules["src/tracks/track-catalog.js"] = { SEASONS, CIRCUITS, getCircuit, seasonOf };
+__modules["src/tracks/track-catalog.js"] = { SEASONS, CIRCUITS, DEV_CIRCUITS, getCircuit, seasonOf };
 })();
 // ---- src/multiplayer/split-screen.js
 (function () {
@@ -13285,7 +14446,10 @@ const FR = {
   'lab.title': 'BANC D\'ESSAI (DÉVELOPPEMENT)', 'lab.auto': 'pilote automatique jusqu\'au contact', 'lab.yours': 'À VOUS DE CONDUIRE', 'lab.stopped': 'arrêté',
   'lab.case.wheel': '1 · roue contre roue, sans décollage', 'lab.case.hop': '2 · saut récupérable', 'lab.case.crash': '3 · accident violent (E3)',
   'lab.case.board': '4 · panneau de bord de piste (E5)', 'lab.case.bump': '5 · tamponnages',
-  'lab.keys': 'Touches 1 à 5 : choisir un cas · Entrée : rejouer · C : changer de caméra',
+  'lab.case.sign': '6 · panneau destructible (EXPÉRIMENTAL)', 'lab.case.rock': '7 · obstacle rigide (EXPÉRIMENTAL)', 'lab.case.gantry': '8 · passage sous un portique',
+  'lab.case.pillar': '9 · support de portique (EXPÉRIMENTAL)', 'lab.case.tunnel': '0 · passage dans un tunnel', 'lab.case.offtrack': 'O · sortie de piste, accotements ouverts (EXPÉRIMENTAL)',
+  'lab.case.close': 'K · contact rapproché entre deux voitures',
+  'lab.keys': 'Touches 1 à 0, O, K : choisir un cas · Entrée : rejouer · C : changer de caméra',
 };
 
 __modules["src/localization/fr.js"] = { FR };
@@ -13373,7 +14537,10 @@ const EN = {
   'lab.title': 'TEST BENCH (DEVELOPMENT)', 'lab.auto': 'autopilot until the contact', 'lab.yours': 'YOUR TURN TO DRIVE', 'lab.stopped': 'stopped',
   'lab.case.wheel': '1 · wheel to wheel, no flight', 'lab.case.hop': '2 · recoverable hop', 'lab.case.crash': '3 · hard accident (E3)',
   'lab.case.board': '4 · roadside board (E5)', 'lab.case.bump': '5 · rear-end bumps',
-  'lab.keys': 'Keys 1 to 5: choose a case · Enter: replay · C: change camera',
+  'lab.case.sign': '6 · breakable board (EXPERIMENTAL)', 'lab.case.rock': '7 · rigid obstacle (EXPERIMENTAL)', 'lab.case.gantry': '8 · under a gantry',
+  'lab.case.pillar': '9 · gantry support (EXPERIMENTAL)', 'lab.case.tunnel': '0 · through a tunnel', 'lab.case.offtrack': 'O · leaving the road, open verges (EXPERIMENTAL)',
+  'lab.case.close': 'K · close contact between two cars',
+  'lab.keys': 'Keys 1 to 0, O, K: choose a case · Enter: replay · C: change camera',
 };
 
 __modules["src/localization/en.js"] = { EN };
@@ -13705,6 +14872,7 @@ const { closedCurve, blobPoints, brushStroke, seeded } = __modules["src/art/styl
 const { drawText, measureText } = __modules["src/art/styles/lettering.js"];
 const { hexToRgb } = __modules["src/art/palettes/palettes.js"];
 const { COLLISION_TUNING } = __modules["src/physics/collision-tuning.js"];
+const { TRACKSIDE_TUNING } = __modules["src/physics/trackside-tuning.js"];
 const { CAMERA } = __modules["src/rendering/compositing/race-view.js"];
 const { cockpitPlacement } = __modules["src/rendering/compositing/cockpit-layer.js"];
 const { COCKPIT_REF_FOCAL } = __modules["src/art/cockpits/cockpit-art.js"];
@@ -13894,6 +15062,7 @@ class EffectsLayer {
     }
     if (event.type === 'bump' || event.type === 'wheel') { this.onTypedContact(event, app); return; }
     if (event.type === 'obstacle') { this.onObstacle(event, app); return; }
+    if (event.type === 'object') { this.onObject(event, app); return; }
     if (event.type === 'launch' || event.type === 'landing') { this.onFlight(event, app); return; }
     // (a contact that already has its own staging does not get the generic burst as well)
     if (event.type === 'contact' && this.typedClock < 0.1 && (event.car === this.typedCar || event.other === this.typedCar)) return;
@@ -14032,6 +15201,37 @@ class EffectsLayer {
       if (view.carIndex !== event.car) continue;
       view.addImpact(0.6);
       if (fx.onomatopoeia && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, WORD.CRAC, o.d > car.d ? 0.62 : 0.38, 0.35, 0.8, false); }
+    }
+  }
+
+  /**
+   * EXPERIMENTAL trackside object (tracks/trackside-objects.js) touched by a car: a star on the spot, dust or
+   * splinters, a shake and a sound word for the driver, all scaled by the reaction of the object.
+   */
+  onObject(event, app) {
+    const fx = app.effects, race = app.race;
+    const car = race.cars[event.car], o = race.objects[event.other];
+    if (!o) return;
+    const r = TRACKSIDE_TUNING.reactions[o.reaction] || {}, solid = r.kind === 'solid';
+    const strength = solid ? Math.min(1, event.value / 30) : r.jolt ?? 0.5;
+    if (fx.impactFrames && strength > 0.2) {
+      const f = this.flash(-1, o.s, o.d, solid ? 1.1 : 0.7, solid ? 3 : 2, 0.2);
+      let ds = o.s - car.s;
+      if (ds > this.track.length / 2) ds -= this.track.length; else if (ds < -this.track.length / 2) ds += this.track.length;
+      const dd = o.d - car.d, ch = Math.cos(car.headingError), sh = Math.sin(car.headingError);
+      this.onCockpit(f, event.car, ds * ch + dd * sh, -ds * sh + dd * ch, 0.9);
+    }
+    if (fx.dust) {
+      const count = Math.round(3 + strength * 8);
+      for (let k = 0; k < count; k++) {
+        this.spawn(1, o.s, o.d + (this.random() - 0.5) * 1.4, 0.3 + this.random() * 1.1, car.speed * (0.2 + this.random() * 0.5), (this.random() - 0.5) * 8, 2.5 + this.random() * 4.5, 0.4 + this.random() * 0.3, 0.3, 0.2, this.dust, 1);
+      }
+    }
+    for (let v = 0; v < app.viewCount; v++) {
+      const view = app.views[v];
+      if (view.carIndex !== event.car) continue;
+      view.addImpact(0.25 + strength * 0.6);
+      if (fx.onomatopoeia && r.word && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, WORD[r.word] ?? WORD.CRAC, o.d > car.d ? 0.62 : 0.38, 0.35, 0.5 + strength * 0.4, false); }
     }
   }
 
@@ -15922,6 +17122,7 @@ const { PlayerEngineVoice, OpponentEngineVoice, createEngineWave, createStutterW
 const { CarNoise } = __modules["src/audio/car-noise.js"];
 const { CrowdAmbience } = __modules["src/audio/ambience.js"];
 const { SfxPlayer } = __modules["src/audio/sfx.js"];
+const { TRACKSIDE_TUNING } = __modules["src/physics/trackside-tuning.js"];
 
 const MIX = AUDIO_TUNING.mix;
 const ENGINE = AUDIO_TUNING.engine;
@@ -16464,6 +17665,14 @@ class GameAudio {
           const v = this.voiceOf(index);
           if (v >= 0) this.voices[v].shift();
         }
+        break;
+      }
+      case 'object': {
+        // EXPERIMENTAL trackside object (tracks/trackside-objects.js): the impact sound of its reaction (physics/trackside-tuning.js)
+        const o = app.race.objects ? app.race.objects[event.other] : null;
+        const r = o ? TRACKSIDE_TUNING.reactions[o.reaction] : null, sound = (r && r.sound) || { gain: 0.6, weight: 10, hard: true };
+        const gain = this.locate(index, app) * sound.gain;
+        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, sound.weight, sound.hard, time);
         break;
       }
       case 'wall':
@@ -17901,10 +19110,24 @@ const LAB_SCENARIOS = {
   board: { key: 'Digit4', circuit: 'hazelbrook', board: true, me: { speed: 245, back: 70 }, release: 'landing' },
   // a first contact at about 40 km/h of closing speed, then the follower comes back gently on the car ahead (5 km/h faster)
   bump: { key: 'Digit5', circuit: 'kestrel-fields', me: { speed: 146, back: 12, side: 0 }, other: { speed: 105 }, steerTo: 0, steerFrom: 0, hold: 146, afterBump: 5, release: 'bump' },
+  // ---- trackside objects (tracks/trackside-objects.js). The objects of the bench circuit can be hit: EXPERIMENTAL
+  // interactions are on for that circuit only. `object`: the object aimed at (the car drives on the verge, on its line);
+  // `pass`: something to drive under on the road, the car is handed back `after` metres beyond it;
+  // `leave`: the car leaves the road toward `d` metres beyond the usual barrier line, for `seconds`.
+  sign: { key: 'Digit6', circuit: 'banc-objets', object: { family: 'sign.advert.low', side: 1 }, me: { speed: 150, back: 150 }, release: 'object' },
+  rock: { key: 'Digit7', circuit: 'banc-objets', object: { family: 'boulder', side: -1 }, me: { speed: 110, back: 130 }, release: 'object' },
+  gantry: { key: 'Digit8', circuit: 'banc-objets', pass: { prop: 'gantry.banner.0', after: 50 }, me: { speed: 250, back: 280 }, release: 'passed' },
+  pillar: { key: 'Digit9', circuit: 'banc-objets', object: { family: 'gantry.banner', support: true, side: -1 }, me: { speed: 100, back: 130 }, release: 'object' },
+  tunnel: { key: 'Digit0', circuit: 'banc-objets', pass: { tunnel: true, after: 90 }, me: { speed: 220, back: 240 }, release: 'passed' },
+  // EXPERIMENTAL open verges: a copy of a circuit whose limits are moved outward (track builder: openVerges)
+  offtrack: { key: 'KeyO', circuit: 'banc-accotements', leave: { beyond: 7, seconds: 4.6 }, me: { speed: 160 }, release: 'passed' },
+  // two cars side by side at almost the same speed, one drifting slowly onto the other (the validated contact rules)
+  close: { key: 'KeyK', circuit: 'kestrel-fields', me: { speed: 183, back: -3.6, side: -3.1 }, other: { speed: 180 }, steerTo: -1.8, steerFrom: 0.8, hold: 183, release: 'wheel' },
 };
 /** Other names accepted by the launch option (the names of the events in the analysis report, and French). */
-const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump' };
-const WATCHED = ['bump', 'wheel', 'launch', 'hop', 'landing', 'obstacle', 'crash', 'restart', 'reset', 'contact'];
+const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump',
+  destructible: 'sign', rocher: 'rock', rigide: 'rock', portique: 'gantry', pilier: 'pillar', support: 'pillar', sortie: 'offtrack', accotement: 'offtrack', contact: 'close' };
+const WATCHED = ['bump', 'wheel', 'launch', 'hop', 'landing', 'obstacle', 'object', 'crash', 'wall', 'restart', 'reset', 'contact'];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** Scripted driver after a recoverable landing: lateral error (m) to heading asked for (rad), times the speed (m/s). */
 const LAB_AFTER_GAIN = 1.5;
@@ -17954,7 +19177,51 @@ class CollisionLab {
     this.name = key; this.scenario = sc; this.race = race; this.me = me; this.lead = null; this.board = null;
     this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
     this.handOver = handOver; this.events.length = 0;
-    if (sc.board) {
+    this.line = null; this.target = null; this.passAt = -1; this.leaveUntil = -1;
+    if (sc.object || sc.pass || sc.leave) {
+      const layout = track.sceneryLayout, objects = race.objects;
+      others.forEach((c, k) => put(c, track.length * 0.5 + k * 40, 0, 150));       // (the other cars: parked far away, driving on)
+      if (sc.object) {
+        // the object aimed at; every other experimental object is taken out of the way, so that this contact is the only one
+        const o = objects.find((x) => x.family === sc.object.family && !!x.support === !!sc.object.support && x.d * sc.object.side > 0);
+        this.target = o;
+        objects.forEach((x, k) => { if (x !== o) race.objectState[k] = 2; });
+        put(me, o.s - sc.me.back, o.d, sc.me.speed);
+        this.line = { d: o.d, speed: sc.me.speed };
+      } else if (sc.pass) {
+        const at = sc.pass.tunnel ? layout.trackside.tunnels[0].from : layout.props.find((p) => p.id === sc.pass.prop).s;
+        const beyond = sc.pass.tunnel ? layout.trackside.tunnels[0].length : 0;
+        put(me, at - sc.me.back, 0, sc.me.speed);
+        this.line = { d: 0, speed: sc.me.speed };
+        this.passAt = me.progress + sc.me.back + beyond + sc.pass.after;
+        this.target = { s: at, length: beyond };
+      } else {
+        // a straight away from the pits where the ground beyond the usual barrier line is open on one side and clear of objects
+        const corridor = (i, side) => { const d = side * (track.closedBarrierR ? (side > 0 ? track.closedBarrierR[i] : track.closedBarrierL[i]) + sc.leave.beyond : 0); return d; };
+        let found = null;
+        for (let i = 0; i < track.n && !found; i += 4) {
+          for (const side of [1, -1]) {
+            const usual = side > 0 ? track.closedBarrierR[i] : track.closedBarrierL[i];
+            const open = (side > 0 ? track.barrierR[i] : track.barrierL[i]) - usual;
+            if (open < sc.leave.beyond + 12 || usual > track.halfWidth + 10) continue;        // (an ordinary grass verge, not a gravel trap)
+            let straight = true;
+            for (let k = -10; k <= 150 && straight; k++) if (Math.abs(track.kappa[(i + k + track.n) % track.n]) > 1 / 900) straight = false;
+            if (straight) { found = { i, side, d: corridor(i, side) }; break; }
+          }
+        }
+        if (!found) found = { i: Math.round(track.n * 0.4), side: 1, d: corridor(Math.round(track.n * 0.4), 1) };
+        // the strip of ground the car will cross is cleared of the objects planted there; the others stay, and can be hit
+        const s0 = found.i * track.ds;
+        objects.forEach((x, k) => {
+          let ds = x.s - s0; if (ds < -track.length / 2) ds += track.length;
+          if (ds > -30 && ds < 520 && x.d * found.side > 0 && Math.abs(x.d) < Math.abs(found.d) + 5) race.objectState[k] = 2;
+        });
+        put(me, s0, 0, sc.me.speed);
+        this.line = { d: found.d, speed: sc.me.speed };
+        this.leaveUntil = Math.round(sc.leave.seconds / SIM_DT);
+        this.target = { s: found.i * track.ds, d: found.d, side: found.side };
+      }
+    } else if (sc.board) {
       // a braking board at the end of a straight; the car leaves the road toward it. Only this board is
       // left standing: the reference case is a single obstacle.
       const o = race.obstacles.find((b) => { const i = Math.floor(b.s / track.ds) % track.n; return Math.abs(track.kappa[(i - 20 + track.n) % track.n]) < 0.001; }) || race.obstacles[0];
@@ -17992,7 +19259,24 @@ class CollisionLab {
       this.released = true;
       if (this.onChange) this.onChange(this);
     }
-    if (!this.released) {
+    // (cases that end by position or by time rather than by an event)
+    if (this.passAt >= 0 && me.progress >= this.passAt) this.triggered = true;
+    if (this.leaveUntil >= 0 && this.tick >= this.leaveUntil) this.triggered = true;
+    if (!this.released && this.line) {
+      // trackside cases: the car is driven along a line parallel to the road, at a held speed; nothing else is scripted
+      let steer = 0, throttle = 0, brake = 0;
+      if (me.state === CAR_STATE.RACING) {
+        const line = this.triggered && this.leaveUntil >= 0 ? 0 : this.line.d;          // (after an excursion the recordings come back to the road)
+        const slant = this.leaveUntil >= 0 ? 0.12 : 0.22;                                 // (an excursion leaves and rejoins the road at a shallow angle)
+        const want = clamp((line - me.d) * 0.035, -slant, slant);
+        steer = clamp((want - me.headingError) * 3, -0.5, 0.5);
+        // once the case is over the recordings slow down: 110 km/h for the bend that follows a passage, a stop after a contact
+        const speed = !this.triggered ? this.line.speed : this.scenario.object ? 0 : Math.min(this.line.speed, 110);
+        throttle = speed > 0 ? clamp(0.5 + (speed / 3.6 - me.speed) * 0.4, 0, 1) : 0;
+        brake = speed > 0 && me.speed > speed / 3.6 + 4 ? 0.7 : 0;
+      }
+      race.setPlayerInput(0, steer, throttle, brake, 0, false, false);
+    } else if (!this.released) {
       let steer = 0, throttle = 1;
       if (me.state !== CAR_STATE.RACING) this.left = true;               // after the accident: straight on, full throttle
       else if (this.left && this.backTick < 0) this.backTick = this.tick;  // first step back on its wheels
@@ -18050,7 +19334,7 @@ function attachLabControls(lab, t) {
   lab.onChange = refresh;
   window.addEventListener('keydown', (event) => {
     if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
-    const chosen = Object.keys(LAB_SCENARIOS).find((name) => LAB_SCENARIOS[name].key === event.code);
+    const chosen = Object.keys(LAB_SCENARIOS).find((name) => LAB_SCENARIOS[name].key === event.code);   // (1 to 0, then O and K)
     if (chosen) lab.start(chosen);
     else if (event.code === 'Enter' || event.code === 'NumpadEnter') lab.start(lab.name);
   });
@@ -18088,6 +19372,7 @@ const { GameFlow } = __modules["src/ui/game-flow.js"];
 const { t, setLanguage } = __modules["src/localization/i18n.js"];
 const { runBenchmark, describeEnvironment, measureRefreshRate, BENCHMARK_SCENARIOS } = __modules["src/core/benchmark.js"];
 const { CollisionLab, attachLabControls } = __modules["src/core/collision-lab.js"];
+const { configureTrackside, TRACKSIDE, TRACKSIDE_OBJECTS } = __modules["src/tracks/trackside-objects.js"];
 
 function parseParams() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -18106,6 +19391,11 @@ async function boot() {
   notice.hidden = false;
   notice.textContent = `${t('game.title')} — ${t('game.loading')}`;
   await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  // Trackside objects (tracks/trackside-objects.js), development options, read before any circuit is built:
+  //   index.html#scenery=classic        the scenery as it was before these objects (for comparisons)
+  //   index.html#objects=interactive    EXPERIMENTAL: objects on the verges that cars can hit, supports of gantries as volumes
+  // Without them: the enriched, purely decorative scenery; the simulation is the validated one.
+  configureTrackside({ scenery: params.scenery === 'classic' ? 'classic' : 'enriched', interactions: params.objects === 'interactive' });
   try {
     const text = new TextPainter();
     let cockpitLayout = null;
@@ -18194,7 +19484,7 @@ async function boot() {
    */
   const createLab = () => { if (!app.lab) app.lab = new CollisionLab(app, quickRace); return app.lab; };
   // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick } };
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick, trackside: TRACKSIDE, tracksideObjects: Object.keys(TRACKSIDE_OBJECTS) } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
   if (params.lab) {
     const lab = createLab();

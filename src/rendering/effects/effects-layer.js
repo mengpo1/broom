@@ -12,6 +12,7 @@ import { closedCurve, blobPoints, brushStroke, seeded } from '../../art/styles/i
 import { drawText, measureText } from '../../art/styles/lettering.js';
 import { hexToRgb } from '../../art/palettes/palettes.js';
 import { COLLISION_TUNING } from '../../physics/collision-tuning.js';
+import { TRACKSIDE_TUNING } from '../../physics/trackside-tuning.js';
 import { CAMERA } from '../compositing/race-view.js';
 import { cockpitPlacement } from '../compositing/cockpit-layer.js';
 import { COCKPIT_REF_FOCAL } from '../../art/cockpits/cockpit-art.js';
@@ -201,6 +202,7 @@ export class EffectsLayer {
     }
     if (event.type === 'bump' || event.type === 'wheel') { this.onTypedContact(event, app); return; }
     if (event.type === 'obstacle') { this.onObstacle(event, app); return; }
+    if (event.type === 'object') { this.onObject(event, app); return; }
     if (event.type === 'launch' || event.type === 'landing') { this.onFlight(event, app); return; }
     // (a contact that already has its own staging does not get the generic burst as well)
     if (event.type === 'contact' && this.typedClock < 0.1 && (event.car === this.typedCar || event.other === this.typedCar)) return;
@@ -339,6 +341,37 @@ export class EffectsLayer {
       if (view.carIndex !== event.car) continue;
       view.addImpact(0.6);
       if (fx.onomatopoeia && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, WORD.CRAC, o.d > car.d ? 0.62 : 0.38, 0.35, 0.8, false); }
+    }
+  }
+
+  /**
+   * EXPERIMENTAL trackside object (tracks/trackside-objects.js) touched by a car: a star on the spot, dust or
+   * splinters, a shake and a sound word for the driver, all scaled by the reaction of the object.
+   */
+  onObject(event, app) {
+    const fx = app.effects, race = app.race;
+    const car = race.cars[event.car], o = race.objects[event.other];
+    if (!o) return;
+    const r = TRACKSIDE_TUNING.reactions[o.reaction] || {}, solid = r.kind === 'solid';
+    const strength = solid ? Math.min(1, event.value / 30) : r.jolt ?? 0.5;
+    if (fx.impactFrames && strength > 0.2) {
+      const f = this.flash(-1, o.s, o.d, solid ? 1.1 : 0.7, solid ? 3 : 2, 0.2);
+      let ds = o.s - car.s;
+      if (ds > this.track.length / 2) ds -= this.track.length; else if (ds < -this.track.length / 2) ds += this.track.length;
+      const dd = o.d - car.d, ch = Math.cos(car.headingError), sh = Math.sin(car.headingError);
+      this.onCockpit(f, event.car, ds * ch + dd * sh, -ds * sh + dd * ch, 0.9);
+    }
+    if (fx.dust) {
+      const count = Math.round(3 + strength * 8);
+      for (let k = 0; k < count; k++) {
+        this.spawn(1, o.s, o.d + (this.random() - 0.5) * 1.4, 0.3 + this.random() * 1.1, car.speed * (0.2 + this.random() * 0.5), (this.random() - 0.5) * 8, 2.5 + this.random() * 4.5, 0.4 + this.random() * 0.3, 0.3, 0.2, this.dust, 1);
+      }
+    }
+    for (let v = 0; v < app.viewCount; v++) {
+      const view = app.views[v];
+      if (view.carIndex !== event.car) continue;
+      view.addImpact(0.25 + strength * 0.6);
+      if (fx.onomatopoeia && r.word && this.popClock[v] > 0.3) { this.popClock[v] = 0; this.pop(v, WORD[r.word] ?? WORD.CRAC, o.d > car.d ? 0.62 : 0.38, 0.35, 0.5 + strength * 0.4, false); }
     }
   }
 

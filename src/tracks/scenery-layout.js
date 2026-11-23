@@ -7,6 +7,7 @@ import { Random, hashString } from '../core/random.js';
 import { mod } from '../core/math.js';
 import { VERGE } from './track-builder.js';
 import { getTheme } from './themes.js';
+import { placeTracksideObjects, collectInteractiveObjects, tracksideSettings } from './trackside-objects.js';
 
 /** Variants available per logical family (the art library provides `${family}.${index}`). */
 export const VARIANTS = {
@@ -27,8 +28,10 @@ function pickWeighted(rng, table) {
  *   strips: object[], stripsAt: number[][], props: object[], propStart: Int32Array,
  *   theme: object }}
  * strip: { id, side, from, count, offset, absolute, base, height, tile, phase }
- * prop:  { id, s, d, sample, scale, flip, reach, solidHalfWidth, obstacle }  (reach: draw distance in metres;
- *         obstacle: index in `obstacles` when the object is solid, else -1)
+ * prop:  { id, s, d, sample, scale, flip, reach, solidHalfWidth, obstacle, interactive, object }  (reach: draw
+ *         distance in metres; obstacle: index in `obstacles` when the object is a validated solid board, else -1;
+ *         object: index in `objects`, the EXPERIMENTAL interactive objects of trackside-objects.js, else -1)
+ * Also returned: obstacles (validated boards), objects (experimental, empty by default), trackside (tunnels, gantries).
  */
 export function buildSceneryLayout(track) {
   const theme = getTheme(track.theme);
@@ -56,7 +59,7 @@ export function buildSceneryLayout(track) {
   };
   const addProp = (id, s, d, opt = {}) => {
     props.push({ id, s: mod(s, length), d, sample: Math.floor(mod(s, length) / ds) % n, scale: opt.scale ?? 1, flip: !!opt.flip, reach: opt.reach ?? 1300,
-      solidHalfWidth: opt.solidHalfWidth ?? 0, obstacle: -1 });
+      solidHalfWidth: opt.solidHalfWidth ?? 0, obstacle: -1, interactive: !!opt.interactive, object: -1 });
   };
   const barrierOf = (side, i) => (side > 0 ? track.barrierR[i] : track.barrierL[i]);
   const vergeOf = (side, i) => (side > 0 ? track.vergeR[i] : track.vergeL[i]);
@@ -236,6 +239,11 @@ export function buildSceneryLayout(track) {
     addProp(`crowd.group.${rng.int(0, VARIANTS['crowd.group'] - 1)}`, i * ds, side * (barrierOf(side, i) + 2.2 + rng.next() * 2), { flip: rng.chance(0.5), reach: 400 });
   });
 
+  // ---- trackside objects added on top of the above (trackside-objects.js): own random sequence, nothing above moves
+  const settings = tracksideSettings(track);
+  const trackside = settings.scenery === 'classic' ? { tunnels: [], gantries: [], cover: null }
+    : placeTracksideObjects({ track, theme, props, addProp, addStrip, barrierOf, vergeOf, inPitWall, blocked, tall }, settings);
+
   // ---- index props by sample (sorted along the track inside each sample)
   props.sort((a, b) => a.sample - b.sample || a.s - b.s);
   const propStart = new Int32Array(n + 1);
@@ -248,7 +256,9 @@ export function buildSceneryLayout(track) {
     prop.obstacle = obstacles.length;
     obstacles.push({ index: obstacles.length, prop: index, s: prop.s, d: prop.d, halfWidth: prop.solidHalfWidth });
   });
-  return { strips, stripsAt, props, propStart, theme, obstacles };
+  // EXPERIMENTAL interactive objects (none unless asked for): a separate list with its own reactions
+  const objects = settings.scenery === 'classic' ? [] : collectInteractiveObjects(track, props, settings);
+  return { strips, stripsAt, props, propStart, theme, obstacles, objects, trackside };
 }
 
 /** Layout of a track, built once (the race and the renderer must see the same objects). */

@@ -63,6 +63,9 @@ export class SceneBuilder {
   reset(race, track, layout, palette) {
     this.track = track; this.layout = layout;
     this.obstacleDown = race.obstacleDown || null;
+    // trackside objects (tracks/trackside-objects.js): state of the experimental interactive ones, shade over the road
+    this.objectState = race.objectState || null;
+    this.cover = layout.trackside ? layout.trackside.cover : null;
     // light of the place over the cars and the cockpit; colours of the rear view in the mirrors
     this.ambient = hexToRgb(palette.ambient);
     this.mirror = {
@@ -84,6 +87,7 @@ export class SceneBuilder {
     for (const prop of layout.props) {
       prop.sprite = this.art.sprite(prop.id);
       prop.lights = prop.id === 'gantry.start';
+      prop.spans = /^tunnel\./.test(prop.id);            // a tunnel mouth or rib is drawn right up to the camera
     }
     // order the strips of every sample from the farthest from the road to the nearest
     const dist = (s, i) => (s.absolute ? s.offset - (s.side > 0 ? track.barrierR[i] : track.barrierL[i]) : s.offset);
@@ -285,16 +289,19 @@ export class SceneBuilder {
     for (let q = start; q !== end; q += inc) {
       const prop = layout.props[q];
       if (prop.slot !== slot || (prop.obstacle >= 0 && this.obstacleDown && this.obstacleDown[prop.obstacle])) continue;
+      if (prop.object >= 0 && this.objectState && this.objectState[prop.object] === 2) continue;      // (taken away by the test bench)
       const z = depthOf(p, prop.s);
       const reach = prop.reach < reachLimit ? prop.reach : reachLimit;
       if (z < 1.2 || z > reach * detail) continue;
       if (!projectAtDepth(p, z, prop.d, 0, pt)) continue;
       const sp = prop.sprite;
-      const w = sp.worldW * prop.scale * pt.scale, h = sp.worldH * prop.scale * pt.scale;
+      let w = sp.worldW * prop.scale * pt.scale, h = sp.worldH * prop.scale * pt.scale;
+      // an experimental object that was knocked down stays where it fell, lying flat
+      if (prop.object >= 0 && this.objectState && this.objectState[prop.object] === 1) { h *= 0.2; w *= 1.08; }
       if (h < 3 || pt.x + w * 0.5 < 0 || pt.x - w * 0.5 > W) continue;
       // fade in at the limit of the draw distance instead of popping; an object the camera is right
       // against would be drawn far above the size it was inked at, so it is left out
-      if (h > (sp.h || h) * 2.4) continue;                 // (dropped outright: a half-faded object reads as a ghost)
+      if (h > (sp.h || h) * 2.4 && !prop.spans) continue;   // (dropped outright: a half-faded object reads as a ghost; what spans the road is kept: the car passes under it)
       const fade = z > reach * detail - 60 ? (reach * detail - z) / 60 : 1;
       quads.sprite(sp, pt.x - w * 0.5, pt.y - h, w, h, 1, 1, 1, fade, z, prop.flip);
       if (prop.lights && this.lamps && z < 400) {
@@ -329,6 +336,9 @@ export class SceneBuilder {
     const u0 = flip ? 1 : 0, u1 = flip ? 0 : 1;
     const clipZ = z > 3.4 ? z - 2.9 : 0.5;                 // clip test at the car's near end: the drawing extends in front of its centre
     const att = flightAttitude(car, attitude);
+    // a car under a bridge or in a tunnel is in the shade (no such place: the light is untouched)
+    const lit = this.cover && car.segIndex >= 0 ? 1 - this.cover[car.segIndex] * 0.5 : 1;
+    const ambR = this.ambient[0] * lit, ambG = this.ambient[1] * lit, ambB = this.ambient[2] * lit;
     if (car.airHeight > 0.02 || att.squash !== 1 || att.pitch !== 0) {
       // a car in an accident: its shadow stays on the road under it, and the drawing takes the attitude
       // of the flight (nose up then down, the side that was hit lifted, flattened as it lands)
@@ -347,11 +357,11 @@ export class SceneBuilder {
       const x0 = left - ax, x1 = left + w - ax, y0 = (top - ay) * tall, y1 = (top + h - ay) * tall;
       quads.quad(ax + x0 * cosP + y0 * sinP, ay - x0 * sinP + y0 * cosP, 1, ax + x1 * cosP + y0 * sinP, ay - x1 * sinP + y0 * cosP, 1,
         ax + x0 * cosP + y1 * sinP, ay - x0 * sinP + y1 * cosP, 1, ax + x1 * cosP + y1 * sinP, ay - x1 * sinP + y1 * cosP, 1,
-        u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, clipZ);
+        u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, ambR, ambG, ambB, ghost, clipZ);
       return;
     }
     quads.quad(left, top, 1, left + w, top, 1, left, top + h, 1, left + w, top + h, 1,
-      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, this.ambient[0], this.ambient[1], this.ambient[2], ghost, clipZ);
+      u0, 0, u1, 1, cs.layer, QUAD_MODE.CAR + car.teamIndex, ambR, ambG, ambB, ghost, clipZ);
   }
 
   /** Cockpit and other per-view foreground drawings. */
