@@ -1,6 +1,7 @@
 // Performance benchmark of the real build in Chromium (Playwright), real-time loop:
 //   solo race, race with every opponent, split screen — 60 s each at 2560x1440 by default.
 // node tests/performance/benchmark.mjs [--seconds 60] [--width 2560] [--height 1440] [--quality high] [--out work/benchmarks/name.json]
+//      [--scenarios solo,grid,split] [--hash "other launch options"]
 // GPU, CPU and frame-interval figures are reported separately. The adapter is recorded: on a
 // software rasteriser (SwiftShader, llvmpipe) the numbers say nothing about a real GPU.
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -9,9 +10,11 @@ import { openGame, root } from '../../work/scripts/lib-browser.mjs';
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
 const seconds = +arg('seconds', 60), width = +arg('width', 2560), height = +arg('height', 1440), quality = arg('quality', 'high');
 const out = arg('out', `work/benchmarks/benchmark-${width}x${height}.json`);
-const { page, logs, close } = await openGame({ width, height, hash: `quality=${quality}`, extraArgs: ['--enable-precise-memory-info', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
+const extraHash = arg('hash', ''), scenarios = arg('scenarios', 'solo,grid,split').split(',');       // e.g. --hash "scenery=classic&circuit=grand-zenith" --scenarios grid
+const { page, logs, close } = await openGame({ width, height, hash: `quality=${quality}${extraHash ? `&${extraHash}` : ''}`, extraArgs: ['--enable-precise-memory-info', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
 await page.evaluate(([w, h]) => window.virage.app.setCanvasSize(w, h), [width, height]);
-const results = await page.evaluate((seconds) => window.virage.benchmark(['solo', 'grid', 'split'], seconds), seconds);
+const results = await page.evaluate(([seconds, scenarios]) => window.virage.benchmark(scenarios, seconds), [seconds, scenarios]);
+results.launchOptions = extraHash;
 results.viewport = { width, height }; results.quality = quality; results.date = new Date().toISOString();
 mkdirSync(`${root}/work/benchmarks`, { recursive: true });
 writeFileSync(`${root}/${out}`, JSON.stringify(results, null, 2));

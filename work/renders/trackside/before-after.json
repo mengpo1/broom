@@ -1,0 +1,150 @@
+{
+ "width": 1280,
+ "height": 720,
+ "scenes": [
+  {
+   "name": "gantry",
+   "circuit": "hazelbrook",
+   "what": "portique",
+   "s": 1027.294818935124,
+   "enriched": {
+    "s": 1027.294818935124,
+    "props": 1165,
+    "strips": 114,
+    "quads": 1656
+   },
+   "classic": {
+    "s": 1027.294818935124,
+    "props": 1007,
+    "strips": 92,
+    "quads": 1514
+   }
+  },
+  {
+   "name": "chevrons",
+   "circuit": "hazelbrook",
+   "what": "chevrons",
+   "s": 487.9052322750465,
+   "enriched": {
+    "s": 487.9052322750465,
+    "props": 1165,
+    "strips": 114,
+    "quads": 482
+   },
+   "classic": {
+    "s": 487.9052322750465,
+    "props": 1007,
+    "strips": 92,
+    "quads": 389
+   }
+  },
+  {
+   "name": "tunnel-mouth",
+   "circuit": "montclair",
+   "what": "tunnel",
+   "s": 2498.211268202844,
+   "enriched": {
+    "s": 2498.211268202844,
+    "props": 1288,
+    "strips": 118,
+    "quads": 710
+   },
+   "classic": {
+    "s": 2498.211268202844,
+    "props": 1034,
+    "strips": 98,
+    "quads": 561
+   }
+  },
+  {
+   "name": "tunnel-inside",
+   "circuit": "meridian-docks",
+   "what": "tunnel",
+   "s": 437.2826440070897,
+   "enriched": {
+    "s": 437.2826440070897,
+    "props": 281,
+    "strips": 134,
+    "quads": 1109
+   },
+   "classic": {
+    "s": 437.2826440070897,
+    "props": 141,
+    "strips": 132,
+    "quads": 1021
+   }
+  },
+  {
+   "name": "desert",
+   "circuit": "ouarzane",
+   "what": "cactus, rochers, sable",
+   "s": 255.3415966242341,
+   "enriched": {
+    "s": 255.3415966242341,
+    "props": 1001,
+    "strips": 141,
+    "quads": 1307
+   },
+   "classic": {
+    "s": 255.3415966242341,
+    "props": 596,
+    "strips": 116,
+    "quads": 1099
+   }
+  },
+  {
+   "name": "adverts",
+   "circuit": "grand-zenith",
+   "what": "panneaux publicitaires",
+   "s": 162.45225359167188,
+   "enriched": {
+    "s": 162.45225359167188,
+    "props": 1588,
+    "strips": 207,
+    "quads": 1720
+   },
+   "classic": {
+    "s": 162.45225359167188,
+    "props": 1300,
+    "strips": 160,
+    "quads": 1450
+   }
+  },
+  {
+   "name": "highland",
+   "circuit": "glenmoor",
+   "what": "rochers, bottes de paille",
+   "s": 374.5130336591244,
+   "enriched": {
+    "s": 374.5130336591244,
+    "props": 1075,
+    "strips": 136,
+    "quads": 1218
+   },
+   "classic": {
+    "s": 374.5130336591244,
+    "props": 755,
+    "strips": 108,
+    "quads": 1045
+   }
+  },
+  {
+   "name": "turn-sign",
+   "circuit": "kestrel-fields",
+   "what": "signalisation avant virage",
+   "s": 762.1923648814025,
+   "enriched": {
+    "s": 762.1923648814025,
+    "props": 605,
+    "strips": 142,
+    "quads": 550
+   },
+   "classic": {
+    "s": 762.1923648814025,
+    "props": 386,
+    "strips": 113,
+    "quads": 482
+   }
+  }
+ ]
+}

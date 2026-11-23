@@ -1,0 +1,1033 @@
+{
+ "circuits": [
+  {
+   "id": "hazelbrook",
+   "theme": "forest",
+   "propsBefore": 1007,
+   "propsAfter": 1165,
+   "stripsBefore": 92,
+   "stripsAfter": 114,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 28,
+    "stones": 25,
+    "tree.oak": 19,
+    "sign.advert.high": 6,
+    "sign.turn": 8,
+    "sign.chevron": 34,
+    "tyrestack": 20,
+    "sign.advert.low": 8,
+    "gantry.banner": 1,
+    "boulder": 5,
+    "haybale": 4
+   },
+   "validatedBoards": 18,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "sign.advert.low": 2,
+    "support of gantry.banner": 2,
+    "tree.oak": 2,
+    "sign.chevron": 9,
+    "tyrestack": 3,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "porto-sereno",
+   "theme": "coast",
+   "propsBefore": 682,
+   "propsAfter": 858,
+   "stripsBefore": 81,
+   "stripsAfter": 101,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 22,
+    "stones": 36,
+    "sign.advert.low": 10,
+    "boulder": 27,
+    "sign.advert.high": 7,
+    "sign.turn": 9,
+    "tree.poplar": 7,
+    "sign.chevron": 32,
+    "barrel": 9,
+    "tyrestack": 16,
+    "gantry.banner": 1
+   },
+   "validatedBoards": 9,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "tree.poplar": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "support of bridge": 2,
+    "support of gantry.banner": 2,
+    "sign.advert.low": 2
+   }
+  },
+  {
+   "id": "montclair",
+   "theme": "alpine",
+   "propsBefore": 1034,
+   "propsAfter": 1288,
+   "stripsBefore": 98,
+   "stripsAfter": 118,
+   "tunnels": [
+    {
+     "fromM": 2593,
+     "lengthM": 150
+    }
+   ],
+   "gantries": [
+    "gantry.banner.0"
+   ],
+   "added": {
+    "marker.post": 20,
+    "boulder": 66,
+    "stones": 62,
+    "tree.oak": 5,
+    "sign.advert.high": 5,
+    "gantry.banner": 1,
+    "sign.turn": 9,
+    "sign.chevron": 31,
+    "tyrestack": 24,
+    "sign.advert.low": 5,
+    "haybale": 8,
+    "tunnel.portal": 2,
+    "tunnel.arch": 16
+   },
+   "validatedBoards": 9,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "tree.oak": 2,
+    "support of gantry.banner": 2,
+    "sign.advert.low": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "sablon",
+   "theme": "desert",
+   "propsBefore": 493,
+   "propsAfter": 825,
+   "stripsBefore": 95,
+   "stripsAfter": 119,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.0"
+   ],
+   "added": {
+    "marker.post": 44,
+    "cactus": 91,
+    "stones": 77,
+    "boulder": 47,
+    "gantry.banner": 1,
+    "sign.advert.high": 7,
+    "sign.turn": 7,
+    "sign.advert.low": 9,
+    "sign.chevron": 38,
+    "tyrestack": 8,
+    "barrel": 3
+   },
+   "validatedBoards": 12,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "cactus": 2,
+    "support of gantry.banner": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "sign.advert.low": 2,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "kestrel-fields",
+   "theme": "plains",
+   "propsBefore": 386,
+   "propsAfter": 605,
+   "stripsBefore": 113,
+   "stripsAfter": 142,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 40,
+    "tree.poplar": 39,
+    "stones": 23,
+    "sign.advert.low": 15,
+    "gantry.banner": 1,
+    "tree.oak": 19,
+    "sign.advert.high": 11,
+    "sign.turn": 10,
+    "sign.chevron": 37,
+    "haybale": 20,
+    "tyrestack": 4
+   },
+   "validatedBoards": 18,
+   "interactiveObjects": 24,
+   "interactive": {
+    "support of gantry.start": 2,
+    "support of gantry.banner": 2,
+    "tree.poplar": 2,
+    "support of bridge": 4,
+    "sign.chevron": 9,
+    "tyrestack": 3,
+    "sign.advert.low": 2
+   }
+  },
+  {
+   "id": "aurelia-parc",
+   "theme": "park",
+   "propsBefore": 755,
+   "propsAfter": 897,
+   "stripsBefore": 136,
+   "stripsAfter": 164,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.0"
+   ],
+   "added": {
+    "marker.post": 22,
+    "tree.oak": 15,
+    "sign.advert.low": 19,
+    "sign.advert.high": 6,
+    "sign.turn": 10,
+    "sign.chevron": 33,
+    "tree.poplar": 14,
+    "stones": 6,
+    "tyrestack": 16,
+    "gantry.banner": 1
+   },
+   "validatedBoards": 12,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "sign.advert.low": 2,
+    "support of bridge": 2,
+    "sign.chevron": 9,
+    "tyrestack": 3,
+    "tree.poplar": 1,
+    "support of gantry.banner": 2,
+    "tree.oak": 1
+   }
+  },
+  {
+   "id": "lindqvist",
+   "theme": "taiga",
+   "propsBefore": 1341,
+   "propsAfter": 1531,
+   "stripsBefore": 106,
+   "stripsAfter": 133,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 24,
+    "boulder": 23,
+    "sign.advert.low": 8,
+    "tree.oak": 7,
+    "stones": 59,
+    "gantry.banner": 1,
+    "sign.turn": 9,
+    "sign.chevron": 36,
+    "sign.advert.high": 3,
+    "tyrestack": 20
+   },
+   "validatedBoards": 12,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "support of gantry.banner": 2,
+    "support of bridge": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "sign.advert.low": 2,
+    "tree.oak": 2
+   }
+  },
+  {
+   "id": "baia-dourada",
+   "theme": "coast",
+   "propsBefore": 802,
+   "propsAfter": 1031,
+   "stripsBefore": 122,
+   "stripsAfter": 158,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 30,
+    "tree.poplar": 20,
+    "sign.advert.low": 11,
+    "stones": 44,
+    "sign.advert.high": 12,
+    "boulder": 33,
+    "sign.turn": 11,
+    "sign.chevron": 49,
+    "tyrestack": 12,
+    "barrel": 6,
+    "gantry.banner": 1
+   },
+   "validatedBoards": 18,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "tree.poplar": 2,
+    "sign.advert.low": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "support of gantry.banner": 2,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "roca-alta",
+   "theme": "canyon",
+   "propsBefore": 489,
+   "propsAfter": 795,
+   "stripsBefore": 120,
+   "stripsAfter": 142,
+   "tunnels": [
+    {
+     "fromM": 3368,
+     "lengthM": 110
+    }
+   ],
+   "gantries": [
+    "gantry.banner.0"
+   ],
+   "added": {
+    "marker.post": 28,
+    "boulder": 67,
+    "cactus": 54,
+    "stones": 62,
+    "sign.advert.low": 6,
+    "gantry.banner": 1,
+    "sign.turn": 12,
+    "sign.advert.high": 3,
+    "sign.chevron": 42,
+    "barrel": 18,
+    "tunnel.portal": 2,
+    "tunnel.arch": 11
+   },
+   "validatedBoards": 9,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "support of gantry.banner": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "cactus": 2,
+    "sign.advert.low": 2,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "tannenring",
+   "theme": "alpine",
+   "propsBefore": 1139,
+   "propsAfter": 1387,
+   "stripsBefore": 119,
+   "stripsAfter": 146,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 26,
+    "stones": 66,
+    "boulder": 60,
+    "sign.advert.low": 9,
+    "gantry.banner": 1,
+    "sign.turn": 10,
+    "sign.chevron": 41,
+    "tree.oak": 8,
+    "tyrestack": 8,
+    "sign.advert.high": 3,
+    "haybale": 16
+   },
+   "validatedBoards": 15,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "support of gantry.banner": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "tree.oak": 2,
+    "sign.advert.low": 2,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "meridian-docks",
+   "theme": "docks",
+   "propsBefore": 141,
+   "propsAfter": 281,
+   "stripsBefore": 132,
+   "stripsAfter": 134,
+   "tunnels": [
+    {
+     "fromM": 402,
+     "lengthM": 130
+    }
+   ],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 36,
+    "sign.advert.low": 13,
+    "tunnel.portal": 2,
+    "tunnel.arch": 14,
+    "sign.turn": 10,
+    "sign.chevron": 33,
+    "tyrestack": 8,
+    "sign.advert.high": 11,
+    "stones": 9,
+    "barrel": 3,
+    "gantry.banner": 1
+   },
+   "validatedBoards": 9,
+   "interactiveObjects": 20,
+   "interactive": {
+    "support of gantry.start": 2,
+    "sign.advert.low": 2,
+    "sign.chevron": 9,
+    "tyrestack": 3,
+    "support of gantry.banner": 2,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "kagerou-hills",
+   "theme": "dusk",
+   "propsBefore": 947,
+   "propsAfter": 1137,
+   "stripsBefore": 115,
+   "stripsAfter": 142,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 26,
+    "stones": 33,
+    "tree.oak": 9,
+    "tree.poplar": 16,
+    "sign.advert.high": 4,
+    "boulder": 9,
+    "sign.advert.low": 12,
+    "sign.turn": 10,
+    "sign.chevron": 38,
+    "tyrestack": 20,
+    "haybale": 12,
+    "gantry.banner": 1
+   },
+   "validatedBoards": 6,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "support of bridge": 2,
+    "support of gantry.banner": 2,
+    "tree.poplar": 2,
+    "sign.chevron": 9,
+    "tyrestack": 3,
+    "sign.advert.low": 2
+   }
+  },
+  {
+   "id": "silverlake",
+   "theme": "lake",
+   "propsBefore": 1128,
+   "propsAfter": 1342,
+   "stripsBefore": 94,
+   "stripsAfter": 120,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.0"
+   ],
+   "added": {
+    "marker.post": 22,
+    "tree.poplar": 33,
+    "stones": 39,
+    "sign.advert.high": 9,
+    "tree.oak": 9,
+    "sign.turn": 10,
+    "boulder": 21,
+    "sign.chevron": 35,
+    "haybale": 16,
+    "tyrestack": 12,
+    "sign.advert.low": 7,
+    "gantry.banner": 1
+   },
+   "validatedBoards": 18,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "tree.poplar": 1,
+    "sign.advert.low": 2,
+    "support of gantry.banner": 2,
+    "tree.oak": 1,
+    "support of bridge": 2,
+    "sign.chevron": 9,
+    "tyrestack": 3
+   }
+  },
+  {
+   "id": "costa-brisa",
+   "theme": "coast",
+   "propsBefore": 923,
+   "propsAfter": 1167,
+   "stripsBefore": 141,
+   "stripsAfter": 181,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.0"
+   ],
+   "added": {
+    "marker.post": 38,
+    "stones": 51,
+    "boulder": 41,
+    "sign.advert.high": 11,
+    "sign.advert.low": 14,
+    "tree.poplar": 18,
+    "gantry.banner": 1,
+    "sign.turn": 10,
+    "sign.chevron": 45,
+    "barrel": 15
+   },
+   "validatedBoards": 21,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "support of gantry.banner": 2,
+    "tree.poplar": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "support of bridge": 2,
+    "sign.advert.low": 2
+   }
+  },
+  {
+   "id": "ouarzane",
+   "theme": "desert",
+   "propsBefore": 596,
+   "propsAfter": 1001,
+   "stripsBefore": 116,
+   "stripsAfter": 141,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.0"
+   ],
+   "added": {
+    "marker.post": 50,
+    "boulder": 72,
+    "stones": 86,
+    "cactus": 97,
+    "sign.advert.high": 4,
+    "sign.advert.low": 15,
+    "sign.turn": 11,
+    "sign.chevron": 39,
+    "barrel": 18,
+    "tyrestack": 12,
+    "gantry.banner": 1
+   },
+   "validatedBoards": 24,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "sign.advert.low": 2,
+    "support of bridge": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "cactus": 2,
+    "support of gantry.banner": 2
+   }
+  },
+  {
+   "id": "glenmoor",
+   "theme": "highland",
+   "propsBefore": 755,
+   "propsAfter": 1075,
+   "stripsBefore": 108,
+   "stripsAfter": 136,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 26,
+    "boulder": 88,
+    "stones": 85,
+    "sign.advert.low": 4,
+    "tree.oak": 15,
+    "sign.turn": 11,
+    "sign.chevron": 49,
+    "haybale": 36,
+    "gantry.banner": 1,
+    "sign.advert.high": 5
+   },
+   "validatedBoards": 18,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "sign.chevron": 9,
+    "boulder": 3,
+    "support of gantry.banner": 2,
+    "tree.oak": 2,
+    "sign.advert.low": 2,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "nova-belvedere",
+   "theme": "park",
+   "propsBefore": 841,
+   "propsAfter": 1010,
+   "stripsBefore": 118,
+   "stripsAfter": 147,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 20,
+    "sign.advert.high": 11,
+    "sign.advert.low": 16,
+    "gantry.banner": 1,
+    "sign.turn": 12,
+    "sign.chevron": 42,
+    "tyrestack": 36,
+    "tree.oak": 11,
+    "stones": 7,
+    "tree.poplar": 13
+   },
+   "validatedBoards": 12,
+   "interactiveObjects": 22,
+   "interactive": {
+    "support of gantry.start": 2,
+    "support of gantry.banner": 2,
+    "sign.advert.low": 2,
+    "tree.oak": 2,
+    "sign.chevron": 9,
+    "tyrestack": 3,
+    "support of bridge": 2
+   }
+  },
+  {
+   "id": "grand-zenith",
+   "theme": "zenith",
+   "propsBefore": 1300,
+   "propsAfter": 1588,
+   "stripsBefore": 160,
+   "stripsAfter": 207,
+   "tunnels": [],
+   "gantries": [
+    "gantry.banner.0",
+    "gantry.banner.1"
+   ],
+   "added": {
+    "marker.post": 50,
+    "stones": 46,
+    "tree.poplar": 21,
+    "sign.advert.low": 34,
+    "sign.advert.high": 18,
+    "boulder": 21,
+    "sign.turn": 14,
+    "sign.chevron": 54,
+    "tyrestack": 28,
+    "gantry.banner": 2
+   },
+   "validatedBoards": 33,
+   "interactiveObjects": 26,
+   "interactive": {
+    "support of gantry.start": 2,
+    "support of bridge": 4,
+    "support of gantry.banner": 4,
+    "tree.poplar": 2,
+    "sign.chevron": 9,
+    "tyrestack": 3,
+    "sign.advert.low": 2
+   }
+  }
+ ],
+ "simulation": [
+  {
+   "circuit": "hazelbrook",
+   "cars": 16,
+   "classic": {
+    "objects": 0,
+    "msPer1000Steps": 30.5,
+    "winnerTime": 109.937,
+    "objectsHit": 0
+   },
+   "enriched": {
+    "objects": 0,
+    "msPer1000Steps": 15.1,
+    "winnerTime": 109.937,
+    "objectsHit": 0
+   },
+   "interactive": {
+    "objects": 22,
+    "msPer1000Steps": 23.7,
+    "winnerTime": 109.937,
+    "objectsHit": 2
+   }
+  },
+  {
+   "circuit": "grand-zenith",
+   "cars": 16,
+   "classic": {
+    "objects": 0,
+    "msPer1000Steps": 37.5,
+    "winnerTime": 203.532,
+    "objectsHit": 0
+   },
+   "enriched": {
+    "objects": 0,
+    "msPer1000Steps": 46.9,
+    "winnerTime": 203.532,
+    "objectsHit": 0
+   },
+   "interactive": {
+    "objects": 26,
+    "msPer1000Steps": 43.4,
+    "winnerTime": 203.532,
+    "objectsHit": 0
+   }
+  },
+  {
+   "circuit": "montclair",
+   "cars": 16,
+   "classic": {
+    "objects": 0,
+    "msPer1000Steps": 41.4,
+    "winnerTime": 124.722,
+    "objectsHit": 0
+   },
+   "enriched": {
+    "objects": 0,
+    "msPer1000Steps": 38,
+    "winnerTime": 124.722,
+    "objectsHit": 0
+   },
+   "interactive": {
+    "objects": 22,
+    "msPer1000Steps": 40.6,
+    "winnerTime": 124.722,
+    "objectsHit": 1
+   }
+  }
+ ],
+ "openVerges": [
+  {
+   "seed": 1,
+   "laps": 3,
+   "cars": 16,
+   "closedLimits": {
+    "steps": 34680,
+    "msPer1000Steps": 43.3,
+    "winnerTime": 243.794,
+    "finished": 13,
+    "wallHits": 6,
+    "offTrackSeconds": 33.3,
+    "resets": 7,
+    "contacts": 148,
+    "spins": 7,
+    "validatedBoardsHit": 0,
+    "objectsHit": 0,
+    "objectsDown": 0,
+    "byFamily": {},
+    "launches": 2
+   },
+   "openVergesWithoutVolumes": {
+    "steps": 34144,
+    "msPer1000Steps": 39.5,
+    "winnerTime": 241.825,
+    "finished": 15,
+    "wallHits": 0,
+    "offTrackSeconds": 41.6,
+    "resets": 7,
+    "contacts": 99,
+    "spins": 8,
+    "validatedBoardsHit": 0,
+    "objectsHit": 0,
+    "objectsDown": 0,
+    "byFamily": {},
+    "launches": 2
+   },
+   "openVergesWithVolumes": {
+    "objects": 194,
+    "steps": 34144,
+    "msPer1000Steps": 42,
+    "winnerTime": 242.176,
+    "finished": 15,
+    "wallHits": 0,
+    "offTrackSeconds": 52.2,
+    "resets": 7,
+    "contacts": 107,
+    "spins": 8,
+    "validatedBoardsHit": 0,
+    "objectsHit": 3,
+    "objectsDown": 0,
+    "byFamily": {
+     "tree.broadleaf": 1,
+     "gantry.banner": 2
+    },
+    "launches": 2
+   }
+  },
+  {
+   "seed": 2,
+   "laps": 3,
+   "cars": 16,
+   "closedLimits": {
+    "steps": 31681,
+    "msPer1000Steps": 32,
+    "winnerTime": 233.547,
+    "finished": 16,
+    "wallHits": 17,
+    "offTrackSeconds": 58.4,
+    "resets": 0,
+    "contacts": 99,
+    "spins": 0,
+    "validatedBoardsHit": 1,
+    "objectsHit": 0,
+    "objectsDown": 0,
+    "byFamily": {},
+    "launches": 4
+   },
+   "openVergesWithoutVolumes": {
+    "steps": 31217,
+    "msPer1000Steps": 35,
+    "winnerTime": 233.547,
+    "finished": 16,
+    "wallHits": 2,
+    "offTrackSeconds": 48.7,
+    "resets": 0,
+    "contacts": 74,
+    "spins": 0,
+    "validatedBoardsHit": 0,
+    "objectsHit": 0,
+    "objectsDown": 0,
+    "byFamily": {},
+    "launches": 2
+   },
+   "openVergesWithVolumes": {
+    "objects": 194,
+    "steps": 31252,
+    "msPer1000Steps": 31.7,
+    "winnerTime": 233.547,
+    "finished": 16,
+    "wallHits": 0,
+    "offTrackSeconds": 54.7,
+    "resets": 1,
+    "contacts": 102,
+    "spins": 0,
+    "validatedBoardsHit": 0,
+    "objectsHit": 2,
+    "objectsDown": 1,
+    "byFamily": {
+     "rock": 1,
+     "bush": 1
+    },
+    "launches": 2
+   }
+  },
+  {
+   "seed": 3,
+   "laps": 3,
+   "cars": 16,
+   "closedLimits": {
+    "steps": 31683,
+    "msPer1000Steps": 43.3,
+    "winnerTime": 233.422,
+    "finished": 16,
+    "wallHits": 13,
+    "offTrackSeconds": 49.2,
+    "resets": 0,
+    "contacts": 115,
+    "spins": 1,
+    "validatedBoardsHit": 0,
+    "objectsHit": 0,
+    "objectsDown": 0,
+    "byFamily": {},
+    "launches": 3
+   },
+   "openVergesWithoutVolumes": {
+    "steps": 31177,
+    "msPer1000Steps": 41.9,
+    "winnerTime": 233.422,
+    "finished": 16,
+    "wallHits": 0,
+    "offTrackSeconds": 43.8,
+    "resets": 0,
+    "contacts": 92,
+    "spins": 0,
+    "validatedBoardsHit": 0,
+    "objectsHit": 0,
+    "objectsDown": 0,
+    "byFamily": {},
+    "launches": 3
+   },
+   "openVergesWithVolumes": {
+    "objects": 194,
+    "steps": 31357,
+    "msPer1000Steps": 42.6,
+    "winnerTime": 233.422,
+    "finished": 16,
+    "wallHits": 0,
+    "offTrackSeconds": 46,
+    "resets": 1,
+    "contacts": 92,
+    "spins": 0,
+    "validatedBoardsHit": 0,
+    "objectsHit": 1,
+    "objectsDown": 0,
+    "byFamily": {
+     "tree.broadleaf": 1
+    },
+    "launches": 4
+   }
+  }
+ ],
+ "tuning": {
+  "carHeight": 1.05,
+  "repeatDelay": 0.6,
+  "quietSpeed": 1.5,
+  "reactions": {
+   "cone": {
+    "kind": "break",
+    "speedKeep": 0.985,
+    "jolt": 0.12,
+    "word": null,
+    "sound": {
+     "gain": 0.35,
+     "weight": 4,
+     "hard": false
+    }
+   },
+   "lightSign": {
+    "kind": "break",
+    "speedKeep": 0.92,
+    "jolt": 0.5,
+    "word": "CRAC",
+    "sound": {
+     "gain": 0.7,
+     "weight": 9,
+     "hard": true
+    }
+   },
+   "board": {
+    "kind": "break",
+    "speedKeep": 0.84,
+    "jolt": 0.8,
+    "word": "CRAC",
+    "sound": {
+     "gain": 0.9,
+     "weight": 12,
+     "hard": true
+    }
+   },
+   "bale": {
+    "kind": "break",
+    "speedKeep": 0.78,
+    "jolt": 0.7,
+    "word": "CRAC",
+    "sound": {
+     "gain": 0.6,
+     "weight": 6,
+     "hard": false
+    }
+   },
+   "tyres": {
+    "kind": "break",
+    "speedKeep": 0.6,
+    "jolt": 1,
+    "word": "BANG",
+    "sound": {
+     "gain": 0.8,
+     "weight": 7,
+     "hard": false
+    }
+   },
+   "bush": {
+    "kind": "break",
+    "speedKeep": 0.88,
+    "jolt": 0.45,
+    "word": null,
+    "sound": {
+     "gain": 0.45,
+     "weight": 5,
+     "hard": false
+    }
+   },
+   "barrel": {
+    "kind": "solid",
+    "stopKeep": 0.3,
+    "glanceKeep": 0.8,
+    "glanceOverlap": 0.5,
+    "spinSpeed": 30,
+    "word": "BANG",
+    "sound": {
+     "gain": 0.9,
+     "weight": 14,
+     "hard": true
+    }
+   },
+   "trunk": {
+    "kind": "solid",
+    "stopKeep": 0.1,
+    "glanceKeep": 0.7,
+    "glanceOverlap": 0.45,
+    "spinSpeed": 20,
+    "word": "BANG",
+    "sound": {
+     "gain": 1,
+     "weight": 16,
+     "hard": false
+    }
+   },
+   "rock": {
+    "kind": "solid",
+    "stopKeep": 0.08,
+    "glanceKeep": 0.65,
+    "glanceOverlap": 0.45,
+    "spinSpeed": 18,
+    "word": "BANG",
+    "sound": {
+     "gain": 1,
+     "weight": 18,
+     "hard": true
+    }
+   },
+   "pillar": {
+    "kind": "solid",
+    "stopKeep": 0.08,
+    "glanceKeep": 0.65,
+    "glanceOverlap": 0.4,
+    "spinSpeed": 18,
+    "word": "BANG",
+    "sound": {
+     "gain": 1,
+     "weight": 18,
+     "hard": true
+    }
+   }
+  }
+ }
+}
