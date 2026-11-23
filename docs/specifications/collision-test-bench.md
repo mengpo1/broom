@@ -31,6 +31,21 @@ l'adresse et recharger la page.
 | `#lab=board` (ou `e5`, `panneau`) | **Panneau de bord de piste** (E5) | envol à 242 km/h, retombée sans explosion, glissade jusqu'à l'arrêt dans l'herbe |
 | `#lab=bump` (ou `e4`, `tamponnage`) | Tamponnage arrière (E4) | 146 → environ 59 km/h derrière une voiture à 105 km/h |
 
+### Objets de bord de piste (lot suivant)
+
+Sept cas ajoutés pour les objets de bord de piste (`trackside-objects.md`). Les contacts avec
+ces objets sont **expérimentaux** : ils n'existent que sur les circuits du banc.
+
+| Option | Touche | Cas rejoué | Ce qui doit se passer |
+|---|---|---|---|
+| `#lab=sign` (ou `destructible`) | `6` | Panneau destructible | sur l'accotement à 150 km/h : le panneau tombe et reste couché, la voiture continue vers 127 km/h, sans envol |
+| `#lab=rock` (ou `rocher`, `rigide`) | `7` | Obstacle rigide | bloc heurté à 110 km/h : arrêt net, tête-à-queue, remise en piste ; le bloc ne bouge pas |
+| `#lab=gantry` (ou `portique`) | `8` | Passage sous un portique | à 250 km/h : rien, on passe dessous |
+| `#lab=pillar` (ou `pilier`, `support`) | `9` | Support de portique | sur l'accotement à 100 km/h : arrêt net, tête-à-queue |
+| `#lab=tunnel` | `0` | Tunnel | à 220 km/h : aucun contact ; le sol et les murs s'assombrissent, la sortie reste claire |
+| `#lab=offtrack` (ou `sortie`, `accotement`) | `O` | Sortie de piste, accotements ouverts | la voiture roule 7 m au-delà de la ligne de barrière habituelle, sans mur, puis revient |
+| `#lab=close` (ou `contact`) | `K` | Contact rapproché | deux voitures côte à côte à 180 km/h : contact roue contre roue des règles validées |
+
 ## Pendant l'essai
 
 Un bandeau en haut de l'écran rappelle le cas en cours et les touches.
@@ -38,6 +53,7 @@ Un bandeau en haut de l'écran rappelle le cas en cours et les touches.
 | Touche | Effet |
 |---|---|
 | `1` `2` `3` `4` `5` | choisir un cas (roue contre roue, saut, accident, panneau, tamponnages) |
+| `6` `7` `8` `9` `0` `O` `K` | cas des objets de bord de piste (tableau ci-dessus) |
 | `Entrée` | rejouer le cas en cours |
 | `C` | changer de caméra (cockpit, poursuite, face, bord de piste), comme en course |
 | `Échap` | pause, comme en course |
