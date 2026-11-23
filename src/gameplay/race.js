@@ -12,6 +12,7 @@ import { DIFFICULTY_LEVELS, makeAiSkill } from '../ai/driver-profiles.js';
 import { createAiController, updateAiController } from '../ai/driver-ai.js';
 import { buildSpeedProfile } from '../ai/speed-profile.js';
 import { resolveRules } from './rules.js';
+import { resolveSteering, steeringVariant } from '../vehicles/steering-variants.js';
 
 export const RACE_PHASE = { COUNTDOWN: 'countdown', RACING: 'racing', FINISHED: 'finished' };
 export const SIM_HZ = 120;
@@ -72,6 +73,8 @@ export class Race {
       car.isHuman = !!entry.human;
       car.playerIndex = entry.human ? entry.playerIndex ?? 0 : -1;
       car.autoDrive = !!entry.autoDrive;
+      // (experimental steering variants are for the cars a player drives; unset, or for any other car: the validated driving)
+      car.steering = car.isHuman && !car.autoDrive ? resolveSteering(config.steering) : null;
       car.teamIndex = entry.driver.team;
       const skill = makeAiSkill(entry.driver, car.isHuman ? DIFFICULTY_LEVELS.expert : this.difficulty);
       const setup = sanitizeSetup(entry.setup);
@@ -94,6 +97,17 @@ export class Race {
     this.humanCount = this.cars.filter((c) => c.isHuman).length;
     const reference = deriveCarParams(BASE_CAR_SPEC, null, this.profile, null);
     this.speedProfile = buildSpeedProfile(this.track, reference, this.difficulty.brakeUsage);
+  }
+
+  /**
+   * EXPERIMENTAL: change the steering variant of the players' cars (vehicles/steering-variants.js):
+   * a name, or a variant object (a hand-tuned copy). False, and nothing changed, for an unknown name.
+   */
+  setSteeringVariant(variant) {
+    const resolved = variant && typeof variant === 'object' ? variant : steeringVariant(variant);
+    if (resolved === undefined) return false;
+    for (const car of this.cars) if (car.isHuman && !car.autoDrive) { car.steering = resolved; car.steerHold = 0; car.steerExtra = 0; car.steerShown = 0; car.driftYaw = 0; }
+    return true;
   }
 
   /** Feed one player's controls (called by the input layer before each step). */

@@ -89,7 +89,32 @@ export const CIRCUITS = [
   },
 ];
 
-const BY_ID = new Map(CIRCUITS.map((c) => [c.id, c]));
+/**
+ * Development circuits: not part of any season, never listed in the menus, reachable only through a
+ * launch option (see core/steering-bench.js).
+ * `banc-direction`: a flat test track for the steering. After a long straight, seven bends of
+ * different radii, six to the right and one to the left (the fourth). Measured on the built track:
+ * 72, 135, 208, 100, 158, 259 and 311 m, turning by 90, 52, 91, 95, 98, 79 and 45 degrees.
+ * `banc-reference`: the two long turns of the passage of the reference footage studied for the held
+ * steering (a right-hand turn of about 128 degrees entered at 318 km/h, then a left-hand turn of
+ * 67 degrees taken at 215 km/h). The footage shows neither the controls nor the shape of the road:
+ * these bends are the path of the validated car driven with the keys the hands of the footage
+ * suggest, at the speed its display shows, a hypothesis (fitted by
+ * work/scripts/reference-passage-track.mjs --fit: the car then stays within 3 m of the centre
+ * line); the three other corners only close the loop.
+ */
+export const DEV_CIRCUITS = [
+  {
+    id: 'banc-direction', name: 'Banc de direction', region: 'Piste d\'essai', theme: 'plains', pitSide: -1, width: 14, laps: 3,
+    corners: [[1100, 0, 60], [1100, 500, 120], [650, 850, 200], [350, 450, 90], [-100, 850, 150], [-400, 400, 250], [0, 0, 300]],
+  },
+  {
+    id: 'banc-reference', name: 'Banc du passage de référence', region: 'Piste d\'essai', theme: 'plains', pitSide: -1, width: 14, laps: 3,
+    corners: [[310.4, 0, 159.9], [380.3, 203.6, 157], [261.6, 355.7, 136.9], [477.1, 744.3, 120], [-1000, 744.3, 150], [-1000, 0, 150]],
+  },
+];
+
+const BY_ID = new Map([...CIRCUITS, ...DEV_CIRCUITS].map((c) => [c.id, c]));
 
 export function getCircuit(id) {
   const def = BY_ID.get(id);

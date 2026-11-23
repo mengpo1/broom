@@ -106,7 +106,7 @@ export class GameApp {
       this.renderer.setTrackAttributes(buildTrackAttributes(track, MAX_TRACK_SAMPLES));
       this.art.loadTheme(track, this.palette, layout);
     }
-    this.race = new Race({ ...config, track });
+    this.race = new Race({ steering: this.steeringVariant, ...config, track });      // (steeringVariant: experimental launch option, undefined otherwise)
     this.viewTargets = config.views && config.views.length ? config.views.slice(0, 2) : [0];
     this.viewCount = this.viewTargets.length;
     const colors = shaderColors(this.palette);
@@ -184,6 +184,7 @@ export class GameApp {
     const race = this.race;
     if (this.input) this.input.apply(race, this);
     if (this.lab) this.lab.beforeStep();          // development test bench (collision-lab.js): absent in normal play
+    if (this.steerLab) this.steerLab.beforeStep();   // development steering bench (steering-bench.js): absent in normal play
     race.step(SIM_DT);
     for (let i = 0; i < race.eventCount; i++) this.dispatch(race.events[i]);
     race.eventCount = 0;
