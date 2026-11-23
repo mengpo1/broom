@@ -105,14 +105,20 @@ const out = { date: new Date().toISOString(), note: 'reference values are approx
       statesSeen: states, explosion: !!ev('crash'), repositioned: !!ev('reset'), carAheadDisturbed: Math.abs(log.frames[launch.frame].b.speed - log.atEvent(launch).b.speed) > 0.5 };
   };
   out.HOP = { reference: 'none: the recoverable hop is an original gameplay choice, not shown by the footage',
-    thresholds: { closingKmh: r1(T.hopClosingSpeed * KMH), minSpeedKmh: r1(T.hopMinSpeed * KMH), alignedWithinDegrees: r1(Math.acos(T.hopAlignedCos) * 57.3), lateralOverlapFromBehind: [T.hopOverlapMin, T.launchOverlapMax], lateralOverlapOfTheAccident: [T.launchOverlapMin, T.launchOverlapMax],
-      lengthwiseOverlapSideBySideMax: T.hopSideOverlapMax, accidentFromClosingKmh: r1(T.launchClosingSpeed * KMH), accidentFromSpeedKmh: r1(T.launchMinSpeed * KMH) },
+    thresholds: { closingKmh: r1(T.hopClosingSpeed * KMH), minSpeedKmh: r1(T.hopMinSpeed * KMH), alignedWithinDegrees: r1(Math.acos(T.hopAlignedCos) * 57.3),
+      shareOfFrontTyreBehindRearTyreMin: T.hopTyreOverlapMin, frontWheelBehindRearAxleMinMetres: T.hopAxleGapMin, noSecondHopOverTheSameCarSeconds: T.hopSamePairTime,
+      lateralOverlapOfTheAccident: [T.launchOverlapMin, T.launchOverlapMax], accidentFromClosingKmh: r1(T.launchClosingSpeed * KMH), accidentFromSpeedKmh: r1(T.launchMinSpeed * KMH) },
     game: {
-      fromBehind200onto150: hopOf({ gap: 2, lateral: 0.93, speedA: 200 / KMH, speedB: 150 / KMH }, { throttleA: 1, throttleB: 0.6 }),
-      fromBehind170onto100: hopOf({ gap: 2, lateral: 0.93, speedA: 170 / KMH, speedB: 100 / KMH }, { throttleA: 1, throttleB: 0.5 }),
-      sideBySide200beside150: hopOf({ gap: 1.2, lateral: 2.1, speedA: 200 / KMH, speedB: 150 / KMH, headingA: 0.02 }, { throttleA: 0.8, throttleB: 0.6 }),
-      belowTheClosingSpeed160onto140: hopOf({ gap: 2, lateral: 0.93, speedA: 160 / KMH, speedB: 140 / KMH }, { throttleA: 0.6, throttleB: 0.5 }),
-      aboveIt262onto190isTheAccident: hopOf({ gap: 2.5, lateral: 0.93, speedA: 262 / KMH, speedB: 190 / KMH }, { throttleA: 1, throttleB: 0.7 }),
+      // tyre behind tyre: the cars offset by 1.7 m
+      fromBehind200onto150: hopOf({ gap: 2, lateral: 1.7, speedA: 200 / KMH, speedB: 150 / KMH }, { throttleA: 1, throttleB: 0.6 }),
+      fromBehind262onto188: hopOf({ gap: 2, lateral: 1.7, speedA: 262 / KMH, speedB: 188 / KMH }, { throttleA: 1, throttleB: 0.7 }),
+      arrivingFromTheSideBehindTheRearWheel: hopOf({ gap: 0.3, lateral: 2.05, speedA: 200 / KMH, speedB: 150 / KMH, headingA: 0.1 }, { throttleA: 0.8, throttleB: 0.6 }),
+      // no hop: not enough energy, or not the geometry (half a car width apart: the nose on the wheel; wheels side by side)
+      belowTheClosingSpeed192onto150: hopOf({ gap: 2, lateral: 1.7, speedA: 192 / KMH, speedB: 150 / KMH }, { throttleA: 0.45, throttleB: 0.45 }),
+      belowTheSpeed140onto90: hopOf({ gap: 2, lateral: 1.7, speedA: 140 / KMH, speedB: 90 / KMH }, { throttleA: 0.45, throttleB: 0.45 }),
+      noseOnTheWheel200onto150: hopOf({ gap: 2, lateral: 0.93, speedA: 200 / KMH, speedB: 150 / KMH }, { throttleA: 1, throttleB: 0.6 }),
+      wheelsSideBySide200beside150: hopOf({ gap: -1.5, lateral: 2.1, speedA: 200 / KMH, speedB: 150 / KMH, headingA: 0.03 }, { throttleA: 0.8, throttleB: 0.6 }),
+      noseOnTheWheel262onto190isTheAccident: hopOf({ gap: 2.5, lateral: 0.93, speedA: 262 / KMH, speedB: 190 / KMH }, { throttleA: 1, throttleB: 0.7 }),
     } };
 }
 // ---- E5: board

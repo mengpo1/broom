@@ -178,14 +178,16 @@ test('E5 launch on a board: thrown in the air, light landing without loss of spe
   assert.equal(car.gear, 1);
 });
 
-// (Changed with the recoverable hop. This test used to say "no flight" for every case below the
-// thresholds of the accident. One of its cases, wheel over wheel at 170 km/h onto a car doing
-// 100 km/h, now sits in the new intermediate level and gives a hop: the test states the three
-// levels instead. The cases and the thresholds of the accident itself are unchanged.)
+// (Changed twice. With the recoverable hop, its case "wheel over wheel at 170 km/h onto a car doing
+// 100 km/h" became a hop. After the third human test the hop was restricted to a front wheel standing
+// behind a rear wheel: half a car width apart the nose is on the wheel, and that case is again what
+// it was at first, a contact without flight. A case of the hop with its own geometry is added. The
+// cases and the thresholds of the accident itself have never changed.)
 test('launch conditions are explicit: three levels by energy, and no flight outside the overlap window', () => {
   const cases = [
     { name: 'in line (full overlap)', lateral: 0, speedA: 262, speedB: 190, outcome: 'none' },
-    { name: 'too slow for the accident: a hop', lateral: 0.93, speedA: 170, speedB: 100, outcome: 'hop' },
+    { name: 'too slow for the accident, nose on the wheel: no flight', lateral: 0.93, speedA: 170, speedB: 100, outcome: 'none' },
+    { name: 'front wheel behind rear wheel, enough energy: a hop', lateral: 1.7, speedA: 200, speedB: 150, outcome: 'hop' },
     { name: 'low closing speed', lateral: 0.93, speedA: 262, speedB: 240, outcome: 'none' },
     { name: 'too slow even for a hop', lateral: 0.93, speedA: 95, speedB: 45, outcome: 'none' },
     { name: 'wheel over wheel, fast', lateral: 0.93, speedA: 262, speedB: 190, outcome: 'accident' },
@@ -200,7 +202,7 @@ test('launch conditions are explicit: three levels by energy, and no flight outs
     if (c.outcome === 'accident') assert.equal(a.airKind, 1, `${c.name}: hard landing ahead`);
   }
   assert.ok(T.launchMinSpeed * KMH > 146 && T.launchClosingSpeed > 0, 'thresholds stay above the speeds of the bumps of E4');
-  assert.ok(T.hopClosingSpeed * KMH > 30, 'and the hop needs more closing speed than the wheel contact of E2 (about 25 km/h)');
+  assert.ok(T.hopClosingSpeed * KMH > 41, 'and the hop needs more closing speed than the wheel contact of E2 (about 25 km/h) and the bump of E4 (about 41)');
 });
 
 test('pitch of the view (E3, hard): nose up and held, steady swing, ground held, rebound, second dip, level again', () => {

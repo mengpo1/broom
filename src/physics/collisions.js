@@ -102,9 +102,8 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
           contactDamage(follower, leader, closing, rules);
           return true;
         }
-        // the same contact with less energy, or tyre against tyre at the very edge of the cars (less overlap than the
-        // accident needs): a hop the car recovers from
-        if (overlap > T.hopOverlapMin && overlap <= T.launchOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
+        // a front wheel behind a rear wheel, with enough energy: a hop the car recovers from (occasional: see the tuning)
+        if (wheelBehindWheel(follower, leader) && hopEnergy(follower, leader, closing, ca * cb + sa * sb, rules)) {
           startHop(follower, emit, leader.index, side, Math.abs(dx * ca + dz * sa), leader.speed);
           countContact(follower, leader, time, emit, closing);
           contactDamage(follower, leader, closing, rules);
@@ -114,13 +113,13 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
         return true;
       }
     } else {
-      // side by side. When the car behind has only its front wheel beside the rear wheel of the car ahead
-      // and arrives fast enough, that wheel lifts it: a hop. Otherwise the wheels rub (E2).
+      // side by side. When the nose of the car behind is only just alongside the tail of the car ahead, its front
+      // wheel is still BEHIND the rear wheel of that car, in the same lane: arriving fast enough, it runs onto it
+      // and is lifted (a hop). As soon as the wheels are side by side they only rub (E2).
       const along = dx * ca + dz * sa;                             // how far b is ahead of a
       const follower = along > 0 ? a : b, leader = follower === a ? b : a;
       const closing = follower.speed - leader.speed;
-      const lengthwise = (pa.halfLength + pb.halfLength - Math.abs(along)) / (pa.halfLength + pb.halfLength);
-      if (lengthwise <= T.hopSideOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
+      if (wheelBehindWheel(follower, leader) && hopEnergy(follower, leader, closing, ca * cb + sa * sb, rules)) {
         const lateral = -dx * sa + dz * ca, side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
         startHop(follower, emit, leader.index, side, Math.abs(along), leader.speed);
         // thrown clear of the car it touched: it flies parallel to it, drifting away sideways
@@ -228,12 +227,35 @@ function rearContact(follower, leader, closing, rules, time, emit) {
 function rearmed(car) { return car.clock - car.rearmClock >= COLLISION_TUNING.hopRearmTime; }
 
 /**
+ * Geometry of a wheel riding over a wheel: is a front wheel of `follower` standing behind a rear wheel
+ * of `leader`, in line with it? The wheels compared are the front wheel of the car behind that is on
+ * the side of the car ahead, and the rear wheel of the car ahead that is on the side of the car
+ * behind (cars offset sideways by about a track width; in line, the nose would meet the gearbox first).
+ * `out` (optional) receives [share of the front tyre width in line with the rear tyre, distance of the
+ * front wheel behind the rear axle of the car ahead in metres].
+ */
+export function wheelBehindWheel(follower, leader, out) {
+  const T = COLLISION_TUNING, W = T.wheels;
+  const cl = Math.cos(leader.heading), sl = Math.sin(leader.heading), cf = Math.cos(follower.heading), sf = Math.sin(follower.heading);
+  const side = -(follower.x - leader.x) * sl + (follower.z - leader.z) * cl >= 0 ? 1 : -1;      // which side of the car ahead the car behind is on
+  // the front wheel of the car behind, on the side of the car ahead, seen from the car ahead
+  const px = follower.x + cf * W.frontAxle + sf * side * W.frontTrack - leader.x, pz = follower.z + sf * W.frontAxle - cf * side * W.frontTrack - leader.z;
+  const xw = px * cl + pz * sl, yw = (-px * sl + pz * cl) * side;
+  const inLine = Math.min(yw + W.frontTyreWidth / 2, W.rearTrack + W.rearTyreWidth / 2) - Math.max(yw - W.frontTyreWidth / 2, W.rearTrack - W.rearTyreWidth / 2);
+  const share = Math.max(0, inLine) / W.frontTyreWidth, gap = W.rearAxle - xw;
+  if (out) { out[0] = share; out[1] = gap; }
+  return share >= T.hopTyreOverlapMin && gap >= T.hopAxleGapMin;
+}
+
+/**
  * Energy of a wheel-over-wheel contact that lifts the car behind without wrecking it: explicit
  * thresholds on the relative speed, the speed of the car and the angle between the two
- * (the geometry of the contact is checked by the caller).
+ * (the geometry of the contact is checked by the caller). A car does not hop twice in a row over
+ * the same car: for a while after the landing, a new contact with it is an ordinary one.
  */
-function hopEnergy(follower, closing, cosAngle, rules) {
+function hopEnergy(follower, leader, closing, cosAngle, rules) {
   const T = COLLISION_TUNING;
+  if (follower.landKind === LANDING.RECOVERABLE && follower.launchOther === leader.index && follower.clock - follower.rearmClock < T.hopSamePairTime) return false;
   return rules.crashes !== false && closing >= T.hopClosingSpeed && follower.speed >= T.hopMinSpeed
     && cosAngle >= T.hopAlignedCos && rearmed(follower);
 }

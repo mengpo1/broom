@@ -1,0 +1,2491 @@
+{
+ "tuning": {
+  "launchClosingSpeed": 15,
+  "launchMinSpeed": 50,
+  "launchOverlapMin": 0.2,
+  "launchOverlapMax": 0.8,
+  "hopTyreOverlapMin": 0.5,
+  "hopAxleGapMin": 0.65,
+  "hopClosingSpeed": 15,
+  "hopMinSpeed": 50,
+  "hopAlignedCos": 0.94,
+  "hopSamePairTime": 8,
+  "hopFlightTime": 0.45,
+  "hopPeakHeight": 0.55,
+  "hopSeparation": 13.33,
+  "hopLandingSpeedFactor": 1,
+  "hopSideKick": 1.5,
+  "hopWobbleTime": 0.7,
+  "hopWobbleSteer": 0.3,
+  "hopWobbleSwings": 1,
+  "hopRearmTime": 1.5
+ },
+ "seriesWindowSeconds": 10,
+ "afterWindowSeconds": 5,
+ "summary": {
+  "races": 108,
+  "carsPerRace": 16,
+  "laps": 3,
+  "hops": 15,
+  "hopsPerRace": 0.14,
+  "racesWithoutHop": 95,
+  "mostInOneRace": 3,
+  "alone": 15,
+  "inSeries": 0,
+  "followedByContactOfTheSameCars": 0,
+  "followedBy": {
+   "bump": 0,
+   "wheel": 0,
+   "hop": 0,
+   "launch": 0,
+   "crash": 0
+  },
+  "playerCar": 4,
+  "tyreBehindTyre": {
+   "atLeastHalf": 1,
+   "none": 0
+  },
+  "frontAxleBehindRearAxleByATyre": 1,
+  "bodyOverlap": {
+   "under20": 1,
+   "from20to50": 0,
+   "from50to80": 0
+  },
+  "fromTheSide": 0.8,
+  "closingKmh": {
+   "under45": 0,
+   "from45to54": 0,
+   "over54": 1
+  },
+  "speedKmh": {
+   "under150": 0,
+   "from150to180": 0,
+   "over180": 1
+  },
+  "totals": {
+   "bump": 937,
+   "wheel": 5901,
+   "hop": 15,
+   "hardLaunch": 35,
+   "crash": 123,
+   "obstacle": 67,
+   "wall": 1195,
+   "reset": 106
+  }
+ },
+ "races": [
+  {
+   "circuit": "hazelbrook",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 168.02,
+   "winnerTime": 155.27,
+   "bestLap": 50.58,
+   "counts": {
+    "bump": 7,
+    "wheel": 26,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 7,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "porto-sereno",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 186.37,
+   "winnerTime": 175.12,
+   "bestLap": 57.171,
+   "counts": {
+    "bump": 14,
+    "wheel": 62,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 14,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "montclair",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 182.62,
+   "winnerTime": 175.25,
+   "bestLap": 57.202,
+   "counts": {
+    "bump": 7,
+    "wheel": 60,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 16,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "sablon",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 173.35,
+   "winnerTime": 163.61,
+   "bestLap": 53.089,
+   "counts": {
+    "bump": 5,
+    "wheel": 27,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 5,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kestrel-fields",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 238.16,
+   "winnerTime": 225.12,
+   "bestLap": 73.824,
+   "counts": {
+    "bump": 10,
+    "wheel": 59,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 3,
+    "obstacle": 2,
+    "wall": 11,
+    "reset": 3
+   },
+   "hops": []
+  },
+  {
+   "circuit": "aurelia-parc",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 212.13,
+   "winnerTime": 195.55,
+   "bestLap": 64.009,
+   "counts": {
+    "bump": 10,
+    "wheel": 96,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 1,
+    "wall": 23,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "lindqvist",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 182.38,
+   "winnerTime": 174.06,
+   "bestLap": 56.765,
+   "counts": {
+    "bump": 6,
+    "wheel": 48,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 10,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "baia-dourada",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 225.75,
+   "winnerTime": 212.92,
+   "bestLap": 69.773,
+   "counts": {
+    "bump": 5,
+    "wheel": 41,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 2,
+    "wall": 2,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "roca-alta",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 233.44,
+   "winnerTime": 220.88,
+   "bestLap": 72.433,
+   "counts": {
+    "bump": 9,
+    "wheel": 65,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 9,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "tannenring",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 193.01,
+   "winnerTime": 181,
+   "bestLap": 59.113,
+   "counts": {
+    "bump": 8,
+    "wheel": 51,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 4,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "meridian-docks",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 234.5,
+   "winnerTime": 221.93,
+   "bestLap": 72.753,
+   "counts": {
+    "bump": 23,
+    "wheel": 88,
+    "hop": 1,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 6,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 69.09,
+     "car": 15,
+     "other": 8,
+     "player": true,
+     "speed": 219.7,
+     "closing": 73.4,
+     "side": 1.78,
+     "behind": 4.11,
+     "bodyOverlap": 0.04,
+     "tyreOverlap": 0.66,
+     "axleGap": 1.37,
+     "landed": 69.54,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "kagerou-hills",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 215.47,
+   "winnerTime": 203.72,
+   "bestLap": 66.733,
+   "counts": {
+    "bump": 11,
+    "wheel": 57,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 12,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "silverlake",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 198.75,
+   "winnerTime": 183.62,
+   "bestLap": 60.017,
+   "counts": {
+    "bump": 7,
+    "wheel": 53,
+    "hop": 1,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 3,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 110.09,
+     "car": 15,
+     "other": 8,
+     "player": true,
+     "speed": 247,
+     "closing": 123.4,
+     "side": 2.04,
+     "behind": 3.9,
+     "bodyOverlap": 0,
+     "tyreOverlap": 0.54,
+     "axleGap": 1.08,
+     "landed": 110.54,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "costa-brisa",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 237.7,
+   "winnerTime": 225.02,
+   "bestLap": 73.615,
+   "counts": {
+    "bump": 5,
+    "wheel": 34,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 2,
+    "wall": 7,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "ouarzane",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 242.38,
+   "winnerTime": 228.91,
+   "bestLap": 75.091,
+   "counts": {
+    "bump": 4,
+    "wheel": 59,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 4,
+    "obstacle": 1,
+    "wall": 15,
+    "reset": 4
+   },
+   "hops": []
+  },
+  {
+   "circuit": "glenmoor",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 214.11,
+   "winnerTime": 201.95,
+   "bestLap": 66.134,
+   "counts": {
+    "bump": 7,
+    "wheel": 39,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 4,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "nova-belvedere",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 231.95,
+   "winnerTime": 217.66,
+   "bestLap": 71.473,
+   "counts": {
+    "bump": 12,
+    "wheel": 56,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 7,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "grand-zenith",
+   "rules": "arcade",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 305.87,
+   "winnerTime": 287.97,
+   "bestLap": 94.764,
+   "counts": {
+    "bump": 8,
+    "wheel": 49,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 3,
+    "obstacle": 2,
+    "wall": 17,
+    "reset": 3
+   },
+   "hops": []
+  },
+  {
+   "circuit": "hazelbrook",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 163.03,
+   "winnerTime": 155.6,
+   "bestLap": 50.58,
+   "counts": {
+    "bump": 5,
+    "wheel": 36,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 2,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "porto-sereno",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 190.12,
+   "winnerTime": 175.16,
+   "bestLap": 57.171,
+   "counts": {
+    "bump": 7,
+    "wheel": 66,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 18,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "montclair",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 189.02,
+   "winnerTime": 175.29,
+   "bestLap": 57.202,
+   "counts": {
+    "bump": 13,
+    "wheel": 68,
+    "hop": 1,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 12,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 63.92,
+     "car": 15,
+     "other": 9,
+     "player": true,
+     "speed": 269.4,
+     "closing": 54.9,
+     "side": 2,
+     "behind": 4.02,
+     "bodyOverlap": 0,
+     "tyreOverlap": 0.57,
+     "axleGap": 1.17,
+     "landed": 64.37,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "sablon",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 172.39,
+   "winnerTime": 163.79,
+   "bestLap": 53.244,
+   "counts": {
+    "bump": 4,
+    "wheel": 28,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 10,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kestrel-fields",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 240.81,
+   "winnerTime": 225.2,
+   "bestLap": 73.797,
+   "counts": {
+    "bump": 13,
+    "wheel": 61,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 1,
+    "wall": 28,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "aurelia-parc",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 206.22,
+   "winnerTime": 195.64,
+   "bestLap": 64.01,
+   "counts": {
+    "bump": 22,
+    "wheel": 67,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 15,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "lindqvist",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 187.75,
+   "winnerTime": 174.49,
+   "bestLap": 56.867,
+   "counts": {
+    "bump": 7,
+    "wheel": 51,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 27,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "baia-dourada",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 224.22,
+   "winnerTime": 213.29,
+   "bestLap": 69.773,
+   "counts": {
+    "bump": 3,
+    "wheel": 53,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 3,
+    "obstacle": 0,
+    "wall": 22,
+    "reset": 3
+   },
+   "hops": []
+  },
+  {
+   "circuit": "roca-alta",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 239.93,
+   "winnerTime": 220.98,
+   "bestLap": 72.433,
+   "counts": {
+    "bump": 12,
+    "wheel": 77,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 4,
+    "obstacle": 1,
+    "wall": 17,
+    "reset": 3
+   },
+   "hops": []
+  },
+  {
+   "circuit": "tannenring",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 191.78,
+   "winnerTime": 181.34,
+   "bestLap": 59.113,
+   "counts": {
+    "bump": 5,
+    "wheel": 42,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 10,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "meridian-docks",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 237.82,
+   "winnerTime": 221.96,
+   "bestLap": 72.49,
+   "counts": {
+    "bump": 17,
+    "wheel": 62,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 20,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kagerou-hills",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 219.72,
+   "winnerTime": 204.05,
+   "bestLap": 66.733,
+   "counts": {
+    "bump": 12,
+    "wheel": 65,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 3,
+    "obstacle": 0,
+    "wall": 6,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "silverlake",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 193.38,
+   "winnerTime": 183.8,
+   "bestLap": 60.017,
+   "counts": {
+    "bump": 6,
+    "wheel": 41,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 5,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "costa-brisa",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 237.72,
+   "winnerTime": 225.11,
+   "bestLap": 72.791,
+   "counts": {
+    "bump": 7,
+    "wheel": 65,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 3,
+    "obstacle": 2,
+    "wall": 29,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "ouarzane",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 240.8,
+   "winnerTime": 229.11,
+   "bestLap": 75.091,
+   "counts": {
+    "bump": 8,
+    "wheel": 69,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 4,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "glenmoor",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 214.94,
+   "winnerTime": 202.15,
+   "bestLap": 66.135,
+   "counts": {
+    "bump": 4,
+    "wheel": 60,
+    "hop": 1,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 11,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 107.22,
+     "car": 11,
+     "other": 7,
+     "player": false,
+     "speed": 219.1,
+     "closing": 84.4,
+     "side": 2.11,
+     "behind": 4.04,
+     "bodyOverlap": 0,
+     "tyreOverlap": 0.79,
+     "axleGap": 1.33,
+     "landed": 107.67,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "nova-belvedere",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 225.94,
+   "winnerTime": 217.98,
+   "bestLap": 71.472,
+   "counts": {
+    "bump": 6,
+    "wheel": 56,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 4,
+    "obstacle": 1,
+    "wall": 26,
+    "reset": 4
+   },
+   "hops": []
+  },
+  {
+   "circuit": "grand-zenith",
+   "rules": "arcade",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 297.79,
+   "winnerTime": 288.17,
+   "bestLap": 94.764,
+   "counts": {
+    "bump": 7,
+    "wheel": 59,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 2,
+    "wall": 4,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "hazelbrook",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 167.7,
+   "winnerTime": 155.61,
+   "bestLap": 50.58,
+   "counts": {
+    "bump": 10,
+    "wheel": 56,
+    "hop": 1,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 3,
+    "reset": 1
+   },
+   "hops": [
+    {
+     "t": 151.11,
+     "car": 13,
+     "other": 15,
+     "player": false,
+     "speed": 250,
+     "closing": 68.1,
+     "side": 2,
+     "behind": 3.99,
+     "bodyOverlap": 0,
+     "tyreOverlap": 0.56,
+     "axleGap": 1.15,
+     "landed": 151.56,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "porto-sereno",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 188.45,
+   "winnerTime": 175.16,
+   "bestLap": 57.171,
+   "counts": {
+    "bump": 11,
+    "wheel": 71,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 18,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "montclair",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 188.33,
+   "winnerTime": 175.28,
+   "bestLap": 57.202,
+   "counts": {
+    "bump": 14,
+    "wheel": 71,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 1,
+    "wall": 8,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "sablon",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 172.07,
+   "winnerTime": 163.79,
+   "bestLap": 53.244,
+   "counts": {
+    "bump": 7,
+    "wheel": 31,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 3,
+    "obstacle": 0,
+    "wall": 21,
+    "reset": 3
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kestrel-fields",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 244.15,
+   "winnerTime": 225.2,
+   "bestLap": 73.824,
+   "counts": {
+    "bump": 11,
+    "wheel": 79,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 3,
+    "obstacle": 2,
+    "wall": 13,
+    "reset": 3
+   },
+   "hops": []
+  },
+  {
+   "circuit": "aurelia-parc",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 214.07,
+   "winnerTime": 195.63,
+   "bestLap": 64.009,
+   "counts": {
+    "bump": 20,
+    "wheel": 77,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 25,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "lindqvist",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 187.84,
+   "winnerTime": 174.51,
+   "bestLap": 56.867,
+   "counts": {
+    "bump": 10,
+    "wheel": 58,
+    "hop": 0,
+    "hardLaunch": 2,
+    "crash": 3,
+    "obstacle": 0,
+    "wall": 9,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "baia-dourada",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 222.04,
+   "winnerTime": 213.29,
+   "bestLap": 69.773,
+   "counts": {
+    "bump": 10,
+    "wheel": 45,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 2,
+    "wall": 6,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "roca-alta",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 237.96,
+   "winnerTime": 220.98,
+   "bestLap": 72.433,
+   "counts": {
+    "bump": 9,
+    "wheel": 51,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 3,
+    "obstacle": 0,
+    "wall": 19,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "tannenring",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 191.77,
+   "winnerTime": 181.36,
+   "bestLap": 59.113,
+   "counts": {
+    "bump": 7,
+    "wheel": 39,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 4,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "meridian-docks",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 235.82,
+   "winnerTime": 221.95,
+   "bestLap": 72.753,
+   "counts": {
+    "bump": 23,
+    "wheel": 66,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 3,
+    "obstacle": 1,
+    "wall": 16,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kagerou-hills",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 213.5,
+   "winnerTime": 204.07,
+   "bestLap": 66.621,
+   "counts": {
+    "bump": 4,
+    "wheel": 55,
+    "hop": 1,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 13,
+    "reset": 1
+   },
+   "hops": [
+    {
+     "t": 17.14,
+     "car": 15,
+     "other": 7,
+     "player": true,
+     "speed": 205.6,
+     "closing": 65.1,
+     "side": 2.06,
+     "behind": 4.04,
+     "bodyOverlap": 0,
+     "tyreOverlap": 1,
+     "axleGap": 1.34,
+     "landed": 17.59,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "silverlake",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 197.22,
+   "winnerTime": 183.77,
+   "bestLap": 60.017,
+   "counts": {
+    "bump": 8,
+    "wheel": 58,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 4,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "costa-brisa",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 233.32,
+   "winnerTime": 225.13,
+   "bestLap": 73.629,
+   "counts": {
+    "bump": 10,
+    "wheel": 45,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 11,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "ouarzane",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 242.97,
+   "winnerTime": 229.14,
+   "bestLap": 75.09,
+   "counts": {
+    "bump": 15,
+    "wheel": 61,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 1,
+    "wall": 12,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "glenmoor",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 214.92,
+   "winnerTime": 202.17,
+   "bestLap": 66.134,
+   "counts": {
+    "bump": 4,
+    "wheel": 69,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 15,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "nova-belvedere",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 230.86,
+   "winnerTime": 218.01,
+   "bestLap": 71.472,
+   "counts": {
+    "bump": 12,
+    "wheel": 65,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 1,
+    "wall": 9,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "grand-zenith",
+   "rules": "arcade",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 303.3,
+   "winnerTime": 288.22,
+   "bestLap": 94.764,
+   "counts": {
+    "bump": 8,
+    "wheel": 71,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 2,
+    "wall": 12,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "hazelbrook",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 177.13,
+   "winnerTime": 161.77,
+   "bestLap": 52.69,
+   "counts": {
+    "bump": 6,
+    "wheel": 36,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 7,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "porto-sereno",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 196.17,
+   "winnerTime": 182.05,
+   "bestLap": 59.463,
+   "counts": {
+    "bump": 7,
+    "wheel": 57,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 17,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "montclair",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 193.87,
+   "winnerTime": 182.32,
+   "bestLap": 59.546,
+   "counts": {
+    "bump": 8,
+    "wheel": 47,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 11,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "sablon",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 185.67,
+   "winnerTime": 170.45,
+   "bestLap": 55.398,
+   "counts": {
+    "bump": 2,
+    "wheel": 40,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 3,
+    "obstacle": 1,
+    "wall": 19,
+    "reset": 3
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kestrel-fields",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 246.62,
+   "winnerTime": 233.41,
+   "bestLap": 76.529,
+   "counts": {
+    "bump": 4,
+    "wheel": 60,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 16,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "aurelia-parc",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 218.88,
+   "winnerTime": 203.1,
+   "bestLap": 66.493,
+   "counts": {
+    "bump": 6,
+    "wheel": 52,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 19,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "lindqvist",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 197.63,
+   "winnerTime": 181.31,
+   "bestLap": 59.161,
+   "counts": {
+    "bump": 9,
+    "wheel": 50,
+    "hop": 1,
+    "hardLaunch": 2,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 3,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 27.47,
+     "car": 6,
+     "other": 3,
+     "player": false,
+     "speed": 198.4,
+     "closing": 100.4,
+     "side": 1.96,
+     "behind": 4.05,
+     "bodyOverlap": 0,
+     "tyreOverlap": 1,
+     "axleGap": 1.37,
+     "landed": 27.92,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "baia-dourada",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 239.81,
+   "winnerTime": 221.44,
+   "bestLap": 72.494,
+   "counts": {
+    "bump": 9,
+    "wheel": 63,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 3,
+    "wall": 15,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "roca-alta",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 242.81,
+   "winnerTime": 229.52,
+   "bestLap": 75.281,
+   "counts": {
+    "bump": 7,
+    "wheel": 63,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 7,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "tannenring",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 203.74,
+   "winnerTime": 188.65,
+   "bestLap": 61.562,
+   "counts": {
+    "bump": 10,
+    "wheel": 39,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 3,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "meridian-docks",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 252.55,
+   "winnerTime": 230.27,
+   "bestLap": 75.459,
+   "counts": {
+    "bump": 14,
+    "wheel": 60,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 16,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kagerou-hills",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 223.27,
+   "winnerTime": 211.87,
+   "bestLap": 69.351,
+   "counts": {
+    "bump": 9,
+    "wheel": 52,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 13,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "silverlake",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 203.04,
+   "winnerTime": 191.57,
+   "bestLap": 62.59,
+   "counts": {
+    "bump": 10,
+    "wheel": 34,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 1,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "costa-brisa",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 242.87,
+   "winnerTime": 234.16,
+   "bestLap": 76.772,
+   "counts": {
+    "bump": 3,
+    "wheel": 34,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 2,
+    "wall": 29,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "ouarzane",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 250.06,
+   "winnerTime": 237.49,
+   "bestLap": 77.853,
+   "counts": {
+    "bump": 12,
+    "wheel": 64,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 10,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "glenmoor",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 229.14,
+   "winnerTime": 210.3,
+   "bestLap": 68.848,
+   "counts": {
+    "bump": 6,
+    "wheel": 52,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 5,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "nova-belvedere",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 244.31,
+   "winnerTime": 226.44,
+   "bestLap": 74.319,
+   "counts": {
+    "bump": 11,
+    "wheel": 74,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 4,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "grand-zenith",
+   "rules": "racing",
+   "seed": 11,
+   "laps": 3,
+   "raceTime": 310.08,
+   "winnerTime": 299.68,
+   "bestLap": 98.556,
+   "counts": {
+    "bump": 9,
+    "wheel": 47,
+    "hop": 0,
+    "hardLaunch": 2,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 9,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "hazelbrook",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 174.53,
+   "winnerTime": 162.25,
+   "bestLap": 52.69,
+   "counts": {
+    "bump": 5,
+    "wheel": 29,
+    "hop": 1,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 0,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 22.63,
+     "car": 14,
+     "other": 7,
+     "player": false,
+     "speed": 206.3,
+     "closing": 84.1,
+     "side": 1.77,
+     "behind": 4.1,
+     "bodyOverlap": 0.05,
+     "tyreOverlap": 0.51,
+     "axleGap": 1.39,
+     "landed": 23.08,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "porto-sereno",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 191.75,
+   "winnerTime": 182.33,
+   "bestLap": 59.463,
+   "counts": {
+    "bump": 4,
+    "wheel": 32,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 6,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "montclair",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 193.47,
+   "winnerTime": 182.58,
+   "bestLap": 59.548,
+   "counts": {
+    "bump": 9,
+    "wheel": 53,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 5,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "sablon",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 188.08,
+   "winnerTime": 170.61,
+   "bestLap": 55.398,
+   "counts": {
+    "bump": 4,
+    "wheel": 32,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 13,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kestrel-fields",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 258.07,
+   "winnerTime": 233.69,
+   "bestLap": 76.528,
+   "counts": {
+    "bump": 7,
+    "wheel": 60,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 17,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "aurelia-parc",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 224.84,
+   "winnerTime": 203.26,
+   "bestLap": 66.492,
+   "counts": {
+    "bump": 11,
+    "wheel": 62,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 12,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "lindqvist",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 194.61,
+   "winnerTime": 181.73,
+   "bestLap": 59.161,
+   "counts": {
+    "bump": 7,
+    "wheel": 58,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 3,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "baia-dourada",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 235.32,
+   "winnerTime": 221.53,
+   "bestLap": 72.494,
+   "counts": {
+    "bump": 8,
+    "wheel": 51,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 10,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "roca-alta",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 239.34,
+   "winnerTime": 229.78,
+   "bestLap": 75.281,
+   "counts": {
+    "bump": 12,
+    "wheel": 71,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 12,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "tannenring",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 207.72,
+   "winnerTime": 189.02,
+   "bestLap": 61.562,
+   "counts": {
+    "bump": 11,
+    "wheel": 45,
+    "hop": 1,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 9,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 103.2,
+     "car": 10,
+     "other": 8,
+     "player": false,
+     "speed": 208.6,
+     "closing": 84.4,
+     "side": 1.87,
+     "behind": 4.08,
+     "bodyOverlap": 0,
+     "tyreOverlap": 0.82,
+     "axleGap": 1.37,
+     "landed": 103.65,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "meridian-docks",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 241.64,
+   "winnerTime": 230.3,
+   "bestLap": 75.46,
+   "counts": {
+    "bump": 7,
+    "wheel": 56,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 9,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kagerou-hills",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 229.56,
+   "winnerTime": 212.24,
+   "bestLap": 69.352,
+   "counts": {
+    "bump": 7,
+    "wheel": 58,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 8,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "silverlake",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 210.11,
+   "winnerTime": 191.63,
+   "bestLap": 62.589,
+   "counts": {
+    "bump": 9,
+    "wheel": 66,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 0,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "costa-brisa",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 254.67,
+   "winnerTime": 234.5,
+   "bestLap": 76.753,
+   "counts": {
+    "bump": 4,
+    "wheel": 29,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 1,
+    "obstacle": 2,
+    "wall": 13,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "ouarzane",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 251.32,
+   "winnerTime": 237.84,
+   "bestLap": 77.852,
+   "counts": {
+    "bump": 7,
+    "wheel": 55,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 13,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "glenmoor",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 227.47,
+   "winnerTime": 210.68,
+   "bestLap": 68.849,
+   "counts": {
+    "bump": 13,
+    "wheel": 74,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 2,
+    "wall": 22,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "nova-belvedere",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 250.53,
+   "winnerTime": 226.8,
+   "bestLap": 74.32,
+   "counts": {
+    "bump": 12,
+    "wheel": 70,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 13,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "grand-zenith",
+   "rules": "racing",
+   "seed": 23,
+   "laps": 3,
+   "raceTime": 310.39,
+   "winnerTime": 300.05,
+   "bestLap": 98.556,
+   "counts": {
+    "bump": 0,
+    "wheel": 34,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 6,
+    "obstacle": 1,
+    "wall": 21,
+    "reset": 6
+   },
+   "hops": []
+  },
+  {
+   "circuit": "hazelbrook",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 173.98,
+   "winnerTime": 162.26,
+   "bestLap": 52.69,
+   "counts": {
+    "bump": 3,
+    "wheel": 34,
+    "hop": 3,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 7,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 22.82,
+     "car": 9,
+     "other": 4,
+     "player": false,
+     "speed": 200.2,
+     "closing": 115.1,
+     "side": 2,
+     "behind": 3.97,
+     "bodyOverlap": 0,
+     "tyreOverlap": 0.62,
+     "axleGap": 1.45,
+     "landed": 23.27,
+     "inSeries": false,
+     "after": null
+    },
+    {
+     "t": 22.97,
+     "car": 11,
+     "other": 4,
+     "player": false,
+     "speed": 193.2,
+     "closing": 100.9,
+     "side": 2.25,
+     "behind": 3.97,
+     "bodyOverlap": 0,
+     "tyreOverlap": 0.5,
+     "axleGap": 1.31,
+     "landed": 23.42,
+     "inSeries": false,
+     "after": null
+    },
+    {
+     "t": 26.38,
+     "car": 12,
+     "other": 9,
+     "player": false,
+     "speed": 246,
+     "closing": 70.7,
+     "side": 1.79,
+     "behind": 4.14,
+     "bodyOverlap": 0.04,
+     "tyreOverlap": 0.92,
+     "axleGap": 1.34,
+     "landed": 26.83,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "porto-sereno",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 204.87,
+   "winnerTime": 182.33,
+   "bestLap": 59.464,
+   "counts": {
+    "bump": 8,
+    "wheel": 72,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 17,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "montclair",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 199.02,
+   "winnerTime": 182.61,
+   "bestLap": 59.548,
+   "counts": {
+    "bump": 9,
+    "wheel": 58,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 8,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "sablon",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 186.12,
+   "winnerTime": 170.6,
+   "bestLap": 55.399,
+   "counts": {
+    "bump": 12,
+    "wheel": 32,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 1,
+    "wall": 11,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kestrel-fields",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 255.42,
+   "winnerTime": 233.71,
+   "bestLap": 76.528,
+   "counts": {
+    "bump": 8,
+    "wheel": 60,
+    "hop": 1,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 3,
+    "reset": 1
+   },
+   "hops": [
+    {
+     "t": 28.79,
+     "car": 12,
+     "other": 14,
+     "player": false,
+     "speed": 222.1,
+     "closing": 63.6,
+     "side": 1.82,
+     "behind": 4.19,
+     "bodyOverlap": 0.02,
+     "tyreOverlap": 1,
+     "axleGap": 1.32,
+     "landed": 29.24,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "aurelia-parc",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 220.65,
+   "winnerTime": 203.27,
+   "bestLap": 66.491,
+   "counts": {
+    "bump": 9,
+    "wheel": 83,
+    "hop": 1,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 9,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 35.78,
+     "car": 8,
+     "other": 5,
+     "player": false,
+     "speed": 193.1,
+     "closing": 73.5,
+     "side": 1.77,
+     "behind": 4.16,
+     "bodyOverlap": 0.05,
+     "tyreOverlap": 0.98,
+     "axleGap": 1.34,
+     "landed": 36.23,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "lindqvist",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 194.56,
+   "winnerTime": 181.73,
+   "bestLap": 59.161,
+   "counts": {
+    "bump": 5,
+    "wheel": 40,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 8,
+    "reset": 2
+   },
+   "hops": []
+  },
+  {
+   "circuit": "baia-dourada",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 235.67,
+   "winnerTime": 221.51,
+   "bestLap": 72.495,
+   "counts": {
+    "bump": 3,
+    "wheel": 58,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 2,
+    "wall": 11,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "roca-alta",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 241.72,
+   "winnerTime": 229.81,
+   "bestLap": 75.281,
+   "counts": {
+    "bump": 13,
+    "wheel": 59,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 1,
+    "wall": 10,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "tannenring",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 202.07,
+   "winnerTime": 189.03,
+   "bestLap": 61.562,
+   "counts": {
+    "bump": 10,
+    "wheel": 51,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 2,
+    "obstacle": 0,
+    "wall": 10,
+    "reset": 1
+   },
+   "hops": []
+  },
+  {
+   "circuit": "meridian-docks",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 241.89,
+   "winnerTime": 230.32,
+   "bestLap": 75.46,
+   "counts": {
+    "bump": 8,
+    "wheel": 68,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 6,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "kagerou-hills",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 232.51,
+   "winnerTime": 212.26,
+   "bestLap": 69.351,
+   "counts": {
+    "bump": 8,
+    "wheel": 60,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 18,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "silverlake",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 207.62,
+   "winnerTime": 191.64,
+   "bestLap": 62.589,
+   "counts": {
+    "bump": 8,
+    "wheel": 40,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 3,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "costa-brisa",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 243.29,
+   "winnerTime": 234.52,
+   "bestLap": 76.063,
+   "counts": {
+    "bump": 10,
+    "wheel": 59,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 3,
+    "wall": 13,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "ouarzane",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 250.68,
+   "winnerTime": 237.86,
+   "bestLap": 77.852,
+   "counts": {
+    "bump": 12,
+    "wheel": 68,
+    "hop": 1,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 6,
+    "reset": 0
+   },
+   "hops": [
+    {
+     "t": 65.84,
+     "car": 10,
+     "other": 3,
+     "player": false,
+     "speed": 222,
+     "closing": 63.4,
+     "side": 1.66,
+     "behind": 4.17,
+     "bodyOverlap": 0.1,
+     "tyreOverlap": 0.63,
+     "axleGap": 1.34,
+     "landed": 66.29,
+     "inSeries": false,
+     "after": null
+    }
+   ]
+  },
+  {
+   "circuit": "glenmoor",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 221.62,
+   "winnerTime": 210.7,
+   "bestLap": 68.848,
+   "counts": {
+    "bump": 8,
+    "wheel": 44,
+    "hop": 0,
+    "hardLaunch": 1,
+    "crash": 1,
+    "obstacle": 0,
+    "wall": 5,
+    "reset": 0
+   },
+   "hops": []
+  },
+  {
+   "circuit": "nova-belvedere",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 242.52,
+   "winnerTime": 226.85,
+   "bestLap": 74.32,
+   "counts": {
+    "bump": 5,
+    "wheel": 34,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 0,
+    "wall": 1,
+    "reset": 5
+   },
+   "hops": []
+  },
+  {
+   "circuit": "grand-zenith",
+   "rules": "racing",
+   "seed": 37,
+   "laps": 3,
+   "raceTime": 315.87,
+   "winnerTime": 300.1,
+   "bestLap": 98.591,
+   "counts": {
+    "bump": 10,
+    "wheel": 58,
+    "hop": 0,
+    "hardLaunch": 0,
+    "crash": 0,
+    "obstacle": 1,
+    "wall": 3,
+    "reset": 0
+   },
+   "hops": []
+  }
+ ]
+}

@@ -49,18 +49,28 @@ export const COLLISION_TUNING = {
 
   // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
   // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.
-  // Interlocked wheels (the front wheel of the car behind against the rear wheel of the car ahead) lift
-  // the car behind when it arrives fast enough: a short flight, it comes down on its wheels and drives on.
-  // Ladder of the same contact by energy: below hopClosingSpeed nothing changes (bump or wheel contact);
-  // from hopClosingSpeed a hop; from launchClosingSpeed and launchMinSpeed, from behind, the hard accident.
-  hopClosingSpeed: 10,           // m/s (36 km/h): relative speed from which the wheels lift the car
-  hopMinSpeed: 33,               // m/s (119 km/h): the car behind must be at least this fast
+  // A front wheel that runs onto a rear wheel is lifted by it: a short flight, the car comes down on its
+  // wheels and drives on. It is meant to be OCCASIONAL (a player found the first version far too frequent):
+  // it needs the real geometry of a front wheel behind a rear wheel, and more energy than the two validated
+  // reference contacts (the wheel contact E2, about 25 km/h of closing speed; the bump E4, about 41 km/h).
+  // Any other contact keeps its validated outcome: bump, wheel contact, or the hard accident E3.
+  //
+  // Geometry: where the wheels are on the cars (the dimensions of the car model; a test keeps the two in step).
+  // The collision boxes are a little narrower than the tyres: two cars "touching" side by side have their
+  // tyre lanes overlapping.
+  wheels: { frontAxle: 1.55, rearAxle: -1.35, frontTrack: 0.9, rearTrack: 0.82, frontTyreWidth: 0.29, rearTyreWidth: 0.42, frontTyreRadius: 0.325, rearTyreRadius: 0.33 },
+  hopTyreOverlapMin: 0.5,        // share of the width of the front tyre of the car behind that must be in line with the rear tyre
+                                 // of the car ahead (the front wheel on the side of the car ahead, the rear wheel on the side of the
+                                 // car behind: cars offset by about a track width; in line, the nose meets the gearbox first)
+  hopAxleGapMin: 0.65,           // m: that front wheel must be this far behind the rear axle of the car ahead (the sum of the two
+                                 // tyre radii): one tyre behind the other. Closer, the wheels are side by side and only rub (E2)
+  // Energy
+  hopClosingSpeed: 12.5,         // m/s (45 km/h): relative speed from which the rear wheel lifts the car (10 m/s at first)
+  hopMinSpeed: 41.7,             // m/s (150 km/h): the car behind must be at least this fast (33 m/s at first)
   hopAlignedCos: 0.94,           // angle: the two cars head within about 20 degrees of each other
-  hopSideOverlapMax: 0.5,        // contact point, side by side: the cars overlap by at most this share of their length
-                                 // (front wheel beside rear wheel; fully alongside, wheels only rub: E2)
-  hopOverlapMin: 0,              // lateral overlap, from behind: from the slightest overlap (tyre against tyre at the edge of the
-                                 // cars) up to launchOverlapMax; beyond, nose in the gearbox, the cars bump. (The accident
-                                 // keeps its own, narrower window: launchOverlapMin..launchOverlapMax.)
+  // After a hop
+  hopSamePairTime: 8,            // s after the landing during which the car cannot hop over the SAME car again: a new contact with
+                                 // it is an ordinary one (bump, wheel contact). No series of hops behind one car
   hopFlightTime: 0.45,           // s in the air (the hard accident: 0.85 s)
   hopPeakHeight: 0.55,           // m at the top of the hop (the hard accident: 1.3 m)
   hopSeparation: 13.33,          // m/s: it comes down this much slower than the car it rode over was at the shock (as after a bump).
