@@ -6,9 +6,10 @@ import { VEGETATION_PAINTERS } from './vegetation.js';
 import { TRACKSIDE_PAINTERS } from './trackside.js';
 import { TERRAIN_STRIP_PAINTERS } from './terrain-strips.js';
 import { BUILDING_PAINTERS } from './buildings.js';
+import { TRACKSIDE_OBJECT_PAINTERS } from './trackside-objects-art.js';
 import { LINE } from '../styles/ink.js';
 
-const PAINTERS = { ...VEGETATION_PAINTERS, ...TRACKSIDE_PAINTERS, ...TERRAIN_STRIP_PAINTERS, ...BUILDING_PAINTERS };
+const PAINTERS = { ...VEGETATION_PAINTERS, ...TRACKSIDE_PAINTERS, ...TERRAIN_STRIP_PAINTERS, ...BUILDING_PAINTERS, ...TRACKSIDE_OBJECT_PAINTERS };
 
 /** Neutral stand-in used when a family has no painter yet: an inked blank panel. */
 function placeholder(ctx, w, h, P) {

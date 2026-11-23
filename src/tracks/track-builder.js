@@ -189,6 +189,13 @@ export function buildTrack(def) {
   };
   layoutEdges(track, def);
   layoutPit(track, def);
+  if (track.openVerges) {
+    // (experimental open verges: where nothing was opened, around the pits, the usual barrier line is the barrier itself)
+    for (let i = 0; i < n; i++) {
+      if (track.barrierR[i] < track.closedBarrierR[i] || Math.min(i, n - i) * ds < (def.openVerges.pitMargin ?? 380)) track.closedBarrierR[i] = track.barrierR[i];
+      if (track.barrierL[i] < track.closedBarrierL[i] || Math.min(i, n - i) * ds < (def.openVerges.pitMargin ?? 380)) track.closedBarrierL[i] = track.barrierL[i];
+    }
+  }
   const line = computeRacingLine(track);
   track.line = line.offset;
   track.lineKappa = line.kappa;
@@ -266,6 +273,32 @@ function layoutEdges(track, def) {
   }
   if (track.minClearance < 2 * minBarrier + 1) {
     track.warnings.push(`layout too tight: clearance ${track.minClearance.toFixed(1)} m`);
+  }
+  // EXPERIMENTAL prototype (development circuits only: def.openVerges = { extra: metres }): the limits are moved
+  // outward away from the pits, so that the ground beyond the usual barrier line can be driven on. The usual line is
+  // kept in closedBarrierL/R (where the scenery used to start). No existing circuit asks for this; grip is untouched.
+  if (def.openVerges) {
+    const extra = def.openVerges.extra ?? 30, keep = around(def.openVerges.pitMargin ?? 380);
+    track.closedBarrierR = Float32Array.from(track.barrierR); track.closedBarrierL = Float32Array.from(track.barrierL);
+    const openR = new Float32Array(n), openL = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const fromLine = Math.min(i, n - i);                       // samples from the start line (the pits are around it)
+      const share = smoothstep(keep, keep + around(120), fromLine);
+      const radius = 1 / Math.max(absK[i], 1e-5);
+      const foldR = kappa[i] > 0 ? radius * 0.72 : 1e9, foldL = kappa[i] < 0 ? radius * 0.72 : 1e9;
+      openR[i] = Math.max(track.closedBarrierR[i], Math.min(track.closedBarrierR[i] + extra * share, clearR[i] / 2 - 0.6, foldR));
+      openL[i] = Math.max(track.closedBarrierL[i], Math.min(track.closedBarrierL[i] + extra * share, clearL[i] / 2 - 0.6, foldL));
+    }
+    const hardR = Float32Array.from(openR), hardL = Float32Array.from(openL);
+    for (let pass = 0; pass < 3; pass++) {
+      closedSmooth(openR, 6); closedSmooth(openL, 6);
+      for (let i = 0; i < n; i++) {
+        openR[i] = Math.max(track.closedBarrierR[i], Math.min(openR[i], hardR[i]));
+        openL[i] = Math.max(track.closedBarrierL[i], Math.min(openL[i], hardL[i]));
+      }
+    }
+    track.barrierR = openR; track.barrierL = openL;
+    track.openVerges = { extra };
   }
 }
 

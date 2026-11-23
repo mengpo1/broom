@@ -16,6 +16,7 @@ import { PlayerEngineVoice, OpponentEngineVoice, createEngineWave, createStutter
 import { CarNoise } from './car-noise.js';
 import { CrowdAmbience } from './ambience.js';
 import { SfxPlayer } from './sfx.js';
+import { TRACKSIDE_TUNING } from '../physics/trackside-tuning.js';
 
 const MIX = AUDIO_TUNING.mix;
 const ENGINE = AUDIO_TUNING.engine;
@@ -558,6 +559,14 @@ export class GameAudio {
           const v = this.voiceOf(index);
           if (v >= 0) this.voices[v].shift();
         }
+        break;
+      }
+      case 'object': {
+        // EXPERIMENTAL trackside object (tracks/trackside-objects.js): the impact sound of its reaction (physics/trackside-tuning.js)
+        const o = app.race.objects ? app.race.objects[event.other] : null;
+        const r = o ? TRACKSIDE_TUNING.reactions[o.reaction] : null, sound = (r && r.sound) || { gain: 0.6, weight: 10, hard: true };
+        const gain = this.locate(index, app) * sound.gain;
+        if (gain > 0.02) sfx.impact(hear.slot, hear.pan, gain, sound.weight, sound.hard, time);
         break;
       }
       case 'wall':

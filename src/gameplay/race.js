@@ -6,6 +6,7 @@ import { BASE_CAR_SPEC, DRIVING_PROFILES, deriveCarParams, sanitizeSetup } from 
 import { CAR_STATE, createCarState, placeCar, stepCar } from '../physics/car-physics.js';
 import { resolveCarContacts, updateDrafts } from '../physics/collisions.js';
 import { collideObstacles } from '../physics/obstacles.js';
+import { collideTracksideObjects } from '../physics/trackside-contacts.js';
 import { getSceneryLayout } from '../tracks/scenery-layout.js';
 import { gridSlot, pitBox, relativeS } from '../tracks/track-builder.js';
 import { DIFFICULTY_LEVELS, makeAiSkill } from '../ai/driver-profiles.js';
@@ -56,6 +57,10 @@ export class Race {
     // solid roadside objects of this track, and which ones have been knocked down in this race
     this.obstacles = getSceneryLayout(this.track).obstacles;
     this.obstacleDown = new Uint8Array(this.obstacles.length);
+    // EXPERIMENTAL interactive trackside objects (tracks/trackside-objects.js): none unless the circuit was built with them
+    this.objects = getSceneryLayout(this.track).objects || [];
+    this.objectState = new Uint8Array(this.objects.length);
+    this.objectCooldown = new Float32Array(config.entries.length);
     this.events = Array.from({ length: MAX_EVENTS }, () => ({ type: '', car: 0, value: 0, other: -1 }));
     this.eventCount = 0;
     this.emit = (type, car, value = 0, other = -1) => {
@@ -131,6 +136,7 @@ export class Race {
     for (let i = 0; i < n; i++) if (!cars[i].removed) stepCar(cars[i], this.track, dt, this.rules, this.emit);
     resolveCarContacts(cars, this.rules, this.time, this.emit);
     if (this.obstacles.length) collideObstacles(cars, this.track, this.obstacles, this.obstacleDown, this.emit);
+    if (this.objects.length) collideTracksideObjects(cars, this.track, this.objects, this.objectState, this.objectCooldown, dt, this.emit);
     for (let i = 0; i < n; i++) {
       const car = cars[i];
       if (car.removed) continue;

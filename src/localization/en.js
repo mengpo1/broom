@@ -79,5 +79,8 @@ export const EN = {
   'lab.title': 'TEST BENCH (DEVELOPMENT)', 'lab.auto': 'autopilot until the contact', 'lab.yours': 'YOUR TURN TO DRIVE', 'lab.stopped': 'stopped',
   'lab.case.wheel': '1 · wheel to wheel, no flight', 'lab.case.hop': '2 · recoverable hop', 'lab.case.crash': '3 · hard accident (E3)',
   'lab.case.board': '4 · roadside board (E5)', 'lab.case.bump': '5 · rear-end bumps',
-  'lab.keys': 'Keys 1 to 5: choose a case · Enter: replay · C: change camera',
+  'lab.case.sign': '6 · breakable board (EXPERIMENTAL)', 'lab.case.rock': '7 · rigid obstacle (EXPERIMENTAL)', 'lab.case.gantry': '8 · under a gantry',
+  'lab.case.pillar': '9 · gantry support (EXPERIMENTAL)', 'lab.case.tunnel': '0 · through a tunnel', 'lab.case.offtrack': 'O · leaving the road, open verges (EXPERIMENTAL)',
+  'lab.case.close': 'K · close contact between two cars',
+  'lab.keys': 'Keys 1 to 0, O, K: choose a case · Enter: replay · C: change camera',
 };

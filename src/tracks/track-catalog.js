@@ -89,7 +89,37 @@ export const CIRCUITS = [
   },
 ];
 
-const BY_ID = new Map(CIRCUITS.map((c) => [c.id, c]));
+/**
+ * Development circuits: not part of any season, never listed in the menus, reachable only through the collision
+ * test bench (core/collision-lab.js). They carry their own trackside settings (tracks/trackside-objects.js).
+ * `banc-objets`: a flat rectangle with long straights. Its objects are placed by hand (`features`) and can be hit:
+ *   EXPERIMENTAL interactions are on for this circuit only.
+ * `banc-accotements`: EXPERIMENTAL copy of Kestrel Fields with open verges (the limits moved 30 m outward away from
+ *   the pits), to study driving on the ground beyond the usual barrier line. Kestrel Fields itself is unchanged.
+ */
+export const DEV_CIRCUITS = [
+  {
+    id: 'banc-objets', name: 'Banc des objets', region: 'Piste d\'essai', theme: 'plains', pitSide: -1, width: 14, laps: 3,
+    corners: [[1500, 0, 140], [1500, 650, 140], [0, 650, 140], [0, 0, 140]],
+    trackside: { scenery: 'enriched', interactions: true },
+    // (first straight: 170 m after the line to the first bend at 890 m; back straight: 1700 to 2920 m)
+    features: [
+      { type: 'object', s: 330, id: 'sign.advert.low.0', d: 10.5 },
+      { type: 'object', s: 384, id: 'cone', d: 9.2 }, { type: 'object', s: 388, id: 'cone', d: 9.9 }, { type: 'object', s: 392, id: 'cone', d: 10.6 },
+      { type: 'object', s: 520, id: 'boulder.0', d: -10.5 },
+      { type: 'object', s: 600, id: 'tyrestack', d: 10.5 },
+      { type: 'object', s: 660, id: 'tree.oak', d: 11.5 },
+      { type: 'gantry', s: 760, id: 'gantry.banner.0' },
+      { type: 'tunnel', at: 0.56, length: 170 },
+    ],
+  },
+  {
+    ...CIRCUITS.find((c) => c.id === 'kestrel-fields'), id: 'banc-accotements', name: 'Banc des accotements ouverts', region: 'Piste d\'essai',
+    openVerges: { extra: 30 }, trackside: { scenery: 'enriched', interactions: true },
+  },
+];
+
+const BY_ID = new Map([...CIRCUITS, ...DEV_CIRCUITS].map((c) => [c.id, c]));
 
 export function getCircuit(id) {
   const def = BY_ID.get(id);

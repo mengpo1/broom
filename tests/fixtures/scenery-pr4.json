@@ -1,0 +1,110 @@
+{
+ "hazelbrook": {
+  "strips": 92,
+  "props": 1007,
+  "obstacles": 18,
+  "sha256": "cca99e34e4341b28948ccf1453ac275afe8ea3666f3a324db294dd8de5db0db7"
+ },
+ "porto-sereno": {
+  "strips": 81,
+  "props": 682,
+  "obstacles": 9,
+  "sha256": "a0d08e6ffaca7dfa0d85cb4a71aae4c6d971ae36f14af5018bbede889e8c9d11"
+ },
+ "montclair": {
+  "strips": 98,
+  "props": 1034,
+  "obstacles": 9,
+  "sha256": "b2cc6a70bde524c37e185dbbbec0a1d1283544747e9ec0489a71ceb75ef118e5"
+ },
+ "sablon": {
+  "strips": 95,
+  "props": 493,
+  "obstacles": 12,
+  "sha256": "1901caf45d44644de80d1ee54beceb0033ebbf00793662b88ccaa0ec64ec3672"
+ },
+ "kestrel-fields": {
+  "strips": 113,
+  "props": 386,
+  "obstacles": 18,
+  "sha256": "0efc363081bee84a0137ebaebdc40bc05985f6e5bbd73141e7ca32412316c841"
+ },
+ "aurelia-parc": {
+  "strips": 136,
+  "props": 755,
+  "obstacles": 12,
+  "sha256": "fea98b2109a6499b591dfc6155c628aa06405a6100ce7b87bfd833f635795639"
+ },
+ "lindqvist": {
+  "strips": 106,
+  "props": 1341,
+  "obstacles": 12,
+  "sha256": "bc51e1f278808efbdb45a9094e561397430f38cc5b4cbaf581f3a1071453417e"
+ },
+ "baia-dourada": {
+  "strips": 122,
+  "props": 802,
+  "obstacles": 18,
+  "sha256": "779f0f70cf1947f34c762512475b55b61c1aa77c79fd5f1b5ea6c0ba56196824"
+ },
+ "roca-alta": {
+  "strips": 120,
+  "props": 489,
+  "obstacles": 9,
+  "sha256": "1f8ba47260c6930dd444a6d7cb81d493468b52b3eec641e5a46ab0d8f31daa7c"
+ },
+ "tannenring": {
+  "strips": 119,
+  "props": 1139,
+  "obstacles": 15,
+  "sha256": "7570ad51e81a39d3c0777f5071d5c915631d3e778a6779306fcd5539ea46917a"
+ },
+ "meridian-docks": {
+  "strips": 132,
+  "props": 141,
+  "obstacles": 9,
+  "sha256": "fbf09b30809f49445ef7d6d83eda184cbb732a67323e1e936cb117b8da665c71"
+ },
+ "kagerou-hills": {
+  "strips": 115,
+  "props": 947,
+  "obstacles": 6,
+  "sha256": "e7610511ae2fe69cc3f734f6fa34cd287ea5c04123b87cb4c98f180d1c3b7cbf"
+ },
+ "silverlake": {
+  "strips": 94,
+  "props": 1128,
+  "obstacles": 18,
+  "sha256": "f9f71fd62082b0bbba02f4eebccdbc601c6e900e293cbe4ccccd3ff615b49736"
+ },
+ "costa-brisa": {
+  "strips": 141,
+  "props": 923,
+  "obstacles": 21,
+  "sha256": "fe2afed6bd5830d911df737dc7be4425095ef94593ceca6707753d9e2d094fa6"
+ },
+ "ouarzane": {
+  "strips": 116,
+  "props": 596,
+  "obstacles": 24,
+  "sha256": "d6951ef65462e6841808a2d50858f969a2293ddd60971f7703e0572809f629cd"
+ },
+ "glenmoor": {
+  "strips": 108,
+  "props": 755,
+  "obstacles": 18,
+  "sha256": "7cc67f67329eb65d03b8b7ab4b3de0e6bfaf93e443ba20431ac911af3bf2b910"
+ },
+ "nova-belvedere": {
+  "strips": 118,
+  "props": 841,
+  "obstacles": 12,
+  "sha256": "d3b67abe434162dea0765aa26c61bb87b06038f12267fe14c331aeda2e62a81a"
+ },
+ "grand-zenith": {
+  "strips": 160,
+  "props": 1300,
+  "obstacles": 33,
+  "sha256": "4d8c7e0a3871dcaf0ddfb57161f2e1f6203732f36770cda8ed2928950772e96c"
+ }
+}

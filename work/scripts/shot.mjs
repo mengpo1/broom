@@ -1,9 +1,9 @@
 // Quick development screenshot: node work/scripts/shot.mjs <out.png> [json options]
-// options: { width, height, race: {...quickRace options}, simSeconds, frames, layout, eval }
+// options: { width, height, race: {...quickRace options}, simSeconds, frames, layout, eval, hash: extra launch options }
 import { openGame, root } from './lib-browser.mjs';
 const out = process.argv[2] || 'work/renders/dev.png';
 const opt = JSON.parse(process.argv[3] || '{}');
-const { page, logs, close } = await openGame({ width: opt.width || 1280, height: opt.height || 720, hash: `manual=1&quality=${opt.quality || 'medium'}${opt.lang ? `&lang=${opt.lang}` : ''}` });
+const { page, logs, close } = await openGame({ width: opt.width || 1280, height: opt.height || 720, hash: `manual=1&quality=${opt.quality || 'medium'}${opt.lang ? `&lang=${opt.lang}` : ''}${opt.hash ? `&${opt.hash}` : ''}` });
 const t0 = Date.now();
 const info = await page.evaluate(async (opt) => {
   const { app, quickRace } = window.virage;

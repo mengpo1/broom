@@ -58,6 +58,7 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
   let kwEnd = kw * smoothstep(0.0, 1.0, kerb);        // a kerb narrows to a point at its ends instead of stopping square
   let barrier = select(aa.z, aa.w, right);
   let verge = select(b0.x, b0.y, right);
+  let cover = mix(b0.w, b1.w, fr);                    // shade over the ground: 1 inside a tunnel, less under a bridge, 0 in the open
   var sRel = s; if (sRel > len * 0.5) { sRel = sRel - len; }
   let detail = clamp(1.0 - z / 420.0, 0.0, 1.0) * view.sky.w;
   let inkW = clamp(0.085 / mpp, 0.0, 3.2) * mpp;      // ink line half-width: thinner with distance
@@ -141,7 +142,13 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     // ---------------------------------------------------------------- verge
     let vEdge = hw + kwEnd;
     let gravel = verge > 0.5 && verge < 1.5 && ad > hw + 3.0;
-    if (gravel) {
+    if (cover > 0.9) {
+      // inside a tunnel the verge is a concrete apron, with joints across it
+      c = col(C_PIT);
+      let joint = abs(fract(s / 6.0) - 0.5) * 6.0;
+      c = mix(c, mix(c, ink, 0.45), (1.0 - aastep(0.05, joint, mpr)) * clamp(0.2 / mpr, 0.0, 1.0) * detail);
+      c = mix(c, ink, (1.0 - aastep(inkW, ad - vEdge, mpp)) * inkA * 0.85);
+    } else if (gravel) {
       c = col(C_GRAVEL_A);
       // raked furrows: thin, wavering, broken lines along the trap
       let rakeRow = floor(d / 1.15 + 0.5);
@@ -180,6 +187,9 @@ fn dashField(s: f32, d: f32, laneW: f32, blockL: f32, widthM: f32, density: f32,
     let farDash = dashField(s, d, 2.2, 19.0, 0.12, 0.25, mpp, mpr, 33.0);
     c = mix(c, col(C_GRASS_DARK), farDash.x * 0.5 * detail);
   }
+
+  // shade of what spans the road (0 everywhere on a circuit without such objects: the colour is untouched)
+  c = mix(c, c * 0.4 + ink * 0.06, clamp(cover, 0.0, 1.0) * 0.8);
 
   // crest contour: ink where the next row up belongs to much farther ground
   if (ri > 0u) {

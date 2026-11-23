@@ -51,7 +51,7 @@ test('scenery layout: deterministic, every object has a drawing, objects stay of
       assert.ok(specs.has(prop.id), `spec for ${prop.id}`);
       assert.ok(hasSceneryPainter(specs.get(prop.id).family), `painter for ${prop.id}`);
       assert.ok(prop.sample >= last, 'props are indexed along the lap'); last = prop.sample;
-      const spans = prop.id.startsWith('gantry') || prop.id.startsWith('bridge');
+      const spans = prop.id.startsWith('gantry') || prop.id.startsWith('bridge') || prop.id.startsWith('tunnel');   // (tunnel mouths and ribs span the road too)
       if (!spans) assert.ok(Math.abs(prop.d) > track.halfWidth + 1, `${prop.id} stands off the road (${prop.d})`);
     }
     assert.equal(a.propStart[track.n], a.props.length);
