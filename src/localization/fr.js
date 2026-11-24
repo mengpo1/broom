@@ -83,6 +83,6 @@ export const FR = {
   // banc d'essai des collisions (outil de développement, option de lancement #lab=...)
   'lab.title': 'BANC D\'ESSAI (DÉVELOPPEMENT)', 'lab.auto': 'pilote automatique jusqu\'au contact', 'lab.yours': 'À VOUS DE CONDUIRE', 'lab.stopped': 'arrêté',
   'lab.case.wheel': '1 · roue contre roue, sans décollage', 'lab.case.hop': '2 · saut récupérable (roue contre roue)', 'lab.case.crash': '3 · accident violent (E3)',
-  'lab.case.board': '4 · panneau de bord de piste (E5)', 'lab.case.bump': '5 · tamponnages', 'lab.case.body': '6 · nez contre roue arrière : pas de saut',
-  'lab.keys': 'Touches 1 à 6 : choisir un cas · Entrée : rejouer · C : changer de caméra',
+  'lab.case.board': '4 · panneau de bord de piste (E5)', 'lab.case.bump': '5 · tamponnages', 'lab.case.body': '6 · nez contre roue arrière : pas de saut', 'lab.case.under': '7 · saut, une troisième voiture reste sous la voiture en vol',
+  'lab.keys': 'Touches 1 à 7 : choisir un cas · Entrée : rejouer · C : changer de caméra',
 };

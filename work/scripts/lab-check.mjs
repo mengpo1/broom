@@ -54,7 +54,7 @@ const state = (page) => page.evaluate(() => {
   await page.keyboard.press('Enter');
   const s4 = await state(page);
   check('Enter replays the current case', s4.name === 'crash' && !s4.released && s4.events.length === 0, `tick ${s4.tick}`);
-  for (const [key, name] of [['Digit1', 'wheel'], ['Digit4', 'board'], ['Digit5', 'bump'], ['Digit6', 'body'], ['Digit2', 'hop']]) {
+  for (const [key, name] of [['Digit1', 'wheel'], ['Digit4', 'board'], ['Digit5', 'bump'], ['Digit6', 'body'], ['Digit7', 'under'], ['Digit2', 'hop']]) {
     await page.keyboard.press(key);
     const s = await state(page);
     check(`key ${key.slice(-1)} starts the case "${name}"`, s.name === name && s.active && !s.released);
@@ -66,6 +66,26 @@ const state = (page) => page.evaluate(() => {
   const s6 = await state(page), air = await page.evaluate(() => window.__air);
   check('case 6 (nose against rear wheel): a bump, no hop, the car stays on the ground', bumped && s6.events.includes('bump') && !s6.events.includes('hop') && !s6.events.includes('launch') && air === 0, `${s6.events.join(' ')}, highest ${air} m`);
   check('its help line names the case', /pas de saut/.test(s6.panel), s6.panel.split('\n')[0]);
+  // case 7 (securing of PR #8): a third car keeps itself under the car in flight. The landing waits, for well under the
+  // limit, and the car is handed back on free ground: in no car, without having been put back on the track
+  await page.keyboard.press('Digit7');
+  await page.evaluate(() => {
+    const lab = window.virage.app.lab, me = lab.me, step = lab.race.step.bind(lab.race);
+    const over = (a, b) => { const dx = b.x - a.x, dz = b.z - a.z; let min = Infinity; for (const h of [a.heading, a.heading + Math.PI / 2, b.heading, b.heading + Math.PI / 2]) { const ax = Math.cos(h), az = Math.sin(h), r = (c) => c.params.halfLength * Math.abs(ax * Math.cos(c.heading) + az * Math.sin(c.heading)) + c.params.halfWidth * Math.abs(-ax * Math.sin(c.heading) + az * Math.cos(c.heading)); const o = r(a) + r(b) - Math.abs(dx * ax + dz * az); if (o <= 0) return 0; min = Math.min(min, o); } return min; };
+    window.__wait = { waited: 0, under: 0, air: 0, atLanding: -1, resets: me.resets, was: me.state };
+    lab.race.step = (dt) => {
+      step(dt);
+      const w = window.__wait;
+      if (me.state === 6) { w.air += dt; if (me.airWaiting) w.waited += dt; if (over(me, lab.third) > 0) w.under += dt; }
+      else if (w.was === 6) w.atLanding = Math.max(...lab.race.cars.filter((c) => c !== me && !c.removed).map((c) => over(me, c)));
+      w.was = me.state; w.putBack = me.resets > w.resets;
+    };
+  });
+  const back7 = await waitFor(page, () => window.virage.app.lab.released, null, 60);
+  const s7 = await state(page), w7 = await page.evaluate(() => window.__wait);
+  check('case 7: the third car did come under the car in flight, and the landing waited', back7 && s7.events.includes('hop') && w7.under > 0.3 && w7.waited > 0.3, `under it ${w7.under.toFixed(2)} s, landing put off ${w7.waited.toFixed(2)} s, ${w7.air.toFixed(2)} s in the air`);
+  check('case 7: the wait is short and ends by a landing on free ground', w7.waited < 1.3 && w7.atLanding === 0 && !w7.putBack && !s7.events.includes('reset') && !s7.events.includes('crash'), `in a car at the landing: ${w7.atLanding} m; put back on the track: ${w7.putBack}; ${s7.events.join(' ')}`);
+  check('case 7: the car is handed back driving, and its help line names the case', s7.released && s7.state === 1 && /sous la voiture en vol/.test(s7.panel), `${s7.speed} km/h — ${s7.panel.split('\n')[0]}`);
   const errors = logs.filter((l) => l.startsWith('[error]') || l.startsWith('[pageerror]'));
   check('no console error', errors.length === 0, errors.slice(0, 3).join(' | '));
   await close();
@@ -74,7 +94,7 @@ const state = (page) => page.evaluate(() => {
 {
   const { page, close } = await openGame({ width: 960, height: 540, hash: 'quality=medium' });
   const before = await page.evaluate(() => ({ lab: !!window.virage.app.lab, state: window.virage.flow.state, race: !!window.virage.app.race, panel: [...document.querySelectorAll('div')].some((d) => /BANC|BENCH/.test(d.textContent)) }));
-  for (const key of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6']) await page.keyboard.press(key);
+  for (const key of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7']) await page.keyboard.press(key);
   await page.waitForTimeout(500);
   const after = await page.evaluate(() => ({ lab: !!window.virage.app.lab, state: window.virage.flow.state, race: !!window.virage.app.race }));
   check('without the option there is no bench and no help line', !before.lab && !before.panel, JSON.stringify(before));

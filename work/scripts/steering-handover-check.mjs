@@ -75,7 +75,7 @@ const report = { note: 'real game, real time, real key events; nothing is change
 {
   const { page, logs, close } = await openGame({ width: 960, height: 540, hash: 'lab=hop&quality=medium' });
   await instrument(page);
-  for (const [key, name] of [['Digit2', 'hop'], ['Digit1', 'wheel'], ['Digit5', 'bump'], ['Digit6', 'body'], ['Digit3', 'crash'], ['Digit4', 'board']]) {
+  for (const [key, name] of [['Digit2', 'hop'], ['Digit1', 'wheel'], ['Digit5', 'bump'], ['Digit6', 'body'], ['Digit7', 'under'], ['Digit3', 'crash'], ['Digit4', 'board']]) {
     await page.keyboard.press(key);
     if ((await page.evaluate(() => window.virage.app.lab.name)) !== name) { console.log(`     (${name}: this build has no such case)`); continue; }
     const entry = (report.cases[name] = {});

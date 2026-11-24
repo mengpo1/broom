@@ -64,10 +64,12 @@ export const COLLISION_TUNING = {
   flightYieldSpeed: 8,           // m/s (29 km/h) kept between the speed of the car in flight and that of any car below it: it
                                  //    passes it or lets it go, whichever is nearer its own speed. Two lengths of car at that
                                  //    difference: a car below is left within about 1.2 s, whatever it does
-  flightWaitMax: 3,              // s: all the waits of one flight together. One car alone cannot reach it (about 2.5 s at the
-                                 //    very worst: nearly passed, then let go; 1.5 s measured); several cars taking turns under
-                                 //    it can. Beyond, last resort: the car is put back on the track on a free place, as a car
-                                 //    that has left the road is. It is never set down where it is if a car is there
+  flightWaitMax: 3.5,            // s: the longest a flight can go on beyond its planned time, whatever the reason (the wait
+                                 //    above included). One car alone cannot use it up (0.5 s for the car that threw it up, then
+                                 //    about 2.5 s at the very worst over one car: nearly passed, then let go; 2.3 s measured);
+                                 //    several cars taking turns under it can. Beyond, last resort: the car is put back on the
+                                 //    track on a free place, as a car that has left the road is. It is never set down where it
+                                 //    is if a car is there
 
   // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
   // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.

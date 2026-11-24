@@ -124,7 +124,7 @@ export function watchFlights(f, seconds, { after = 1.5, each = null } = {}) {
     for (const car of f.cars) {
       const b = state.get(car), flying = car.state === CAR_STATE.AIRBORNE;
       let fl = flights.get(car);
-      if (flying && (b.st !== CAR_STATE.AIRBORNE || !fl)) { fl = { car, up: f.step - 1, down: -1, takeOffSpeed: Math.max(b.v, Math.hypot(car.velX, car.velZ)), seconds: 0, overlapAtLanding: 0, overlapAfter: 0, wreckDrivenThrough: 0, offVelocity: 0, speedGain: 0, fastest: 0, rise: 0, top: 0, putBack: false, waited: 0, lowest: Infinity, landedSpeed: 0, comingDown: false }; flights.set(car, fl); }
+      if (flying && (b.st !== CAR_STATE.AIRBORNE || !fl)) { fl = { car, up: f.step - 1, down: -1, takeOffSpeed: Math.max(b.v, Math.hypot(car.velX, car.velZ)), planned: car.airPlanned, seconds: 0, overlapAtLanding: 0, overlapAfter: 0, wreckDrivenThrough: 0, offVelocity: 0, speedGain: 0, fastest: 0, rise: 0, top: 0, putBack: false, waited: 0, lowest: Infinity, landedSpeed: 0, comingDown: false }; flights.set(car, fl); }
       if (!fl) continue;
       if (flying && b.st === CAR_STATE.AIRBORNE) {
         fl.offVelocity = Math.max(fl.offVelocity, Math.hypot(car.x - b.x - car.velX * SIM_DT, car.z - b.z - car.velZ * SIM_DT));

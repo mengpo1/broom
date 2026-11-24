@@ -62,8 +62,8 @@ export function playCase(name, seconds, { handOver = false, keys = null } = {}) 
       if (!['bump', 'wheel', 'launch', 'hop', 'landing', 'obstacle', 'crash', 'wall', 'restart', 'reset', 'contact'].includes(e.type)) continue;
       events.push({ ...e, t: +(t + SIM_DT).toFixed(4), frame: frames.length, mine: e.car === me.index });
     }
-    const snap = (c) => (c ? { x: c.x, z: c.z, s: c.s, d: c.d, heading: c.heading, speed: c.speed, state: c.state, steer: c.steer, inSteer: c.inSteer, yawRate: c.yawRate, airHeight: c.airHeight || 0, params: c.params } : null);
-    frames.push({ t: t + SIM_DT, released: lab.released, me: snap(me), lead: snap(lead) });
+    const snap = (c) => (c ? { x: c.x, z: c.z, s: c.s, d: c.d, heading: c.heading, speed: c.speed, state: c.state, steer: c.steer, inSteer: c.inSteer, yawRate: c.yawRate, airHeight: c.airHeight || 0, airWaiting: !!c.airWaiting, params: c.params } : null);
+    frames.push({ t: t + SIM_DT, released: lab.released, me: snap(me), lead: snap(lead), third: snap(lab.third) });
   }
   return { lab, race: lab.race, me, lead, events, frames, mine: events.filter((e) => e.mine) };
 }

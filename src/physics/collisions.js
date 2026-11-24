@@ -421,9 +421,12 @@ function wheelHop(follower, leader, rules, time, emit) {
  * that if the car changed its mind once), and nothing is moved by hand: the car in flight goes on moving by its
  * own velocity, the cars below are not touched.
  *
- * Cars can still take turns under it. All the waits of a flight together are limited to flightWaitMax: beyond,
- * as a last resort, the car is put back on the track on a free place (putBack), as a car that has left the road
- * is. It is not set down where it is: that could be in another car.
+ * Another car in flight counts as a car below for a car that took off after it, not the other way round.
+ *
+ * Cars can still take turns under it. A flight never lasts more than flightWaitMax beyond its planned time (plus
+ * the fraction of a second it takes to come down when the way is clear at that moment): once that is spent and a
+ * car is still below, as a last resort, the car is put back on the track on a free place (putBack), as a car that
+ * has left the road is. It is not set down where it is: that could be in another car.
  */
 function holdLanding(car, cars, dt, track, emit) {
   const T = COLLISION_TUNING, left = car.airDuration - car.airTime;
@@ -453,6 +456,10 @@ function holdLanding(car, cars, dt, track, emit) {
   for (let i = 0; i < cars.length; i++) {
     const o = cars[i];
     if (o === car || o.removed || o.inPit || o.state === CAR_STATE.RESET) continue;
+    // another car in flight: the one that took off first goes first, and does not look at the other (if each of two
+    // cars waiting over each other let the other go, on the speed the other had a step before, the two would chase each
+    // other's speed down without end). The later one gets clear of it as of any car.
+    if (o.state === CAR_STATE.AIRBORNE && (o.airTime < car.airTime || (o.airTime === car.airTime && o.index > car.index))) continue;
     const nx = o.x - car.x, nz = o.z - car.z;
     if (nx * nx + nz * nz > 1600) continue;
     motionOf(o, vb);
@@ -468,7 +475,9 @@ function holdLanding(car, cars, dt, track, emit) {
   // the landing is put off again by flightHoldTime
   if (!car.airWaiting) { car.airHold = Math.max(car.airHeight, 0.05); car.airWaiting = true; car.airMode = 0; car.airCap = Math.max(speed, T.flightYieldSpeed); }
   car.airWaited += dt;
-  if (car.airWaited > T.flightWaitMax) { putBack(car, cars, track, emit); return; }
+  // (counted from the moment it should have landed, whatever the time was spent on: waiting for the car that threw it up,
+  // waiting over a car, or coming down and having to stop again because a car came back)
+  if (car.airTime - car.airPlanned > T.flightWaitMax) { putBack(car, cars, track, emit); return; }
   // its speed for the next step: its own if that keeps it clear of the speed of every car below; otherwise the nearest
   // speed that does, just above (it holds its speed and passes them, if that is no faster than it may go: airCap) or
   // just below (it lets them go, and from then on never goes faster than that: airCap comes down with it)
@@ -478,6 +487,10 @@ function holdLanding(car, cars, dt, track, emit) {
     const over = clearOf(next, below, T.flightYieldSpeed, 1), under = clearOf(next, below, T.flightYieldSpeed, -1);
     if (over <= car.airCap + 1e-9 && over - next <= next - under) { car.airMode = 1; next = over; } else { car.airMode = -1; next = under; car.airCap = under; }
   }
+  // (a floor that the rule above never reaches by itself: no car on the ground goes backwards faster than a few m/s,
+  // so nothing asks for less than about twice the margin; it is there so that no fault could ever send a car flying
+  // backwards at any speed)
+  if (next < -3 * T.flightYieldSpeed) next = -3 * T.flightYieldSpeed;
   car.airSpeed = next;                                                  // (applied by the next step of the car: it moves by its velocity, as ever)
   // and the arc is stretched so that the car stays at the height it has as the wait begins (each time it begins); it
   // comes down from there, in that same time, once the way is clear
@@ -527,7 +540,8 @@ function putBack(car, cars, track, emit) {
     for (let k = 0; k < 160; k++) {
       for (let lane = 0; lane < 4; lane++) {
         placeCar(car, track, s0 - k * 1.5, lane === 0 ? own : lane === 1 ? 0 : lane === 2 ? room * 0.6 : -room * 0.6);
-        if (standsClear(car, cars)) { putBackOnTrack(car, track, car.s, car.d, emit); return true; }
+        // (it is further back than it was: its distance covered in the race goes back by as much)
+        if (standsClear(car, cars)) { putBackOnTrack(car, track, car.s, car.d, emit); car.progress -= k * 1.5; return true; }
       }
     }
     putBackOnTrack(car, track, s0, 0, emit);          // (a road full of cars for 240 m: where any car is put back)

@@ -108,3 +108,25 @@ test('steering after the hand-over: until then the bench drives whatever the pla
     assert.ok(Math.abs(results[-1].heading + results[1].heading) < 0.2 * Math.abs(results[1].heading) + 2, `${name}: ${results[-1].heading.toFixed(1)} degrees to the left, ${results[1].heading.toFixed(1)} to the right`);
   }
 });
+
+test('bench, case 7 (a third car stays under the car in flight): the landing waits, the car gets clear of it and comes down on free ground', () => {
+  const r = playCase('under', 9);
+  const launch = r.mine.find((e) => e.type === 'launch'), landing = r.mine.find((e) => e.type === 'landing');
+  assert.ok(launch && r.mine.some((e) => e.type === 'hop') && landing, 'the same hop as case 2');
+  const up = r.frames.findIndex((f) => f.me.state === CAR_STATE.AIRBORNE), down = r.frames.findIndex((f, i) => i > up && f.me.state !== CAR_STATE.AIRBORNE);
+  const flight = r.frames.slice(up, down), waited = flight.filter((f) => f.me.airWaiting).length * SIM_DT;
+  // the third car did come under it: its body under the body of the car in flight, at the moment it should have landed
+  const under = flight.filter((f) => bodyOverlap(f.me, f.third) > 0).length * SIM_DT;
+  assert.ok(under > 0.3, `the third car was under the car in flight for ${under.toFixed(2)} s`);
+  assert.ok(waited > 0.3 && waited < 1.3, `the landing waited ${waited.toFixed(2)} s: more than nothing, far less than the limit (${T.flightWaitMax} s)`);
+  assert.ok((down - up) * SIM_DT < r.me.airPlanned + 1.3, `${((down - up) * SIM_DT).toFixed(2)} s in the air`);
+  // set down on free ground, by a landing (not put back on the track), and still a hop: on its wheels, driving
+  const at = r.frames[down];
+  assert.equal(bodyOverlap(at.me, at.third), 0); assert.equal(bodyOverlap(at.me, at.lead), 0);
+  assert.equal(at.me.state, CAR_STATE.RACING);
+  assert.ok(!r.events.some((e) => e.type === 'reset' || e.type === 'crash'), 'no car put back on the track, no accident');
+  // the car below is not touched by any of it: it loses speed only as its own driver brakes (never faster than the brakes of a car)
+  for (let i = up + 1; i < down; i++) assert.ok(r.frames[i - 1].third.speed - r.frames[i].third.speed < 45 * SIM_DT, `step ${i}: the third car is slowed by more than its brakes`);
+  // and nobody is driven through afterwards
+  for (const f of r.frames.slice(down)) { assert.equal(bodyOverlap(f.me, f.third), 0); assert.equal(bodyOverlap(f.me, f.lead), 0); }
+});

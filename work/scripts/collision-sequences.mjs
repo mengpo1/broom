@@ -6,7 +6,7 @@
 // E2 to E5 are the events of the analysis report; HOP is the recoverable hop (original gameplay); BODY is a contact
 // between bodies with the energy of a hop (a bump). HOPslow and HOPslowx show the wheel contact of the hop four times
 // slower (one simulation step per image, 30 images per second), from the cockpit and from behind.
-// node work/scripts/collision-sequences.mjs [E2,HOP,HOPx,HOPslow,HOPslowx,E3,E3x,E4,E5,BODY|all] [--width 1280] [--height 720] [--out work/renders/collisions]
+// node work/scripts/collision-sequences.mjs [E2,HOP,HOPx,HOPslow,HOPslowx,E3,E3x,E4,E5,BODY,HOLD,HOLDx,HOLDslowx|all] [--width 1280] [--height 720] [--out work/renders/collisions]
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { openGame, root } from './lib-browser.mjs';
@@ -28,6 +28,11 @@ const SCENARIOS = {
   E3x: { title: 'the same launch seen from behind', lab: 'crash', seconds: 8, camera: 'CHASE' },
   E4: { title: 'repeated rear-end bumps', lab: 'bump', seconds: 10, camera: 'COCKPIT' },
   E5: { title: 'launch on a roadside board, light landing, slide', lab: 'board', seconds: 6.5, camera: 'COCKPIT' },
+  // (securing of PR #8) the hop with a third car that keeps itself under the car in flight: the landing waits, the car
+  // gets clear of it and comes down on free ground. From behind, from the cockpit, and from behind four times slower
+  HOLDx: { title: 'a third car stays under the car in flight: the landing waits, the car gets clear of it and lands on free ground (from behind)', lab: 'under', seconds: 7, camera: 'CHASE' },
+  HOLD: { title: 'the same from the cockpit', lab: 'under', seconds: 7, camera: 'COCKPIT' },
+  HOLDslowx: { title: 'the same four times slower, from behind', lab: 'under', seconds: 1.9, from: 1.45, slow: true, camera: 'CHASE' },
 };
 
 /** Runs in the page: starts the case on the test bench (which keeps driving after the event) and defines the per-image step. */
@@ -58,7 +63,9 @@ const setup = ([sc, width, height]) => {
       steerAsked: +me.inSteer.toFixed(3), steerDisturbance: +window.virage.debug.hopSteerKick(me).toFixed(3), steer: +me.steer.toFixed(3),
       headingToRoad: +(me.headingError * 57.2958).toFixed(2), gapToOther: lab.lead ? +((((lab.lead.s - me.s + L * 1.5) % L) - L / 2)).toFixed(2) : null,   // metres along the road, centre to centre
       // (lot 5) where the two cars are: x, z (m) and heading (rad), for the diagrams seen from above
-      place: place(me), placeOther: place(lab.lead), s: +me.s.toFixed(2) };
+      place: place(me), placeOther: place(lab.lead), s: +me.s.toFixed(2),
+      // (only for the case with a third car) is the landing waiting, for how long so far, and where that car is
+      ...(lab.third ? { waiting: !!me.airWaiting, waited: +(me.airWaited || 0).toFixed(3), placeThird: place(lab.third), third: +(lab.third.speed * 3.6).toFixed(1), gapToThird: +((((lab.third.s - me.s + L * 1.5) % L) - L / 2)).toFixed(2) } : {}) };
   };
   return { board: lab.board ? { s: lab.board.s, d: lab.board.d } : null, cars: lab.race.cars.length, parameters: lab.scenario };
 };

@@ -18,9 +18,9 @@ import { field, hold, parked, shadow, switching, watchFlights, SIM_DT, CAR_STATE
 
 const track = buildTrack(getCircuit('kestrel-fields'));
 const LENGTH = 4.2;                                                    // of a car (m)
-const WAIT_MAX = T.flightWaitMax ?? 3;                                 // s: longest wait of a landing, all causes together
+const WAIT_MAX = T.flightWaitMax ?? 3.5;                               // s: the longest a flight can go on beyond its planned time
 const YIELD = T.flightYieldSpeed ?? 8;                                 // m/s kept between the car in flight and a car below it
-/** Longest time a flight can last: the longest plan, the wait, and the descent. */
+/** Longest time a flight can last: its plan, the longest wait, and the descent. */
 const longest = (fl) => fl.car.airPlanned + WAIT_MAX + T.flightHoldTime + 2 * SIM_DT;
 
 /**
@@ -43,7 +43,7 @@ function accident(f, { kmhA = 262, kmhB = 188, d = 0, side = 1, driveB = null } 
 const KINDS = { hop, accident };
 
 /** What every scenario must show for the flight of `car`. Returns the flight. */
-function checkFlight(flights, car, label, { noPutBack = true, waitAtMost = WAIT_MAX, offVelocity = 1e-6 } = {}) {
+function checkFlight(flights, car, label, { noPutBack = true, waitAtMost = WAIT_MAX + T.flightHoldTime, offVelocity = 1e-6 } = {}) {   // (a wait begins flightHoldTime before the planned landing)
   const fl = flights.find((x) => x.car === car);
   assert.ok(fl, `${label}: the car took off`);
   // it ends
@@ -237,16 +237,23 @@ test('last resort: when cars stay under it for the whole of the longest wait, th
   for (let i = 1; i < 26; i++) f.put(f.cars[i], 60 + 4 + i * (LENGTH + 0.15), 0, 0, parked());
   f.put(a, 60, 0, 150, hold(150, 0));
   startHop(a, null, -1, 1, 0.45);
-  const flights = fly(f, 8);
+  let before = null, after = null;
+  const nearest = () => Math.min(...f.cars.filter((o) => o !== a).map((o) => Math.hypot(o.x - a.x, o.z - a.z)));
+  const flights = fly(f, 8, { each: () => {
+    if (a.state === CAR_STATE.AIRBORNE) before = { progress: a.progress, along: f.along(a), d: a.d };
+    else if (before && !after) after = { progress: a.progress, along: f.along(a), d: a.d, speed: a.speed, clear: nearest(), free: Math.max(...f.cars.filter((o) => o !== a).map((o) => bodyOverlap(a, o))) };
+  } });
   const fl = checkFlight(flights, a, 'over a line of 25 stopped cars', { noPutBack: false });
+  // its distance covered in the race follows it back: it has not gained the metres it flew over the line
+  assert.ok(Math.abs((after.progress - before.progress) - (after.along - before.along)) < 0.5, `distance covered changed by ${(after.progress - before.progress).toFixed(1)} m for a move of ${(after.along - before.along).toFixed(1)} m`);
   assert.equal(fl.putBack, true, 'the flight ended by the car being put back on the track');
-  assert.ok(fl.waited >= WAIT_MAX - 0.05, `after the whole wait (${fl.waited.toFixed(2)} s)`);
-  // where: on the road, stationary, clear of every car
-  const clear = Math.min(...f.cars.filter((o) => o !== a).map((o) => Math.hypot(o.x - a.x, o.z - a.z)));
-  assert.ok(Math.abs(a.d) <= track.halfWidth, `on the road (${a.d.toFixed(1)} m from the centre line)`);
-  assert.ok(clear > LENGTH + 2, `nearest car ${clear.toFixed(1)} m away`);
+  assert.ok(fl.seconds > fl.planned + WAIT_MAX - 0.05 && fl.seconds <= fl.planned + WAIT_MAX + 2 * SIM_DT, `when the whole of the longest wait was spent: ${fl.seconds.toFixed(2)} s after a plan of ${fl.planned.toFixed(2)} s`);
+  // where: the nearest free place, here beside the line; on the road, stationary, in no car
+  assert.ok(Math.abs(after.d) <= track.halfWidth - 0.93, `on the road (${after.d.toFixed(2)} m from the centre line)`);
+  assert.equal(after.free, 0, 'in no car'); assert.ok(Math.abs(after.speed) < 0.01, 'stationary');
+  assert.ok(Math.abs(after.along - before.along) < 3 && Math.abs(after.d - before.d) > 1.86, `beside where it was (${(after.along - before.along).toFixed(1)} m along, ${(after.d - before.d).toFixed(2)} m across)`);
   assert.ok(f.events.some((e) => e.type === 'reset' && e.car === a.index), 'signalled as any car put back on the track');
-  t.diagnostic(`over a line of 25 stopped cars: ${fl.seconds.toFixed(2)} s in the air, then put back on the track ${clear.toFixed(1)} m from the nearest car`);
+  t.diagnostic(`over a line of 25 stopped cars: ${fl.seconds.toFixed(2)} s in the air (plan ${fl.planned.toFixed(2)} s), then put back on the track ${(after.d - before.d).toFixed(2)} m to the side of where it was, ${after.clear.toFixed(1)} m from the centre of the nearest car`);
 });
 
 test('letting a crawling car go: the car drifts back off it, comes down rolling backwards a little, and drives off', (t) => {
@@ -268,4 +275,26 @@ test('letting a crawling car go: the car drifts back off it, comes down rolling 
   assert.ok(Math.abs(a.heading - heading) < 0.02 && a.state === CAR_STATE.RACING && !a.reverse, `heading ${a.heading.toFixed(3)} (was ${heading.toFixed(3)}), state ${a.state}`);
   assert.ok(a.speed > 3, `driving forward again, behind the crawling car (${(a.speed * KMH).toFixed(0)} km/h)`);
   t.diagnostic(`over a car crawling at 18 km/h: ${told(fl)}; ${backwards} steps moving backwards, at ${(-slowestAlong * KMH).toFixed(0)} km/h at most`);
+});
+
+test('two cars whose landings wait over each other: one gets clear of the other, their speeds stay those of cars', (t) => {
+  // two hops started by hand, one car just behind the other on the same line, over a line of stopped cars that keeps
+  // both in the air: each is "a car below" for the other. (If each let the other go, each slowing down below the speed
+  // the other had a step before, the two would chase each other's speed down without end.)
+  for (const [gap, kmh1, kmh2] of [[1.5, 120, 120], [0.5, 110, 125], [3, 130, 115], [0, 120, 120]]) {
+    const f = field(track, 7);
+    const [a1, a2] = f.cars;
+    for (let i = 2; i < 7; i++) f.put(f.cars[i], 60 + 14 + (i - 2) * (LENGTH + 0.15), 0, 0, parked());
+    f.put(a1, 60, 0.4, kmh1, hold(kmh1, 0.4)); f.put(a2, 60 - gap, -0.4, kmh2, hold(kmh2, -0.4));
+    startHop(a1, null, -1, 1, 0.45); startHop(a2, null, -1, 1, 0.45);
+    let slowest = Infinity, fastest = -Infinity, bothWaiting = 0;
+    const flights = fly(f, 9, { each: () => {
+      for (const car of [a1, a2]) if (car.state === CAR_STATE.AIRBORNE) { const v = f.alongSpeed(car); slowest = Math.min(slowest, v); fastest = Math.max(fastest, v); }
+      if (a1.state === CAR_STATE.AIRBORNE && a2.state === CAR_STATE.AIRBORNE && a1.airWaiting && a2.airWaiting) bothWaiting++;
+    } });
+    assert.ok(bothWaiting > 10, `${gap} m apart: both landings waited at the same time (${bothWaiting} steps)`);
+    assert.ok(slowest > -YIELD - 8 && fastest <= Math.max(kmh1, kmh2) / KMH + 0.01, `${gap} m apart: speeds in the air from ${slowest.toFixed(1)} to ${fastest.toFixed(1)} m/s`);
+    for (const car of [a1, a2]) checkFlight(flights, car, `${gap} m apart, car ${car === a1 ? 1 : 2}`);
+    t.diagnostic(`${gap} m apart at ${kmh1} and ${kmh2} km/h: speeds in the air from ${(slowest * KMH).toFixed(0)} to ${(fastest * KMH).toFixed(0)} km/h; ${flights.map((x) => `car ${x.car === a1 ? 1 : 2}: ${told(x)}${x.putBack ? ' (put back)' : ''}`).join('; ')}`);
+  }
 });
