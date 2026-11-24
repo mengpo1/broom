@@ -737,6 +737,11 @@ const COLLISION_TUNING = {
   flightYieldSpeed: 8,           // m/s (29 km/h) kept between the speed of the car in flight and that of any car below it: it
                                  //    passes it or lets it go, whichever is nearer its own speed. Two lengths of car at that
                                  //    difference: a car below is left within about 1.2 s, whatever it does
+  flightYieldSlack: 5,           // m/s: once it is passing a car it goes no faster than that speed plus this: a car speeding up
+                                 //    below does not pull it along (it is then let go). Smaller, it lets cars go more often and
+                                 //    comes down behind them more often; larger, it follows them further (measured: stress script)
+  flightYieldRate: 120,          // m/s^2: how fast its speed moves to the value chosen (8 m/s in 0.07 s): six times the brakes of
+                                 //    a car, so the car below cannot outrun it, and no jump of tens of km/h in one step
   flightWaitMax: 3.5,            // s: the longest a flight can go on beyond its planned time, whatever the reason (the wait
                                  //    above included). One car alone cannot use it up (0.5 s for the car that threw it up, then
                                  //    about 2.5 s at the very worst over one car: nearly passed, then let go; 2.3 s measured);
@@ -837,7 +842,7 @@ function createCarState(index) {
     airKind: 0, airPeak: 0, landKind: 0, airPlanned: 0, airHold: 0, airWaiting: false, rearmClock: -10,
     // a landing that waits (see holdLanding in collisions.js): time waited in this flight, how the car is getting
     // clear of what is under it (0: nothing below, +1: ahead of it, -1: letting it go), and whether it moves backwards
-    airWaited: 0, airMode: 0, airBack: false, airDirX: 1, airDirZ: 0, airCap: 0, airSpeed: 0,
+    airWaited: 0, airMode: 0, airBack: false, airDirX: 1, airDirZ: 0, airCap: 0, airSpeed: 0, airFree: true,
   };
 }
 
@@ -888,7 +893,7 @@ function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
   }
   car.state = CAR_STATE.AIRBORNE;
   car.airTime = 0; car.airDuration = duration; car.airPlanned = duration; car.airHold = 0; car.airWaiting = false; car.airHard = hard; car.airHeight = 0;
-  car.airWaited = 0; car.airMode = 0; car.airBack = false; car.airCap = 0; car.airSpeed = 0;
+  car.airWaited = 0; car.airMode = 0; car.airBack = false; car.airCap = 0; car.airSpeed = 0; car.airFree = true;
   const launched = Math.hypot(car.velX, car.velZ);
   if (launched > 1e-3) { car.airDirX = car.velX / launched; car.airDirZ = car.velZ / launched; } else { car.airDirX = Math.cos(car.heading); car.airDirZ = Math.sin(car.heading); }
   car.airKind = hard ? LANDING.HARD : LANDING.LIGHT;
@@ -945,8 +950,9 @@ function stepAirborne(car, dt, emit) {
   const v = Math.hypot(car.velX, car.velZ);
   const decel = car.airKind === LANDING.RECOVERABLE ? T.hopAirDecel : T.airDecel;
   let nv;
-  if (car.airWaiting) {
-    // its landing waits: its speed along its line for this step was chosen where the wait is decided (holdLanding)
+  if (car.airWaiting && !car.airFree) {
+    // its landing waits and it is getting clear of a car below: its speed along its line for this step was chosen where
+    // the wait is decided (holdLanding)
     nv = Math.abs(car.airSpeed); car.airBack = car.airSpeed < 0;
     car.velX = car.airDirX * car.airSpeed; car.velZ = car.airDirZ * car.airSpeed;
   } else {
@@ -965,14 +971,16 @@ function stepAirborne(car, dt, emit) {
   if (car.airTime < car.airDuration) return;
   // ---- landing
   car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
-  const back = car.airBack;                                            // (it was letting a slow car below get away: it comes down rolling backwards)
-  car.airWaiting = false; car.airMode = 0; car.airBack = false;
+  // (it was drifting back off a slow car below: it comes down stationary. A car is never handed to the ground moving
+  // backwards out of reverse gear: the rules of the ground are not made for it)
+  if (car.airBack) { car.velX = 0; car.velZ = 0; nv = 0; }
+  car.airWaiting = false; car.airMode = 0; car.airBack = false; car.airFree = true;
   if (car.airKind === LANDING.RECOVERABLE) {
     // on its wheels and driving again at once, at the speed it had in the air: what the hop costs was
     // taken during the flight
     car.velX *= T.hopLandingSpeedFactor; car.velZ *= T.hopLandingSpeedFactor;
-    car.speed = (back ? -nv : nv) * T.hopLandingSpeedFactor;
-    if (nv > 1 && !back) car.heading = Math.atan2(car.velZ, car.velX); // it comes down pointing the way it flew
+    car.speed = nv * T.hopLandingSpeedFactor;
+    if (nv > 1) car.heading = Math.atan2(car.velZ, car.velX);          // it comes down pointing the way it flew
     car.state = CAR_STATE.RACING;
     car.rearmClock = car.clock; car.stuckTimer = 0;
     if (emit) emit('landing', car.index, LANDING.RECOVERABLE);
@@ -1152,7 +1160,7 @@ function stepSpin(car, dt) {
  */
 function putBackOnTrack(car, track, s, d, emit) {
   placeCar(car, track, s, d);
-  car.airHeight = 0; car.airWaiting = false; car.airMode = 0; car.airBack = false;
+  car.airHeight = 0; car.airWaiting = false; car.airMode = 0; car.airBack = false; car.airFree = true;
   car.rearmClock = car.clock;                                           // (no landing is staged: it did not land)
   car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING;
   car.ghostTimer = 2.5;
@@ -3489,15 +3497,16 @@ function rearmed(car) { return car.clock - car.rearmClock >= COLLISION_TUNING.ho
 
 /**
  * Overlap of the boxes of two cars along the axis where it is smallest (0 when they are apart), the
- * second car seen (dx, dz) metres from the first. `grow` (m) lengthens the first box at both ends.
+ * second car seen (dx, dz) metres from the first. `grow` (m) lengthens the first box at both ends,
+ * `widen` (m) widens it on both sides.
  */
-function boxOverlap(a, b, dx, dz, grow = 0) {
+function boxOverlap(a, b, dx, dz, grow = 0, widen = 0) {
   const pa = a.params, pb = b.params;
   const ca = Math.cos(a.heading), sa = Math.sin(a.heading), cb = Math.cos(b.heading), sb = Math.sin(b.heading);
   let min = 1e9;
   for (let k = 0; k < 4; k++) {
     const ax = k === 0 ? ca : k === 1 ? -sa : k === 2 ? cb : -sb, az = k === 0 ? sa : k === 1 ? ca : k === 2 ? sb : cb;
-    const ra = (pa.halfLength + grow) * Math.abs(ax * ca + az * sa) + pa.halfWidth * Math.abs(-ax * sa + az * ca);
+    const ra = (pa.halfLength + grow) * Math.abs(ax * ca + az * sa) + (pa.halfWidth + widen) * Math.abs(-ax * sa + az * ca);
     const rb = pb.halfLength * Math.abs(ax * cb + az * sb) + pb.halfWidth * Math.abs(-ax * sb + az * cb);
     const overlap = ra + rb - Math.abs(dx * ax + dz * az);
     if (overlap <= 0) return 0;
@@ -3593,7 +3602,7 @@ function flightPlan(car, other, cars, baseTime, maxTime, decel, aside) {
     let clear = true;
     for (let i = 0; i < cars.length && clear; i++) {
       const o = cars[i];
-      if (o === car || o.removed || o.inPit || o.state === CAR_STATE.RESET) continue;
+      if (o === car || o.removed) continue;                    // (every car that is drawn: also one waiting to be put back, or in the pit entry)
       let dx, dz, margin = T.flightClearance * 0.5;
       if (o.state === CAR_STATE.AIRBORNE) { placeOfFlight(o, time, spot); dx = spot[0] - lx; dz = spot[1] - lz; margin += T.flightClearance; }   // (less sure: more room)
       else { worldVelocity(o, vb); dx = o.x + vb[0] * time - lx; dz = o.z + vb[1] * time - lz; }
@@ -3702,7 +3711,7 @@ function holdLanding(car, cars, dt, track, emit) {
   let below = 0;
   for (let i = 0; i < cars.length; i++) {
     const o = cars[i];
-    if (o === car || o.removed || o.inPit || o.state === CAR_STATE.RESET) continue;
+    if (o === car || o.removed) continue;                      // (every car that is drawn: also one waiting to be put back, or in the pit entry)
     // another car in flight: the one that took off first goes first, and does not look at the other (if each of two
     // cars waiting over each other let the other go, on the speed the other had a step before, the two would chase each
     // other's speed down without end). The later one gets clear of it as of any car.
@@ -3710,6 +3719,7 @@ function holdLanding(car, cars, dt, track, emit) {
     const nx = o.x - car.x, nz = o.z - car.z;
     if (nx * nx + nz * nz > 1600) continue;
     motionOf(o, vb);
+    // (no margin sideways: a hop passes 1 to 17 cm beside the car it touched, which is beside it, not below)
     let under = nx * nx + nz * nz <= 30 && boxOverlap(car, o, nx, nz, T.flightClearance * 0.5) > 0;
     if (!under) {
       const dx = o.x + vb[0] * ahead - lx, dz = o.z + vb[1] * ahead - lz;
@@ -3732,13 +3742,22 @@ function holdLanding(car, cars, dt, track, emit) {
   car.airMode = 0;
   if (below && paced(next, below, T.flightYieldSpeed)) {
     const over = clearOf(next, below, T.flightYieldSpeed, 1), under = clearOf(next, below, T.flightYieldSpeed, -1);
-    if (over <= car.airCap + 1e-9 && over - next <= next - under) { car.airMode = 1; next = over; } else { car.airMode = -1; next = under; car.airCap = under; }
+    // (passing: from now on no faster than this, give or take what a driver holding his speed wavers by, so that a car
+    // speeding up below does not pull the car in flight along with it)
+    if (over <= car.airCap + 1e-9 && over - next <= next - under) { car.airMode = 1; next = over; car.airCap = Math.min(car.airCap, over + T.flightYieldSlack); }
+    else { car.airMode = -1; next = under; car.airCap = under; }
   }
   // (a floor that the rule above never reaches by itself: no car on the ground goes backwards faster than a few m/s,
   // so nothing asks for less than about twice the margin; it is there so that no fault could ever send a car flying
   // backwards at any speed)
   if (next < -3 * T.flightYieldSpeed) next = -3 * T.flightYieldSpeed;
-  car.airSpeed = next;                                                  // (applied by the next step of the car: it moves by its velocity, as ever)
+  // its speed goes to that value at a limited rate (several times what any car can do on the ground, so that the car
+  // below cannot outrun the change): no jump of tens of km/h from one step to the next
+  const most = T.flightYieldRate * dt;
+  if (next > speed + most) next = speed + most; else if (next < speed - most) next = speed - most;
+  // (applied by the next step of the car, which moves by its velocity as ever; when it is simply its own speed, that step
+  // computes it exactly as in a free flight)
+  car.airSpeed = next; car.airFree = next === natural;
   // and the arc is stretched so that the car stays at the height it has as the wait begins (each time it begins); it
   // comes down from there, in that same time, once the way is clear
   car.airDuration = car.airTime + T.flightHoldTime;
@@ -3763,13 +3782,13 @@ function clearOf(speed, n, margin, way) {
   return speed;
 }
 
-/** Is the place where `car` stands clear of every other car, with a length of margin ahead and behind? */
+/** Is the place where `car` stands clear of every other car, with a length of margin ahead and behind and half a metre on each side? */
 function standsClear(car, cars) {
   for (let i = 0; i < cars.length; i++) {
     const o = cars[i];
     if (o === car || o.removed) continue;
     const dx = o.x - car.x, dz = o.z - car.z;
-    if (dx * dx + dz * dz <= 100 && boxOverlap(car, o, dx, dz, 2 * car.params.halfLength) > 0) return false;
+    if (dx * dx + dz * dz <= 121 && boxOverlap(car, o, dx, dz, 2 * car.params.halfLength, 0.5) > 0) return false;
   }
   return true;
 }
@@ -3801,7 +3820,7 @@ function putBack(car, cars, track, emit) {
     if (standsClear(car, cars)) break;
   }
   car.velX = 0; car.velZ = 0; car.speed = 0; car.vLat = 0; car.yawRate = 0; car.airHeight = 0;
-  car.airWaiting = false; car.airMode = 0; car.airBack = false; car.rearmClock = car.clock;
+  car.airWaiting = false; car.airMode = 0; car.airBack = false; car.airFree = true; car.rearmClock = car.clock;
   car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING; car.ghostTimer = 2.5; car.stuckTimer = 0; car.resets++;
   if (emit) emit('reset', car.index, 0);
   return true;

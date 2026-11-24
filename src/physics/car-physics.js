@@ -47,7 +47,7 @@ export function createCarState(index) {
     airKind: 0, airPeak: 0, landKind: 0, airPlanned: 0, airHold: 0, airWaiting: false, rearmClock: -10,
     // a landing that waits (see holdLanding in collisions.js): time waited in this flight, how the car is getting
     // clear of what is under it (0: nothing below, +1: ahead of it, -1: letting it go), and whether it moves backwards
-    airWaited: 0, airMode: 0, airBack: false, airDirX: 1, airDirZ: 0, airCap: 0, airSpeed: 0,
+    airWaited: 0, airMode: 0, airBack: false, airDirX: 1, airDirZ: 0, airCap: 0, airSpeed: 0, airFree: true,
   };
 }
 
@@ -98,7 +98,7 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
   }
   car.state = CAR_STATE.AIRBORNE;
   car.airTime = 0; car.airDuration = duration; car.airPlanned = duration; car.airHold = 0; car.airWaiting = false; car.airHard = hard; car.airHeight = 0;
-  car.airWaited = 0; car.airMode = 0; car.airBack = false; car.airCap = 0; car.airSpeed = 0;
+  car.airWaited = 0; car.airMode = 0; car.airBack = false; car.airCap = 0; car.airSpeed = 0; car.airFree = true;
   const launched = Math.hypot(car.velX, car.velZ);
   if (launched > 1e-3) { car.airDirX = car.velX / launched; car.airDirZ = car.velZ / launched; } else { car.airDirX = Math.cos(car.heading); car.airDirZ = Math.sin(car.heading); }
   car.airKind = hard ? LANDING.HARD : LANDING.LIGHT;
@@ -155,8 +155,9 @@ function stepAirborne(car, dt, emit) {
   const v = Math.hypot(car.velX, car.velZ);
   const decel = car.airKind === LANDING.RECOVERABLE ? T.hopAirDecel : T.airDecel;
   let nv;
-  if (car.airWaiting) {
-    // its landing waits: its speed along its line for this step was chosen where the wait is decided (holdLanding)
+  if (car.airWaiting && !car.airFree) {
+    // its landing waits and it is getting clear of a car below: its speed along its line for this step was chosen where
+    // the wait is decided (holdLanding)
     nv = Math.abs(car.airSpeed); car.airBack = car.airSpeed < 0;
     car.velX = car.airDirX * car.airSpeed; car.velZ = car.airDirZ * car.airSpeed;
   } else {
@@ -175,14 +176,16 @@ function stepAirborne(car, dt, emit) {
   if (car.airTime < car.airDuration) return;
   // ---- landing
   car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
-  const back = car.airBack;                                            // (it was letting a slow car below get away: it comes down rolling backwards)
-  car.airWaiting = false; car.airMode = 0; car.airBack = false;
+  // (it was drifting back off a slow car below: it comes down stationary. A car is never handed to the ground moving
+  // backwards out of reverse gear: the rules of the ground are not made for it)
+  if (car.airBack) { car.velX = 0; car.velZ = 0; nv = 0; }
+  car.airWaiting = false; car.airMode = 0; car.airBack = false; car.airFree = true;
   if (car.airKind === LANDING.RECOVERABLE) {
     // on its wheels and driving again at once, at the speed it had in the air: what the hop costs was
     // taken during the flight
     car.velX *= T.hopLandingSpeedFactor; car.velZ *= T.hopLandingSpeedFactor;
-    car.speed = (back ? -nv : nv) * T.hopLandingSpeedFactor;
-    if (nv > 1 && !back) car.heading = Math.atan2(car.velZ, car.velX); // it comes down pointing the way it flew
+    car.speed = nv * T.hopLandingSpeedFactor;
+    if (nv > 1) car.heading = Math.atan2(car.velZ, car.velX);          // it comes down pointing the way it flew
     car.state = CAR_STATE.RACING;
     car.rearmClock = car.clock; car.stuckTimer = 0;
     if (emit) emit('landing', car.index, LANDING.RECOVERABLE);
@@ -362,7 +365,7 @@ function stepSpin(car, dt) {
  */
 export function putBackOnTrack(car, track, s, d, emit) {
   placeCar(car, track, s, d);
-  car.airHeight = 0; car.airWaiting = false; car.airMode = 0; car.airBack = false;
+  car.airHeight = 0; car.airWaiting = false; car.airMode = 0; car.airBack = false; car.airFree = true;
   car.rearmClock = car.clock;                                           // (no landing is staged: it did not land)
   car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING;
   car.ghostTimer = 2.5;

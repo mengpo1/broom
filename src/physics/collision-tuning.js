@@ -64,6 +64,11 @@ export const COLLISION_TUNING = {
   flightYieldSpeed: 8,           // m/s (29 km/h) kept between the speed of the car in flight and that of any car below it: it
                                  //    passes it or lets it go, whichever is nearer its own speed. Two lengths of car at that
                                  //    difference: a car below is left within about 1.2 s, whatever it does
+  flightYieldSlack: 5,           // m/s: once it is passing a car it goes no faster than that speed plus this: a car speeding up
+                                 //    below does not pull it along (it is then let go). Smaller, it lets cars go more often and
+                                 //    comes down behind them more often; larger, it follows them further (measured: stress script)
+  flightYieldRate: 120,          // m/s^2: how fast its speed moves to the value chosen (8 m/s in 0.07 s): six times the brakes of
+                                 //    a car, so the car below cannot outrun it, and no jump of tens of km/h in one step
   flightWaitMax: 3.5,            // s: the longest a flight can go on beyond its planned time, whatever the reason (the wait
                                  //    above included). One car alone cannot use it up (0.5 s for the car that threw it up, then
                                  //    about 2.5 s at the very worst over one car: nearly passed, then let go; 2.3 s measured);

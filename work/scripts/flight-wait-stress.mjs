@@ -24,7 +24,9 @@ const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 42
 const pick = (list) => list[Math.floor(rnd() * list.length)];
 const between = (a, b) => a + (b - a) * rnd();
 
-const total = { packs, flights: 0, hops: 0, accidents: 0, waited: 0, putBack: 0, setDownInACar: 0, drivenThroughAfter: 0, touchingAfter: 0, offVelocity: 0, notEnded: 0, stillUpAtTheEnd: 0, longestWait: 0, longestFlight: 0, wreckDrivenThrough: 0, twoInTheAir: 0, landedBehind: 0, fasterThanAtTakeOff: 0, notANumber: 0 };
+const total = { packs, flights: 0, hops: 0, accidents: 0, waited: 0, putBack: 0, setDownInACar: 0, drivenThroughAfter: 0, touchingAfter: 0, offVelocity: 0, notEnded: 0, stillUpAtTheEnd: 0, longestWait: 0, longestFlight: 0, wreckDrivenThrough: 0, twoInTheAir: 0, landedBehind: 0, fasterThanAtTakeOff: 0, notANumber: 0,
+  // how the car in flight behaves while its landing waits (its speed is then chosen by rule)
+  waitedAndLostOver30KmhInAStep: 0, largestLossInAStepKmh: 0, waitedAndTookBackOver7Kmh: 0, mostSpeedTakenBackKmh: 0, flewBackwards: 0, furthestBackwardsM: 0 };
 const waits = [], worst = [];
 const only = process.env.VIRAGE_PACK ? Number(process.env.VIRAGE_PACK) : -1;      // (to look at one pack: its flights step by step)
 for (let p = 0; p < packs; p++) {
@@ -67,7 +69,15 @@ for (let p = 0; p < packs; p++) {
     total.flights++;
     if (fl.car.airKind === 2) total.hops++; else total.accidents++;
     if (fl.down < 0) { if ((f.step - fl.up) * SIM_DT > 5.5) total.notEnded++; else total.stillUpAtTheEnd++; continue; }   // (a flight that began in the last seconds of the run is not one that did not end)
-    if (fl.waited > 0) { total.waited++; waits.push(fl.waited); }
+    if (fl.waited > 0) {
+      total.waited++; waits.push(fl.waited);
+      if ((fl.speedDrop ?? 0) * KMH > 30) total.waitedAndLostOver30KmhInAStep++;
+      total.largestLossInAStepKmh = Math.max(total.largestLossInAStepKmh, Math.round((fl.speedDrop ?? 0) * KMH));
+      if ((fl.regained ?? 0) * KMH > 7) total.waitedAndTookBackOver7Kmh++;
+      total.mostSpeedTakenBackKmh = Math.max(total.mostSpeedTakenBackKmh, Math.round((fl.regained ?? 0) * KMH));
+      if ((fl.backwards ?? 0) > 0.05) total.flewBackwards++;
+      total.furthestBackwardsM = Math.max(total.furthestBackwardsM, +(fl.backwards ?? 0).toFixed(1));
+    }
     if (fl.putBack) total.putBack++;
     if (fl.overlapAtLanding > 0) total.setDownInACar++;
     // (three cars meeting in the same step can be left a few centimetres in each other for a step, on the ground, flight or
@@ -77,7 +87,7 @@ for (let p = 0; p < packs; p++) {
     if (fl.offVelocity > 0.05) total.offVelocity++;
     if (fl.fastest > Math.max(fl.takeOffSpeed, (T.flightYieldSpeed ?? 0)) + 0.01) total.fasterThanAtTakeOff++;
     total.longestWait = Math.max(total.longestWait, fl.waited); total.longestFlight = Math.max(total.longestFlight, fl.seconds);
-    if (fl.car === a && !fl.putBack && f.along(a) < f.along(b)) total.landedBehind++;
+    if (fl.car === a && !fl.putBack && fl.behindLauncher) total.landedBehind++;                 // (where it was at the step it came down)
     if (fl.waited > 2 || fl.putBack || fl.overlapAtLanding > 0 || fl.overlapAfter > 0.3) worst.push({ pack: p, cars: n, car: fl.car.index, kind: fl.car.airKind === 2 ? 'hop' : 'accident', seconds: +fl.seconds.toFixed(2), waited: +fl.waited.toFixed(2), putBack: fl.putBack, setDownInACar: +fl.overlapAtLanding.toFixed(2), overlappingAfter: +fl.overlapAfter.toFixed(2) });
   }
 }
