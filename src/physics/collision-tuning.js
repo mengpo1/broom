@@ -57,10 +57,17 @@ export const COLLISION_TUNING = {
   flightTimeCarMax: 1.1,         // s: longest flight of the hard accident (0.85 s measured, more only when needed to get past)
   flightHoldTime: 0.12,          // s before the planned landing from which the place where the car will come down is looked at
   flightHoldMax: 0.5,            // s: the landing waits at most this long when the car is not past the other one yet although
-                                 //    still gaining on it (that car sped up more than expected). While a car is under it, or
-                                 //    where it would land, the landing waits for as long as it takes: the place where it comes
-                                 //    down is chosen free of every car at the take-off, so this only acts when a car changed
-                                 //    its speed or its line during the flight
+                                 //    still gaining on it (that car sped up more than expected)
+  // While a car is under it, or where it would land, the landing waits too (the place where it comes down is chosen
+  // free of every car at the take-off, so this only acts when a car changed its speed or its line during the flight),
+  // but not for as long as that car likes: the car in flight gets clear of it, and all the waits of a flight are limited.
+  flightYieldSpeed: 8,           // m/s (29 km/h) kept between the speed of the car in flight and that of any car below it: it
+                                 //    passes it or lets it go, whichever is nearer its own speed. Two lengths of car at that
+                                 //    difference: a car below is left within about 1.2 s, whatever it does
+  flightWaitMax: 3,              // s: all the waits of one flight together. One car alone cannot reach it (about 2.5 s at the
+                                 //    very worst: nearly passed, then let go; 1.5 s measured); several cars taking turns under
+                                 //    it can. Beyond, last resort: the car is put back on the track on a free place, as a car
+                                 //    that has left the road is. It is never set down where it is if a car is there
 
   // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
   // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.

@@ -45,6 +45,9 @@ export function createCarState(index) {
     airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
     landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
     airKind: 0, airPeak: 0, landKind: 0, airPlanned: 0, airHold: 0, airWaiting: false, rearmClock: -10,
+    // a landing that waits (see holdLanding in collisions.js): time waited in this flight, how the car is getting
+    // clear of what is under it (0: nothing below, +1: ahead of it, -1: letting it go), and whether it moves backwards
+    airWaited: 0, airMode: 0, airBack: false, airDirX: 1, airDirZ: 0, airCap: 0, airSpeed: 0,
   };
 }
 
@@ -82,8 +85,8 @@ export function startSpin(car, impact, direction, emit) {
 /**
  * Throw a car in the air (it rode over another car, or hit a roadside object). In flight it
  * follows its velocity, cannot be steered and slows down; it comes down after `duration` seconds
- * (later only if another car is then under it: see the contacts between cars),
- * hard (stopped on the spot, see WRECKED) or light (it slides out of control, see startSlide).
+ * (later only if another car is then under it, for a limited time: see holdLanding in the contacts
+ * between cars), hard (stopped on the spot, see WRECKED) or light (it slides out of control, see startSlide).
  * @param side  -1 / 0 / +1: side of the car that took the hit (where the damage shows)
  */
 export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
@@ -95,6 +98,9 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
   }
   car.state = CAR_STATE.AIRBORNE;
   car.airTime = 0; car.airDuration = duration; car.airPlanned = duration; car.airHold = 0; car.airWaiting = false; car.airHard = hard; car.airHeight = 0;
+  car.airWaited = 0; car.airMode = 0; car.airBack = false; car.airCap = 0; car.airSpeed = 0;
+  const launched = Math.hypot(car.velX, car.velZ);
+  if (launched > 1e-3) { car.airDirX = car.velX / launched; car.airDirZ = car.velZ / launched; } else { car.airDirX = Math.cos(car.heading); car.airDirZ = Math.sin(car.heading); }
   car.airKind = hard ? LANDING.HARD : LANDING.LIGHT;
   const reach = duration / COLLISION_TUNING.flightTimeCar;
   car.airPeak = COLLISION_TUNING.airPeakHeight * reach * reach;
@@ -148,9 +154,16 @@ function stepAirborne(car, dt, emit) {
   const T = COLLISION_TUNING, spec = car.params.spec;
   const v = Math.hypot(car.velX, car.velZ);
   const decel = car.airKind === LANDING.RECOVERABLE ? T.hopAirDecel : T.airDecel;
-  const nv = Math.max(0, v - decel * dt);
-  const k = v > 1e-4 ? nv / v : 0;
-  car.velX *= k; car.velZ *= k;
+  let nv;
+  if (car.airWaiting) {
+    // its landing waits: its speed along its line for this step was chosen where the wait is decided (holdLanding)
+    nv = Math.abs(car.airSpeed); car.airBack = car.airSpeed < 0;
+    car.velX = car.airDirX * car.airSpeed; car.velZ = car.airDirZ * car.airSpeed;
+  } else {
+    nv = Math.max(0, v - decel * dt);
+    const k = v > 1e-4 ? nv / v : 0;
+    car.velX *= k; car.velZ *= k;
+  }
   car.x += car.velX * dt; car.z += car.velZ * dt;
   car.airTime += dt;
   const u = Math.min(1, car.airTime / car.airDuration);
@@ -162,12 +175,14 @@ function stepAirborne(car, dt, emit) {
   if (car.airTime < car.airDuration) return;
   // ---- landing
   car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
+  const back = car.airBack;                                            // (it was letting a slow car below get away: it comes down rolling backwards)
+  car.airWaiting = false; car.airMode = 0; car.airBack = false;
   if (car.airKind === LANDING.RECOVERABLE) {
     // on its wheels and driving again at once, at the speed it had in the air: what the hop costs was
     // taken during the flight
     car.velX *= T.hopLandingSpeedFactor; car.velZ *= T.hopLandingSpeedFactor;
-    car.speed = nv * T.hopLandingSpeedFactor;
-    if (nv > 1) car.heading = Math.atan2(car.velZ, car.velX);          // it comes down pointing the way it flew
+    car.speed = (back ? -nv : nv) * T.hopLandingSpeedFactor;
+    if (nv > 1 && !back) car.heading = Math.atan2(car.velZ, car.velX); // it comes down pointing the way it flew
     car.state = CAR_STATE.RACING;
     car.rearmClock = car.clock; car.stuckTimer = 0;
     if (emit) emit('landing', car.index, LANDING.RECOVERABLE);
@@ -338,6 +353,22 @@ function stepSpin(car, dt) {
     car.resetTimer = 0.7;
     car.speed = 0;
   }
+}
+
+/**
+ * Last resort of a flight that could not end (see holdLanding in collisions.js): the car is put back on the track
+ * at (s, d), a place its caller has found free of every car, as a car that has left the road is (same protection,
+ * same event). It is stationary there, on its wheels.
+ */
+export function putBackOnTrack(car, track, s, d, emit) {
+  placeCar(car, track, s, d);
+  car.airHeight = 0; car.airWaiting = false; car.airMode = 0; car.airBack = false;
+  car.rearmClock = car.clock;                                           // (no landing is staged: it did not land)
+  car.state = car.engineOut ? CAR_STATE.RETIRED : CAR_STATE.RACING;
+  car.ghostTimer = 2.5;
+  car.stuckTimer = 0;
+  car.resets++;
+  if (emit) emit('reset', car.index, 0);
 }
 
 function repositionCar(car, track, emit) {

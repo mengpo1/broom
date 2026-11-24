@@ -129,7 +129,7 @@ export class Race {
     }
     if ((this.tick & 3) === 0) updateDrafts(cars);
     for (let i = 0; i < n; i++) if (!cars[i].removed) stepCar(cars[i], this.track, dt, this.rules, this.emit);
-    resolveCarContacts(cars, this.rules, this.time, this.emit, dt);
+    resolveCarContacts(cars, this.rules, this.time, this.emit, dt, this.track);
     if (this.obstacles.length) collideObstacles(cars, this.track, this.obstacles, this.obstacleDown, this.emit);
     for (let i = 0; i < n; i++) {
       const car = cars[i];
