@@ -1,10 +1,10 @@
 {
- "source": "this branch",
+ "source": "/home/user/broom/src",
  "summary": {
   "races": 21,
-  "bumps": 219,
-  "rubs": 1110,
-  "contacts": 1143,
+  "bumps": 220,
+  "rubs": 1113,
+  "contacts": 1148,
   "boards": 13,
   "hops": 0,
   "accidents": 5,
@@ -16,8 +16,8 @@
    "closingOver57": 3
   },
   "resets": 25,
-  "finishers": 293,
-  "wall": 250,
+  "finishers": 294,
+  "wall": 251,
   "totalWinnerTime": 4268.55
  },
  "results": [
@@ -286,7 +286,7 @@
    "seed": 12,
    "rules": "arcade",
    "finished": true,
-   "raceTime": 189.52,
+   "raceTime": 189.9,
    "winnerTime": 175.31,
    "bestLap": 57.171,
    "finishers": 16,
@@ -294,14 +294,14 @@
    "retired": 0,
    "contact": 59,
    "bump": 12,
-   "wheel": 54,
-   "obstacle": 0,
+   "wheel": 55,
+   "obstacle": 1,
    "launch": 1,
    "hop": 0,
    "crash": 1,
-   "wall": 5,
+   "wall": 7,
    "wheelStrikes": {
-    "any": 8,
+    "any": 9,
     "closing36": 1,
     "closing57": 1
    },
@@ -310,8 +310,8 @@
      "kind": "accident",
      "closingKmh": 62,
      "seconds": 1.275,
-     "aheadOfItsNoseM": -6.5,
-     "sideM": -2.83,
+     "aheadOfItsNoseM": -9.19,
+     "sideM": -2.31,
      "overlapM": 0,
      "landedAhead": false
     }
@@ -322,22 +322,22 @@
    "seed": 13,
    "rules": "arcade",
    "finished": true,
-   "raceTime": 187.72,
+   "raceTime": 188.49,
    "winnerTime": 175,
    "bestLap": 57.171,
-   "finishers": 15,
+   "finishers": 16,
    "resets": 0,
    "retired": 0,
-   "contact": 80,
-   "bump": 11,
-   "wheel": 72,
-   "obstacle": 1,
+   "contact": 85,
+   "bump": 12,
+   "wheel": 74,
+   "obstacle": 0,
    "launch": 1,
    "hop": 0,
    "crash": 1,
-   "wall": 12,
+   "wall": 11,
    "wheelStrikes": {
-    "any": 10,
+    "any": 9,
     "closing36": 0,
     "closing57": 0
    },
@@ -345,9 +345,9 @@
     {
      "kind": "accident",
      "closingKmh": 59,
-     "seconds": 1.283,
-     "aheadOfItsNoseM": -10.49,
-     "sideM": -0.81,
+     "seconds": 1.217,
+     "aheadOfItsNoseM": -10.66,
+     "sideM": -1.13,
      "overlapM": 0,
      "landedAhead": false
     }

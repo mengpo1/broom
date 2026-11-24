@@ -21,7 +21,7 @@ chromium --enable-features=Vulkan index.html      # Linux : Vulkan aide WebGPU s
 
 Pour essayer les collisions rares (saut récupérable, accident violent, panneau) sans attendre
 qu'elles arrivent en course, un banc d'essai de développement s'ouvre avec une option de
-lancement ; touches 1 à 6 pour choisir un cas, Entrée pour rejouer
+lancement ; touches 1 à 7 pour choisir un cas, Entrée pour rejouer
 (`docs/specifications/collision-test-bench.md`) :
 
 ```bash
@@ -46,7 +46,7 @@ en écran partagé (haut/bas ou gauche/droite). 18 circuits originaux, 16 advers
 ## Contenu du dépôt
 
 ```
-index.html            le jeu autonome (construit depuis src/), 1 085 255 octets
+index.html            le jeu autonome (construit depuis src/), 1 102 693 octets
 race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s (enregistrée avant le travail sur les collisions)
 src/                  sources (voir docs/architecture/overview.md)
 tests/                tests automatisés (Node et navigateur)

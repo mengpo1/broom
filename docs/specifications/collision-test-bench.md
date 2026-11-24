@@ -30,6 +30,7 @@ l'adresse et recharger la page.
 | `#lab=crash` (ou `e3`, `accident`) | **Accident violent** (E3) | envol à 262 km/h, la voiture **passe au-dessus de l'autre et retombe devant elle, sur le côté de sa trajectoire** ; explosion, arrêt 3,2 s (l'autre voiture longe l'épave), redémarrage sur place |
 | `#lab=board` (ou `e5`, `panneau`) | **Panneau de bord de piste** (E5) | envol à 242 km/h, retombée sans explosion, glissade jusqu'à l'arrêt dans l'herbe |
 | `#lab=bump` (ou `e4`, `tamponnage`) | Tamponnage arrière (E4) | 146 → environ 59 km/h derrière une voiture à 105 km/h |
+| `#lab=under` (ou `dessous`, `attente`) | **Saut, une troisième voiture reste sous la voiture en vol** (cas extrême) | le saut du cas 2, avec une voiture à côté de la vôtre, à votre vitesse. Dès le décollage elle se rabat sous votre voiture et freine comme elle ralentit pour y rester : la place où vous deviez retomber est prise. L'atterrissage attend (0,6 s), votre voiture ralentit plus qu'elle (215 → 96 km/h) pour la laisser partir, et se pose sur une place libre, derrière elle. Avant la sécurisation de la PR #8, votre voiture restait en l'air jusqu'à l'arrêt complet des deux (4,3 s) |
 | `#lab=body` (ou `nez`, `carrosserie`) | **Nez contre roue arrière : pas de saut** | 165 km/h sur une voiture à 100, décalée d'une demi-largeur : plus d'écart et de vitesse qu'il n'en faut pour un saut, mais ce sont les carrosseries qui se touchent. Tamponnage (165 → environ 54 km/h), la voiture ne quitte pas le sol. Jusqu'à la PR #4 ce contact donnait un saut |
 
 ## Pendant l'essai
@@ -38,7 +39,7 @@ Un bandeau en haut de l'écran rappelle le cas en cours et les touches.
 
 | Touche | Effet |
 |---|---|
-| `1` `2` `3` `4` `5` `6` | choisir un cas (roue contre roue sans saut, saut, accident, panneau, tamponnages, nez contre roue) |
+| `1` `2` `3` `4` `5` `6` `7` | choisir un cas (roue contre roue sans saut, saut, accident, panneau, tamponnages, nez contre roue, saut avec une voiture qui reste dessous) |
 | `Entrée` | rejouer le cas en cours |
 | `C` | changer de caméra (cockpit, poursuite, face, bord de piste), comme en course |
 | `Échap` | pause, comme en course |
@@ -104,7 +105,7 @@ voiture est rendue **devant** celle qu'elle a survolée et que le clavier repren
 un tamponnage sans que la voiture quitte le sol, puis que sans l'option rien du banc n'existe,
 ni dans les menus ni en course (23 contrôles).
 
-Les six cas sont aussi joués sans navigateur, par le vrai module du banc et la vraie
+Les sept cas sont aussi joués sans navigateur, par le vrai module du banc et la vraie
 simulation, dans `tests/gameplay/lab.test.mjs` : ce que donne chaque cas, où la voiture
 retombe, et la direction après restitution (gauche et droite). Et la chaîne clavier → jeu →
 voiture est suivie pas par pas dans le vrai jeu par :

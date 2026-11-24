@@ -6,7 +6,27 @@ Dans le conteneur de développement, WebGPU est exécuté par le rasteriseur log
 SwiftShader derrière un serveur X virtuel (Xvfb) : les tests vérifient le comportement et
 l'image, pas la vitesse.
 
-## 0. Dernière exécution complète
+## 0 bis. Sécurisation de la PR #8 — état au commit intermédiaire
+
+Travail en cours (attente en vol bornée, voiture retirée, cas 7 du banc : `collisions.md`
+§ 2 quater). **Ce tableau dit ce qui a été exécuté sur ce commit, et ce qui ne l'a pas encore
+été** ; la relecture indépendante de ces modifications est en cours.
+
+| Suite | Commande | Résultat sur ce commit |
+|---|---|---|
+| Simulation et logique | `npm test` | **122 / 122** : les 109 tests précédents inchangés et réussis ; 13 nouveaux (10 dans `flight-wait.test.mjs`, 2 dans `retired.test.mjs`, 1 dans `lab.test.mjs`) |
+| Les nouveaux tests sur `dc8b823` | mêmes fichiers sur les sources du commit précédent | les 10 tests de l'attente en vol échouent (vols de 4,3 à 5,3 s, voiture posée dans une autre, vitesses de plusieurs milliers de m/s pour deux vols qui attendent l'un sur l'autre) ; le test de la voiture retirée échoue sans le correctif |
+| Banc d'essai dans le vrai jeu | `node work/scripts/lab-check.mjs` | 27 / 27 (les 23 précédents ; 4 nouveaux sur le cas 7) |
+| Braquage après restitution, clavier réel | `node work/scripts/steering-handover-check.mjs` | **non réussi à ce stade** : 50 puis 49 contrôles sur 51 lors de deux exécutions pendant que d'autres calculs chargeaient la machine (fenêtres de mesure de 0 à 0,2 s au lieu de 0,3 à 0,4 s ; les contrôles en échec ne sont pas les mêmes d'une fois à l'autre). À relancer au calme avant toute conclusion |
+| Conduite | `node work/scripts/driving-report.mjs` | 165 valeurs identiques |
+| Mesures de référence E1 à E5 | `node work/scripts/collision-comparison.mjs` | identiques au commit précédent (donc E1, E2, E4, E5 identiques à la PR #4) |
+| Pelotons hostiles | `node work/scripts/flight-wait-stress.mjs` | 1 000 pelotons, 1 575 vols : 0 voiture posée dans une autre (34 avant), vol le plus long 4,35 s (6,04 s avant), 3 remises en piste |
+| Courses à 20 voitures | `node work/scripts/dense-pack-races.mjs` | 54 courses terminées, temps des vainqueurs identiques au commit précédent ; 38 vols, attente la plus longue 1,09 s, aucune remise en piste, aucune voiture posée dans une autre |
+| 21 courses à 16 voitures | `node work/scripts/race-rules-comparison.mjs` | temps des vainqueurs identiques à la PR #4 (4 268,55 s) |
+| Rendu, modes de jeu, pages, audio (navigateur) | `smoke.browser.mjs`, `flow-check.mjs`, `pages-check.mjs`, `audio-check.mjs` | **pas encore relancés sur ce build** (1 102 693 octets) |
+| Séquences du banc E2 à E5, HOP, BODY : télémétrie image par image | `collision-sequences.mjs` | **pas encore rejouées sur ce build** ; les trois séquences du cas 7 (`HOLD`, `HOLDx`, `HOLDslowx`) sont enregistrées sur ce build |
+
+## 0. Dernière exécution complète (livraison précédente de la PR #8, commit `dc8b823`)
 
 Sur le build final (`index.html`, 1 085 255 octets), le 24 novembre 2026, après le lot 5
 (« corrections après validation humaine de la PR #4 » : saut par contact de roues,

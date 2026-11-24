@@ -63,9 +63,15 @@ par le rasteriseur logiciel SwiftShader).
     une autre ;
   - le lieu d'atterrissage est choisi libre de toute voiture : dans un peloton serré il y a
     donc moins de décollages (le contact reste un tamponnage). Si une voiture vient dessous
-    pendant le vol, la voiture attend en l'air tant qu'elle y est, sans plafond explicite
-    (0,77 s au plus sur 854 vols construits pour cela) : rare, mais visible (une voiture qui
-    glisse à 20–60 cm au-dessus d'une autre) ;
+    pendant le vol, la voiture en vol **s'en dégage** (elle la dépasse ou la laisse partir, à
+    29 km/h d'écart au moins) : une seconde environ, pendant laquelle elle est dessinée
+    au-dessus de l'autre. Un vol ne dure jamais plus de 3,5 s au-delà de sa durée prévue ;
+    passé ce délai, si des voitures se sont relayées dessous, **la voiture est remise en piste
+    sur une place libre** : c'est la seule téléportation en vol, à arbitrer (`collisions.md`
+    § 2 quater, avec les autres issues possibles et leur coût) ;
+  - **la règle « retomber devant » n'est pas tenue en peloton** : 19 vols sur 33 dans 54
+    courses à 20 voitures ne retombent pas devant la voiture heurtée (en courbe, ou quand elle
+    accélère). Exception à arbitrer, non conforme à la règle générale ;
   - la mise en scène (vue, assiette de la voiture en vol) n'a pas été réglée pour les vols
     plus longs que 0,85 s ni pour l'attente en l'air ;
   - rétroviseurs : la variante B (+2,5 cm) est dans le jeu comme **proposition** ; A et C se
@@ -75,10 +81,10 @@ par le rasteriseur logiciel SwiftShader).
     montre un braquage complet quand l'angle réel est de 1,5°. Toute modification de la
     conduite attend un arbitrage ;
   - une relecture indépendante du code a trouvé sept défauts dans la première livraison de
-    ce lot, tous corrigés et testés (`collisions.md` § 2 ter) ; les corrections elles-mêmes
-    n'ont pas été relues à leur tour. Relevé à cette occasion, antérieur au lot et **non
-    corrigé** : une voiture de l'ordinateur retirée après un abandon (elle n'est plus
-    dessinée) reste un obstacle solide ;
+    ce lot, tous corrigés et testés (`collisions.md` § 2 ter). Relevé à cette occasion et
+    **corrigé depuis, à part** : une voiture de l'ordinateur retirée après un abandon (elle
+    n'est plus dessinée) n'est plus un obstacle. La sécurisation qui a suivi (attente en vol
+    bornée) fait l'objet d'une seconde relecture indépendante ;
   - aucun critique indépendant n'a revu l'image de ce lot ; rien n'a été essayé au volant.
 - **Saut récupérable** *(état de la PR #4, pour mémoire)* : choix de gameplay original (rien de tel dans la vidéo de référence),
   ajouté à la demande du joueur. Ses seuils et son dosage sont des réglages de départ, jamais

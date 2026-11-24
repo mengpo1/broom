@@ -24,7 +24,7 @@ const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 42
 const pick = (list) => list[Math.floor(rnd() * list.length)];
 const between = (a, b) => a + (b - a) * rnd();
 
-const total = { packs, flights: 0, hops: 0, accidents: 0, waited: 0, putBack: 0, setDownInACar: 0, drivenThroughAfter: 0, touchingAfter: 0, offVelocity: 0, notEnded: 0, stillUpAtTheEnd: 0, longestWait: 0, longestFlight: 0, wreckDrivenThrough: 0, twoInTheAir: 0, landedBehind: 0 };
+const total = { packs, flights: 0, hops: 0, accidents: 0, waited: 0, putBack: 0, setDownInACar: 0, drivenThroughAfter: 0, touchingAfter: 0, offVelocity: 0, notEnded: 0, stillUpAtTheEnd: 0, longestWait: 0, longestFlight: 0, wreckDrivenThrough: 0, twoInTheAir: 0, landedBehind: 0, fasterThanAtTakeOff: 0, notANumber: 0 };
 const waits = [], worst = [];
 const only = process.env.VIRAGE_PACK ? Number(process.env.VIRAGE_PACK) : -1;      // (to look at one pack: its flights step by step)
 for (let p = 0; p < packs; p++) {
@@ -62,6 +62,7 @@ for (let p = 0; p < packs; p++) {
     for (const x of f.cars) for (const y of f.cars) if (x.index < y.index && x.state === CAR_STATE.AIRBORNE && y.state === CAR_STATE.AIRBORNE) twoInTheAir = Math.max(twoInTheAir, H.bodyOverlap(x, y));
   } });
   if (twoInTheAir > 0) total.twoInTheAir++;
+  if (f.cars.some((x) => !Number.isFinite(x.x + x.z + x.speed + x.velX + x.velZ + x.heading))) total.notANumber++;
   for (const fl of flights) {
     total.flights++;
     if (fl.car.airKind === 2) total.hops++; else total.accidents++;
@@ -74,6 +75,7 @@ for (let p = 0; p < packs; p++) {
     if (fl.overlapAfter > 0.3) total.drivenThroughAfter++; else if (fl.overlapAfter > 0) total.touchingAfter++;
     if (fl.wreckDrivenThrough > 0) total.wreckDrivenThrough++;
     if (fl.offVelocity > 0.05) total.offVelocity++;
+    if (fl.fastest > Math.max(fl.takeOffSpeed, (T.flightYieldSpeed ?? 0)) + 0.01) total.fasterThanAtTakeOff++;
     total.longestWait = Math.max(total.longestWait, fl.waited); total.longestFlight = Math.max(total.longestFlight, fl.seconds);
     if (fl.car === a && !fl.putBack && f.along(a) < f.along(b)) total.landedBehind++;
     if (fl.waited > 2 || fl.putBack || fl.overlapAtLanding > 0 || fl.overlapAfter > 0.3) worst.push({ pack: p, cars: n, car: fl.car.index, kind: fl.car.airKind === 2 ? 'hop' : 'accident', seconds: +fl.seconds.toFixed(2), waited: +fl.waited.toFixed(2), putBack: fl.putBack, setDownInACar: +fl.overlapAtLanding.toFixed(2), overlappingAfter: +fl.overlapAfter.toFixed(2) });

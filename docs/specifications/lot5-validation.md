@@ -13,6 +13,12 @@ Base : PR #4, commit `97252a5`. Décisions du joueur après ses essais :
 Aucune de ces corrections n'est déclarée validée : les tests automatiques montrent que le jeu
 fait ce qui est décrit, pas que cela convient.
 
+**Dernière sécurisation avant essais (§ 5)** : l'attente d'une voiture en vol au-dessus d'une
+autre est maintenant bornée, sans atterrissage forcé ; une voiture retirée de la course n'est
+plus un obstacle invisible. Les réglages de conduite, les 165 valeurs de référence, les
+collisions sans vol et l'animation des roues ne sont pas touchés ; la bande de 17 cm, le seuil
+de 58 km/h et l'écart latéral de l'accident non plus.
+
 ## 1. Commandes pour les essais
 
 Depuis le dossier du dépôt, avec le navigateur qui sert à jouer (l'adresse complète en
@@ -35,6 +41,7 @@ message les touches de direction n'ont pas d'effet.
 | `3` | Accident violent E3 (262 km/h sur 188) | la voiture passe au-dessus de l'autre, retombe devant elle et sur le côté ; explosion, arrêt ; l'autre voiture longe l'épave sans la toucher ; redémarrage |
 | `4` | Panneau E5 | inchangé : envol sur le panneau, retombée 35 m plus loin, glissade |
 | `6` | Nez contre roue arrière (165 km/h sur 100) | plus d'écart qu'il n'en faut pour un saut, mais les carrosseries se touchent : tamponnage, la voiture reste au sol |
+| `7` | **Cas extrême** : le saut du cas 2, avec une troisième voiture qui fait ce qu'elle peut pour rester sous la vôtre | une voiture bleue roule à côté de vous ; au décollage elle se rabat sous votre voiture et freine avec elle. L'atterrissage attend un peu plus d'une demi-seconde, votre voiture ralentit davantage qu'elle (215 → 96 km/h) et se pose derrière elle, sur une place libre. En vue de derrière (`C`) on voit la voiture dessous |
 | `1` | Roue contre roue côte à côte (E2) | inchangé : frottement, pas de décollage |
 | `5` | Tamponnages (E4) | inchangé |
 
@@ -181,13 +188,59 @@ Non couvert : aucun essai au volant ; aucun critique indépendant de l'image sur
 relecture a porté sur le code) ; performances graphiques non remesurées (aucun changement de
 rendu hormis la hauteur des rétroviseurs).
 
-## 5. À valider ou à arbitrer
+## 5. Sécurisation de la PR #8 : l'attente en vol est bornée
+
+Détail, raisonnement et mesures : `collisions.md` § 2 quater.
+
+**Le défaut.** Quand une voiture occupait la place d'atterrissage, la voiture en vol attendait
+tant qu'elle y était ; une voiture qui freinait au même rythme qu'elle la gardait en l'air
+jusqu'à l'arrêt des deux (4 à 5 s), après quoi elle était posée, dans l'autre si elle était
+encore là.
+
+**La correction.** Tant qu'une voiture est dessous, la voiture en vol **se dégage** : sa
+vitesse est tenue à au moins 29 km/h de celle de toute voiture qui est dessous — elle la
+dépasse, ou la laisse partir. Une voiture seule est ainsi quittée en une seconde environ quoi
+qu'elle fasse. Rien n'est déplacé à la main, les autres voitures ne sont pas touchées, un vol
+sans conflit est inchangé. Un vol ne dure jamais plus de 3,5 s au-delà de sa durée prévue.
+
+**L'exception, à arbitrer.** Si des voitures se relaient sous elle pendant ces 3,5 s, la
+voiture est **remise en piste sur une place libre**, comme une voiture sortie de la route :
+c'est une téléportation, la seule, assumée parce que les deux autres issues étaient exclues
+(rester en l'air sans limite ; être posée dans une voiture). Il faut plusieurs voitures pour
+la produire ; les alternatives et leurs conséquences sont dans `collisions.md`.
+
+**Aussi corrigé** : la place d'atterrissage était regardée une fraction de pas trop tôt
+(jusqu'à un demi-mètre d'erreur) ; deux voitures jetées en l'air presque en même temps
+pouvaient être envoyées au même endroit.
+
+**À part** (commit distinct, `collisions.md` § 2 quater n'en dépend pas) : une voiture de
+l'ordinateur retirée de la course après un abandon n'est plus un obstacle. Une voiture
+abandonnée encore sur la piste reste un obstacle ; une voiture de joueur abandonnée n'est
+jamais retirée ; une épave après un accident est traitée comme avant.
+
+| Contrôle | Avant (`dc8b823`) | Maintenant |
+|---|---|---|
+| Les scénarios demandés (`tests/gameplay/flight-wait.test.mjs`, 10 tests) : troisième voiture qui s'arrête dessous, voiture qui arrive pendant le vol, peloton sur toutes les places, voiture franchie qui accélère, barrière, deux décollages presque simultanés | tous échouent : vols de 4,3 à 5,3 s, voiture posée jusqu'à 1,6 m dans une autre | tous réussis : attente de 0,5 à 1,5 s, jamais dans une voiture |
+| 1 000 pelotons hostiles (`flight-wait-stress.mjs`) : voitures posées dans une autre | 34 | 0 |
+| — attente la plus longue ; dernier recours | 5,2 s ; — | 3,6 s ; 3 fois sur 1 575 vols |
+| 54 courses à 20 voitures (`dense-pack-races.mjs`) : attente la plus longue ; dernier recours | 1,6 s ; — | 1,1 s ; 0 |
+| Une voiture seule cherchant à rester dessous (1 458 vols) | — | 2,3 s au plus ; jamais de dernier recours |
+| Contacts validés E1, E2, E4, E5 ; 165 valeurs de conduite | — | identiques |
+
+Vidéos du cas extrême (une troisième voiture reste sous la voiture en vol), dans
+`work/renders/collisions/` : `HOLDx.mp4` (vue de derrière, la plus lisible), `HOLD.mp4`
+(cockpit), `HOLDslowx.mp4` (quatre fois plus lentement).
+
+**Relecture indépendante de ces modifications : en cours au moment de ce commit.** Ses constats
+et leurs suites seront ajoutés ici ; rien de ce qui précède n'a encore été relu par un tiers.
+
+## 6. À valider ou à arbitrer
 
 1. **Le saut par contact de roues** : la bande de 17 cm, le seuil de 58 km/h, la durée et la
    hauteur du vol, le coût (22 à 41 km/h).
-2. **Sa fréquence en course** : nulle dans les courses de l'ordinateur. Convient-il qu'il soit
-   un geste de pilotage rare, ou faut-il l'élargir (freinage en vol allégé pour le saut ;
-   arrivées en biais) ?
+2. **Sa fréquence en course** : nulle dans 21 courses à 16 voitures, 6 sauts dans 54 courses à
+   20 voitures. Convient-il qu'il soit un geste de pilotage rare, ou faut-il l'élargir
+   (freinage en vol allégé pour le saut ; arrivées en biais) ?
 3. **Le seuil de l'accident** passé de 54 à 58 km/h, et le vol plus long près du seuil (jusqu'à
    1,1 s et 2,2 m).
 4. **L'écart latéral de l'accident** (la voiture est jetée de côté pour ne pas retomber dans la
@@ -196,4 +249,16 @@ rendu hormis la hauteur des rétroviseurs).
 6. **La hauteur des rétroviseurs** : A, B ou C.
 7. **Le braquage** : accepter le diagnostic (comportement normal à vitesse élevée) ; puis
    choisir entre ne rien changer, corriger seulement le dessin, ou ouvrir la conduite à haute
-   vitesse (`steering-diagnosis.md` § D).
+   vitesse (`steering-diagnosis.md` § D). Rien n'est modifié à ce stade : ni la physique de la
+   direction, ni le nombre de positions dessinées ; l'écart entre l'angle réel et l'angle
+   affiché reste documenté.
+8. **Les vols qui ne retombent pas devant la voiture heurtée** : ce n'est pas conforme à la
+   règle générale, et c'est fréquent en peloton (19 vols sur 33 dans 54 courses à 20 voitures,
+   2 sur 5 dans 21 courses à 16 voitures : en courbe, ou quand la voiture heurtée accélère). À arbitrer :
+   accepter l'exception, ou resserrer les conditions du décollage (`collisions.md` § 2 quater).
+9. **Le dernier recours de l'attente en vol** (remise en piste après 3,5 s) : seule
+   téléportation du jeu en vol. À accepter, ou à remplacer par l'une des autres issues
+   décrites, chacune avec son coût.
+10. **Le comportement pendant l'attente** : la voiture en vol ralentit ou garde son élan d'un
+    coup, peut reculer au-dessus d'une voiture presque arrêtée, et reste dessinée au-dessus
+    d'une autre pendant une seconde. À juger à l'écran (cas `7` du banc).
