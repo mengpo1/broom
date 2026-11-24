@@ -70,3 +70,56 @@ export function run(race, seconds, inputs = {}) {
   log.atEvent = (e) => log.frames[Math.max(0, e.frame - 1)];
   return log;
 }
+
+// ---- geometry seen from above, written independently of the game (corners and separating axes),
+// so that the tests do not check the collision code with itself
+
+/** Corners of a rectangle centred on (cx, cz), `halfLength` along `heading`, `halfWidth` across. */
+export function corners(cx, cz, heading, halfLength, halfWidth) {
+  const f = [Math.cos(heading), Math.sin(heading)], r = [-Math.sin(heading), Math.cos(heading)];
+  return [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([i, j]) => [cx + f[0] * halfLength * i + r[0] * halfWidth * j, cz + f[1] * halfLength * i + r[1] * halfWidth * j]);
+}
+
+/** Depth (m) by which two convex polygons overlap, 0 when they are apart. */
+export function polygonOverlap(p, q) {
+  let min = Infinity;
+  for (const poly of [p, q]) {
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length], nx = -(b[1] - a[1]), nz = b[0] - a[0], l = Math.hypot(nx, nz);
+      const span = (pts) => { let lo = Infinity, hi = -Infinity; for (const c of pts) { const v = (c[0] * nx + c[1] * nz) / l; lo = Math.min(lo, v); hi = Math.max(hi, v); } return [lo, hi]; };
+      const [a0, a1] = span(p), [b0, b1] = span(q);
+      const overlap = Math.min(a1, b1) - Math.max(a0, b0);
+      if (overlap <= 0) return 0;
+      min = Math.min(min, overlap);
+    }
+  }
+  return min;
+}
+
+/** Body of a car in the collision model: its box. */
+export const bodyOf = (car) => corners(car.x, car.z, car.heading, car.params.halfLength, car.params.halfWidth);
+/** Overlap (m) of the bodies of two cars, 0 when they are apart. */
+export const bodyOverlap = (a, b) => polygonOverlap(bodyOf(a), bodyOf(b));
+
+/** A tyre of a car seen from above. `axle`: 'front' or 'rear'; `side`: +1 right, -1 left. Dimensions from `layout` (WHEEL_LAYOUT). */
+export function tyreOf(car, layout, axle, side) {
+  const x = axle === 'front' ? layout.frontAxleX : layout.rearAxleX, track = axle === 'front' ? layout.frontTrack : layout.rearTrack, tyre = axle === 'front' ? layout.frontTyre : layout.rearTyre;
+  const f = [Math.cos(car.heading), Math.sin(car.heading)], r = [-Math.sin(car.heading), Math.cos(car.heading)];
+  return corners(car.x + f[0] * x + r[0] * side * track, car.z + f[1] * x + r[1] * side * track, car.heading, tyre.radius, tyre.width / 2);
+}
+
+/** Largest overlap (m) between a front tyre of `a` and a rear tyre of `b`. */
+export function frontOnRearTyres(a, b, layout) {
+  let best = 0;
+  for (const sa of [1, -1]) for (const sb of [1, -1]) best = Math.max(best, polygonOverlap(tyreOf(a, layout, 'front', sa), tyreOf(b, layout, 'rear', sb)));
+  return best;
+}
+
+/** How far the centre of `a` is ahead of the centre of `b`, along `b` (m), and to its right. */
+export function relativeTo(a, b) {
+  const f = [Math.cos(b.heading), Math.sin(b.heading)];
+  return { ahead: (a.x - b.x) * f[0] + (a.z - b.z) * f[1], right: -(a.x - b.x) * f[1] + (a.z - b.z) * f[0] };
+}
+
+/** Throttle that holds a car at `kmh` (a function of time, for `run`). */
+export const holdSpeed = (car, kmh) => () => Math.max(0, Math.min(1, 0.35 + (kmh / KMH - car.speed) * 0.4));

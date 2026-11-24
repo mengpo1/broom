@@ -1,7 +1,8 @@
 // Collision test bench — a DEVELOPMENT tool, never reachable from the menus of the game.
 // It is switched on by a launch option only (index.html#lab=hop, see main.js) and replays, on
 // demand, the situations that are rare in a normal race: a wheel contact, a recoverable hop, the
-// hard accident (E3), the launch on a roadside board (E5), repeated bumps (E4).
+// hard accident (E3), the launch on a roadside board (E5), repeated bumps (E4), and a contact
+// between bodies that has the energy of a hop and must not give one.
 //
 // Nothing here is a canned animation: the bench only PLACES two real cars and DRIVES them with
 // ordinary controls (steering, throttle) until they meet. The contact, the flight, the landing and
@@ -22,15 +23,20 @@ import { CAR_STATE, placeCar } from '../physics/car-physics.js';
  */
 export const LAB_SCENARIOS = {
   wheel: { key: 'Digit1', circuit: 'kestrel-fields', me: { speed: 146, back: 7, side: -3.2 }, other: { speed: 118 }, steerTo: -1.7, steerFrom: 0.45, hold: 146, release: 'wheel' },
-  // (the same staging as the accident below, with less speed; `back` makes the contact happen at the same instant, for comparison)
-  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 200, back: 23, side: -0.93 }, other: { speed: 150 }, steerTo: -0.93, steerFrom: 0, hold: 200, afterHold: 0.8, afterMove: 1.2, afterSide: -2.9, release: 'landing' },
+  // wheel on wheel: 1.95 m to the side of the car ahead, the right front wheel runs into the back of its left rear wheel
+  // (the bodies of the two cars 9 cm apart); it flies over that car and comes down ahead of it. `back` makes the contact
+  // happen at about the same instant as in the accident below, for comparison.
+  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 215, back: 28.4, side: -1.95 }, other: { speed: 150 }, steerTo: -1.95, steerFrom: 0, hold: 215, afterHold: 0.8, afterMove: 1.2, afterSide: -2.6, release: 'landing' },
   crash: { key: 'Digit3', circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, release: 'landing' },
   board: { key: 'Digit4', circuit: 'hazelbrook', board: true, me: { speed: 245, back: 70 }, release: 'landing' },
   // a first contact at about 40 km/h of closing speed, then the follower comes back gently on the car ahead (5 km/h faster)
   bump: { key: 'Digit5', circuit: 'kestrel-fields', me: { speed: 146, back: 12, side: 0 }, other: { speed: 105 }, steerTo: 0, steerFrom: 0, hold: 146, afterBump: 5, release: 'bump' },
+  // the nose on a rear wheel with more closing speed than the hop needs, under the speed of the accident: bodies touch,
+  // so it is a bump and nothing leaves the ground (it was a hop until the hop was tied to the wheels)
+  body: { key: 'Digit6', circuit: 'kestrel-fields', me: { speed: 175, back: 22, side: -0.93 }, other: { speed: 110 }, steerTo: -0.93, steerFrom: 0, hold: 175, release: 'bump' },
 };
 /** Other names accepted by the launch option (the names of the events in the analysis report, and French). */
-export const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump' };
+export const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump', nose: 'body', nez: 'body', carrosserie: 'body' };
 const WATCHED = ['bump', 'wheel', 'launch', 'hop', 'landing', 'obstacle', 'crash', 'restart', 'reset', 'contact'];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** Scripted driver after a recoverable landing: lateral error (m) to heading asked for (rad), times the speed (m/s). */
@@ -162,7 +168,7 @@ export class CollisionLab {
 
 /**
  * Interactive use (index.html#lab=...): a line of help above the picture and a few keys, bound only
- * while this option is present. 1 to 5 choose a case, Enter replays the current one.
+ * while this option is present. 1 to 6 choose a case, Enter replays the current one.
  */
 export function attachLabControls(lab, t) {
   const panel = document.createElement('div');

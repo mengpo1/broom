@@ -23,6 +23,12 @@ const state = (page) => page.evaluate(() => {
   const s1 = await state(page);
   check('the real rules produced a hop and a landing', released && s1.events.includes('hop') && s1.events.includes('landing') && !s1.events.includes('crash'), s1.events.join(' '));
   check('the car is handed back driving', s1.released && s1.state === 1 && s1.speed > 60, `state ${s1.state}, ${s1.speed} km/h`);
+  // (lot 5) the hop comes from a wheel on a wheel, and the car comes down ahead of the car it flew over
+  const place = await page.evaluate(() => {
+    const lab = window.virage.app.lab, a = lab.me, b = lab.lead, f = [Math.cos(b.heading), Math.sin(b.heading)];
+    return { ahead: (a.x - b.x) * f[0] + (a.z - b.z) * f[1], side: -(a.x - b.x) * f[1] + (a.z - b.z) * f[0], length: a.params.halfLength + b.params.halfLength, width: a.params.halfWidth + b.params.halfWidth, bump: lab.events.some((e) => e.type === 'bump' || e.type === 'wheel') };
+  });
+  check('handed back AHEAD of the car it flew over, clear of it', place.ahead > place.length && !place.bump, `${(place.ahead - place.length).toFixed(2)} m ahead of its nose, ${Math.abs(place.side).toFixed(2)} m to the side`);
   check('the help line says so', /À VOUS DE CONDUIRE/.test(s1.panel), s1.panel.split('\n')[0]);
   await page.screenshot({ path: `${root}/work/renders/lab-hop-handed-back.png` });
   // the player's own controls now drive the car
@@ -48,11 +54,18 @@ const state = (page) => page.evaluate(() => {
   await page.keyboard.press('Enter');
   const s4 = await state(page);
   check('Enter replays the current case', s4.name === 'crash' && !s4.released && s4.events.length === 0, `tick ${s4.tick}`);
-  for (const [key, name] of [['Digit1', 'wheel'], ['Digit4', 'board'], ['Digit5', 'bump'], ['Digit2', 'hop']]) {
+  for (const [key, name] of [['Digit1', 'wheel'], ['Digit4', 'board'], ['Digit5', 'bump'], ['Digit6', 'body'], ['Digit2', 'hop']]) {
     await page.keyboard.press(key);
     const s = await state(page);
     check(`key ${key.slice(-1)} starts the case "${name}"`, s.name === name && s.active && !s.released);
   }
+  // case 6: a contact between bodies with the energy of a hop gives a bump, and the car never leaves the ground
+  await page.keyboard.press('Digit6');
+  await page.evaluate(() => { const lab = window.virage.app.lab; window.__air = 0; const step = lab.race.step.bind(lab.race); lab.race.step = (dt) => { step(dt); window.__air = Math.max(window.__air, lab.me.airHeight || 0); }; });
+  const bumped = await waitFor(page, () => window.virage.app.lab.released, null, 60);
+  const s6 = await state(page), air = await page.evaluate(() => window.__air);
+  check('case 6 (nose against rear wheel): a bump, no hop, the car stays on the ground', bumped && s6.events.includes('bump') && !s6.events.includes('hop') && !s6.events.includes('launch') && air === 0, `${s6.events.join(' ')}, highest ${air} m`);
+  check('its help line names the case', /pas de saut/.test(s6.panel), s6.panel.split('\n')[0]);
   const errors = logs.filter((l) => l.startsWith('[error]') || l.startsWith('[pageerror]'));
   check('no console error', errors.length === 0, errors.slice(0, 3).join(' | '));
   await close();
@@ -61,7 +74,7 @@ const state = (page) => page.evaluate(() => {
 {
   const { page, close } = await openGame({ width: 960, height: 540, hash: 'quality=medium' });
   const before = await page.evaluate(() => ({ lab: !!window.virage.app.lab, state: window.virage.flow.state, race: !!window.virage.app.race, panel: [...document.querySelectorAll('div')].some((d) => /BANC|BENCH/.test(d.textContent)) }));
-  for (const key of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']) await page.keyboard.press(key);
+  for (const key of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6']) await page.keyboard.press(key);
   await page.waitForTimeout(500);
   const after = await page.evaluate(() => ({ lab: !!window.virage.app.lab, state: window.virage.flow.state, race: !!window.virage.app.race }));
   check('without the option there is no bench and no help line', !before.lab && !before.panel, JSON.stringify(before));

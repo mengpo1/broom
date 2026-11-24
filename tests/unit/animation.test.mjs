@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { carViewFrame } from '../../src/rendering/drawing/scene-builder.js';
 import { wheelVariant, rollingVariant, streakVariant, streakBlend, fastVariant, fastBlend, steerFrame, streakCyclesPerMetre, advanceStreak, WHEEL_SYNC_SPEED, WHEEL_BLEND_SPEED, WHEEL_FAST_START, WHEEL_FAST_FULL } from '../../src/rendering/compositing/cockpit-layer.js';
-import { STEER_FRAMES, WHEEL_VARIANTS, MIRROR, COCKPIT_REF_FOCAL } from '../../src/art/cockpits/cockpit-art.js';
-import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, STREAK_BANDS, FAST_PHASES, FAST_RINGS, MIRROR_MOUNT, buildCarModel, buildFrontWheelModel } from '../../src/art/vehicles/car-model.js';
+import { STEER_FRAMES, WHEEL_VARIANTS, MIRROR, COCKPIT_REF_FOCAL, placeMirror } from '../../src/art/cockpits/cockpit-art.js';
+import { TREAD_PHASES, TREAD_MARKS, CAR_DIMENSIONS, STREAK_PHASES, STREAK_BANDS, FAST_PHASES, FAST_RINGS, MIRROR_MOUNT, MIRROR_PRESETS, MIRROR_DEFAULT, selectMirrorPreset, buildCarModel, buildFrontWheelModel } from '../../src/art/vehicles/car-model.js';
 import { BASE_CAR_SPEC } from '../../src/vehicles/car-spec.js';
 import { CAR_ANGLES } from '../../src/art/art-library.js';
 import { RaceView, CAMERA } from '../../src/rendering/compositing/race-view.js';
@@ -300,4 +300,50 @@ test('impacts jolt the view briefly, then the picture settles', () => {
   view.carIndex = 0;
   for (let i = 0; i < 60; i++) view.update(1 / 60, race, DEFAULT_EFFECTS, 0);
   assert.equal(view.flash, 0); assert.equal(view.impact, 0);
+});
+
+test('mirrors, lot 5: three heights of the same mirrors; only the height of the housing changes, the same on both sides and in every view', () => {
+  const { a, b, c } = MIRROR_PRESETS;
+  assert.deepEqual(Object.keys(MIRROR_PRESETS), ['a', 'b', 'c']);
+  assert.equal(MIRROR_DEFAULT, 'b', 'the game uses the slightly raised mount (a proposal awaiting validation)');
+  // a is the mount of PR #4; b and c only stand higher
+  assert.deepEqual(a, { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] });
+  for (const [name, m] of Object.entries(MIRROR_PRESETS)) {
+    assert.equal(m.y, a.y, `${name}: same distance to the centre line (39.5 cm)`);
+    assert.equal(m.x, a.x); assert.equal(m.width, a.width, `${name}: same width`); assert.equal(m.height, a.height, `${name}: same height of the housing`);
+    assert.deepEqual(m.arm, a.arm, `${name}: the arm starts from the same point of the cockpit rim`);
+    assert.ok(m.z - m.height / 2 > m.arm[2], `${name}: the arm rises to the housing`);
+    assert.ok(m.z + m.height / 2 < CAR_DIMENSIONS.eye[2] - 0.1, `${name}: the mirror stays well under the eye of the driver (below the horizon)`);
+  }
+  assert.ok(Math.abs(b.z - a.z - 0.025) < 1e-9 && Math.abs(c.z - a.z - 0.05) < 1e-9, 'raised by 2.5 cm and by 5 cm');
+  const centreOf = (part) => {
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < part.pos.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], part.pos[i + k]); hi[k] = Math.max(hi[k], part.pos[i + k]); }
+    return { y: (lo[1] + hi[1]) / 2, z: (lo[2] + hi[2]) / 2, w: hi[1] - lo[1], h: hi[2] - lo[2] };
+  };
+  try {
+    const seen = {};
+    for (const name of ['a', 'b', 'c']) {
+      assert.equal(selectMirrorPreset(name), true);
+      // the exterior views: the two housings of the model, reflections of each other, at the height of the mount
+      const parts = buildCarModel().parts, left = centreOf(parts.find((p) => p.name === 'mirror.left')), right = centreOf(parts.find((p) => p.name === 'mirror.right'));
+      assert.ok(Math.abs(left.z - MIRROR_PRESETS[name].z) < 0.01 && Math.abs(right.z - left.z) < 1e-9 && Math.abs(right.y + left.y) < 1e-9, `${name}: both housings at ${left.z.toFixed(3)} m, symmetrical`);
+      // the arm of the model ends under the housing and starts at the same foot
+      const rod = parts.find((p) => p.name === 'mirror.left').rods[0];
+      assert.deepEqual(rod.a, MIRROR_PRESETS[name].arm); assert.ok(Math.abs(rod.b[2] - (MIRROR_PRESETS[name].z - 0.02)) < 1e-9, `${name}: the arm follows the housing`);
+      // the cockpit view: the projection of that same mount from the eye of the driver
+      placeMirror();
+      const scale = COCKPIT_REF_FOCAL / (MIRROR_MOUNT.x - CAR_DIMENSIONS.eye[0]);
+      assert.ok(Math.abs(MIRROR.y - (CAR_DIMENSIONS.eye[2] - MIRROR_PRESETS[name].z) * scale) < 1e-6, `${name}: cockpit view at the height of the model`);
+      seen[name] = { ...MIRROR, modelWidth: left.w, modelHeight: left.h };
+    }
+    // between the variants the cockpit drawing moves up, by the same amount per step, and nothing else changes
+    assert.ok(seen.a.y - seen.b.y > 20 && Math.abs((seen.a.y - seen.b.y) - (seen.b.y - seen.c.y)) < 1e-6, `raised by ${(seen.a.y - seen.b.y).toFixed(1)} units of the cockpit drawing per step`);
+    for (const k of ['x', 'w', 'h', 'armX', 'armY', 'glassInset', 'modelWidth', 'modelHeight']) assert.ok(Math.abs(seen.a[k] - seen.b[k]) < 1e-9 && Math.abs(seen.a[k] - seen.c[k]) < 1e-9, `${k} unchanged`);
+    assert.equal(selectMirrorPreset('z'), false, 'an unknown name changes nothing');
+    assert.equal(MIRROR_MOUNT.z, c.z);
+  } finally {
+    selectMirrorPreset(MIRROR_DEFAULT); placeMirror();
+  }
+  assert.equal(MIRROR_MOUNT.z, b.z);
 });

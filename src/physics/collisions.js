@@ -1,8 +1,12 @@
 // Car-to-car contacts: oriented boxes, separating axis test, equal-mass impulse response.
+// The body of a car is its box. One contact is decided on the wheels instead (wheel-contacts.js): a front
+// wheel running into the back of a rear wheel, the bodies not touching; it is the only one that can lift a
+// car into a recoverable hop.
 
 import { clamp } from '../core/math.js';
 import { CAR_STATE, LANDING, startSpin, startAirborne, startHop } from './car-physics.js';
 import { COLLISION_TUNING } from './collision-tuning.js';
+import { wheelStrike } from './wheel-contacts.js';
 
 /** Events emitted for a contact between two cars: `contact` always (sound, statistics), plus the kind when it has consequences. */
 export const CONTACT = { SIMPLE: 'contact', REAR_BUMP: 'bump', WHEEL: 'wheel', LAUNCH: 'launch', HOP: 'hop' };
@@ -37,21 +41,19 @@ const va = new Float64Array(2), vb = new Float64Array(2);
 export function resolveCarContacts(cars, rules, time, emit) {
   let count = 0;
   const n = cars.length;
-  // cars that have just come down from a hop first (whatever their place in the list): they are set
-  // clear of the others and at their landing speed before any contact is looked for
-  for (let i = 0; i < n; i++) if (cars[i].hopLanded) landHop(cars[i], cars);
+  // a car in flight comes down past the car it flew over, and never on another car
+  for (let i = 0; i < n; i++) if (cars[i].state === CAR_STATE.AIRBORNE) holdLanding(cars[i], cars);
   for (let i = 0; i < n; i++) {
     const a = cars[i];
-    if (a.state === CAR_STATE.AIRBORNE && a.launchOther >= 0) {
-      if (a.airKind === LANDING.RECOVERABLE) keepHopClear(a, cars); else holdFlightBehind(a, cars);
-    }
     if (!collidable(a)) continue;
     for (let j = i + 1; j < n; j++) {
       const b = cars[j];
       if (!collidable(b)) continue;
       const dx = b.x - a.x, dz = b.z - a.z;
       if (dx * dx + dz * dz > 30) continue;
+      // the bodies first; only when they do not touch can a wheel reach a wheel
       if (resolvePair(a, b, dx, dz, rules, time, emit)) count++;
+      else if (wheelHop(a, b, rules, time, emit) || wheelHop(b, a, rules, time, emit)) count++;
     }
   }
   return count;
@@ -92,46 +94,26 @@ function resolvePair(a, b, dx, dz, rules, time, emit) {
       if (closing > 0.3) {
         const lateral = -dx * sa + dz * ca;                       // sideways offset of b seen from a
         const overlap = clamp((pa.halfWidth + pb.halfWidth - Math.abs(lateral)) / (2 * Math.min(pa.halfWidth, pb.halfWidth)), 0, 1);
-        const wheelOverWheel = overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax;
+        const partial = overlap >= T.launchOverlapMin && overlap <= T.launchOverlapMax;
         const side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
-        // wheel over wheel at a high closing speed: the follower rides over the car ahead and takes off
+        // the nose on a rear wheel at a high closing speed: the follower rides over the car ahead, takes off,
+        // flies over it and comes down ahead of it (when its speed cannot carry it past, it does not take off)
         if (rules.crashes !== false && closing >= T.launchClosingSpeed && follower.speed >= T.launchMinSpeed
-          && wheelOverWheel && rearmed(follower)) {
-          startAirborne(follower, T.flightTimeCar, T.hardAfterCar, emit, leader.index, side);
-          countContact(follower, leader, time, emit, closing);
-          contactDamage(follower, leader, closing, rules);
-          return true;
+          && partial && rearmed(follower)) {
+          const flight = flightPlan(follower, leader, T.flightTimeCar, T.flightTimeCarMax, T.airDecel, true);
+          if (flight && startAirborne(follower, flight.time, T.hardAfterCar, emit, leader.index, side)) {
+            follower.velX += flight.driftX; follower.velZ += flight.driftZ;
+            countContact(follower, leader, time, emit, closing);
+            contactDamage(follower, leader, closing, rules);
+            return true;
+          }
         }
-        // the same contact with less energy, or tyre against tyre at the very edge of the cars (less overlap than the
-        // accident needs): a hop the car recovers from
-        if (overlap > T.hopOverlapMin && overlap <= T.launchOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
-          startHop(follower, emit, leader.index, side, Math.abs(dx * ca + dz * sa), leader.speed);
-          countContact(follower, leader, time, emit, closing);
-          contactDamage(follower, leader, closing, rules);
-          return true;
-        }
+        // (a contact between bodies never lifts a car into a recoverable hop: that takes a wheel on a wheel, see wheelHop)
         rearContact(follower, leader, closing, rules, time, emit);
         return true;
       }
     } else {
-      // side by side. When the car behind has only its front wheel beside the rear wheel of the car ahead
-      // and arrives fast enough, that wheel lifts it: a hop. Otherwise the wheels rub (E2).
-      const along = dx * ca + dz * sa;                             // how far b is ahead of a
-      const follower = along > 0 ? a : b, leader = follower === a ? b : a;
-      const closing = follower.speed - leader.speed;
-      const lengthwise = (pa.halfLength + pb.halfLength - Math.abs(along)) / (pa.halfLength + pb.halfLength);
-      if (lengthwise <= T.hopSideOverlapMax && hopEnergy(follower, closing, ca * cb + sa * sb, rules)) {
-        const lateral = -dx * sa + dz * ca, side = (follower === a ? lateral : -lateral) > 0 ? 1 : -1;
-        startHop(follower, emit, leader.index, side, Math.abs(along), leader.speed);
-        // thrown clear of the car it touched: it flies parallel to it, drifting away sideways
-        const lh = leader.heading, fx = Math.cos(lh), fz = Math.sin(lh);
-        const forward = follower.velX * fx + follower.velZ * fz;
-        follower.velX = fx * forward + fz * side * T.hopSideKick;
-        follower.velZ = fz * forward - fx * side * T.hopSideKick;
-        countContact(follower, leader, time, emit, closing);
-        contactDamage(follower, leader, closing, rules);
-        return true;
-      }
+      // side by side: the wheels rub (E2). Tyres that come together sideways do not lift a car.
       sideContact(a, b, nx, nz, rules, time, emit);
       return true;
     }
@@ -228,88 +210,127 @@ function rearContact(follower, leader, closing, rules, time, emit) {
 function rearmed(car) { return car.clock - car.rearmClock >= COLLISION_TUNING.hopRearmTime; }
 
 /**
- * Energy of a wheel-over-wheel contact that lifts the car behind without wrecking it: explicit
- * thresholds on the relative speed, the speed of the car and the angle between the two
- * (the geometry of the contact is checked by the caller).
+ * Overlap of the boxes of two cars along the axis where it is smallest (0 when they are apart), the
+ * second car seen (dx, dz) metres from the first. `grow` (m) is added all round the first box.
  */
-function hopEnergy(follower, closing, cosAngle, rules) {
-  const T = COLLISION_TUNING;
-  return rules.crashes !== false && closing >= T.hopClosingSpeed && follower.speed >= T.hopMinSpeed
-    && cosAngle >= T.hopAlignedCos && rearmed(follower);
-}
-
-/** Overlap of the boxes of two cars along the axis where it is smallest (0 when they are apart); the push direction goes to `out`. */
-function boxOverlap(a, b, out) {
-  const pa = a.params, pb = b.params, dx = b.x - a.x, dz = b.z - a.z;
+function boxOverlap(a, b, dx, dz, grow = 0) {
+  const pa = a.params, pb = b.params;
   const ca = Math.cos(a.heading), sa = Math.sin(a.heading), cb = Math.cos(b.heading), sb = Math.sin(b.heading);
   let min = 1e9;
   for (let k = 0; k < 4; k++) {
     const ax = k === 0 ? ca : k === 1 ? -sa : k === 2 ? cb : -sb, az = k === 0 ? sa : k === 1 ? ca : k === 2 ? sb : cb;
-    const ra = pa.halfLength * Math.abs(ax * ca + az * sa) + pa.halfWidth * Math.abs(-ax * sa + az * ca);
+    const ra = (pa.halfLength + grow) * Math.abs(ax * ca + az * sa) + (pa.halfWidth + grow) * Math.abs(-ax * sa + az * ca);
     const rb = pb.halfLength * Math.abs(ax * cb + az * sb) + pb.halfWidth * Math.abs(-ax * sb + az * cb);
-    const dist = dx * ax + dz * az, overlap = ra + rb - Math.abs(dist);
+    const overlap = ra + rb - Math.abs(dx * ax + dz * az);
     if (overlap <= 0) return 0;
-    if (overlap < min) { min = overlap; const sign = dist >= 0 ? 1 : -1; out[0] = ax * sign; out[1] = az * sign; }
+    if (overlap < min) min = overlap;
   }
   return min;
 }
 
-const pushOut = new Float64Array(2);
+const flight = { time: 0, driftX: 0, driftZ: 0 };
 
 /**
- * A car in a recoverable hop stays clear of the others: it does not gain ground on the car that
- * lifted it, and it is moved out of the way of any car it would come down into. Only the car in
- * flight is moved; nothing is taken from anyone's speed here.
+ * Flight of a car over the car that throws it in the air: how long it stays up, and how much it is
+ * thrown to the side. Returns null when its speed cannot carry it past the other car: there is then
+ * no take-off.
+ *
+ * The flight itself is free: the car follows its velocity and loses `decel` m/s every second. Past
+ * the other car means its tail ahead of the nose of that car by flightClearance. Whether it can get
+ * past is judged on the speed the other car has now (a rule a driver can read: so many km/h of
+ * closing speed). The time in the air is `baseTime`, or longer (up to `maxTime`) when that is what
+ * getting past takes, the other car going on as it does now (its speed, and its acceleration when it
+ * is speeding up); the landing can still wait a little if that car speeds up more (holdLanding).
+ * With `aside` (a flight that ends with the car stopped: the hard accident), the car also goes on to
+ * the side it is already on, just enough to come down beside the path of the other car
+ * (flightSideClearance between the two) and not in front of it.
  */
-function keepHopClear(car, cars) {
-  const other = cars[car.launchOther];
+function flightPlan(car, other, baseTime, maxTime, decel, aside) {
+  const T = COLLISION_TUNING;
+  worldVelocity(car, va); worldVelocity(other, vb);
+  const speed = Math.hypot(va[0], va[1]);
+  if (speed < 1) return null;
+  const ux = va[0] / speed, uz = va[1] / speed;
+  const closing = speed - (vb[0] * ux + vb[1] * uz);
+  const distance = (other.x - car.x) * ux + (other.z - car.z) * uz + car.params.halfLength + other.params.halfLength + T.flightClearance;
+  let time = baseTime;
+  if (distance > 0) {
+    // distance gained on the other car after t seconds: closing * t - loss * t^2 / 2
+    const root = closing * closing - 2 * decel * distance;
+    if (closing <= 0 || root < 0) return null;
+    if ((decel > 0 ? (closing - Math.sqrt(root)) / decel : distance / closing) > maxTime) return null;
+    // the same with the other car speeding up as it does now; if it then cannot be passed, up until it stops gaining
+    const loss = decel + Math.max(0, other.accelLong || 0), rootNow = closing * closing - 2 * loss * distance;
+    const first = loss > 0 ? (rootNow >= 0 ? (closing - Math.sqrt(rootNow)) / loss : closing / loss) : distance / closing;
+    const last = loss > 0 && rootNow >= 0 ? (closing + Math.sqrt(rootNow)) / loss : Infinity;      // after this the other car would have caught it up
+    time = Math.min(Math.max(baseTime, first), last, maxTime);
+  }
+  const side = -(car.x - other.x) * uz + (car.z - other.z) * ux;         // metres to the right of the other car, across the motion
+  const shift = aside ? car.params.halfWidth + other.params.halfWidth + T.flightSideClearance - Math.abs(side) : 0;
+  let drift = 0;
+  if (shift > 0) {
+    const travel = time - (0.5 * decel * time * time) / speed;           // the sideways speed fades with the speed of the car
+    drift = ((side >= 0 ? 1 : -1) * shift) / Math.max(0.1, travel);
+  }
+  flight.time = time; flight.driftX = -uz * drift; flight.driftZ = ux * drift;
+  return flight;
+}
+
+/**
+ * Recoverable hop. The front wheel of `follower` has just run into the back of a rear wheel of
+ * `leader` (wheel-contacts.js), fast enough, the two cars heading the same way, and the flight can
+ * carry it past: it takes off. Called only when the bodies of the two cars do not touch.
+ */
+function wheelHop(follower, leader, rules, time, emit) {
+  const T = COLLISION_TUNING;
+  if (rules.crashes === false || follower.state !== CAR_STATE.RACING || leader.state !== CAR_STATE.RACING) return false;
+  if (follower.speed < T.hopMinSpeed || leader.speed <= 0 || !rearmed(follower)) return false;
+  const cl = Math.cos(leader.heading), sl = Math.sin(leader.heading);
+  if (Math.cos(follower.heading) * cl + Math.sin(follower.heading) * sl < T.hopAlignedCos) return false;
+  worldVelocity(follower, va); worldVelocity(leader, vb);
+  const closing = (va[0] - vb[0]) * cl + (va[1] - vb[1]) * sl;           // speed at which the wheel arrives on the other, along the car ahead
+  if (closing < T.hopClosingSpeed) return false;
+  const side = wheelStrike(follower, leader, T.hopTyreOverlapMin);
+  if (!side) return false;
+  const plan = flightPlan(follower, leader, T.hopFlightTime, T.hopFlightTimeMax, T.hopAirDecel, false);
+  if (!plan || !startHop(follower, emit, leader.index, side, plan.time)) return false;
+  countContact(follower, leader, time, emit, closing);
+  contactDamage(follower, leader, closing, rules);
+  return true;
+}
+
+/**
+ * The landing of a car in flight waits when it has to. Its time in the air is planned so that it comes
+ * down past the car that threw it up and clear of it (flightPlan). In the last moments of the flight
+ * the place where it is about to land is looked at: if it would not be past that car yet while still
+ * gaining on it (that car sped up more than expected), or if another car would be under it (a third
+ * car was there), it stays up a little longer, step after step, for at most flightHoldMax seconds.
+ * Nothing is moved: only the landing waits.
+ */
+function holdLanding(car, cars) {
+  const T = COLLISION_TUNING, left = car.airDuration - car.airTime;
+  if (left >= T.flightHoldTime || car.airTime >= car.airPlanned + T.flightHoldMax) return;
   const v = Math.hypot(car.velX, car.velZ);
-  if (other && other !== car && !other.removed && v > 1) {
-    const ux = car.velX / v, uz = car.velZ / v;
-    const along = (other.x - car.x) * ux + (other.z - car.z) * uz;
-    if (along < car.launchAlong) { car.x -= ux * (car.launchAlong - along); car.z -= uz * (car.launchAlong - along); }
+  if (v < 1) return;
+  // where the car will be when it lands, `left` seconds from now, and how fast
+  const decel = car.airKind === LANDING.RECOVERABLE ? T.hopAirDecel : T.airDecel;
+  const ux = car.velX / v, uz = car.velZ / v, travel = Math.max(0, v * left - 0.5 * decel * left * left);
+  const lx = car.x + ux * travel, lz = car.z + uz * travel;
+  const other = car.launchOther >= 0 ? cars[car.launchOther] : null;
+  if (other && other !== car && !other.removed) {
+    worldVelocity(other, vb);
+    const along = vb[0] * ux + vb[1] * uz;
+    const behind = (other.x + vb[0] * left - lx) * ux + (other.z + vb[1] * left - lz) * uz + car.params.halfLength + other.params.halfLength + T.flightClearance * 0.8;   // > 0: not past it yet
+    if (behind > 0 && v - decel * left - along > 0.5) { car.airDuration = car.airTime + T.flightHoldTime; return; }
   }
   for (let i = 0; i < cars.length; i++) {
     const o = cars[i];
-    if (o === car || o.removed || o.inPit || (o.state !== CAR_STATE.RACING && o.state !== CAR_STATE.SPIN && o.state !== CAR_STATE.RETIRED && o.state !== CAR_STATE.WRECKED)) continue;
-    const dx = o.x - car.x, dz = o.z - car.z;
+    if (o === car || o.removed || o.inPit || o.state === CAR_STATE.AIRBORNE || o.state === CAR_STATE.RESET) continue;
+    worldVelocity(o, vb);
+    const dx = o.x + vb[0] * left - lx, dz = o.z + vb[1] * left - lz;
     if (dx * dx + dz * dz > 30) continue;
-    const overlap = boxOverlap(car, o, pushOut);
-    if (overlap > 0) { car.x -= pushOut[0] * (overlap + 0.01); car.z -= pushOut[1] * (overlap + 0.01); }
+    if (boxOverlap(car, o, dx, dz, T.flightClearance * 0.5) > 0) { car.airDuration = car.airTime + T.flightHoldTime; return; }
   }
-}
-
-/**
- * Landing of a recoverable hop (called once, in the step where the car comes down): it is clear of
- * every other car, and slower than the car it rode over when that car is still racing, so that the
- * two separate as they do after a bump. That limit is a safeguard: the speed was already brought
- * to this value by the shock and the flight (startHop), so it only acts when the car ahead slowed
- * down while the other was in the air.
- */
-function landHop(car, cars) {
-  const T = COLLISION_TUNING;
-  car.hopLanded = false;
-  keepHopClear(car, cars);
-  const other = cars[car.launchOther];
-  if (other && other !== car && !other.removed && other.state === CAR_STATE.RACING) {
-    const limit = Math.max(T.penaltyFloorSpeed, other.speed - T.hopSeparation);
-    if (car.speed > limit) car.speed = limit;
-  }
-}
-
-/**
- * A car thrown in the air by another one does not fly past it: it is carried behind the car it
- * rode over and comes down there (its own speed, shown to its driver, goes on falling as in any flight).
- */
-function holdFlightBehind(car, cars) {
-  const other = cars[car.launchOther];
-  if (!other || other === car || other.removed) return;
-  const v = Math.hypot(car.velX, car.velZ);
-  if (v < 1) return;
-  const ux = car.velX / v, uz = car.velZ / v;
-  const along = (other.x - car.x) * ux + (other.z - car.z) * uz;
-  const gap = car.params.halfLength + other.params.halfLength + COLLISION_TUNING.flightGapBehind;
-  if (along > 0 && along < gap) { car.x -= ux * (gap - along); car.z -= uz * (gap - along); }
 }
 
 /**

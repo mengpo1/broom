@@ -12,6 +12,7 @@ import { PLAYER_TEAMS } from './vehicles/liveries.js';
 import { liveryColors } from './art/art-library.js';
 import { rgbToHex } from './art/palettes/palettes.js';
 import { defineCockpitArt } from './art/cockpits/cockpit-art.js';
+import { selectMirrorPreset, MIRROR_DEFAULT, MIRROR_PRESETS } from './art/vehicles/car-model.js';
 import { CockpitLayer } from './rendering/compositing/cockpit-layer.js';
 import { TextPainter } from './ui/text-painter.js';
 import { Hud, defineHudArt, trackMapSprite } from './ui/hud.js';
@@ -41,6 +42,9 @@ async function boot() {
   notice.hidden = false;
   notice.textContent = `${t('game.title')} — ${t('game.loading')}`;
   await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  // Height of the mirrors, three variants awaiting the player's validation (index.html#mirrors=a, b or c): a development
+  // option, not a setting. Without it, or with an unknown name, the mount of the game is used.
+  const mirrors = params.mirrors && selectMirrorPreset(params.mirrors) ? String(params.mirrors).toLowerCase() : MIRROR_DEFAULT;
   try {
     const text = new TextPainter();
     let cockpitLayout = null;
@@ -124,12 +128,12 @@ async function boot() {
   };
   /**
    * Collision test bench, a development tool (core/collision-lab.js). It exists only when asked for:
-   * by the launch option index.html#lab=wheel|hop|crash|board|bump, which also binds its keys, or by
+   * by the launch option index.html#lab=wheel|hop|crash|board|bump|body, which also binds its keys, or by
    * an automation script. Nothing in the menus or in a normal race creates it.
    */
   const createLab = () => { if (!app.lab) app.lab = new CollisionLab(app, quickRace); return app.lab; };
   // `debug` gives the automation scripts what they need to stage a situation (work/scripts/collision-sequences.mjs)
-  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick } };
+  window.virage = { app, quickRace, CAMERA, params, flow, storage, input, audio, benchmark, describeEnvironment, measureRefreshRate, createLab, debug: { placeCar, CAR_STATE, COLLISION_TUNING, hopSteerKick, mirrors, mirrorPresets: Object.keys(MIRROR_PRESETS) } };
   if (params.auto) quickRace({ circuit: params.circuit, opponents: params.opponents ? +params.opponents : undefined, players: params.players ? +params.players : 1 });
   if (params.lab) {
     const lab = createLab();

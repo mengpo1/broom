@@ -44,7 +44,7 @@ export function createCarState(index) {
     clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
     airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
     landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
-    airKind: 0, airPeak: 0, landKind: 0, launchAlong: 0, hopLanded: false, rearmClock: -10,
+    airKind: 0, airPeak: 0, landKind: 0, airPlanned: 0, rearmClock: -10,
   };
 }
 
@@ -81,7 +81,8 @@ export function startSpin(car, impact, direction, emit) {
 
 /**
  * Throw a car in the air (it rode over another car, or hit a roadside object). In flight it
- * follows its velocity, cannot be steered and slows down; it comes down after `duration` seconds,
+ * follows its velocity, cannot be steered and slows down; it comes down after `duration` seconds
+ * (later only if another car is then under it: see the contacts between cars),
  * hard (stopped on the spot, see WRECKED) or light (it slides out of control, see startSlide).
  * @param side  -1 / 0 / +1: side of the car that took the hit (where the damage shows)
  */
@@ -93,7 +94,7 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
     car.velZ = sh * car.speed + ch * car.vLat;
   }
   car.state = CAR_STATE.AIRBORNE;
-  car.airTime = 0; car.airDuration = duration; car.airHard = hard; car.airHeight = 0;
+  car.airTime = 0; car.airDuration = duration; car.airPlanned = duration; car.airHard = hard; car.airHeight = 0;
   car.airKind = hard ? LANDING.HARD : LANDING.LIGHT;
   const reach = duration / COLLISION_TUNING.flightTimeCar;
   car.airPeak = COLLISION_TUNING.airPeakHeight * reach * reach;
@@ -104,27 +105,21 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
 }
 
 /**
- * Recoverable hop: the car is lifted by the wheel of another one, flies for a short while and comes
- * down on its wheels (see LANDING.RECOVERABLE). `along` is how far ahead the other car is at the
- * launch (metres along the motion): the car in flight does not gain ground on it.
+ * Recoverable hop: a front wheel of the car has run into the back of a rear wheel of another one and
+ * climbs it. The car flies for `duration` seconds and comes down on its wheels (see LANDING.RECOVERABLE).
  *
- * The speed is lost where its cause is seen: at the shock, the car is slowed to a little less than
- * `otherSpeed` (the speed of the car whose wheel it rides over), by an amount chosen so that the
- * steady loss of the flight then brings it down `hopSeparation` slower than that car, as after a
- * bump. Nothing more is taken at the landing. It is never sped up.
+ * Nothing is taken from its speed at the shock: it needs it to get past the car it touched. What the
+ * hop costs is the time spent in the air, where the car slows down as in any flight; nothing more is
+ * taken at the landing. It is never sped up.
  */
-export function startHop(car, emit, other, side, along, otherSpeed) {
+export function startHop(car, emit, other, side, duration = COLLISION_TUNING.hopFlightTime) {
   if (car.state !== CAR_STATE.RACING) return false;
   const T = COLLISION_TUNING;
-  startAirborne(car, T.hopFlightTime, false, null, other, side);
-  car.airKind = LANDING.RECOVERABLE; car.airPeak = T.hopPeakHeight; car.launchAlong = along;
-  const before = Math.hypot(car.velX, car.velZ);
-  if (emit) { emit('launch', car.index, before, other); emit('hop', car.index, before, other); }
-  if (otherSpeed !== undefined && before > 1e-4) {
-    const gap = Math.max(0, T.hopSeparation - T.airDecel * T.hopFlightTime);
-    const after = Math.min(before, Math.max(T.penaltyFloorSpeed, otherSpeed - gap));
-    car.velX *= after / before; car.velZ *= after / before; car.speed = after;
-  }
+  startAirborne(car, duration, false, null, other, side);
+  const reach = duration / T.flightTimeCar;
+  car.airKind = LANDING.RECOVERABLE; car.airPeak = Math.max(T.hopPeakHeight, T.airPeakHeight * reach * reach);
+  const speed = Math.hypot(car.velX, car.velZ);
+  if (emit) { emit('launch', car.index, speed, other); emit('hop', car.index, speed, other); }
   return true;
 }
 
@@ -152,7 +147,8 @@ function startSlide(car) {
 function stepAirborne(car, dt, emit) {
   const T = COLLISION_TUNING, spec = car.params.spec;
   const v = Math.hypot(car.velX, car.velZ);
-  const nv = Math.max(0, v - T.airDecel * dt);
+  const decel = car.airKind === LANDING.RECOVERABLE ? T.hopAirDecel : T.airDecel;
+  const nv = Math.max(0, v - decel * dt);
   const k = v > 1e-4 ? nv / v : 0;
   car.velX *= k; car.velZ *= k;
   car.x += car.velX * dt; car.z += car.velZ * dt;
@@ -162,19 +158,18 @@ function stepAirborne(car, dt, emit) {
   car.speed = nv; car.vLat = 0; car.yawRate = 0; car.slip = 0; car.wheelspin = 0;
   car.throttle = 0; car.brake = 0; car.steer = moveToward(car.steer, 0, 3 * dt);
   car.rpm = damp(car.rpm, spec.rpmIdle + (spec.rpmMax - spec.rpmIdle) * 0.35, 5, dt);
-  car.accelLong = -T.airDecel; car.accelLat = 0;
+  car.accelLong = -decel; car.accelLat = 0;
   if (car.airTime < car.airDuration) return;
   // ---- landing
   car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
   if (car.airKind === LANDING.RECOVERABLE) {
     // on its wheels and driving again at once, at the speed it had in the air: what the hop costs was
-    // taken at the shock and during the flight (the car it rode over, if it braked meanwhile, still
-    // sets an upper limit to that speed: see the contacts between cars)
+    // taken during the flight
     car.velX *= T.hopLandingSpeedFactor; car.velZ *= T.hopLandingSpeedFactor;
     car.speed = nv * T.hopLandingSpeedFactor;
     if (nv > 1) car.heading = Math.atan2(car.velZ, car.velX);          // it comes down pointing the way it flew
     car.state = CAR_STATE.RACING;
-    car.hopLanded = true; car.rearmClock = car.clock; car.stuckTimer = 0;
+    car.rearmClock = car.clock; car.stuckTimer = 0;
     if (emit) emit('landing', car.index, LANDING.RECOVERABLE);
   } else if (car.airHard) {
     car.velX *= T.hardLandingSpeedFactor; car.velZ *= T.hardLandingSpeedFactor;

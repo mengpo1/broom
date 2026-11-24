@@ -38,24 +38,75 @@ test('E3 launch: wheel over wheel at a high closing speed throws the follower in
   assert.ok(log.events.every((e) => e.type !== 'bump' && e.type !== 'wheel'), 'not a bump');
 });
 
-test('E3 flight: the car comes down behind the car it rode over, which drives away ahead', () => {
-  // report: after the flight "the two cars reappear just ahead, seen from close"
-  const { a, b, log } = scenarioE3(1.2);
+test('E3 flight: the car flies over the car it rode over and comes down ahead of it, beside its path; that car drives past the wreck', () => {
+  // (until lot 5 the car was held behind the one it hit, as on the reference footage; the player asked for the
+  // opposite after the trials of PR #4: a car that takes off clears what threw it up and lands ahead of it)
+  const { race, a, b, log } = scenarioE3(2.6);
   const launch = stateAt(log, 'a', 'launch'), landing = stateAt(log, 'a', 'landing');
-  const length = a.params.halfLength + b.params.halfLength;
-  const ahead = (f) => { let ds = f.b.s - f.a.s; if (ds > track.length / 2) ds -= track.length; else if (ds < -track.length / 2) ds += track.length; return ds; };
-  for (let i = launch.e.frame + 1; i <= landing.e.frame; i++) {
-    const f = log.frames[i];
-    assert.ok(ahead(f) > length - 0.3, `in flight the car stays behind the one it hit (${ahead(f).toFixed(2)} m at ${f.time.toFixed(2)} s)`);
-  }
-  const gapAtLanding = ahead(log.frames[landing.e.frame]);
-  assert.ok(gapAtLanding > length - 0.3 && gapAtLanding < length + 3, `lands just behind it (${gapAtLanding.toFixed(2)} m between centres)`);
-  const later = log.frames.at(-1);
-  assert.ok(ahead(later) > gapAtLanding + 5, 'the car ahead drives away');
-  assert.equal(later.b.state, CAR_STATE.RACING);
-  // its own speed goes on falling as measured (50 km/h per second), whatever the pace of the car ahead
+  const length = a.params.halfLength + b.params.halfLength, width = a.params.halfWidth + b.params.halfWidth;
+  // how far the car in flight is ahead of the other one (m along the road, centre to centre), and to its side
+  const ahead = (f) => { let ds = f.a.s - f.b.s; if (ds > track.length / 2) ds -= track.length; else if (ds < -track.length / 2) ds += track.length; return ds; };
+  const atLaunch = log.frames[launch.e.frame], atLanding = log.frames[landing.e.frame];
+  assert.ok(ahead(atLaunch) < -length + 0.6, `it takes off behind (${ahead(atLaunch).toFixed(2)} m)`);
+  // it passes over the other car during the flight...
+  const over = log.frames.slice(launch.e.frame, landing.e.frame).filter((f) => Math.abs(ahead(f)) < length && Math.abs(f.a.d - f.b.d) < width);
+  assert.ok(over.length > 20, `${over.length} steps above the other car`);
+  assert.ok(over.every((f) => f.a.state === CAR_STATE.AIRBORNE));
+  const above = over.filter((f) => Math.abs(ahead(f)) < 1.5);
+  assert.ok(above.length > 5 && above.every((f) => f.a.airHeight > 0.7), `well off the ground when it is right above it (${Math.min(...above.map((f) => f.a.airHeight)).toFixed(2)} m at least)`);
+  // ...and comes down ahead of it, clear of it lengthwise and beside its path
+  assert.ok(ahead(atLanding) >= length + T.flightClearance - 0.15, `lands ${(ahead(atLanding) - length).toFixed(2)} m ahead of the nose of the other car`);
+  assert.ok(Math.abs(atLanding.a.d - atLanding.b.d) >= width + T.flightSideClearance - 0.1, `and ${(Math.abs(atLanding.a.d - atLanding.b.d) - width).toFixed(2)} m to the side of it`);
+  assert.ok(Math.sign(atLanding.a.d - atLanding.b.d) === Math.sign(atLaunch.a.d - atLaunch.b.d), 'on the side it was already on');
+  // the flight is free: at each step the car moves by its own velocity, slowing by 50 km/h per second
   const lost = (launch.frame.speed - log.frames[landing.e.frame - 1].a.speed) * KMH / (landing.e.time - launch.e.time);
   assert.ok(Math.abs(lost - 50) < 4, `${lost.toFixed(1)} km/h per second lost in flight`);
+  for (let i = launch.e.frame + 2; i < landing.e.frame; i++) {
+    const step = Math.abs(ahead(log.frames[i]) - ahead(log.frames[i - 1]));
+    assert.ok(step < (log.frames[i].a.speed - log.frames[i].b.speed) * SIM_DT + 0.02, `no jump of position in flight (step ${i}: ${step.toFixed(3)} m)`);
+  }
+  // then it is a wreck where it landed, and the car it flew over drives past it without touching it
+  let nearest = Infinity;
+  for (let i = landing.e.frame; i < log.frames.length; i++) {
+    const f = log.frames[i];
+    if (Math.abs(ahead(f)) < length) nearest = Math.min(nearest, Math.abs(f.a.d - f.b.d) - width);
+  }
+  assert.ok(nearest > 0.2 && nearest < 1.5, `the other car passes ${nearest.toFixed(2)} m beside the wreck`);
+  const end = log.frames.at(-1);
+  assert.ok(ahead(end) < -20, 'and drives away ahead');
+  assert.equal(end.b.state, CAR_STATE.RACING);
+  assert.ok(log.events.every((e) => e.car !== b.index || !['bump', 'wheel', 'crash', 'launch'].includes(e.type)), 'nothing happens to it');
+  assert.equal(b.contacts, 1, 'one contact for the car that was hit: the shock itself');
+  assert.equal(race.cars.filter((c) => c.state === CAR_STATE.WRECKED).length, 1);
+});
+
+test('E3 near a barrier: the flight stays between the barriers, and the car is still not set down on another one', () => {
+  // the two cars against the right-hand barrier, the follower on the outside: the flight would carry it further out
+  // (the follower on the right: the left-hand side of this straight is the pit wall)
+  const setup = twoCars(track, { gap: 2.5, lateral: -0.93, speedA: 262 / KMH, speedB: 190 / KMH, straight: 700 });
+  const { race, a, b } = setup;
+  const i0 = Math.floor(a.s / track.ds) % track.n, wall = track.barrierR[i0];
+  const side = Math.sign(a.d - b.d);                       // the side the follower is on: it is thrown further that way
+  assert.equal(side, 1);
+  const shift = wall - a.params.halfWidth - 0.3 - a.d;
+  for (const car of [a, b]) placeCar(car, track, car.s, car.d + shift);
+  a.state = CAR_STATE.RACING; b.state = CAR_STATE.RACING; a.speed = 262 / KMH; b.speed = 190 / KMH; a.gear = 6; b.gear = 5;
+  let flew = false, landed = false, worst = 0;
+  for (let i = 0; i < 2.5 / SIM_DT; i++) {
+    race.setPlayerInput(0, 0, 1, 0, 0, false, false); race.setPlayerInput(1, 0, 0.7, 0, 0, false, false);
+    race.step(SIM_DT); race.eventCount = 0;
+    if (a.state === CAR_STATE.AIRBORNE) flew = true;
+    const k = a.segIndex, limit = (a.d > 0 ? track.barrierR[k] : track.barrierL[k]) - a.params.halfWidth;
+    assert.ok(Math.abs(a.d) <= limit + 0.02, `inside the barrier at step ${i} (${Math.abs(a.d).toFixed(2)} m for ${limit.toFixed(2)})`);
+    if (flew && !landed && a.state !== CAR_STATE.AIRBORNE) {
+      landed = true;
+      const dx = a.x - b.x, dz = a.z - b.z, f = [Math.cos(b.heading), Math.sin(b.heading)];
+      const along = Math.abs(dx * f[0] + dz * f[1]), across = Math.abs(-dx * f[1] + dz * f[0]);
+      assert.ok(along >= a.params.halfLength + b.params.halfLength || across >= a.params.halfWidth + b.params.halfWidth, 'clear of the other car as it lands');
+    }
+  }
+  assert.ok(flew && landed, 'the accident happened against the barrier');
+  assert.equal(a.state, CAR_STATE.WRECKED);
 });
 
 test('E3 flight: 0.85 s, slowing by 50 km/h per second, rising then coming down', () => {
@@ -178,18 +229,19 @@ test('E5 launch on a board: thrown in the air, light landing without loss of spe
   assert.equal(car.gear, 1);
 });
 
-// (Changed with the recoverable hop. This test used to say "no flight" for every case below the
-// thresholds of the accident. One of its cases, wheel over wheel at 170 km/h onto a car doing
-// 100 km/h, now sits in the new intermediate level and gives a hop: the test states the three
-// levels instead. The cases and the thresholds of the accident itself are unchanged.)
-test('launch conditions are explicit: three levels by energy, and no flight outside the overlap window', () => {
+// (Until lot 5 a contact too slow for the accident, with the same partial overlap, gave a recoverable hop: the
+// test stated three levels by energy. The hop now comes from a contact between wheels only, at the edge of the
+// cars; the cases and the thresholds of the accident itself are unchanged, with one consequence stated below.)
+test('launch conditions are explicit: the accident inside its overlap window, the hop on the wheels, nothing else flies', () => {
   const cases = [
     { name: 'in line (full overlap)', lateral: 0, speedA: 262, speedB: 190, outcome: 'none' },
-    { name: 'too slow for the accident: a hop', lateral: 0.93, speedA: 170, speedB: 100, outcome: 'hop' },
+    { name: 'too slow for the accident: a bump', lateral: 0.93, speedA: 170, speedB: 100, outcome: 'none' },
     { name: 'low closing speed', lateral: 0.93, speedA: 262, speedB: 240, outcome: 'none' },
-    { name: 'too slow even for a hop', lateral: 0.93, speedA: 95, speedB: 45, outcome: 'none' },
-    { name: 'wheel over wheel, fast', lateral: 0.93, speedA: 262, speedB: 190, outcome: 'accident' },
-    { name: 'wheel over wheel, other side', lateral: -0.93, speedA: 262, speedB: 190, outcome: 'accident' },
+    { name: 'slow car', lateral: 0.93, speedA: 95, speedB: 45, outcome: 'none' },
+    { name: 'nose on a rear wheel, fast', lateral: 0.93, speedA: 262, speedB: 190, outcome: 'accident' },
+    { name: 'nose on a rear wheel, other side', lateral: -0.93, speedA: 262, speedB: 190, outcome: 'accident' },
+    { name: 'front wheel on rear wheel, fast', lateral: 1.95, speedA: 262, speedB: 190, outcome: 'hop' },
+    { name: 'front wheel on rear wheel, slower car', lateral: -1.95, speedA: 185, speedB: 110, outcome: 'hop' },
   ];
   for (const c of cases) {
     const { race, a } = twoCars(track, { gap: 2, lateral: c.lateral, speedA: c.speedA / KMH, speedB: c.speedB / KMH, straight: 700 });
@@ -198,9 +250,22 @@ test('launch conditions are explicit: three levels by energy, and no flight outs
     assert.equal(launched, c.outcome !== 'none', c.name);
     assert.equal(hop, c.outcome === 'hop', `${c.name}: hop`);
     if (c.outcome === 'accident') assert.equal(a.airKind, 1, `${c.name}: hard landing ahead`);
+    if (c.outcome === 'none' && c.lateral !== 0 && c.speedA - c.speedB > 30) assert.ok(log.events.some((e) => e.type === 'bump'), `${c.name}: bump`);
   }
   assert.ok(T.launchMinSpeed * KMH > 146 && T.launchClosingSpeed > 0, 'thresholds stay above the speeds of the bumps of E4');
   assert.ok(T.hopClosingSpeed * KMH > 30, 'and the hop needs more closing speed than the wheel contact of E2 (about 25 km/h)');
+  // consequence of landing ahead: a car only takes off when its speed can carry it past the other one. With the loss of
+  // speed of any flight, the accident needs about 58 km/h of closing speed where its own threshold says 54
+  const hold = (car, kmh) => () => Math.max(0, Math.min(1, 0.35 + (kmh / KMH - car.speed) * 0.4));
+  const closingNeeded = (lateral) => {
+    for (let kmh = 200; kmh <= 215; kmh++) {
+      const s = twoCars(track, { gap: 4, lateral, speedA: kmh / KMH, speedB: 150 / KMH, straight: 700 });
+      if (run(s.race, 1.5, { throttleA: hold(s.a, kmh), throttleB: hold(s.b, 150) }).events.some((e) => e.type === 'launch')) return kmh - 150;
+    }
+    return null;
+  };
+  const needed = closingNeeded(0.93);
+  assert.ok(needed >= T.launchClosingSpeed * KMH && needed <= 61, `the accident starts at ${needed} km/h of closing speed on a car holding its speed`);
 });
 
 test('pitch of the view (E3, hard): nose up and held, steady swing, ground held, rebound, second dip, level again', () => {
