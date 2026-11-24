@@ -8,7 +8,37 @@ l'image, pas la vitesse.
 
 ## 0. Dernière exécution complète
 
-Sur le build final (`index.html`, 1 068 261 octets), le 22 novembre 2026, après le lot « saut
+Sur le build final (`index.html`, 1 081 435 octets), le 24 novembre 2026, après le lot 5
+(« corrections après validation humaine de la PR #4 » : saut par contact de roues,
+franchissement, rétroviseurs remontés, diagnostic du braquage) :
+
+| Suite | Commande | Résultat |
+|---|---|---|
+| Simulation et logique | `npm test` | **103 / 103** : 76 tests de la PR #4 inchangés ; 15 réécrits ou adaptés aux règles demandées par le joueur, devenus 14 (voir § 1 ter) ; 13 nouveaux |
+| Navigateur (WebGPU) | `node tests/rendering/smoke.browser.mjs` | 13 / 13 |
+| Modes de jeu de bout en bout | `node work/scripts/flow-check.mjs` | réussi (5 parcours) |
+| Pages, pause, caméras, souris | `node work/scripts/pages-check.mjs` | 14 / 14 |
+| Audio | `node work/scripts/audio-check.mjs` | 80 / 80 |
+| Banc d'essai des collisions | `node work/scripts/lab-check.mjs` | 23 / 23 (19 précédents, 4 nouveaux : retombée devant, cas 6) |
+| Braquage après restitution du contrôle, clavier réel | `node work/scripts/steering-handover-check.mjs` | 44 / 44 (six cas du banc et une course normale) ; 37 / 37 sur les sources de la PR #4 |
+| Conduite (non-régression) | `node work/scripts/driving-report.mjs` | **165 valeurs identiques** à la PR #4 et à la référence d'origine |
+| Mesures de référence E1 à E5 | `node work/scripts/collision-comparison.mjs` | E1 (2 valeurs), E2 (13), E4 (31), E5 (14) : identiques à la PR #4. E3 : 13 identiques sur 17 ; les 4 autres sont la position d'atterrissage, **changée à la demande du joueur** (`collisions.md` § 2 ter) |
+| Séquences du banc, télémétrie image par image | `node work/scripts/collision-sequences.mjs all`, `python3 work/scripts/telemetry-compare.py` | E2, E4, E5 : identiques à la PR #4. E3, E3x : identiques jusqu'au décollage, puis différentes en position. HOP, HOPx : autre scénario |
+| Courses de l'ordinateur | `node work/scripts/race-rules-comparison.mjs` | 21 courses de 16 voitures : toutes terminées, somme des temps des vainqueurs identique à la PR #4 (4 268,55 s) ; 0 saut (42 avant), 5 accidents (10 avant), aucune voiture posée sur une autre (3 avant) |
+| Déterminisme à 120 Hz | `npm test` (« deterministic at 120 Hz… », « same seed, same race… ») | réussi : même saut pas pour pas, quel que soit l'ordre des voitures |
+
+Ce que cette exécution **ne** dit **pas** : que les corrections conviennent. Les sauts, le
+franchissement, la hauteur des rétroviseurs et le braquage sont à juger au volant ; aucun
+critique indépendant n'a revu ce lot.
+
+Pendant le lot, deux de mes propres scripts de mesure étaient faux et ont été corrigés avant
+toute conclusion (le jeu n'était pas en cause) : le contrôle clavier étiquetait mal qui écrit
+les commandes d'une course à l'autre, et la mesure de la hauteur des rétroviseurs sur l'image
+repérait le pneu au lieu du boîtier.
+
+### Exécution précédente (22 novembre 2026)
+
+Sur le build de 1 068 261 octets, après le lot « saut
 récupérable, roues à très haute vitesse, rétroviseurs rapprochés » et les corrections qui ont
 suivi les revues indépendantes :
 
@@ -37,10 +67,11 @@ exists »), d'où des captures à refaire. Le chien de garde graphique du naviga
 est maintenant coupé (`--disable-gpu-watchdog`, `lib-browser.mjs`) et le script des
 rétroviseurs attend après chaque image. Le jeu n'est pas concerné.
 
-## 1. Tests de simulation et de logique (Node) — 91 / 91 réussis
+## 1. Tests de simulation et de logique (Node) — 103 / 103 réussis
 
-Dernière exécution : `npm test` → 91 tests, 91 réussis, 0 échec (environ 10 s) : les 76 tests
-précédents (dont quatre modifiés, voir § 1 bis) et 15 nouveaux.
+Dernière exécution : `npm test` → 103 tests, 103 réussis, 0 échec (environ 10 s) : 76 tests
+de la PR #4 inchangés, 15 réécrits ou adaptés au lot 5 et devenus 14 (voir § 1 ter), 13 nouveaux.
+À la PR #4 : 91 tests, soit 76 précédents (dont quatre modifiés, voir § 1 bis) et 15 nouveaux.
 
 ### Conduite — `tests/unit/physics.test.mjs`
 
@@ -116,24 +147,48 @@ Scénarios E3 et E5 du rapport.
 - ✅ seen from outside: a car in flight is tilted (nose up then down, the side that was hit lifted) and flattened as it lands
 - ✅ explosion: four phases in order, 1.25 s of fire, plumes until 1.6 s
 
-### Saut récupérable — `tests/gameplay/hop.test.mjs` (nouveau)
+### Contact de roues — `tests/gameplay/wheel-contacts.test.mjs` (nouveau, lot 5)
 
-Niveau intermédiaire entre le contact sans décollage et l'accident violent. Les huit tests
-demandés sont marqués d'un numéro.
+Ce qui déclenche un saut : une roue avant qui entre par l'arrière dans une roue arrière,
+carrosseries séparées, et rien d'autre. Les six familles de contacts demandées y sont :
+roue / roue, roue / carrosserie, nez / arrière, côte à côte, obliques, sans contact réel.
 
-- ✅ **(1 — saut récupérable)** recoverable hop: wheels interlocked at a medium closing speed lift the car behind; a short flight, it comes down on its wheels
-- ✅ the speed of a hop is lost where its cause is seen: at the shock and during the flight, none as the wheels touch down *(ajouté après la seconde revue)*
-- ✅ recoverable hop from the side: front wheel beside rear wheel; fully alongside, the wheels only rub (E2)
-- ✅ **(2 — reprise du contrôle)** after a hop the driver has the car back: the steering swings once and settles, then answers as on any car
-- ✅ **(3 — pas d'immobilisation)** a hop never stops the car: no standstill, no explosion, no repositioning, it accelerates again
-- ✅ what triggers a hop is the wheel: tyre against tyre at the edge of the cars lifts the car, nose in the gearbox does not *(ajouté après la seconde revue)*
-- ✅ **(4 — non-déclenchement à faible énergie)** low energy: below the hop thresholds nothing changes, the validated contacts keep their outcome
-- ✅ **(5 — maintien d'E3)** the hard accident E3 is kept: same contact with more energy, hard landing, wreck
-- ✅ **(6 — maintien d'E5)** the launch on a board E5 is kept: light landing, slide, no hop
-- ✅ **(7 — déterminisme à 120 Hz)** deterministic at 120 Hz: the same hop gives the same race, step for step
-- ✅ **(8 — pas de traversée)** no car is driven through: in flight and at the landing the hopping car stays clear of every other car
+- ✅ the wheels of the collision model are those of the drawing of the car, without the simulation reading the drawing
+- ✅ wheel strike: the front wheel must go in through the back of the rear wheel *(roue / roue par l'arrière, par le côté, déjà engagée, effleurement, en biais)*
+- ✅ by kind of contact, with the energy of a hop (215 km/h on a car at 150 km/h): only a wheel on a wheel lifts the car *(nez / arrière, nez sur roue, aileron sur roue, roue sur roue, sans contact)*
+- ✅ side by side: tyres that come together sideways rub (E2) and never lift a car, whatever the difference of speed
+- ✅ energy and direction: closing speed, speed of the car, angle between the cars, accidents switched off
+- ✅ swept over 900 arrivals: every hop starts with a front tyre in the back of a rear tyre and the bodies apart; nothing else lifts a car *(909 arrivées : 24 sauts, 235 accidents, 366 tamponnages, 16 frottements, 268 sans contact ; géométrie de contrôle écrite à part du jeu)*
+
+### Saut récupérable — `tests/gameplay/hop.test.mjs` (réécrit au lot 5)
+
+Le vol, l'atterrissage et la suite. Les tests de la PR #4 vérifiaient que la voiture était
+ralentie au choc et retombait derrière : la règle demandée par le joueur est l'inverse, ils
+sont réécrits (§ 1 ter).
+
+- ✅ recoverable hop: a front wheel on a rear wheel lifts the car behind; it flies, comes down on its wheels and drives
+- ✅ **(franchissement, sans téléportation)** the hop clears the car that caused it: it flies past it and comes down ahead of it, without ever being moved
+- ✅ what a hop costs is the time in the air: nothing at the shock, the loss of any flight, nothing at the landing
+- ✅ a slower arrival needs a longer flight to get past; too slow to get past, the car does not take off
+- ✅ **(atterrissage sans chevauchement)** the landing waits rather than set the car down on another one: the car ahead speeding up, a third car in the way
+- ✅ **(braquage après le saut)** after a hop the driver has the car back: the steering swings once and settles, then answers as on any car *(gauche et droite, pendant et après la perturbation ; même réponse qu'une voiture qui n'a pas sauté, à 2 % près)*
+- ✅ a hop never stops the car: no standstill, no explosion, no repositioning, it accelerates again
+- ✅ low energy: below the thresholds nothing changes, the validated contacts keep their outcome
+- ✅ the hard accident E3 is kept: the nose on a rear wheel at high energy, hard landing, wreck
+- ✅ the launch on a board E5 is kept: light landing, slide, no hop
+- ✅ **(déterminisme à 120 Hz)** deterministic at 120 Hz: the same hop gives the same race, step for step
 - ✅ a car that has just come down cannot be thrown in the air again at once
-- ✅ the landing of a hop is settled before contacts are looked for, whichever car comes first in the list
+
+### Banc d'essai — `tests/gameplay/lab.test.mjs` (nouveau, lot 5)
+
+Les six cas du banc joués par le vrai module (`collision-lab.js`) et la vraie simulation, sans
+navigateur.
+
+- ✅ bench, case 2 (hop): a front wheel on a rear wheel, the car flies over the other one and comes down ahead of it
+- ✅ bench, case 3 (accident E3): the car flies over the other one, comes down ahead of it and to its side, wrecked; the other drives past
+- ✅ bench, case 4 (board E5): the car is thrown up by the board and comes down well beyond it
+- ✅ bench, cases 1, 5 and 6: contacts that must not lift a car
+- ✅ **(braquage après restitution du contrôle)** steering after the hand-over: until then the bench drives whatever the player holds; from then on the car obeys, left and right alike
 
 ### Multijoueur — `tests/integration/multiplayer.test.mjs`
 
@@ -191,6 +246,24 @@ indépendante (ce ne sont pas des tests de la PR précédente) :
 |---|---|---|
 | `hop.test.mjs` — *recoverable hop: wheels interlocked…* | L'écart de 48 km/h à l'atterrissage est vérifié par rapport à la vitesse de la voiture de devant **au moment du choc** (et l'écart à l'atterrissage doit être au moins aussi grand) | La perte de vitesse a été déplacée de l'atterrissage au choc (défaut A-1) : la voiture de devant peut avoir accéléré pendant le vol |
 | `animation.test.mjs` — *front wheels near top speed: a third drawing…* | Le dessin est complet à 311 km/h et non plus à 300 ; part attendue à 300 km/h entre 85 et 97 % | La transition a été étirée jusqu'à la plus basse des vitesses maximales (défaut B-1 : plus rien ne changeait entre 300 km/h et la vitesse maximale) |
+
+## 1 ter. Tests existants réécrits ou adaptés par le lot 5
+
+Le comportement attendu de ces tests **a changé par décision du joueur** (saut par contact de
+roues seulement ; tout décollage franchit l'obstacle). Ce ne sont donc pas des non-régressions :
+ils énoncent la nouvelle règle. Tous les autres tests de la PR #4 sont inchangés et réussis.
+
+| Test de la PR #4 | Ce qu'il devient | Raison |
+|---|---|---|
+| `hop.test.mjs` — les 13 tests | 12 tests réécrits sur le saut « roue sur roue » (215 km/h sur 150, 1,95 m de côté). Disparus : le saut par le côté, le ralentissement au choc, « retombe derrière sans gagner de terrain », l'ordre de traitement de l'atterrissage. Conservés tels quels dans leur objet : E3 maintenu, E5 maintenu, pas d'immobilisation, délai de 1,5 s, déterminisme, contacts à faible énergie | Les deux règles du joueur remplacent ce que ces tests vérifiaient |
+| `accidents.test.mjs` — *E3 flight: the car comes down behind the car it rode over…* | *E3 flight: the car flies over the car it rode over and comes down ahead of it, beside its path; that car drives past the wreck* | Règle 2 du joueur. La perte de 50 km/h par seconde en vol y est toujours vérifiée |
+| `accidents.test.mjs` — *launch conditions are explicit: three levels by energy…* | *…the accident inside its overlap window, the hop on the wheels, nothing else flies* : le cas « 170 km/h sur 100, demi-largeur » donne un tamponnage et non plus un saut ; deux cas roue sur roue ajoutés ; le seuil de l'accident est mesuré (58 km/h d'écart) | Règle 1 du joueur ; conséquence de la règle 2 sur le seuil |
+
+Treize tests nouveaux : six dans `wheel-contacts.test.mjs`, cinq dans `lab.test.mjs`, et deux
+ajoutés à des fichiers existants. Ajouté à `accidents.test.mjs` : *E3 near a barrier: the flight stays between the barriers, and
+the car is still not set down on another one*. Ajouté à `animation.test.mjs` : *mirrors, lot 5:
+three heights of the same mirrors…*. Le test existant des rétroviseurs passe sans modification
+sur la variante B.
 
 ## 2. Tests navigateur — `tests/rendering/smoke.browser.mjs` — 13 / 13 réussis
 

@@ -224,6 +224,60 @@ sur B, non traitées et laissées au jugement du joueur :
   en A) ;
 - C-3 (la vue arrière de la planche ne montrait pas les rétroviseurs) : corrigé.
 
+## 2 ter. Rétroviseurs légèrement remontés — trois hauteurs comparées (lot 5)
+
+Après les essais de la PR #4 le joueur a demandé que les rétroviseurs soient « légèrement
+remontés ». La hauteur se règle au même endroit que le reste, `MIRROR_PRESETS` dans
+`src/art/vehicles/car-model.js` (`z` : hauteur du centre du boîtier au-dessus du sol). Trois
+montages, **identiques en tout sauf cette hauteur** :
+
+| Variante | Hauteur du boîtier | Dans la vue cockpit (1280×720) | Option de lancement |
+|---|---|---|---|
+| A — hauteur de la PR #4 | 67,5 cm | — | `#mirrors=a` |
+| **B — légèrement remontés (dans le jeu)** | 70,0 cm (+2,5 cm) | 30 px plus haut (4,2 % de la hauteur de l'image) | `#mirrors=b`, ou rien |
+| C — remontés davantage | 72,5 cm (+5 cm) | 59 px plus haut | `#mirrors=c` |
+
+Ce qui ne change pas d'une variante à l'autre : l'entraxe (centre à 39,5 cm de l'axe, la
+valeur retenue au lot précédent), la largeur et la hauteur du boîtier (14 × 7,5 cm), la
+symétrie, et le pied du bras, toujours au même point du tour de cockpit. **Le bras suit le
+boîtier** : son extrémité haute est fixée 2 cm sous le centre du boîtier, elle monte donc avec
+lui ; le bras s'allonge de 1,4 cm en B et de 3,0 cm en C et devient plus raide (29° au-dessus
+de l'horizontale en A, 37° en B, 44° en C). Les vues extérieures et la vue cockpit sont toutes
+tirées de cette même définition : la vue cockpit est la projection du modèle depuis l'œil du
+pilote, rien n'y est déplacé à la main.
+
+Planche : `work/renders/comparison/mirror-heights.jpg` (même scène, mêmes voitures aux mêmes
+places, mêmes caméras : vue cockpit, vue de face agrandie, vue de trois quarts arrière
+agrandie) ; images sources dans `work/renders/comparison/frames/mirror-height-{A,B,C}-*.png` ;
+mesures dans `mirror-heights.json`. Elle est produite par
+`node work/scripts/compare-mirror-heights.mjs`, qui ouvre le vrai jeu avec chacune des trois
+options : ce que montre la planche est ce qu'une personne voit avec l'option.
+
+Vérifications :
+
+- **déplacement mesuré sur les images** (en faisant glisser l'image de la variante jusqu'à
+  superposer son rétroviseur à celui de A) : 30 px pour B (29,6 attendus par la projection),
+  59 px pour C (59,1 attendus) ;
+- **symétrie** : le rétroviseur gauche et le droit montent du même nombre de pixels (30 / 30
+  et 59 / 59) ;
+- **pas de déplacement latéral** : 0 px dans les trois variantes, des deux côtés ;
+- **cohérence cockpit / extérieur et dimensions** : test `animation.test.mjs` (« mirrors,
+  lot 5… ») — pour chaque variante les deux boîtiers du modèle sont à la hauteur annoncée et
+  reflets l'un de l'autre, le bras part du même pied et arrive sous le boîtier, la vue cockpit
+  est la projection de ce montage, et rien d'autre que la position verticale ne change entre
+  les variantes (position horizontale, largeur, hauteur, pied du bras).
+
+**Variante préconisée : B.** C'est la plus petite des deux corrections, et la seule demande
+est « légèrement ». Ce que l'on voit sur la planche : en A le boîtier est sous le triangle de
+suspension supérieur et couvre le bas du pneu ; en B son bord supérieur arrive à hauteur de ce
+triangle et il couvre le moyeu ; en C il passe au-dessus de l'attache du triangle et couvre le
+haut du pneu — il commence à masquer davantage la roue elle-même. **B est une proposition,
+pas une valeur validée** : la planche et les options servent à ce que le joueur tranche. Je
+n'ai pas pu juger si B « corrige le défaut », faute de savoir ce qui gênait exactement dans la
+hauteur de la PR #4. Aucun critique indépendant n'a revu cette planche.
+
+Changer de variante par défaut : `MIRROR_DEFAULT` dans `car-model.js`.
+
 ## 3. Séquences comparatives
 
 | Fichier | Contenu |

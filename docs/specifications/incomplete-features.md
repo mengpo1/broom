@@ -45,7 +45,31 @@ par le rasteriseur logiciel SwiftShader).
   Un critique indépendant a relevé 7 défauts moyens et 13 mineurs sur les séquences
   (`work/reviews/collision-review.md`) ; ce qui n'a pas été traité est listé dans
   `collisions.md` § 9, et les corrections n'ont pas été revues à leur tour.
-- **Saut récupérable** : choix de gameplay original (rien de tel dans la vidéo de référence),
+- **Lot 5 — saut par contact de roues, franchissement, rétroviseurs remontés, braquage**
+  (décisions du joueur après les essais de la PR #4 ; `collisions.md` § 2 ter,
+  `wheels-and-mirrors.md` § 2 ter, `steering-diagnosis.md`) :
+  - le saut récupérable ne vient plus que d'une roue avant qui entre par l'arrière dans une
+    roue arrière, carrosseries séparées : une bande de 17 cm de chaque côté, avec 58 km/h
+    d'écart. **Dans 21 courses de 16 voitures de l'ordinateur il ne s'en produit plus aucun**
+    (42 avec les règles de la PR #4). Il se teste au banc d'essai ; sa fréquence en course est
+    à arbitrer, avec les réglages possibles (`collisions.md`, « solutions chiffrées ») ;
+  - tout décollage sur une voiture la franchit et retombe devant elle ; pour cela il faut
+    58 km/h d'écart (54 auparavant pour l'accident, 36 pour le saut), et le vol dure plus
+    longtemps près du seuil. **Sur ce point le jeu s'écarte de la vidéo de référence**, où
+    les voitures heurtées sont devant après le vol ;
+  - une épave reste traversable par les autres voitures ; seule la voiture survolée est sûre
+    de passer à côté. En virage ou contre une barrière la voiture peut ne pas retomber
+    « devant » (2 accidents sur 5 dans les courses d'essai), mais jamais sur une autre ;
+  - la mise en scène (vue, assiette de la voiture en vol) n'a pas été réglée pour les vols
+    plus longs que 0,85 s ni pour l'attente en l'air ;
+  - rétroviseurs : la variante B (+2,5 cm) est dans le jeu comme **proposition** ; A et C se
+    choisissent par `#mirrors=a` et `#mirrors=c` ;
+  - braquage : **aucune correction**. Le diagnostic conclut à un comportement normal à
+    vitesse élevée (la butée est limitée par l'adhérence) ; le dessin des roues et du volant
+    montre un braquage complet quand l'angle réel est de 1,5°. Toute modification de la
+    conduite attend un arbitrage ;
+  - aucun critique indépendant n'a revu ce lot ; rien n'a été essayé au volant.
+- **Saut récupérable** *(état de la PR #4, pour mémoire)* : choix de gameplay original (rien de tel dans la vidéo de référence),
   ajouté à la demande du joueur. Ses seuils et son dosage sont des réglages de départ, jamais
   essayés au volant ; il se teste avec le banc d'essai (`collision-test-bench.md`). Les
   voitures de l'ordinateur sautent aussi (1 à 5 fois par course de 16 voitures sur six courses

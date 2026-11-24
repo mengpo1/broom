@@ -25,7 +25,8 @@ src/
   tracks/         définition des 18 circuits, construction (courbure, relief, stands), trajectoire idéale,
                   thèmes logiques, disposition logique des décors (scenery-layout)
   physics/        dynamique arcade d'une monoplace ; contacts voiture-voiture classés (tamponnage, roue contre roue,
-                  saut récupérable, accident), panneaux solides, vol et atterrissages ; réglages des collisions (collision-tuning)
+                  saut récupérable, accident), roues du modèle de collision et contact roue avant / roue arrière
+                  (wheel-contacts), panneaux solides, vol et atterrissages ; réglages des collisions (collision-tuning)
   vehicles/       paramètres de la voiture (car-spec), écuries et pilotes fictifs (liveries)
   ai/             pilote ordinateur (mêmes commandes et même physique que le joueur), profil de vitesse
   gameplay/       course (départ, tours, classement, stands), règles, championnat, sessions (modes de jeu)
