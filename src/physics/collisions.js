@@ -211,7 +211,7 @@ function rearmed(car) { return car.clock - car.rearmClock >= COLLISION_TUNING.ho
 
 /**
  * Overlap of the boxes of two cars along the axis where it is smallest (0 when they are apart), the
- * second car seen (dx, dz) metres from the first. `grow` (m) is added all round the first box.
+ * second car seen (dx, dz) metres from the first. `grow` (m) lengthens the first box at both ends.
  */
 function boxOverlap(a, b, dx, dz, grow = 0) {
   const pa = a.params, pb = b.params;
@@ -219,7 +219,7 @@ function boxOverlap(a, b, dx, dz, grow = 0) {
   let min = 1e9;
   for (let k = 0; k < 4; k++) {
     const ax = k === 0 ? ca : k === 1 ? -sa : k === 2 ? cb : -sb, az = k === 0 ? sa : k === 1 ? ca : k === 2 ? sb : cb;
-    const ra = (pa.halfLength + grow) * Math.abs(ax * ca + az * sa) + (pa.halfWidth + grow) * Math.abs(-ax * sa + az * ca);
+    const ra = (pa.halfLength + grow) * Math.abs(ax * ca + az * sa) + pa.halfWidth * Math.abs(-ax * sa + az * ca);
     const rb = pb.halfLength * Math.abs(ax * cb + az * sb) + pb.halfWidth * Math.abs(-ax * sb + az * cb);
     const overlap = ra + rb - Math.abs(dx * ax + dz * az);
     if (overlap <= 0) return 0;
@@ -303,34 +303,47 @@ function wheelHop(follower, leader, rules, time, emit) {
  * The landing of a car in flight waits when it has to. Its time in the air is planned so that it comes
  * down past the car that threw it up and clear of it (flightPlan). In the last moments of the flight
  * the place where it is about to land is looked at: if it would not be past that car yet while still
- * gaining on it (that car sped up more than expected), or if another car would be under it (a third
- * car was there), it stays up a little longer, step after step, for at most flightHoldMax seconds.
- * Nothing is moved: only the landing waits.
+ * gaining on it (that car sped up more than expected), or if a car is under it or would be where it
+ * lands (a third car was there; or the car it flew over, when it could neither be passed nor left to
+ * one side: against a barrier), it stays up, at the height it has then, until the way is clear: for at
+ * most flightHoldMax seconds in the first case, flightOverCarMax in the second. Nothing is moved: only
+ * the landing waits.
  */
 function holdLanding(car, cars) {
   const T = COLLISION_TUNING, left = car.airDuration - car.airTime;
-  if (left >= T.flightHoldTime || car.airTime >= car.airPlanned + T.flightHoldMax) return;
-  const v = Math.hypot(car.velX, car.velZ);
-  if (v < 1) return;
+  if (!car.airHold && left >= T.flightHoldTime) return;
+  const v = Math.hypot(car.velX, car.velZ), late = car.airTime - car.airPlanned;
+  if (v < 1 || late >= T.flightOverCarMax) return;
   // where the car will be when it lands, `left` seconds from now, and how fast
   const decel = car.airKind === LANDING.RECOVERABLE ? T.hopAirDecel : T.airDecel;
   const ux = car.velX / v, uz = car.velZ / v, travel = Math.max(0, v * left - 0.5 * decel * left * left);
   const lx = car.x + ux * travel, lz = car.z + uz * travel;
+  let wait = false;
   const other = car.launchOther >= 0 ? cars[car.launchOther] : null;
-  if (other && other !== car && !other.removed) {
+  if (other && other !== car && !other.removed && late < T.flightHoldMax) {
     worldVelocity(other, vb);
     const along = vb[0] * ux + vb[1] * uz;
     const behind = (other.x + vb[0] * left - lx) * ux + (other.z + vb[1] * left - lz) * uz + car.params.halfLength + other.params.halfLength + T.flightClearance * 0.8;   // > 0: not past it yet
-    if (behind > 0 && v - decel * left - along > 0.5) { car.airDuration = car.airTime + T.flightHoldTime; return; }
+    wait = behind > 0 && v - decel * left - along > 0.5;
   }
-  for (let i = 0; i < cars.length; i++) {
+  for (let i = 0; i < cars.length && !wait; i++) {
     const o = cars[i];
     if (o === car || o.removed || o.inPit || o.state === CAR_STATE.AIRBORNE || o.state === CAR_STATE.RESET) continue;
+    // (under it now, or where it will land: it only starts coming down once nothing is below)
+    const nx = o.x - car.x, nz = o.z - car.z;
+    if (nx * nx + nz * nz <= 30 && boxOverlap(car, o, nx, nz, T.flightClearance * 0.5) > 0) { wait = true; break; }
     worldVelocity(o, vb);
     const dx = o.x + vb[0] * left - lx, dz = o.z + vb[1] * left - lz;
     if (dx * dx + dz * dz > 30) continue;
-    if (boxOverlap(car, o, dx, dz, T.flightClearance * 0.5) > 0) { car.airDuration = car.airTime + T.flightHoldTime; return; }
+    wait = boxOverlap(car, o, dx, dz, T.flightClearance * 0.5) > 0;
   }
+  if (!wait) return;
+  // the landing is put off again by flightHoldTime, and the arc is stretched so that the car stays at the height it had
+  // when the wait began (it comes down from there, in that same time, once the way is clear)
+  if (!car.airHold) car.airHold = Math.max(car.airHeight, 0.05);
+  car.airDuration = car.airTime + T.flightHoldTime;
+  const u = car.airTime / car.airDuration;
+  car.airPeak = car.airHold / (4 * u * (1 - u));
 }
 
 /**

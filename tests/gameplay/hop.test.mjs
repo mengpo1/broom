@@ -166,7 +166,8 @@ test('the landing waits rather than set the car down on another one: the car ahe
     if (landed) assert.equal(bodyOverlap(a, b), 0, 'and never driven through afterwards');
   });
   assert.ok(hopped && landed, 'the hop happened');
-  // a third car exactly where the hop would come down
+  // a third car exactly where the hop would come down, in its lane and at the speed of the car it flew over: the worst
+  // case (it can neither be passed nor is it left behind quickly); the car waits above it until it has gone
   const reference = wheelHop();
   let spot = null, flightTime = 0, t0 = -1;
   stepThrough(reference, 1.6, holding(reference), (i) => {
@@ -178,17 +179,22 @@ test('the landing waits rather than set the car down on another one: the car ahe
   const third = crowded.race.cars.find((c) => !c.isHuman);
   placeCar(third, track, crowded.b.s + spot.ahead + 1, crowded.b.d + spot.right);
   third.state = CAR_STATE.RACING; third.ghostTimer = 0; third.speed = KMH_B / KMH; third.gear = crowded.b.gear; third.isHuman = true;
-  let up = -1, down = -1, worst = 0;
-  stepThrough(crowded, 2.2, holding(crowded), (i) => {
+  let up = -1, down = -1, worst = 0, lowestWhileWaiting = Infinity, px = 0, pz = 0;
+  stepThrough(crowded, 4, holding(crowded), (i) => {
     const { a, b } = crowded;
     third.inThrottle = holdSpeed(third, KMH_B)(); third.inSteer = 0;
     if (a.state === CAR_STATE.AIRBORNE && up < 0) up = i;
+    // while it waits it is not moved either: only its own velocity carries it, and it keeps its height
+    if (a.state === CAR_STATE.AIRBORNE && up >= 0 && i > up) assert.ok(Math.hypot(a.x - px - a.velX * SIM_DT, a.z - pz - a.velZ * SIM_DT) < 1e-6, `step ${i} of the flight: moved by its own velocity only`);
+    if (a.state === CAR_STATE.AIRBORNE && a.airHold > 0 && a.airTime < a.airPlanned + T.flightOverCarMax && bodyOverlap(a, third) > 0) lowestWhileWaiting = Math.min(lowestWhileWaiting, a.airHeight);
+    px = a.x; pz = a.z;
     if (up >= 0 && down < 0 && a.state !== CAR_STATE.AIRBORNE) { down = i; assert.equal(bodyOverlap(a, third), 0, 'not set down on the third car'); assert.equal(bodyOverlap(a, b), 0); }
     if (down >= 0) worst = Math.max(worst, bodyOverlap(a, third), bodyOverlap(a, b));
   });
   assert.ok(up > 0 && down > up, 'the hop happened with a third car in the way');
   assert.ok((down - up) * SIM_DT > flightTime + 0.02, `the landing waited: ${((down - up) * SIM_DT).toFixed(3)} s in the air instead of ${flightTime.toFixed(3)} s`);
-  assert.ok((down - up) * SIM_DT <= flightTime + T.flightHoldMax + T.flightHoldTime + 2 * SIM_DT, 'within the longest wait allowed');
+  assert.ok((down - up) * SIM_DT <= flightTime + T.flightOverCarMax + T.flightHoldTime + 2 * SIM_DT, 'within the longest wait allowed');
+  assert.ok(lowestWhileWaiting > 0.3 && lowestWhileWaiting < 1, `while it waits over the third car it keeps its height: ${lowestWhileWaiting.toFixed(2)} m at the lowest`);
   assert.equal(worst, 0, 'no car driven through after the landing');
   assert.equal(third.state, CAR_STATE.RACING);
 });

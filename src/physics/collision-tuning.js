@@ -55,9 +55,12 @@ export const COLLISION_TUNING = {
   flightSideClearance: 0.4,      // m between the two cars side by side at the landing: the car is thrown a little to the side
                                  // it was already on, so that it does not come down in the path of the car it flew over
   flightTimeCarMax: 1.1,         // s: longest flight of the hard accident (0.85 s measured, more only when needed to get past)
-  flightHoldTime: 0.12,          // s: the landing waits when the car is not past the other one yet although still gaining on it
-  flightHoldMax: 0.5,            //    (that car sped up more than expected), or when a third car is under it: it stays up
-                                 //    flightHoldTime longer, step after step, for at most flightHoldMax seconds
+  flightHoldTime: 0.12,          // s before the planned landing from which the place where the car will come down is looked at
+  flightHoldMax: 0.5,            // s: the landing waits at most this long when the car is not past the other one yet although
+                                 //    still gaining on it (that car sped up more than expected)
+  flightOverCarMax: 1.5,         // s: and at most this long when a car is under it (a third car; or the car it flew over, when it
+                                 //    could neither be passed nor left to one side). A car in the air loses 50 km/h every
+                                 //    second: any car that holds its speed is out from under it in about a second
 
   // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
   // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.
