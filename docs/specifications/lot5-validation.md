@@ -200,9 +200,10 @@ encore là.
 **La correction.** Tant qu'une voiture est dessous, la voiture en vol **se dégage** : sa
 vitesse est tenue à au moins 29 km/h de celle de toute voiture qui est dessous — elle la
 dépasse, ou la laisse partir ; une fois qu'elle en a laissé partir une, elle laisse partir
-toutes les autres jusqu'à la fin du vol. Une voiture seule est ainsi quittée en une à trois
-secondes quoi qu'elle fasse (2,8 s au pire dans les mesures, touche de remise en piste
-comprise). Rien n'est déplacé à la main, les autres voitures ne sont pas touchées, un vol sans
+toutes les autres jusqu'à la fin du vol (sauf si elle les a toutes passées en moins de 0,4 s
+en continuant simplement son vol). Une voiture seule est ainsi quittée en une à trois secondes
+(3,2 s au pire dans des recherches faites pour cela, touche de remise en piste comprise : la
+limite de 3,5 s n'a pas été atteinte par une voiture seule, avec 0,3 s de marge). Rien n'est déplacé à la main, les autres voitures ne sont pas touchées, un vol sans
 conflit est inchangé. Un vol ne dure jamais plus de 3,5 s au-delà de sa durée prévue. Sa
 vitesse change progressivement (4 km/h par pas au plus) ; si elle reculait en se posant, elle
 est posée à l'arrêt.
@@ -224,19 +225,19 @@ jamais retirée ; une épave après un accident est traitée comme avant.
 
 | Contrôle | Avant (`dc8b823`) | Maintenant |
 |---|---|---|
-| Les scénarios demandés (`tests/gameplay/flight-wait.test.mjs`, 14 tests) : troisième voiture qui s'arrête dessous, voiture qui arrive pendant le vol, peloton sur toutes les places, voiture franchie qui accélère, barrière, deux décollages presque simultanés | tous échouent : vols de 4,3 à 5,3 s, voiture posée jusqu'à 1,6 m dans une autre | tous réussis : attente de 0,5 à 1,6 s, jamais dans une voiture |
+| Les scénarios demandés (`tests/gameplay/flight-wait.test.mjs`, 17 tests) : troisième voiture qui s'arrête dessous, voiture qui arrive pendant le vol, peloton sur toutes les places, voiture franchie qui accélère, barrière, deux décollages presque simultanés | tous échouent : vols de 4,3 à 5,3 s, voiture posée jusqu'à 1,6 m dans une autre | tous réussis : attente de 0,5 à 1,6 s, jamais dans une voiture |
 | 1 000 pelotons hostiles (`flight-wait-stress.mjs`) : voitures posées dans une autre | 34 | 0 |
-| — vol le plus long ; dernier recours | 6,0 s ; — | 4,35 s ; 1 fois sur 1 572 vols |
+| — vol le plus long ; dernier recours | 6,0 s ; — | 4,35 s ; 1 fois sur 1 573 vols |
 | 54 courses à 20 voitures (`dense-pack-races.mjs`) : attente la plus longue ; dernier recours | 1,6 s ; — | 1,1 s ; 0 |
-| Une voiture seule cherchant à rester dessous (1 458 vols au hasard ; 20 000 essais de l'adversaire du relecteur ; 30 000 essais du même avec la touche de remise en piste) | — | 1,6 s ; 2,2 s ; 2,8 s au plus ; jamais de dernier recours |
+| Une voiture seule cherchant à rester dessous (1 458 vols au hasard ; 20 000 et 30 000 essais de l'adversaire du premier relecteur, sans et avec la touche de remise en piste ; 28 200 essais de la recherche du second) | — | 1,6 s ; 2,2 s ; 2,8 s ; 3,2 s au plus ; jamais de dernier recours, mais 0,3 s de marge seulement |
 | Contacts validés E1, E2, E4, E5 ; 165 valeurs de conduite ; 19 des 21 courses à 16 voitures | — | identiques (les deux autres courses sont celles où un atterrissage attend) |
 
 Vidéos du cas extrême (une troisième voiture reste sous la voiture en vol), dans
 `work/renders/collisions/` : `HOLDx.mp4` (vue de derrière, la plus lisible), `HOLD.mp4`
 (cockpit), `HOLDslowx.mp4` (quatre fois plus lentement).
 
-**Relecture indépendante.** Trois passes, chacune sur le code et les exigences, sans mes
-conclusions ; détail dans `collisions.md` § 2 quater, « Seconde relecture indépendante, et
+**Relecture indépendante.** Quatre passes, par deux relecteurs, chacune sur le code et les
+exigences, sans mes conclusions ; détail dans `collisions.md` § 2 quater, « Seconde relecture indépendante, et
 suites ».
 
 - *Première passe* (deux premiers commits). Confirmé : contacts au sol, conduite et vols sans
@@ -253,8 +254,22 @@ suites ».
   recours avec la touche de remise en piste (52 fois sur 30 000) — et des points mineurs. Tous
   traités, chacun avec un test qui échoue sur le commit relu ; une réserve de 2 cm est
   documentée et non corrigée (`collisions.md`, « Ce qui reste »).
-- *Troisième passe* (autre relecteur, sur les corrections de la seconde, commit `f8494a8`) :
-  en cours au moment de ce commit.
+- *Troisième passe* (autre relecteur, sur les corrections de la seconde). Confirmé : identité
+  hors conflit, durée bornée, déterminisme. Trouvé : **un défaut grave, régression de ma
+  correction du muret** — une voiture qui décolle dans l'entrée des stands et retombe dans la
+  voie des stands était posée dans la file qui s'y trouve (36 fois sur 36) — et deux moyens :
+  une voiture seule tenait un vol 3,54 s pour une limite de 3,5 s ; davantage de vols arrêtés
+  en l'air puis en recul. Corrigés, deux tests qui échouent sur le commit relu.
+- *Quatrième passe* (sur les corrections de la troisième). Confirmé : pelotons hostiles,
+  identité hors conflit, déterminisme. Trouvé : dans une voie des stands pleine de voitures
+  sur quatre files (100 voitures : aucune course n'en a autant), le dernier recours remettait
+  la voiture du mauvais côté du muret, qui la renvoyait dans une voiture — corrigé, testé ;
+  face à deux voitures adverses, un recul inutile au-dessus d'une voiture arrêtée — corrigé ;
+  et une limite étroite laissée en l'état et signalée (un décollage annulé dans les 60 m avant
+  le muret si une voiture des stands longe le muret à quelques centimètres).
+- **Les corrections de la quatrième passe n'ont pas été relues** par un relecteur indépendant :
+  vérifiées avec ses scripts de reproduction et toutes les mesures, refaites sur le commit
+  final.
 
 ## 6. À valider ou à arbitrer
 
@@ -280,7 +295,10 @@ suites ».
    accepter l'exception, ou resserrer les conditions du décollage (`collisions.md` § 2 quater).
 9. **Le dernier recours de l'attente en vol** (remise en piste après 3,5 s) : seule
    téléportation du jeu en vol. À accepter, ou à remplacer par l'une des autres issues
-   décrites, chacune avec son coût.
+   décrites, chacune avec son coût. Deux voitures suffisent à le provoquer ; une voiture seule
+   ne l'a pas atteint dans les recherches faites pour cela, mais avec 0,3 s de marge seulement
+   (3,2 s pour 3,5 s). Élargir la marge demande de toucher à un réglage visible (écart de
+   vitesse de 29 à 36 km/h, ou limite à 4 s).
 10. **Le comportement pendant l'attente** : la voiture en vol ralentit ou garde son élan
     vivement (29 km/h en 0,07 s), peut reculer au-dessus d'une voiture presque arrêtée (elle
     est alors posée à l'arrêt), et reste dessinée au-dessus d'une autre pendant une à trois

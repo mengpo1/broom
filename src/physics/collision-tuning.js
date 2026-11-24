@@ -75,12 +75,13 @@ export const COLLISION_TUNING = {
                                  //    left to itself, it is past them all within this time (a car below that stops dead, as the
                                  //    reset key does, is simply flown over: a car waiting to be put back stays put for 0.5 s)
   flightWaitMax: 3.5,            // s: the longest a flight can go on beyond its planned time, whatever the reason (the wait
-                                 //    above included). One car alone does not use it up, whatever it does, the reset key
-                                 //    included (0.5 s for the car that threw it up, then: passed nearly to the end, let go, and
-                                 //    the drift back off it if it stops; measured in docs/specifications/collisions.md);
-                                 //    several cars taking turns under it can. Beyond, last resort: the car is put back on the
-                                 //    track on a free place, as a car that has left the road is. It is never set down where it
-                                 //    is if a car is there
+                                 //    above included). One car alone has not been seen to use it up, whatever it does, the
+                                 //    reset key included, but not by much: passed nearly to the end (1.2 s), let go over its
+                                 //    whole length (1.2 s), then stopping dead under the car in flight (0.8 s), 3.2 s at the
+                                 //    worst found by searches made for that (docs/specifications/collisions.md). Two cars
+                                 //    taking turns under it can. Beyond, last resort: the car is put back on the track on a
+                                 //    free place, as a car that has left the road is. It is never set down where it is if a
+                                 //    car is there
 
   // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
   // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.

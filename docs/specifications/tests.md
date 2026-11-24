@@ -8,15 +8,15 @@ l'image, pas la vitesse.
 
 ## 0 bis. Dernière exécution complète — sécurisation de la PR #8
 
-Sur le build final (`index.html`, 1 107 893 octets), après la sécurisation (attente en vol
-bornée, voiture retirée, cas 7 du banc : `collisions.md` § 2 quater) et les suites des trois
+Sur le build final (`index.html`, 1 112 114 octets), après la sécurisation (attente en vol
+bornée, voiture retirée, cas 7 du banc : `collisions.md` § 2 quater) et les suites des
 passes de relecture indépendante. **État intermédiaire** : les lignes marquées « à relancer »
 n'ont pas encore été exécutées sur ce build.
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Simulation et logique | `npm test` | **126 / 126** : les 109 tests précédents inchangés et réussis ; 17 nouveaux (14 dans `flight-wait.test.mjs`, 2 dans `retired.test.mjs`, 1 dans `lab.test.mjs`) |
-| Les nouveaux tests sur `dc8b823` | mêmes fichiers sur les sources du commit précédent | les tests de l'attente en vol échouent (vols de 4,3 à 5,3 s, voiture posée dans une autre) ; celui de la voiture retirée échoue sans le correctif. Les tests ajoutés après la relecture échouent sur le commit qui la précède (voiture posée en marche arrière ; voiture en attente de remise en piste ou dans l'entrée des stands ignorée ; vitesses de plusieurs milliers de m/s pour deux vols en attente). Les trois tests ajoutés après la seconde passe échouent sur `e102802` (hauteur qui remonte de 3,6 cm en un pas dans une attente à répétition ; décollage annulé par la file des stands ; attente de 3,62 s contre une voiture seule), et les contrôles de vitesse ajoutés à chaque vol font échouer 12 tests sur 14 sur `1a95e47` (jusqu'à 55 km/h perdus en un pas) |
+| Simulation et logique | `npm test` | **129 / 129** : les 109 tests précédents inchangés et réussis ; 20 nouveaux (17 dans `flight-wait.test.mjs`, 2 dans `retired.test.mjs`, 1 dans `lab.test.mjs`) |
+| Les nouveaux tests sur `dc8b823` | mêmes fichiers sur les sources du commit précédent | les tests de l'attente en vol échouent (vols de 4,3 à 5,3 s, voiture posée dans une autre) ; celui de la voiture retirée échoue sans le correctif. Les tests ajoutés après la relecture échouent sur le commit qui la précède (voiture posée en marche arrière ; voiture en attente de remise en piste ou dans l'entrée des stands ignorée ; vitesses de plusieurs milliers de m/s pour deux vols en attente). Les trois tests ajoutés après la seconde passe échouent sur `e102802` (hauteur qui remonte de 3,6 cm en un pas dans une attente à répétition ; décollage annulé par la file des stands ; attente de 3,62 s contre une voiture seule), et les contrôles de vitesse ajoutés à chaque vol font échouer 12 tests sur 14 sur `1a95e47` (jusqu'à 55 km/h perdus en un pas). Les deux tests ajoutés après la troisième passe échouent sur `f8494a8` (voiture posée 1,09 m dans une voiture de la voie des stands ; attente de 3,45 s contre une voiture seule). Le test ajouté après la quatrième passe échoue sur `01f7c7a` (voiture déplacée de 4,16 m en un pas par le muret) |
 | Banc d'essai dans le vrai jeu | `node work/scripts/lab-check.mjs` | **à relancer sur ce build** (27 / 27 sur le build de `e102802`) |
 | Braquage après restitution, clavier réel | `node work/scripts/steering-handover-check.mjs` | **à relancer sur ce build**. Sur le build de `e102802` : 51 / 51 (sept cas du banc et une course normale). Deux exécutions précédentes, pendant que d'autres calculs chargeaient la machine, avaient donné 50 puis 49 sur 51 (fenêtres de mesure trop courtes, contrôles en échec différents d'une fois à l'autre) : relancé au calme, tout passe |
 | Navigateur (WebGPU) | `node tests/rendering/smoke.browser.mjs` | **à relancer sur ce build** |
@@ -26,8 +26,8 @@ n'ont pas encore été exécutées sur ce build.
 | Conduite | `node work/scripts/driving-report.mjs` | **165 valeurs identiques** à la PR #4 |
 | Mesures de référence E1 à E5 | `node work/scripts/collision-comparison.mjs` | identiques au commit précédent : E1, E2, E4, E5 identiques à la PR #4 ; E3 avec les quatre différences voulues du lot 5 |
 | Séquences du banc, télémétrie image par image | `node work/scripts/collision-sequences.mjs` | HOLDx, HOLD et HOLDslowx réenregistrées sur ce build ; **rejeu des dix autres en cours** |
-| Pelotons hostiles | `node work/scripts/flight-wait-stress.mjs` | 1 000 pelotons, 1 572 vols : 0 voiture posée dans une autre (34 avant), vol le plus long 4,35 s (6,04 s avant), 1 remise en piste, aucun atterrissage mis en attente plus de deux fois (11 fois avant) ; 3 000 pelotons : 4 665 vols, 0 posée dans une autre, 0 vol non terminé, 3 remises en piste |
-| Une voiture seule contre un vol | adversaires du relecteur (`d_one_car`, `d2_one_car_reset`, `d3_one_car_brake`), hors dépôt | 20 000, 30 000 et 6 000 essais : aucun dernier recours ; au plus 2,22 s, 2,79 s (touche de remise en piste) et 0,74 s au-delà de la durée prévue |
+| Pelotons hostiles | `node work/scripts/flight-wait-stress.mjs` | 1 000 pelotons, 1 573 vols : 0 voiture posée dans une autre (34 avant), vol le plus long 4,35 s (6,04 s avant), 1 remise en piste, aucun atterrissage mis en attente plus de deux fois (11 fois avant) ; 3 000 pelotons : 4 665 vols, 0 posée dans une autre, 0 vol non terminé, 3 remises en piste |
+| Une voiture seule contre un vol | adversaires des relecteurs (`d_one_car`, `d2_one_car_reset`, `d3_one_car_brake`, recherche `c2_climb`), hors dépôt | 20 000, 30 000, 6 000 et 28 200 essais : aucun dernier recours ; au plus 2,22 s, 2,78 s (touche de remise en piste), 0,74 s et **3,17 s** au-delà de la durée prévue, pour une limite de 3,5 s |
 | Courses à 20 voitures | `node work/scripts/dense-pack-races.mjs` | 54 courses terminées, temps des vainqueurs identiques au commit précédent ; 39 vols, attente la plus longue 1,11 s, aucune remise en piste, aucune voiture posée dans une autre |
 | 21 courses à 16 voitures | `node work/scripts/race-rules-comparison.mjs` | temps des vainqueurs identiques à la PR #4 (4 268,55 s) ; 19 courses identiques au commit précédent dans tout ce qui est compté, les deux autres sont celles où un atterrissage attend |
 | Comparaison pas à pas avec `dc8b823` (script du relecteur) | deux simulations jumelles, chaque champ de chaque voiture à chaque pas | 2 500 scénarios, 1,35 million de pas, 11 860 événements de contact : tous les pas qui diffèrent ont un vol dont l'atterrissage attend, ou un décollage avec une voiture déjà en vol |
@@ -58,6 +58,9 @@ rapide qu'au décollage, sans saut de hauteur, et finit par un atterrissage.
 - ✅ a car just ahead of the landing place that brakes hard: the car in flight lets it go once, it does not tailgate it in the air *(seconde passe, constat 11)*
 - ✅ cars in the pit lane, behind the pit wall, change nothing to a take-off on the track *(seconde passe, constat 12)*
 - ✅ one car alone using the reset key as well (it stops dead under the car in flight): not enough to reach the last resort *(seconde passe, constat 13)*
+- ✅ a flight that begins in the pit entry and comes down in the pit lane: the cars queued there are under it like any others *(troisième passe, constat 18)*
+- ✅ one car alone that stops dead under a car in flight still going fast: the car in flight flies on past it *(troisième passe, constat 19)*
+- ✅ last resort for a car that came down over the pit lane: it is put back in the pit lane, on a free place, and stays there *(quatrième passe, constat 24 ; 100 voitures)*
 
 Chaque vol de chaque test est aussi contrôlé sur trois points ajoutés après la seconde passe :
 sa vitesse ne change pas de plus de 4 km/h par pas (hors barrière), il ne reprend pas plus de

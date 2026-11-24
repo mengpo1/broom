@@ -86,10 +86,13 @@ par le rasteriseur logiciel SwiftShader).
     ce lot, tous corrigés et testés (`collisions.md` § 2 ter). Relevé à cette occasion et
     **corrigé depuis, à part** : une voiture de l'ordinateur retirée après un abandon (elle
     n'est plus dessinée) n'est plus un obstacle. La sécurisation qui a suivi (attente en vol
-    bornée) a été relue à son tour par un relecteur indépendant, en trois passes : un défaut
-    grave et deux moyens à la première, trois moyens à la seconde (chacune portant sur les
-    suites de la précédente), tous traités et testés ; une troisième passe, sur les
-    dernières corrections, est en cours ;
+    bornée) a été relue à son tour, en quatre passes par deux relecteurs indépendants, chacune
+    portant sur les suites de la précédente : un défaut grave et deux moyens à la première,
+    trois moyens à la seconde, un grave (régression de la correction du muret des stands) et
+    deux moyens à la troisième, un grave (dans une voie des stands pleine sur quatre files) et
+    un moyen à la quatrième, tous traités et testés, sauf une limite étroite laissée en
+    l'état (`collisions.md` § 2 quater, constat 25). Les corrections de la quatrième passe
+    n'ont pas été relues ;
   - aucun critique indépendant n'a revu l'image de ce lot ; rien n'a été essayé au volant.
 - **Saut récupérable** *(état de la PR #4, pour mémoire)* : choix de gameplay original (rien de tel dans la vidéo de référence),
   ajouté à la demande du joueur. Ses seuils et son dosage sont des réglages de départ, jamais
