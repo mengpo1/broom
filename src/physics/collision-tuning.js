@@ -71,6 +71,9 @@ export const COLLISION_TUNING = {
   flightYieldRate: 120,          // m/s^2: how fast its speed moves to the value chosen (8 m/s in 0.07 s): six times the brakes of
                                  //    a car, so the car below cannot outrun it, and no jump of tens of km/h in one step. A change
                                  //    of speed that has begun is finished before the wait can end
+  flightPassTime: 0.4,           // s: after it has let a car go, the car in flight still flies on past the cars below when,
+                                 //    left to itself, it is past them all within this time (a car below that stops dead, as the
+                                 //    reset key does, is simply flown over: a car waiting to be put back stays put for 0.5 s)
   flightWaitMax: 3.5,            // s: the longest a flight can go on beyond its planned time, whatever the reason (the wait
                                  //    above included). One car alone does not use it up, whatever it does, the reset key
                                  //    included (0.5 s for the car that threw it up, then: passed nearly to the end, let go, and
