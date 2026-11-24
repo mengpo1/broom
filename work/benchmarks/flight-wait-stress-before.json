@@ -21,9 +21,17 @@
   "longestFlight": 6.04,
   "wreckDrivenThrough": 404,
   "twoInTheAir": 42,
-  "landedBehind": 611,
+  "landedBehind": 23,
   "fasterThanAtTakeOff": 0,
-  "notANumber": 0
+  "notANumber": 0,
+  "waitedAndLostOver30KmhInAStep": 0,
+  "largestLossInAStepKmh": 0,
+  "waitedAndTookBackOver7Kmh": 0,
+  "mostSpeedTakenBackKmh": 0,
+  "flewBackwards": 0,
+  "furthestBackwardsM": 0,
+  "beganToWaitMoreThanTwice": 2,
+  "mostTimesALandingBeganToWait": 11
  },
  "waitSeconds": {
   "median": 0.3,

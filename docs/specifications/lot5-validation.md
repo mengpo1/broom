@@ -41,7 +41,7 @@ message les touches de direction n'ont pas d'effet.
 | `3` | Accident violent E3 (262 km/h sur 188) | la voiture passe au-dessus de l'autre, retombe devant elle et sur le côté ; explosion, arrêt ; l'autre voiture longe l'épave sans la toucher ; redémarrage |
 | `4` | Panneau E5 | inchangé : envol sur le panneau, retombée 35 m plus loin, glissade |
 | `6` | Nez contre roue arrière (165 km/h sur 100) | plus d'écart qu'il n'en faut pour un saut, mais les carrosseries se touchent : tamponnage, la voiture reste au sol |
-| `7` | **Cas extrême** : le saut du cas 2, avec une troisième voiture qui fait ce qu'elle peut pour rester sous la vôtre | une voiture bleue roule à côté de vous ; au décollage elle se rabat sous votre voiture et freine avec elle. L'atterrissage attend un peu plus d'une demi-seconde, votre voiture ralentit davantage qu'elle (215 → 96 km/h) et se pose derrière elle, sur une place libre. En vue de derrière (`C`) on voit la voiture dessous |
+| `7` | **Cas extrême** : le saut du cas 2, avec une troisième voiture qui fait ce qu'elle peut pour rester sous la vôtre | une voiture bleue roule à côté de vous ; au décollage elle se rabat sous votre voiture et freine avec elle. L'atterrissage attend un peu plus d'une demi-seconde, votre voiture ralentit davantage qu'elle (215 → 93 km/h) et se pose derrière elle, sur une place libre. En vue de derrière (`C`) on voit la voiture dessous |
 | `1` | Roue contre roue côte à côte (E2) | inchangé : frottement, pas de décollage |
 | `5` | Tamponnages (E4) | inchangé |
 
@@ -199,9 +199,13 @@ encore là.
 
 **La correction.** Tant qu'une voiture est dessous, la voiture en vol **se dégage** : sa
 vitesse est tenue à au moins 29 km/h de celle de toute voiture qui est dessous — elle la
-dépasse, ou la laisse partir. Une voiture seule est ainsi quittée en une seconde environ quoi
-qu'elle fasse. Rien n'est déplacé à la main, les autres voitures ne sont pas touchées, un vol
-sans conflit est inchangé. Un vol ne dure jamais plus de 3,5 s au-delà de sa durée prévue.
+dépasse, ou la laisse partir ; une fois qu'elle en a laissé partir une, elle laisse partir
+toutes les autres jusqu'à la fin du vol. Une voiture seule est ainsi quittée en une à trois
+secondes quoi qu'elle fasse (2,8 s au pire dans les mesures, touche de remise en piste
+comprise). Rien n'est déplacé à la main, les autres voitures ne sont pas touchées, un vol sans
+conflit est inchangé. Un vol ne dure jamais plus de 3,5 s au-delà de sa durée prévue. Sa
+vitesse change progressivement (4 km/h par pas au plus) ; si elle reculait en se posant, elle
+est posée à l'arrêt.
 
 **L'exception, à arbitrer.** Si des voitures se relaient sous elle pendant ces 3,5 s, la
 voiture est **remise en piste sur une place libre**, comme une voiture sortie de la route :
@@ -220,19 +224,37 @@ jamais retirée ; une épave après un accident est traitée comme avant.
 
 | Contrôle | Avant (`dc8b823`) | Maintenant |
 |---|---|---|
-| Les scénarios demandés (`tests/gameplay/flight-wait.test.mjs`, 10 tests) : troisième voiture qui s'arrête dessous, voiture qui arrive pendant le vol, peloton sur toutes les places, voiture franchie qui accélère, barrière, deux décollages presque simultanés | tous échouent : vols de 4,3 à 5,3 s, voiture posée jusqu'à 1,6 m dans une autre | tous réussis : attente de 0,5 à 1,5 s, jamais dans une voiture |
+| Les scénarios demandés (`tests/gameplay/flight-wait.test.mjs`, 14 tests) : troisième voiture qui s'arrête dessous, voiture qui arrive pendant le vol, peloton sur toutes les places, voiture franchie qui accélère, barrière, deux décollages presque simultanés | tous échouent : vols de 4,3 à 5,3 s, voiture posée jusqu'à 1,6 m dans une autre | tous réussis : attente de 0,5 à 1,6 s, jamais dans une voiture |
 | 1 000 pelotons hostiles (`flight-wait-stress.mjs`) : voitures posées dans une autre | 34 | 0 |
-| — attente la plus longue ; dernier recours | 5,2 s ; — | 3,6 s ; 3 fois sur 1 575 vols |
+| — vol le plus long ; dernier recours | 6,0 s ; — | 4,35 s ; 1 fois sur 1 572 vols |
 | 54 courses à 20 voitures (`dense-pack-races.mjs`) : attente la plus longue ; dernier recours | 1,6 s ; — | 1,1 s ; 0 |
-| Une voiture seule cherchant à rester dessous (1 458 vols) | — | 2,3 s au plus ; jamais de dernier recours |
-| Contacts validés E1, E2, E4, E5 ; 165 valeurs de conduite | — | identiques |
+| Une voiture seule cherchant à rester dessous (1 458 vols au hasard ; 20 000 essais de l'adversaire du relecteur ; 30 000 essais du même avec la touche de remise en piste) | — | 1,6 s ; 2,2 s ; 2,8 s au plus ; jamais de dernier recours |
+| Contacts validés E1, E2, E4, E5 ; 165 valeurs de conduite ; 19 des 21 courses à 16 voitures | — | identiques (les deux autres courses sont celles où un atterrissage attend) |
 
 Vidéos du cas extrême (une troisième voiture reste sous la voiture en vol), dans
 `work/renders/collisions/` : `HOLDx.mp4` (vue de derrière, la plus lisible), `HOLD.mp4`
 (cockpit), `HOLDslowx.mp4` (quatre fois plus lentement).
 
-**Relecture indépendante de ces modifications : en cours au moment de ce commit.** Ses constats
-et leurs suites seront ajoutés ici ; rien de ce qui précède n'a encore été relu par un tiers.
+**Relecture indépendante.** Trois passes, chacune sur le code et les exigences, sans mes
+conclusions ; détail dans `collisions.md` § 2 quater, « Seconde relecture indépendante, et
+suites ».
+
+- *Première passe* (deux premiers commits). Confirmé : contacts au sol, conduite et vols sans
+  conflit identiques à `dc8b823` (18 000 scénarios et 98 courses comparés pas à pas) ; correctif
+  de la voiture retirée. Trouvé : un défaut grave (deux vols en attente l'un sur l'autre, dont
+  les vitesses s'emballaient — corrigé entre-temps), deux moyens (voiture posée en marche
+  arrière ; distance parcourue non reculée au dernier recours), un point de jugement (la
+  vitesse pendant l'attente changeait par à-coups de plusieurs dizaines de km/h) et des points
+  mineurs. Tous traités.
+- *Seconde passe* (sur ces suites). Confirmé : le défaut grave est clos, l'identité hors
+  conflit tient toujours. Trouvé : trois défauts moyens — l'attente recommençait jusqu'à 36
+  fois derrière une voiture qui freine devant le lieu d'atterrissage ; une file dans la voie
+  des stands annulait un décollage le long du muret ; une voiture seule atteignait le dernier
+  recours avec la touche de remise en piste (52 fois sur 30 000) — et des points mineurs. Tous
+  traités, chacun avec un test qui échoue sur le commit relu ; une réserve de 2 cm est
+  documentée et non corrigée (`collisions.md`, « Ce qui reste »).
+- *Troisième passe* (autre relecteur, sur les corrections de la seconde, commit `f8494a8`) :
+  en cours au moment de ce commit.
 
 ## 6. À valider ou à arbitrer
 
@@ -253,12 +275,17 @@ et leurs suites seront ajoutés ici ; rien de ce qui précède n'a encore été 
    direction, ni le nombre de positions dessinées ; l'écart entre l'angle réel et l'angle
    affiché reste documenté.
 8. **Les vols qui ne retombent pas devant la voiture heurtée** : ce n'est pas conforme à la
-   règle générale, et c'est fréquent en peloton (19 vols sur 33 dans 54 courses à 20 voitures,
+   règle générale, et c'est fréquent en peloton (20 vols sur 34 dans 54 courses à 20 voitures,
    2 sur 5 dans 21 courses à 16 voitures : en courbe, ou quand la voiture heurtée accélère). À arbitrer :
    accepter l'exception, ou resserrer les conditions du décollage (`collisions.md` § 2 quater).
 9. **Le dernier recours de l'attente en vol** (remise en piste après 3,5 s) : seule
    téléportation du jeu en vol. À accepter, ou à remplacer par l'une des autres issues
    décrites, chacune avec son coût.
-10. **Le comportement pendant l'attente** : la voiture en vol ralentit ou garde son élan d'un
-    coup, peut reculer au-dessus d'une voiture presque arrêtée, et reste dessinée au-dessus
-    d'une autre pendant une seconde. À juger à l'écran (cas `7` du banc).
+10. **Le comportement pendant l'attente** : la voiture en vol ralentit ou garde son élan
+    vivement (29 km/h en 0,07 s), peut reculer au-dessus d'une voiture presque arrêtée (elle
+    est alors posée à l'arrêt), et reste dessinée au-dessus d'une autre pendant une à trois
+    secondes. À juger à l'écran (cas `7` du banc).
+11. **La marge latérale à l'atterrissage** : aucune aujourd'hui, pour qu'un saut puisse retomber
+    tout contre la voiture qu'il a touchée. Prix mesuré par la relecture : 2 atterrissages sur
+    72 050, en peloton hostile, posés 0,1 et 2,3 cm dans une voiture voisine. À accepter, ou à
+    échanger contre des attentes plus fréquentes en peloton.

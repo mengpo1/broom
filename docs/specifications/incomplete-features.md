@@ -64,12 +64,14 @@ par le rasteriseur logiciel SwiftShader).
   - le lieu d'atterrissage est choisi libre de toute voiture : dans un peloton serré il y a
     donc moins de décollages (le contact reste un tamponnage). Si une voiture vient dessous
     pendant le vol, la voiture en vol **s'en dégage** (elle la dépasse ou la laisse partir, à
-    29 km/h d'écart au moins) : une seconde environ, pendant laquelle elle est dessinée
-    au-dessus de l'autre. Un vol ne dure jamais plus de 3,5 s au-delà de sa durée prévue ;
+    29 km/h d'écart au moins) : une à trois secondes, pendant lesquelles elle est dessinée
+    au-dessus de l'autre, sa vitesse fixée par la règle et non plus par le vol ; au-dessus d'une
+    voiture qui rampe elle peut reculer (elle est alors posée à l'arrêt). À juger à l'écran
+    (cas 7 du banc). Un vol ne dure jamais plus de 3,5 s au-delà de sa durée prévue ;
     passé ce délai, si des voitures se sont relayées dessous, **la voiture est remise en piste
     sur une place libre** : c'est la seule téléportation en vol, à arbitrer (`collisions.md`
     § 2 quater, avec les autres issues possibles et leur coût) ;
-  - **la règle « retomber devant » n'est pas tenue en peloton** : 19 vols sur 33 dans 54
+  - **la règle « retomber devant » n'est pas tenue en peloton** : 20 vols sur 34 dans 54
     courses à 20 voitures ne retombent pas devant la voiture heurtée (en courbe, ou quand elle
     accélère). Exception à arbitrer, non conforme à la règle générale ;
   - la mise en scène (vue, assiette de la voiture en vol) n'a pas été réglée pour les vols
@@ -84,7 +86,10 @@ par le rasteriseur logiciel SwiftShader).
     ce lot, tous corrigés et testés (`collisions.md` § 2 ter). Relevé à cette occasion et
     **corrigé depuis, à part** : une voiture de l'ordinateur retirée après un abandon (elle
     n'est plus dessinée) n'est plus un obstacle. La sécurisation qui a suivi (attente en vol
-    bornée) fait l'objet d'une seconde relecture indépendante ;
+    bornée) a été relue à son tour par un relecteur indépendant, en trois passes : un défaut
+    grave et deux moyens à la première, trois moyens à la seconde (chacune portant sur les
+    suites de la précédente), tous traités et testés ; une troisième passe, sur les
+    dernières corrections, est en cours ;
   - aucun critique indépendant n'a revu l'image de ce lot ; rien n'a été essayé au volant.
 - **Saut récupérable** *(état de la PR #4, pour mémoire)* : choix de gameplay original (rien de tel dans la vidéo de référence),
   ajouté à la demande du joueur. Ses seuils et son dosage sont des réglages de départ, jamais

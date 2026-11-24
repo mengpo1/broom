@@ -26,7 +26,7 @@ const between = (a, b) => a + (b - a) * rnd();
 
 const total = { packs, flights: 0, hops: 0, accidents: 0, waited: 0, putBack: 0, setDownInACar: 0, drivenThroughAfter: 0, touchingAfter: 0, offVelocity: 0, notEnded: 0, stillUpAtTheEnd: 0, longestWait: 0, longestFlight: 0, wreckDrivenThrough: 0, twoInTheAir: 0, landedBehind: 0, fasterThanAtTakeOff: 0, notANumber: 0,
   // how the car in flight behaves while its landing waits (its speed is then chosen by rule)
-  waitedAndLostOver30KmhInAStep: 0, largestLossInAStepKmh: 0, waitedAndTookBackOver7Kmh: 0, mostSpeedTakenBackKmh: 0, flewBackwards: 0, furthestBackwardsM: 0 };
+  waitedAndLostOver30KmhInAStep: 0, largestLossInAStepKmh: 0, waitedAndTookBackOver7Kmh: 0, mostSpeedTakenBackKmh: 0, flewBackwards: 0, furthestBackwardsM: 0, beganToWaitMoreThanTwice: 0, mostTimesALandingBeganToWait: 0 };
 const waits = [], worst = [];
 const only = process.env.VIRAGE_PACK ? Number(process.env.VIRAGE_PACK) : -1;      // (to look at one pack: its flights step by step)
 for (let p = 0; p < packs; p++) {
@@ -77,6 +77,8 @@ for (let p = 0; p < packs; p++) {
       total.mostSpeedTakenBackKmh = Math.max(total.mostSpeedTakenBackKmh, Math.round((fl.regained ?? 0) * KMH));
       if ((fl.backwards ?? 0) > 0.05) total.flewBackwards++;
       total.furthestBackwardsM = Math.max(total.furthestBackwardsM, +(fl.backwards ?? 0).toFixed(1));
+      if ((fl.waitStarts ?? 0) > 2) total.beganToWaitMoreThanTwice++;
+      total.mostTimesALandingBeganToWait = Math.max(total.mostTimesALandingBeganToWait, fl.waitStarts ?? 0);
     }
     if (fl.putBack) total.putBack++;
     if (fl.overlapAtLanding > 0) total.setDownInACar++;
