@@ -114,7 +114,7 @@ export function switching(first, when, then) {
  * differed from its velocity times the step, the largest gain of speed in one step in the air, the largest rise
  * of its height in one step once it has started coming down, and whether it was put back on the track.
  * Also: the largest loss and the largest gain of speed in one step in the air, the most speed taken back after having
- * lost it, and the distance flown backwards.
+ * lost it, the distance flown backwards, and how many times its landing began to wait.
  * A car in the air above another is not counted as being in it: the overlaps are those of cars on the ground.
  */
 export function watchFlights(f, seconds, { after = 1.5, each = null } = {}) {
@@ -126,7 +126,7 @@ export function watchFlights(f, seconds, { after = 1.5, each = null } = {}) {
     for (const car of f.cars) {
       const b = state.get(car), flying = car.state === CAR_STATE.AIRBORNE;
       let fl = flights.get(car);
-      if (flying && (b.st !== CAR_STATE.AIRBORNE || !fl)) { fl = { car, up: f.step - 1, down: -1, takeOffSpeed: Math.max(b.v, Math.hypot(car.velX, car.velZ)), planned: car.airPlanned, seconds: 0, overlapAtLanding: 0, overlapAfter: 0, wreckDrivenThrough: 0, offVelocity: 0, speedGain: 0, speedDrop: 0, regained: 0, lowestSoFar: Infinity, backwards: 0, fastest: 0, rise: 0, top: 0, putBack: false, waited: 0, lowest: Infinity, landedSpeed: 0, comingDown: false }; flights.set(car, fl); }
+      if (flying && (b.st !== CAR_STATE.AIRBORNE || !fl)) { fl = { car, up: f.step - 1, down: -1, takeOffSpeed: Math.max(b.v, Math.hypot(car.velX, car.velZ)), planned: car.airPlanned, seconds: 0, overlapAtLanding: 0, overlapAfter: 0, wreckDrivenThrough: 0, offVelocity: 0, speedGain: 0, speedDrop: 0, regained: 0, lowestSoFar: Infinity, backwards: 0, waitStarts: 0, fastest: 0, rise: 0, top: 0, putBack: false, waited: 0, lowest: Infinity, landedSpeed: 0, comingDown: false }; flights.set(car, fl); }
       if (!fl) continue;
       if (flying && b.st === CAR_STATE.AIRBORNE) {
         fl.offVelocity = Math.max(fl.offVelocity, Math.hypot(car.x - b.x - car.velX * SIM_DT, car.z - b.z - car.velZ * SIM_DT));
@@ -139,7 +139,7 @@ export function watchFlights(f, seconds, { after = 1.5, each = null } = {}) {
         if (car.airHeight < b.h - 1e-9) fl.comingDown = true;
         if (fl.comingDown) fl.rise = Math.max(fl.rise, car.airHeight - b.h);
         fl.top = Math.max(fl.top, car.airHeight);
-        if (car.airWaiting) { fl.waited += SIM_DT; fl.lowest = Math.min(fl.lowest, car.airHeight); }
+        if (car.airWaiting) { fl.waited += SIM_DT; fl.lowest = Math.min(fl.lowest, car.airHeight); if (!b.waiting) fl.waitStarts++; }
       }
       if (fl.down < 0 && !flying && b.st === CAR_STATE.AIRBORNE) {
         fl.down = f.step - 1; fl.seconds = (fl.down - fl.up) * SIM_DT; fl.putBack = car.resets > b.resets || car.state === CAR_STATE.RESET;

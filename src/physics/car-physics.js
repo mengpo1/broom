@@ -47,7 +47,7 @@ export function createCarState(index) {
     airKind: 0, airPeak: 0, landKind: 0, airPlanned: 0, airHold: 0, airWaiting: false, rearmClock: -10,
     // a landing that waits (see holdLanding in collisions.js): time waited in this flight, how the car is getting
     // clear of what is under it (0: nothing below, +1: ahead of it, -1: letting it go), and whether it moves backwards
-    airWaited: 0, airMode: 0, airBack: false, airDirX: 1, airDirZ: 0, airCap: 0, airSpeed: 0, airFree: true,
+    airWaited: 0, airMode: 0, airBack: false, airDirX: 1, airDirZ: 0, airCap: 0, airSpeed: 0, airFree: true, airTarget: 0, airLetGo: false,
   };
 }
 
@@ -98,7 +98,7 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
   }
   car.state = CAR_STATE.AIRBORNE;
   car.airTime = 0; car.airDuration = duration; car.airPlanned = duration; car.airHold = 0; car.airWaiting = false; car.airHard = hard; car.airHeight = 0;
-  car.airWaited = 0; car.airMode = 0; car.airBack = false; car.airCap = 0; car.airSpeed = 0; car.airFree = true;
+  car.airWaited = 0; car.airMode = 0; car.airBack = false; car.airCap = 0; car.airSpeed = 0; car.airFree = true; car.airTarget = 0; car.airLetGo = false;
   const launched = Math.hypot(car.velX, car.velZ);
   if (launched > 1e-3) { car.airDirX = car.velX / launched; car.airDirZ = car.velZ / launched; } else { car.airDirX = Math.cos(car.heading); car.airDirZ = Math.sin(car.heading); }
   car.airKind = hard ? LANDING.HARD : LANDING.LIGHT;
@@ -178,7 +178,7 @@ function stepAirborne(car, dt, emit) {
   car.airHeight = 0; car.landClock = car.clock; car.landHard = car.airHard; car.landKind = car.airKind;
   // (it was drifting back off a slow car below: it comes down stationary. A car is never handed to the ground moving
   // backwards out of reverse gear: the rules of the ground are not made for it)
-  if (car.airBack) { car.velX = 0; car.velZ = 0; nv = 0; }
+  if (car.airBack) { car.velX = 0; car.velZ = 0; nv = 0; car.speed = 0; car.gear = 1; car.reverse = false; car.shiftTimer = 0; }   // (stopped: first gear, as any car that restarts)
   car.airWaiting = false; car.airMode = 0; car.airBack = false; car.airFree = true;
   if (car.airKind === LANDING.RECOVERABLE) {
     // on its wheels and driving again at once, at the speed it had in the air: what the hop costs was

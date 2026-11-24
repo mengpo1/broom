@@ -4,6 +4,7 @@
 // car into a recoverable hop.
 
 import { clamp } from '../core/math.js';
+import { relativeS } from '../tracks/track-builder.js';
 import { CAR_STATE, LANDING, placeCar, startSpin, startAirborne, startHop, putBackOnTrack } from './car-physics.js';
 import { COLLISION_TUNING } from './collision-tuning.js';
 import { wheelStrike } from './wheel-contacts.js';
@@ -47,6 +48,19 @@ function motionOf(car, out) {
 }
 
 let field = null;                        // the cars of the step being resolved (for the flight plans)
+let course = null;                       // and the track, when the caller gave it (the pit wall)
+
+/**
+ * Is this car in the pit lane behind the pit wall? Such a car cannot be under a car in flight on the track: the
+ * wall is between them (a car in flight is kept on its side of it). In the pit entry and exit, where no wall stands,
+ * a car of the pit lane counts like any other. Without a track: every car of the pit lane is left out, as before.
+ */
+function behindPitWall(car) {
+  if (!car.inPit) return false;
+  if (!course) return true;
+  const pit = course.pit, rel = relativeS(course, car.s);
+  return rel >= pit.wallStartS && rel <= pit.wallEndS;
+}
 let touched = new Uint8Array(32);         // per car: its body touched another car in this step
 let apart = new Int16Array(256);          // pairs of cars close to each other whose bodies did not touch
 
@@ -59,7 +73,7 @@ let apart = new Int16Array(256);          // pairs of cars close to each other w
 export function resolveCarContacts(cars, rules, time, emit, dt = 1 / 120, track = null) {
   let count = 0, pairs = 0;
   const n = cars.length;
-  field = cars;
+  field = cars; course = track;
   if (touched.length < n) touched = new Uint8Array(n);
   touched.fill(0, 0, n);
   // a car in flight comes down past the car it flew over, and never on another car
@@ -86,7 +100,7 @@ export function resolveCarContacts(cars, rules, time, emit, dt = 1 / 120, track 
     if (!collidable(a) || !collidable(b)) continue;
     if ((!touched[i] && wheelHop(a, b, rules, time, emit)) || (!touched[j] && wheelHop(b, a, rules, time, emit))) count++;
   }
-  field = null;
+  field = null; course = null;
   return count;
 }
 
@@ -347,7 +361,7 @@ function flightPlan(car, other, cars, baseTime, maxTime, decel, aside) {
     let clear = true;
     for (let i = 0; i < cars.length && clear; i++) {
       const o = cars[i];
-      if (o === car || o.removed) continue;                    // (every car that is drawn: also one waiting to be put back, or in the pit entry)
+      if (o === car || o.removed || behindPitWall(o)) continue; // (every car that is drawn and not behind the pit wall: also one waiting to be put back, or in the pit entry)
       let dx, dz, margin = T.flightClearance * 0.5;
       if (o.state === CAR_STATE.AIRBORNE) { placeOfFlight(o, time, spot); dx = spot[0] - lx; dz = spot[1] - lz; margin += T.flightClearance; }   // (less sure: more room)
       else { worldVelocity(o, vb); dx = o.x + vb[0] * time - lx; dz = o.z + vb[1] * time - lz; }
@@ -415,12 +429,21 @@ function wheelHop(follower, leader, rules, time, emit) {
  * kept at least flightYieldSpeed away from the speed of every car below. Left to itself it goes on losing speed as
  * in any flight; when that would bring it within that margin of a car below, it takes the nearest speed that does
  * not: just above (it holds its speed and passes that car; over a stopped car it glides on at that speed) or just
- * below (it lets that car go; below a car that crawls or has stopped, that can mean drifting back off it). It is
- * never faster than when the wait began, apart from that slow glide; and once it has let a car go it never goes
- * faster again while something is below, so that a car cannot make it go to and fro. Whatever a car below does,
- * it is therefore passed or let go within about a second (two lengths of car at that difference of speed, twice
- * that if the car changed its mind once), and nothing is moved by hand: the car in flight goes on moving by its
- * own velocity, the cars below are not touched.
+ * below (it lets that car go; below a car that crawls or has stopped, that means drifting back off it, and it then
+ * comes down stationary). Four things keep a car below from playing with it:
+ *  - it is never faster than when the wait began, apart from that slow glide, and while it passes a car it follows
+ *    that car's speed up by flightYieldSlack at most: a car speeding up below is let go, it does not pull it along;
+ *  - once it has let a car go, for the rest of that flight it lets every car below go (it takes the speed that the
+ *    slowest of them allows): it never passes again, so a car cannot make it go to and fro;
+ *  - its speed moves to the value chosen at flightYieldRate, not in one step, and a change of speed that has begun
+ *    is finished before the wait can end: a car braking just ahead of the landing place is let go once, the car in
+ *    flight does not close in on it again and again;
+ *  - it never drifts back faster than three times flightYieldSpeed.
+ * Whatever one car below does, it is therefore passed or let go within a second or two, and nothing is moved by
+ * hand: the car in flight goes on moving by its own velocity, the cars below are not touched.
+ *
+ * Every car that is drawn counts, whatever its state (also one waiting to be put back, or in the pit entry or
+ * exit), except a car that was removed from the track and a car in the pit lane behind the pit wall.
  *
  * Another car in flight counts as a car below for a car that took off after it, not the other way round.
  *
@@ -456,7 +479,7 @@ function holdLanding(car, cars, dt, track, emit) {
   let below = 0;
   for (let i = 0; i < cars.length; i++) {
     const o = cars[i];
-    if (o === car || o.removed) continue;                      // (every car that is drawn: also one waiting to be put back, or in the pit entry)
+    if (o === car || o.removed || behindPitWall(o)) continue;   // (every car that is drawn and not behind the pit wall: also one waiting to be put back, or in the pit entry)
     // another car in flight: the one that took off first goes first, and does not look at the other (if each of two
     // cars waiting over each other let the other go, on the speed the other had a step before, the two would chase each
     // other's speed down without end). The later one gets clear of it as of any car.
@@ -473,29 +496,45 @@ function holdLanding(car, cars, dt, track, emit) {
     if (!under) continue;
     if (below < paces.length) paces[below++] = vb[0] * ux + vb[1] * uz;
   }
-  if (!below && !wait) { car.airWaiting = false; car.airMode = 0; return; }
+  // (a change of speed that has begun goes on to its end before the wait can end: with the place free for a step only
+  // because the car has just started to slow down, the wait would otherwise stop and start again many times)
+  const changing = car.airWaiting && car.airMode !== 0 && Math.abs(speed - car.airTarget) > 1e-9;
+  if (!below && !wait && !changing) { car.airWaiting = false; car.airMode = 0; return; }
   // the landing is put off again by flightHoldTime
-  if (!car.airWaiting) { car.airHold = Math.max(car.airHeight, 0.05); car.airWaiting = true; car.airMode = 0; car.airCap = Math.max(speed, T.flightYieldSpeed); }
+  if (!car.airWaiting) { car.airHold = Math.max(car.airHeight, 0.05); car.airWaiting = true; car.airMode = 0; car.airCap = car.airLetGo ? speed : Math.max(speed, T.flightYieldSpeed); }
   car.airWaited += dt;
   // (counted from the moment it should have landed, whatever the time was spent on: waiting for the car that threw it up,
   // waiting over a car, or coming down and having to stop again because a car came back)
   if (car.airTime - car.airPlanned > T.flightWaitMax) { putBack(car, cars, track, emit); return; }
   // its speed for the next step: its own if that keeps it clear of the speed of every car below; otherwise the nearest
   // speed that does, just above (it holds its speed and passes them, if that is no faster than it may go: airCap) or
-  // just below (it lets them go, and from then on never goes faster than that: airCap comes down with it)
-  let next = Math.min(natural, car.airCap);
-  car.airMode = 0;
-  if (below && paced(next, below, T.flightYieldSpeed)) {
-    const over = clearOf(next, below, T.flightYieldSpeed, 1), under = clearOf(next, below, T.flightYieldSpeed, -1);
-    // (passing: from now on no faster than this, give or take what a driver holding his speed wavers by, so that a car
-    // speeding up below does not pull the car in flight along with it)
-    if (over <= car.airCap + 1e-9 && over - next <= next - under) { car.airMode = 1; next = over; car.airCap = Math.min(car.airCap, over + T.flightYieldSlack); }
-    else { car.airMode = -1; next = under; car.airCap = under; }
-  }
-  // (a floor that the rule above never reaches by itself: no car on the ground goes backwards faster than a few m/s,
-  // so nothing asks for less than about twice the margin; it is there so that no fault could ever send a car flying
-  // backwards at any speed)
-  if (next < -3 * T.flightYieldSpeed) next = -3 * T.flightYieldSpeed;
+  // just below (it lets them go; from then on, until the end of the flight, it never passes a car again nor goes
+  // faster than that: airCap comes down with it. A car below that changes its speed at once, as the reset key does,
+  // cannot make it change its mind)
+  let next = natural;
+  if (below) {
+    next = Math.min(natural, car.airCap);
+    car.airMode = 0;
+    if (car.airLetGo) {
+      // it has let a car go in this flight: it lets every car below go, the slowest included, even one it would pass
+      // by simply flying on
+      let slowest = paces[0];
+      for (let i = 1; i < below; i++) if (paces[i] < slowest) slowest = paces[i];
+      if (next > slowest - T.flightYieldSpeed) { car.airMode = -1; next = slowest - T.flightYieldSpeed; car.airCap = next; }
+    } else if (paced(next, below, T.flightYieldSpeed)) {
+      const over = clearOf(next, below, T.flightYieldSpeed, 1), under = clearOf(next, below, T.flightYieldSpeed, -1);
+      // (passing: from now on no faster than this, give or take what a driver holding his speed wavers by, so that a car
+      // speeding up below does not pull the car in flight along with it)
+      if (over <= car.airCap + 1e-9 && over - next <= next - under) { car.airMode = 1; next = over; car.airCap = Math.min(car.airCap, over + T.flightYieldSlack); }
+      else { car.airMode = -1; next = under; car.airCap = under; car.airLetGo = true; }
+    }
+    // (a floor: a car on the ground goes backwards at 7 m/s at most, so one car below never asks for less than about
+    // twice the margin; three cars in flight letting each other go, one over the other, can reach it. It is also there
+    // so that no fault could ever send a car flying backwards at any speed)
+    if (next < -3 * T.flightYieldSpeed) next = -3 * T.flightYieldSpeed;
+    car.airTarget = next;
+  } else if (changing) next = car.airTarget;
+  else car.airMode = 0;
   // its speed goes to that value at a limited rate (several times what any car can do on the ground, so that the car
   // below cannot outrun the change): no jump of tens of km/h from one step to the next
   const most = T.flightYieldRate * dt;

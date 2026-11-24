@@ -44,7 +44,7 @@ function accident(f, { kmhA = 262, kmhB = 188, d = 0, side = 1, driveB = null } 
 const KINDS = { hop, accident };
 
 /** What every scenario must show for the flight of `car`. Returns the flight. */
-function checkFlight(flights, car, label, { noPutBack = true, waitAtMost = WAIT_MAX + T.flightHoldTime, offVelocity = 1e-6, touching = 0 } = {}) {   // (a wait begins flightHoldTime before the planned landing)
+function checkFlight(flights, car, label, { noPutBack = true, waitAtMost = WAIT_MAX + T.flightHoldTime, offVelocity = 1e-6, touching = 0, barrier = false, waitStarts = 3 } = {}) {   // (a wait begins flightHoldTime before the planned landing)
   const fl = flights.find((x) => x.car === car);
   assert.ok(fl, `${label}: the car took off`);
   // it ends
@@ -58,6 +58,11 @@ function checkFlight(flights, car, label, { noPutBack = true, waitAtMost = WAIT_
   assert.ok(fl.offVelocity < offVelocity, `${label}: moved otherwise than by its velocity (${fl.offVelocity.toExponential(2)} m in a step)`);
   assert.ok(fl.fastest <= Math.max(fl.takeOffSpeed, YIELD) + 1e-6, `${label}: faster in the air (${(fl.fastest * KMH).toFixed(0)} km/h) than at the take-off (${(fl.takeOffSpeed * KMH).toFixed(0)} km/h)`);
   assert.ok(fl.rise < 0.02, `${label}: its height jumps up by ${(fl.rise * 100).toFixed(1)} cm in a step on the way down`);
+  // its speed changes at a limited rate (a barrier apart), it takes back no more than the slow glide over a stopped car,
+  // and its landing does not start and stop waiting again and again
+  if (!barrier) assert.ok(fl.speedDrop <= T.flightYieldRate * SIM_DT + 1e-6, `${label}: it loses ${(fl.speedDrop * KMH).toFixed(1)} km/h in one step`);
+  assert.ok(fl.regained <= YIELD + 1, `${label}: it takes back ${(fl.regained * KMH).toFixed(0)} km/h in the air`);
+  assert.ok(fl.waitStarts <= waitStarts, `${label}: its landing began to wait ${fl.waitStarts} times`);
   if (noPutBack) assert.equal(fl.putBack, false, `${label}: the flight ends by a landing, not by the car being put back on the track`);
   return fl;
 }
@@ -158,7 +163,7 @@ test('against a barrier, a car under the car in flight: the flight ends, on free
       let outside = -Infinity;
       const flights = fly(f, 9, { each: () => { if (a.state === CAR_STATE.AIRBORNE) outside = Math.max(outside, a.d - limit(a)); } });
       // (a car in flight that reaches the barrier is held inside it: by the few centimetres it would have gone through, as before)
-      const fl = checkFlight(flights, a, `${kind} against the barrier, ${who} under it`, { waitAtMost: 1.8, offVelocity: 0.05 });
+      const fl = checkFlight(flights, a, `${kind} against the barrier, ${who} under it`, { waitAtMost: 1.8, offVelocity: 0.05, barrier: true });
       assert.ok(outside < 0.05, `${kind}, ${who}: ${outside.toFixed(2)} m beyond the barrier during the flight`);
       t.diagnostic(`${kind} against the barrier, ${who} under it: ${told(fl)}; nearest to the barrier: ${(-outside).toFixed(2)} m inside`);
     }
@@ -210,7 +215,7 @@ test('two cars take off almost together towards the same place: neither comes do
   }
 });
 
-test('one car alone cannot keep a car in the air: whatever it does to stay under it, the landing waits a second or two at most', (t) => {
+test('one car alone cannot keep a car in the air: whatever it does with its pedals and its wheel to stay under it, the landing waits a second or two at most', (t) => {
   let worst = 0, flightsSeen = 0, waits = 0, worstCase = '';
   for (const kind of ['hop', 'accident']) {
     for (const back of [-3, 0, 3, 7]) for (const more of [0, 20]) for (const offset of [-3, -1, 0, 1.5, 3.5]) for (const reach of [5, 9, 16]) {
@@ -333,7 +338,7 @@ test('two cars whose landings wait over each other: one gets clear of the other,
     assert.ok(slowest > -YIELD - 8 && fastest <= Math.max(kmh1, kmh2) / KMH + 0.01, `${gap} m apart: speeds in the air from ${slowest.toFixed(1)} to ${fastest.toFixed(1)} m/s`);
     // (afterwards the two cars and the stopped ones meet on the ground: three cars touching in the same step can be left a
     // centimetre or two in each other for a step, as in any contact between three cars)
-    for (const car of [a1, a2]) checkFlight(flights, car, `${gap} m apart, car ${car === a1 ? 1 : 2}`, { touching: 0.05 });
+    for (const car of [a1, a2]) checkFlight(flights, car, `${gap} m apart, car ${car === a1 ? 1 : 2}`, { touching: 0.05, waitStarts: 6 });
     t.diagnostic(`${gap} m apart at ${kmh1} and ${kmh2} km/h: speeds in the air from ${(slowest * KMH).toFixed(0)} to ${(fastest * KMH).toFixed(0)} km/h; ${flights.map((x) => `car ${x.car === a1 ? 1 : 2}: ${told(x)}${x.putBack ? ' (put back)' : ''}`).join('; ')}`);
   }
 });
@@ -375,4 +380,83 @@ test('every car that is drawn counts under the landing place, whatever its state
   assert.ok(flew >= 30, `${flew} hops along the pit entry`);
   assert.equal(inIt, 0, `${inIt} of ${flew} hops set down in the car in the pit entry`);
   t.diagnostic(`${flew} hops along the pit entry with a car in the entry lane: ${inIt} set down in it, ${waits} landings waited`);
+});
+
+test('a car just ahead of the landing place that brakes hard: the car in flight lets it go once, it does not tailgate it in the air', (t) => {
+  // (found by the second pass of the independent review, after the speed of a waiting flight was given a limited rate of
+  // change: the wait ended as soon as the place looked free for a step, with the change of speed barely begun; the car
+  // closed in again, waited again, 25 times in this case, bobbing between 1 and 5 cm)
+  const p = { kmhA: 248.5, kmhB: 168.6, kmhC: 260.2, start: 5.02, ahead: 4.99, brakeFrom: 0.245, brake: 30.8 };
+  const f = field(track, 3), [a, b, c] = f.cars;
+  f.put(b, 60, 0.975, p.kmhB, hold(p.kmhB, 0.975)); f.put(a, 60 - LENGTH - 4, -0.975, p.kmhA, hold(p.kmhA, -0.975));
+  // the third car: beside it and a little ahead; from the take-off it moves onto its line just ahead of where it will come
+  // down, then, a quarter of a second before the landing, brakes at 3 g
+  let braking = false;
+  const cruise = hold(p.kmhC, a.d - 2.2), follow = shadow(a, cruise, { offset: p.ahead, reach: 15.5 });
+  f.put(c, f.along(a) + p.start, a.d - 2.2, p.kmhC, (car, ff) => {
+    if (a.state !== CAR_STATE.AIRBORNE) { if (braking) parked()(car); else cruise(car, ff); return; }
+    if (!braking && (a.airHold || a.airDuration - a.airTime < p.brakeFrom)) braking = true;
+    if (!braking) { follow(car, ff); return; }
+    car.inThrottle = 0; car.inBrake = car.speed > 0.3 ? Math.min(1, p.brake / 17) : 0; car.inSteer = Math.max(-0.3, Math.min(0.3, (ff.across(a) - ff.across(car)) * 0.12 - car.headingError * 1.5));
+  });
+  const flights = fly(f, 7);
+  const fl = checkFlight(flights, a, 'a car braking at 3 g just ahead of the landing place', { waitStarts: 2, waitAtMost: 1.2 });
+  assert.ok(fl.waited > 0, 'the landing did wait');
+  t.diagnostic(`a car braking hard just ahead of the landing place: ${told(fl)}; the landing began to wait ${fl.waitStarts} time(s)`);
+});
+
+test('cars in the pit lane, behind the pit wall, change nothing to a take-off on the track', (t) => {
+  // (second pass of the independent review: once the cars of the pit lane counted under the landing place, an accident
+  // along the pit wall, thrown towards it, "landed" on paper in the pit lane: with a queue of cars there the take-off was
+  // refused. The wall is between them: only the pit entry and exit, where no wall stands, count)
+  const run = (queue) => {
+    const f = field(track, 2 + queue), [a, b] = f.cars, dA = -6.9, dC = -9.78;
+    const at = (rel) => track.length + rel - f.s0;
+    f.put(b, at(-150), dA + 0.93, 188, hold(188, dA + 0.93)); f.put(a, at(-150) - LENGTH - 2.5, dA, 262, hold(262, dA));
+    for (let i = 0; i < queue; i++) {
+      const c = f.cars[2 + i];
+      f.put(c, at(-150) + 22 + i * 9, dC, 79, (car) => { car.inThrottle = 0.3; car.inBrake = 0; car.inSteer = Math.max(-0.2, Math.min(0.2, (dC - car.d) * 0.08 - car.headingError * 1.5)); });
+      c.inPit = true;                                                      // (in the pit lane, as the race marks a car that has entered it)
+    }
+    const flights = fly(f, 4), fl = flights.find((x) => x.car === a);
+    return { fl, x: a.x, z: a.z };
+  };
+  const alone = run(0), queued = run(4);
+  assert.ok(alone.fl && queued.fl, 'the accident happens, with and without cars in the pit lane');
+  assert.equal(queued.fl.seconds, alone.fl.seconds); assert.equal(queued.fl.waited, 0);
+  assert.ok(Math.hypot(queued.x - alone.x, queued.z - alone.z) < 1e-9, 'the car ends exactly where it ends without them');
+  t.diagnostic(`accident along the pit wall, 4 cars queued behind the wall: ${told(queued.fl)}, as without them`);
+});
+
+test('one car alone using the reset key as well (it stops dead under the car in flight): not enough to reach the last resort', (t) => {
+  // (second pass of the independent review, its adversary and one of the cases it found: a car that is passed, speeds up
+  // when nearly passed so as to be let go, brakes hard while the car in flight drifts back, then presses reset when that
+  // car is nearly off its tail. The car in flight then passed it a second time, and let it go a second time: 3.5 s, the
+  // last resort. Now a car that has let a car go lets every car go for the rest of its flight)
+  const p = { kmhA: 222.39730809628963, kmhB: 158.96450384054333, kmhC: 233.78943229373544, start: 5.871588298119605, ahead: 4.405154835199937, slower: 8.015139544382691, reach: 6.077314764261246,
+    side: 0.013592571672052134, accelAt: 1.8381864388706164, brake: 36.53938435250893, resetAt: -4.34797805598937, accel2At: 3.5838915274478493, after: 1 };
+  const f = field(track, 3), [a, b, c] = f.cars, before = hold(p.kmhC, -0.975 - 2.2);
+  let phase = 0, resetStep = 0;
+  f.put(b, 60, 0.975, p.kmhB, hold(p.kmhB, 0.975)); f.put(a, 60 - LENGTH - 4, -0.975, p.kmhA, hold(p.kmhA, -0.975));
+  f.put(c, f.along(a) + p.start, a.d - 2.2, p.kmhC, (car, ff) => {
+    if (a.state !== CAR_STATE.AIRBORNE) { if (phase > 0) parked()(car); else before(car, ff); return; }
+    const vt = ff.alongSpeed(a), v = ff.alongSpeed(car), x = ff.along(a) - ff.along(car);
+    car.inSteer = Math.max(-0.3, Math.min(0.3, (ff.across(a) + p.side - ff.across(car)) * 0.12 - car.headingError * 1.5));
+    let want = 0;
+    if (phase === 0) phase = 1;
+    if (phase === 1) {                                                     // gets to the landing place, then is passed
+      if (!a.airWaiting) { const gap = ff.along(a) + p.ahead - ff.along(car), rate = (vt - p.slower) - v; want = (rate + Math.sign(gap) * Math.sqrt(2 * p.reach * Math.abs(gap))) * 8; }
+      else if (a.airMode < 0) phase = 2;
+      else want = x > p.accelAt ? 40 : 0;                                  // nearly passed: speeds up, to be let go instead
+    }
+    if (phase === 2) { want = -p.brake; if (x < p.resetAt) { car.inReset = true; phase = 3; resetStep = ff.step; } }   // brakes; reset when the car is nearly off its tail
+    else if (phase === 3) { want = x > p.accel2At ? 40 : 0; if (a.airMode < 0 && ff.step - resetStep > 70) phase = 4; }
+    else if (phase === 4) want = p.after;
+    if (want > 0) { car.inThrottle = Math.min(1, want / 6); car.inBrake = 0; } else { car.inThrottle = 0; car.inBrake = car.speed > 0.3 ? Math.min(1, -want / 17) : 0; }
+  });
+  const flights = fly(f, 9);
+  const fl = checkFlight(flights, a, 'a car that is passed, speeds up, brakes, then presses reset', { waitAtMost: 3, waitStarts: 4 });
+  assert.ok(f.events.some((e) => e.type === 'manualReset' && e.car === c.index), 'the car below did press reset under the car in flight');
+  assert.ok(fl.waited > 1, `the landing did wait (${fl.waited.toFixed(2)} s)`);
+  t.diagnostic(`one car using throttle, brake and the reset key under the car in flight: ${told(fl)}; not ended by the last resort`);
 });
