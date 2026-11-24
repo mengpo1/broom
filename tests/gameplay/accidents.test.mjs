@@ -80,6 +80,85 @@ test('E3 flight: the car flies over the car it rode over and comes down ahead of
   assert.equal(race.cars.filter((c) => c.state === CAR_STATE.WRECKED).length, 1);
 });
 
+test('E3 at an angle: the follower converging on the car ahead still comes down beside its path, and is never driven through', () => {
+  // (found by an independent review: the sideways throw assumed the two cars parallel; turned toward the car ahead by
+  // half a degree or more, the wreck was set down in its path and the car drove through it for 22 steps)
+  const overlap = (p, q) => {
+    const dx = q.x - p.x, dz = q.z - p.z; let min = Infinity;
+    for (const h of [p.heading, p.heading + Math.PI / 2, q.heading, q.heading + Math.PI / 2]) {
+      const ax = Math.cos(h), az = Math.sin(h);
+      const reach = (c) => c.params.halfLength * Math.abs(ax * Math.cos(c.heading) + az * Math.sin(c.heading)) + c.params.halfWidth * Math.abs(-ax * Math.sin(c.heading) + az * Math.cos(c.heading));
+      const o = reach(p) + reach(q) - Math.abs(dx * ax + dz * az);
+      if (o <= 0) return 0;
+      min = Math.min(min, o);
+    }
+    return min;
+  };
+  for (const lateral of [0.93, -0.93]) {
+    for (const turned of [-0.03, -0.01, 0, 0.01, 0.02, 0.03, 0.05]) {
+      // (headingA turns the follower to the right: toward the car ahead when it starts on its left)
+      const { race, a, b } = twoCars(track, { gap: 2.5, lateral, speedA: 262 / KMH, speedB: 190 / KMH, headingA: turned * Math.sign(lateral), straight: 700 });
+      let flew = false, landed = false, worst = 0, side = 0;
+      for (let i = 0; i < 2.6 / SIM_DT; i++) {
+        race.setPlayerInput(0, 0, 1, 0, 0, false, false); race.setPlayerInput(1, 0, 0.7, 0, 0, false, false);
+        race.step(SIM_DT); race.eventCount = 0;
+        if (a.state === CAR_STATE.AIRBORNE) flew = true;
+        if (flew && a.state !== CAR_STATE.AIRBORNE) {
+          if (!landed) { landed = true; side = Math.abs(-(a.x - b.x) * Math.sin(b.heading) + (a.z - b.z) * Math.cos(b.heading)); }
+          worst = Math.max(worst, overlap(a, b));
+        }
+      }
+      // (turned further, the nose arrives nearly in line with the tail: more than 80 % of the widths overlap, it is a bump)
+      if (Math.abs(turned) <= 0.03) assert.ok(flew && landed, `turned ${turned} rad, ${lateral} m: the accident happened`);
+      if (!flew) continue;
+      assert.equal(a.state, CAR_STATE.WRECKED);
+      assert.equal(worst, 0, `turned ${turned} rad, ${lateral} m: the car that was hit never drives through the wreck (landed ${side.toFixed(2)} m to its side)`);
+      assert.ok(side >= a.params.halfWidth + b.params.halfWidth + T.flightSideClearance - 0.2, `turned ${turned} rad, ${lateral} m: it comes down ${(side - a.params.halfWidth - b.params.halfWidth).toFixed(2)} m beside the other car`);
+    }
+  }
+});
+
+test('two contacts in the same step: the bodies come first whatever the order of the cars, and a car thrown in the air is touched by nothing else', () => {
+  // (found by an independent review) the car behind meets, in the same step, the rear wheel of one car (L1) with its
+  // front wheel and the tail of another (L2) with its nose. Whichever car has which place in the list, the contact
+  // between bodies decides (the accident), there is no hop, and the two other cars are not disturbed. L2 is moved
+  // forward a little at a time: at first the nose reaches it before the wheels meet, then in the same step, then not
+  // at all (the hop). Before the correction the outcome depended on the order for every position from 0.57 to 0.71 m.
+  const seen = { accident: 0, hop: 0 };
+  for (const extra of [0.5, 0.56, 0.58, 0.6, 0.62, 0.64, 0.66, 0.68, 0.7, 0.72, 0.76]) {
+    const outcomes = [];
+    for (const order of [[2, 0, 1], [2, 1, 0], [0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0]]) {
+      const { race, s0 } = twoCars(track, { gap: 60, lateral: 0, speedA: 1, speedB: 1, straight: 700 });
+      const [F, L1, L2] = order.map((i) => race.cars[i]);
+      // the three cars are the same car (the third entry of the race is a computer driver, with its own figures)
+      const put = (car, s, d, kmh) => { car.params = race.cars[0].params; placeCar(car, track, s, d); car.state = CAR_STATE.RACING; car.ghostTimer = 0; car.speed = kmh / KMH; car.gear = kmh > 200 ? 5 : 4; car.isHuman = true; };
+      put(L1, s0 + 60, 1.95, 150); put(L2, s0 + 60 + extra, -0.6, 150); put(F, s0 + 60 - 4.2 - 2, 0, 215);
+      const hold = (car, kmh) => Math.max(0, Math.min(1, 0.35 + (kmh / KMH - car.speed) * 0.4));
+      const events = [];
+      let px = F.x, pz = F.z, flying = false;
+      for (let i = 0; i < 80; i++) {
+        for (const [car, kmh] of [[F, 215], [L1, 150], [L2, 150]]) { car.inThrottle = car.state === CAR_STATE.RACING ? hold(car, kmh) : 0; car.inSteer = 0; car.inBrake = 0; }
+        const before = { l1: L1.speed, l2: L2.speed };
+        race.step(SIM_DT);
+        for (let e = 0; e < race.eventCount; e++) events.push({ type: race.events[e].type, car: race.events[e].car, other: race.events[e].other, step: i });
+        race.eventCount = 0;
+        if (flying && F.state === CAR_STATE.AIRBORNE) assert.ok(Math.hypot(F.x - px - F.velX * SIM_DT, F.z - pz - F.velZ * SIM_DT) < 1e-6, `L2 ${extra} m ahead, order ${order}: step ${i}, the car in flight is moved by its own velocity only`);
+        flying = F.state === CAR_STATE.AIRBORNE; px = F.x; pz = F.z;
+        assert.ok(Math.abs(L1.speed - before.l1) < 0.3 && Math.abs(L2.speed - before.l2) < 0.3, `L2 ${extra} m ahead, order ${order}: step ${i}, the two other cars are not disturbed`);
+      }
+      const mine = events.filter((e) => e.car === F.index);
+      const launch = mine.find((e) => e.type === 'launch');
+      outcomes.push(`${mine.some((e) => e.type === 'hop') ? 'hop' : launch ? 'accident' : mine.some((e) => e.type === 'bump') ? 'bump' : 'none'} at step ${(launch || mine[0] || { step: -1 }).step} on the car playing ${launch ? (launch.other === L2.index ? 'L2 (body)' : 'L1 (wheel)') : '-'}`);
+    }
+    for (const o of outcomes) assert.equal(o, outcomes[0], `L2 ${extra} m ahead: same outcome for every order of the cars (${outcomes.join(' | ')})`);
+    if (outcomes[0].startsWith('accident')) { seen.accident++; assert.ok(outcomes[0].endsWith('L2 (body)'), `L2 ${extra} m ahead: the contact between bodies decides: ${outcomes[0]}`); }
+    else { seen.hop++; assert.ok(outcomes[0].startsWith('hop') && outcomes[0].endsWith('L1 (wheel)'), `L2 ${extra} m ahead: out of reach of the nose, the wheel decides: ${outcomes[0]}`); }
+    // up to 0.7 m the nose reaches L2 no later than the wheels meet: the bodies decide
+    if (extra <= 0.7) assert.ok(outcomes[0].startsWith('accident'), `L2 ${extra} m ahead: ${outcomes[0]}`);
+  }
+  assert.ok(seen.accident >= 8 && seen.hop >= 2, `both outcomes are met: ${JSON.stringify(seen)}`);
+});
+
 test('E3 near a barrier: the flight stays between the barriers, and the car is still not set down on another one', () => {
   // the two cars against the right-hand barrier, the follower on the outside: the flight would carry it further out
   // (the follower on the right: the left-hand side of this straight is the pit wall)

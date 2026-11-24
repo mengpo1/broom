@@ -3,11 +3,11 @@
  "cases": {
   "hop": {
    "beforeTheHandOver": {
-    "stepsWithTheLeftKeyHeld": 26,
+    "stepsWithTheLeftKeyHeld": 24,
     "keyboardRequests": [
      -1
     ],
-    "stepsFedByTheBench": 26,
+    "stepsFedByTheBench": 24,
     "requestSeenByTheCar": [
      0,
      0
@@ -38,9 +38,9 @@
      -1
     ],
     "steerAtTheEnd": -1,
-    "fullLockAfterSeconds": 0.3,
-    "yawDegPerSecondAtTheEnd": -30.6,
-    "headingTurnedDeg": -7.5,
+    "fullLockAfterSeconds": 0.317,
+    "yawDegPerSecondAtTheEnd": -30.7,
+    "headingTurnedDeg": -7.9,
     "speedKmh": [
      192,
      208
@@ -50,8 +50,8 @@
     ]
    },
    "rightKey": {
-    "steps": 36,
-    "seconds": 0.3,
+    "steps": 48,
+    "seconds": 0.4,
     "keyboardRequests": [
      1
     ],
@@ -61,10 +61,10 @@
     ],
     "steerAtTheEnd": 1,
     "fullLockAfterSeconds": 0.258,
-    "yawDegPerSecondAtTheEnd": 19.4,
-    "headingTurnedDeg": 2.2,
+    "yawDegPerSecondAtTheEnd": 19,
+    "headingTurnedDeg": 4,
     "speedKmh": [
-     212,
+     213,
      221
     ],
     "states": [
@@ -72,7 +72,7 @@
     ]
    },
    "bothKeys": {
-    "steps": 24,
+    "steps": 12,
     "requestSeenByTheCar": [
      0
     ]
@@ -116,11 +116,11 @@
     ],
     "steerAtTheEnd": -1,
     "fullLockAfterSeconds": 0.225,
-    "yawDegPerSecondAtTheEnd": -55.1,
-    "headingTurnedDeg": -15.3,
+    "yawDegPerSecondAtTheEnd": -51.9,
+    "headingTurnedDeg": -14.3,
     "speedKmh": [
-     58,
-     79
+     63,
+     85
     ],
     "states": [
      1
@@ -138,11 +138,11 @@
     ],
     "steerAtTheEnd": 1,
     "fullLockAfterSeconds": 0.258,
-    "yawDegPerSecondAtTheEnd": 44.3,
-    "headingTurnedDeg": 8.3,
+    "yawDegPerSecondAtTheEnd": 42.6,
+    "headingTurnedDeg": 8.1,
     "speedKmh": [
-     85,
-     101
+     91,
+     107
     ],
     "states": [
      1
@@ -182,8 +182,8 @@
     "autoDrive": false
    },
    "leftKey": {
-    "steps": 48,
-    "seconds": 0.4,
+    "steps": 60,
+    "seconds": 0.5,
     "keyboardRequests": [
      -1
     ],
@@ -193,11 +193,11 @@
     ],
     "steerAtTheEnd": -1,
     "fullLockAfterSeconds": 0.225,
-    "yawDegPerSecondAtTheEnd": -51.5,
-    "headingTurnedDeg": -14.2,
+    "yawDegPerSecondAtTheEnd": -49.5,
+    "headingTurnedDeg": -19.2,
     "speedKmh": [
      64,
-     85
+     91
     ],
     "states": [
      1
@@ -215,11 +215,11 @@
     ],
     "steerAtTheEnd": 1,
     "fullLockAfterSeconds": 0.258,
-    "yawDegPerSecondAtTheEnd": 42.4,
-    "headingTurnedDeg": 8.1,
+    "yawDegPerSecondAtTheEnd": 40.9,
+    "headingTurnedDeg": 7.8,
     "speedKmh": [
-     92,
-     108
+     94,
+     114
     ],
     "states": [
      1
@@ -245,9 +245,9 @@
     ]
    },
    "handOver": {
-    "afterSeconds": 1.23,
+    "afterSeconds": 1.22,
     "state": 1,
-    "speedKmh": 64
+    "speedKmh": 54
    },
    "handsOff": {
     "steps": 12,
@@ -259,8 +259,8 @@
     "autoDrive": false
    },
    "leftKey": {
-    "steps": 48,
-    "seconds": 0.4,
+    "steps": 60,
+    "seconds": 0.5,
     "keyboardRequests": [
      -1
     ],
@@ -270,11 +270,11 @@
     ],
     "steerAtTheEnd": -1,
     "fullLockAfterSeconds": 0.225,
-    "yawDegPerSecondAtTheEnd": -49.1,
-    "headingTurnedDeg": -13.4,
+    "yawDegPerSecondAtTheEnd": -52,
+    "headingTurnedDeg": -20.3,
     "speedKmh": [
-     69,
-     90
+     59,
+     85
     ],
     "states": [
      1
@@ -292,11 +292,11 @@
     ],
     "steerAtTheEnd": 1,
     "fullLockAfterSeconds": 0.258,
-    "yawDegPerSecondAtTheEnd": 40.9,
-    "headingTurnedDeg": 7.8,
+    "yawDegPerSecondAtTheEnd": 40.3,
+    "headingTurnedDeg": 8.1,
     "speedKmh": [
-     94,
-     113
+     92,
+     108
     ],
     "states": [
      1
@@ -347,19 +347,19 @@
     ],
     "steerAtTheEnd": -1,
     "fullLockAfterSeconds": 0.225,
-    "yawDegPerSecondAtTheEnd": -47.8,
-    "headingTurnedDeg": -13.1,
+    "yawDegPerSecondAtTheEnd": -50.4,
+    "headingTurnedDeg": -13.8,
     "speedKmh": [
-     72,
-     93
+     66,
+     87
     ],
     "states": [
      1
     ]
    },
    "rightKey": {
-    "steps": 48,
-    "seconds": 0.4,
+    "steps": 60,
+    "seconds": 0.5,
     "keyboardRequests": [
      1
     ],
@@ -369,8 +369,8 @@
     ],
     "steerAtTheEnd": 1,
     "fullLockAfterSeconds": 0.258,
-    "yawDegPerSecondAtTheEnd": 40.2,
-    "headingTurnedDeg": 7.6,
+    "yawDegPerSecondAtTheEnd": 40.9,
+    "headingTurnedDeg": 12.1,
     "speedKmh": [
      94,
      116
@@ -380,7 +380,7 @@
     ]
    },
    "bothKeys": {
-    "steps": 24,
+    "steps": 12,
     "requestSeenByTheCar": [
      0
     ]
@@ -404,7 +404,7 @@
     "speedKmh": 0
    },
    "handsOff": {
-    "steps": 24,
+    "steps": 12,
     "stepsFedByTheBench": 0,
     "requests": [
      "0/0"
@@ -477,8 +477,8 @@
    ],
    "steerAtTheEnd": -1,
    "fullLockAfterSeconds": 0.225,
-   "yawDegPerSecondAtTheEnd": -58,
-   "headingTurnedDeg": -10.1,
+   "yawDegPerSecondAtTheEnd": -57.7,
+   "headingTurnedDeg": -10,
    "speedKmh": [
     55,
     71
@@ -488,8 +488,8 @@
    ]
   },
   "rightKey": {
-   "steps": 48,
-   "seconds": 0.4,
+   "steps": 36,
+   "seconds": 0.3,
    "keyboardRequests": [
     1
    ],
@@ -499,11 +499,11 @@
    ],
    "steerAtTheEnd": 1,
    "fullLockAfterSeconds": 0.258,
-   "yawDegPerSecondAtTheEnd": 46.2,
-   "headingTurnedDeg": 8.6,
+   "yawDegPerSecondAtTheEnd": 43.6,
+   "headingTurnedDeg": 4.1,
    "speedKmh": [
     77,
-    93
+    94
    ],
    "states": [
     1

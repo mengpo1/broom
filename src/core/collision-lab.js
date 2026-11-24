@@ -33,7 +33,8 @@ export const LAB_SCENARIOS = {
   bump: { key: 'Digit5', circuit: 'kestrel-fields', me: { speed: 146, back: 12, side: 0 }, other: { speed: 105 }, steerTo: 0, steerFrom: 0, hold: 146, afterBump: 5, release: 'bump' },
   // the nose on a rear wheel with more closing speed than the hop needs, under the speed of the accident: bodies touch,
   // so it is a bump and nothing leaves the ground (it was a hop until the hop was tied to the wheels)
-  body: { key: 'Digit6', circuit: 'kestrel-fields', me: { speed: 175, back: 22, side: -0.93 }, other: { speed: 110 }, steerTo: -0.93, steerFrom: 0, hold: 175, release: 'bump' },
+  // (165 km/h: well under the speed of the accident, 180 km/h, whatever the scripted driver adds to its target)
+  body: { key: 'Digit6', circuit: 'kestrel-fields', me: { speed: 165, back: 22, side: -0.93 }, other: { speed: 100 }, steerTo: -0.93, steerFrom: 0, hold: 165, release: 'bump' },
 };
 /** Other names accepted by the launch option (the names of the events in the analysis report, and French). */
 export const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump', nose: 'body', nez: 'body', carrosserie: 'body' };

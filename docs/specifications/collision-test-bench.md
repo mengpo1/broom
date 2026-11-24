@@ -30,7 +30,7 @@ l'adresse et recharger la page.
 | `#lab=crash` (ou `e3`, `accident`) | **Accident violent** (E3) | envol à 262 km/h, la voiture **passe au-dessus de l'autre et retombe devant elle, sur le côté de sa trajectoire** ; explosion, arrêt 3,2 s (l'autre voiture longe l'épave), redémarrage sur place |
 | `#lab=board` (ou `e5`, `panneau`) | **Panneau de bord de piste** (E5) | envol à 242 km/h, retombée sans explosion, glissade jusqu'à l'arrêt dans l'herbe |
 | `#lab=bump` (ou `e4`, `tamponnage`) | Tamponnage arrière (E4) | 146 → environ 59 km/h derrière une voiture à 105 km/h |
-| `#lab=body` (ou `nez`, `carrosserie`) | **Nez contre roue arrière : pas de saut** | 175 km/h sur une voiture à 110, décalée d'une demi-largeur : plus d'écart et de vitesse qu'il n'en faut pour un saut, mais ce sont les carrosseries qui se touchent. Tamponnage (175 → environ 62 km/h), la voiture ne quitte pas le sol. Jusqu'à la PR #4 ce contact donnait un saut |
+| `#lab=body` (ou `nez`, `carrosserie`) | **Nez contre roue arrière : pas de saut** | 165 km/h sur une voiture à 100, décalée d'une demi-largeur : plus d'écart et de vitesse qu'il n'en faut pour un saut, mais ce sont les carrosseries qui se touchent. Tamponnage (165 → environ 54 km/h), la voiture ne quitte pas le sol. Jusqu'à la PR #4 ce contact donnait un saut |
 
 ## Pendant l'essai
 

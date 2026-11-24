@@ -8,13 +8,13 @@ l'image, pas la vitesse.
 
 ## 0. Dernière exécution complète
 
-Sur le build final (`index.html`, 1 081 435 octets), le 24 novembre 2026, après le lot 5
+Sur le build final (`index.html`, 1 085 255 octets), le 24 novembre 2026, après le lot 5
 (« corrections après validation humaine de la PR #4 » : saut par contact de roues,
 franchissement, rétroviseurs remontés, diagnostic du braquage) :
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Simulation et logique | `npm test` | **103 / 103** : 76 tests de la PR #4 inchangés ; 15 réécrits ou adaptés aux règles demandées par le joueur, devenus 14 (voir § 1 ter) ; 13 nouveaux |
+| Simulation et logique | `npm test` | **109 / 109** : 76 tests de la PR #4 inchangés ; 15 réécrits ou adaptés aux règles demandées par le joueur, devenus 14 (voir § 1 ter) ; 19 nouveaux, dont 6 écrits pour les défauts trouvés par la relecture indépendante |
 | Navigateur (WebGPU) | `node tests/rendering/smoke.browser.mjs` | 13 / 13 |
 | Modes de jeu de bout en bout | `node work/scripts/flow-check.mjs` | réussi (5 parcours) |
 | Pages, pause, caméras, souris | `node work/scripts/pages-check.mjs` | 14 / 14 |
@@ -67,10 +67,11 @@ exists »), d'où des captures à refaire. Le chien de garde graphique du naviga
 est maintenant coupé (`--disable-gpu-watchdog`, `lib-browser.mjs`) et le script des
 rétroviseurs attend après chaque image. Le jeu n'est pas concerné.
 
-## 1. Tests de simulation et de logique (Node) — 103 / 103 réussis
+## 1. Tests de simulation et de logique (Node) — 109 / 109 réussis
 
-Dernière exécution : `npm test` → 103 tests, 103 réussis, 0 échec (environ 10 s) : 76 tests
-de la PR #4 inchangés, 15 réécrits ou adaptés au lot 5 et devenus 14 (voir § 1 ter), 13 nouveaux.
+Dernière exécution : `npm test` → 109 tests, 109 réussis, 0 échec (environ 12 s) : 76 tests
+de la PR #4 inchangés, 15 réécrits ou adaptés au lot 5 et devenus 14 (voir § 1 ter), 19 nouveaux
+(13 à la première livraison du lot, 6 après la relecture indépendante du code).
 À la PR #4 : 91 tests, soit 76 précédents (dont quatre modifiés, voir § 1 bis) et 15 nouveaux.
 
 ### Conduite — `tests/unit/physics.test.mjs`
@@ -134,13 +135,16 @@ mesures de la vidéo sont approximatives). Détail : `collisions.md`.
 Scénarios E3 et E5 du rapport.
 
 - ✅ E3 launch: wheel over wheel at a high closing speed throws the follower in the air; the car ahead drives on
-- ✅ E3 flight: the car comes down behind the car it rode over, which drives away ahead
+- ✅ **(franchissement)** E3 flight: the car flies over the car it rode over and comes down ahead of it, beside its path; that car drives past the wreck *(réécrit, § 1 ter)*
+- ✅ **(relecture, défaut 2)** E3 at an angle: the follower converging on the car ahead still comes down beside its path, and is never driven through *(de −1,7° à +2,9°, des deux côtés)*
+- ✅ **(relecture, défaut 3)** two contacts in the same step: the bodies come first whatever the order of the cars, and a car thrown in the air is touched by nothing else *(les six ordres de trois voitures)*
+- ✅ E3 near a barrier: the flight stays between the barriers, and the car is still not set down on another one
 - ✅ E3 flight: 0.85 s, slowing by 50 km/h per second, rising then coming down
 - ✅ E3 hard landing: speed cut to about 15 %, standstill within a second, 3.2 s stopped, restart on the spot in first gear
 - ✅ a wrecked or flying car cannot be hit, and the restarting car is protected for a moment
 - ✅ a computer driver steers round a wreck instead of driving through it
 - ✅ E5 launch on a board: thrown in the air, light landing without loss of speed nor explosion, slide, restart from where it stopped
-- ✅ launch conditions are explicit: three levels by energy, and no flight outside the overlap window *(modifié, § 1 bis)*
+- ✅ launch conditions are explicit: the accident inside its overlap window, the hop on the wheels, nothing else flies *(modifié, § 1 bis et § 1 ter)*
 - ✅ pitch of the view (E3, hard): nose up and held, steady swing, ground held, rebound, second dip, level again
 - ✅ pitch of the view (E5, light): same script, shorter, second dip partial; trembling only while sliding
 - ✅ the staging depends only on the simulated state: same values whatever the display rate, nothing for the other player
@@ -155,6 +159,7 @@ roue / roue, roue / carrosserie, nez / arrière, côte à côte, obliques, sans 
 
 - ✅ the wheels of the collision model are those of the drawing of the car, without the simulation reading the drawing
 - ✅ wheel strike: the front wheel must go in through the back of the rear wheel *(roue / roue par l'arrière, par le côté, déjà engagée, effleurement, en biais)*
+- ✅ **(relecture, défaut 6)** wheel strike at an angle: a tyre that passes the back of the other one beside it and then meets its flank is not a strike *(grille d'arrivées en biais comparée à une géométrie de contrôle : 0 contact de flanc accepté ; l'ancien code en acceptait 13)*
 - ✅ by kind of contact, with the energy of a hop (215 km/h on a car at 150 km/h): only a wheel on a wheel lifts the car *(nez / arrière, nez sur roue, aileron sur roue, roue sur roue, sans contact)*
 - ✅ side by side: tyres that come together sideways rub (E2) and never lift a car, whatever the difference of speed
 - ✅ energy and direction: closing speed, speed of the car, angle between the cars, accidents switched off
@@ -170,7 +175,10 @@ sont réécrits (§ 1 ter).
 - ✅ **(franchissement, sans téléportation)** the hop clears the car that caused it: it flies past it and comes down ahead of it, without ever being moved
 - ✅ what a hop costs is the time in the air: nothing at the shock, the loss of any flight, nothing at the landing
 - ✅ a slower arrival needs a longer flight to get past; too slow to get past, the car does not take off
-- ✅ **(atterrissage sans chevauchement)** the landing waits rather than set the car down on another one: the car ahead speeding up, a third car in the way
+- ✅ **(atterrissage sans chevauchement)** the landing waits rather than set the car down on the car it flew over when that car speeds up
+- ✅ **(relecture, défaut 1)** the place where a hop comes down is free of every car: when a third car is there, the car does not take off *(cinq placements de la troisième voiture ; personne n'est déplacé ni pénalisé)*
+- ✅ **(relecture, défauts 1 et 5)** the landing waits when a car moves under the landing place during the flight, at the height it has, without a jolt *(une voiture qui freine sous le lieu d'atterrissage ; pas de remontée de plus de 2 cm)*
+- ✅ **(relecture, défaut 4)** a body contact is not followed by a hop: after a rub that pushes the cars apart the wheel does not climb the wheel
 - ✅ **(braquage après le saut)** after a hop the driver has the car back: the steering swings once and settles, then answers as on any car *(gauche et droite, pendant et après la perturbation ; même réponse qu'une voiture qui n'a pas sauté, à 2 % près)*
 - ✅ a hop never stops the car: no standstill, no explosion, no repositioning, it accelerates again
 - ✅ low energy: below the thresholds nothing changes, the validated contacts keep their outcome
@@ -259,11 +267,21 @@ ils énoncent la nouvelle règle. Tous les autres tests de la PR #4 sont inchang
 | `accidents.test.mjs` — *E3 flight: the car comes down behind the car it rode over…* | *E3 flight: the car flies over the car it rode over and comes down ahead of it, beside its path; that car drives past the wreck* | Règle 2 du joueur. La perte de 50 km/h par seconde en vol y est toujours vérifiée |
 | `accidents.test.mjs` — *launch conditions are explicit: three levels by energy…* | *…the accident inside its overlap window, the hop on the wheels, nothing else flies* : le cas « 170 km/h sur 100, demi-largeur » donne un tamponnage et non plus un saut ; deux cas roue sur roue ajoutés ; le seuil de l'accident est mesuré (58 km/h d'écart) | Règle 1 du joueur ; conséquence de la règle 2 sur le seuil |
 
-Treize tests nouveaux : six dans `wheel-contacts.test.mjs`, cinq dans `lab.test.mjs`, et deux
+Treize tests nouveaux à la première livraison du lot : six dans `wheel-contacts.test.mjs`, cinq dans `lab.test.mjs`, et deux
 ajoutés à des fichiers existants. Ajouté à `accidents.test.mjs` : *E3 near a barrier: the flight stays between the barriers, and
 the car is still not set down on another one*. Ajouté à `animation.test.mjs` : *mirrors, lot 5:
 three heights of the same mirrors…*. Le test existant des rétroviseurs passe sans modification
 sur la variante B.
+
+Six tests ajoutés après la relecture indépendante du code (`collisions.md` § 2 ter, « Relecture
+indépendante du code, et suites »), un par défaut reproduit ou presque : un dans
+`wheel-contacts.test.mjs` (entrée en biais), trois dans `hop.test.mjs` (lieu d'atterrissage
+libre de toute voiture ; attente en l'air sans à-coup ; pas de saut après un contact de
+carrosserie), deux dans `accidents.test.mjs` (arrivée en biais ; deux contacts au même pas).
+Le test *the landing waits rather than set the car down on another one…* de la première
+livraison a été scindé : sa moitié « troisième voiture » énonçait une attente plafonnée à 1,5 s,
+qui était le défaut n° 1. Chacun de ces tests échoue sur le code de la première livraison
+(`ee7f43e`).
 
 ## 2. Tests navigateur — `tests/rendering/smoke.browser.mjs` — 13 / 13 réussis
 

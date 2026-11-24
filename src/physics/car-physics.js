@@ -44,7 +44,7 @@ export function createCarState(index) {
     clock: 0, lastPenaltyClock: -10, bumpClock: -10, bumpStrength: 0,
     airTime: 0, airDuration: 0, airHard: false, airHeight: 0, launchSide: 0, launchOther: -1, launchClock: -10,
     landClock: -10, landHard: false, wreckTimer: 0, wreckDecel: 0, slideGentle: false,
-    airKind: 0, airPeak: 0, landKind: 0, airPlanned: 0, airHold: 0, rearmClock: -10,
+    airKind: 0, airPeak: 0, landKind: 0, airPlanned: 0, airHold: 0, airWaiting: false, rearmClock: -10,
   };
 }
 
@@ -94,7 +94,7 @@ export function startAirborne(car, duration, hard, emit, other = -1, side = 0) {
     car.velZ = sh * car.speed + ch * car.vLat;
   }
   car.state = CAR_STATE.AIRBORNE;
-  car.airTime = 0; car.airDuration = duration; car.airPlanned = duration; car.airHold = 0; car.airHard = hard; car.airHeight = 0;
+  car.airTime = 0; car.airDuration = duration; car.airPlanned = duration; car.airHold = 0; car.airWaiting = false; car.airHard = hard; car.airHeight = 0;
   car.airKind = hard ? LANDING.HARD : LANDING.LIGHT;
   const reach = duration / COLLISION_TUNING.flightTimeCar;
   car.airPeak = COLLISION_TUNING.airPeakHeight * reach * reach;

@@ -31,10 +31,13 @@ export function wheelRectangles(car, layout = WHEEL_LAYOUT) {
 /**
  * Has a front wheel of `a` just run into the BACK of a rear wheel of `b`?
  *
- * Yes when, seen from above, the two tyres overlap now, and one step earlier the front wheel was
- * still entirely behind the rear face of that rear wheel: it came from behind and went in through
- * the back. Two tyres that come together sideways (one beside the other) do not count, whatever
- * the difference of speed between the cars: their first contact is on their flanks.
+ * Yes when, seen from above, the two tyres overlap now, one step earlier the front wheel was still
+ * entirely behind the rear face of that rear wheel, and at the instant its leading edge crossed the
+ * plane of that face it was in line with the rear tyre: it came from behind and went in through the
+ * back. Two tyres that come together sideways do not count, whatever the difference of speed between
+ * the cars: their first contact is on their flanks. That includes a tyre arriving at an angle from
+ * behind and from the side, which passes the plane of the back face beside the other tyre and only
+ * then meets its flank.
  *
  * Positions one step earlier are the `prev` fields of the cars (written at the start of each step).
  * The front wheels are taken along the car: at the speeds where this matters the steering angle is
@@ -71,7 +74,11 @@ export function wheelStrike(a, b, minOverlap = 0, out = null, layout = WHEEL_LAY
       // one step earlier: the front wheel entirely behind the rear face of the rear wheel
       const pbx = b.prevX + pfb * layout.rearAxleX - pgb * sb * layout.rearTrack, pbz = b.prevZ + pgb * layout.rearAxleX + pfb * sb * layout.rearTrack;
       const palong = (pax - pbx) * pfb + (paz - pbz) * pgb;
-      if (palong + pex > -rl + 1e-9) continue;
+      if (along >= 0 || palong + pex > -rl + 1e-9) continue;
+      // between the two: where it was, sideways, when its leading edge crossed the plane of that rear face
+      const lead0 = palong + pex, lead1 = along + ex, share = lead1 > lead0 ? (-rl - lead0) / (lead1 - lead0) : 0;
+      const pacross = -(pax - pbx) * pgb + (paz - pbz) * pfb, crossing = pacross + (across - pacross) * share;
+      if (rw + ey - Math.abs(crossing) <= minOverlap) continue;
       if (out) { out.side = sa; out.wheel = sb; out.overlap = overlap; out.depth = depth; }
       return sa;
     }

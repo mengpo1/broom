@@ -155,7 +155,7 @@ test('a slower arrival needs a longer flight to get past; too slow to get past, 
   assert.ok(made[0].peak > made.at(-1).peak, 'the longest hop is the highest');
 });
 
-test('the landing waits rather than set the car down on another one: the car ahead speeding up, a third car in the way', () => {
+test('the landing waits rather than set the car down on the car it flew over when that car speeds up', () => {
   // the car that is flown over accelerates hard during the flight
   const fleeing = wheelHop({ kmhA: 230 });
   let landed = false, hopped = false;
@@ -166,37 +166,90 @@ test('the landing waits rather than set the car down on another one: the car ahe
     if (landed) assert.equal(bodyOverlap(a, b), 0, 'and never driven through afterwards');
   });
   assert.ok(hopped && landed, 'the hop happened');
-  // a third car exactly where the hop would come down, in its lane and at the speed of the car it flew over: the worst
-  // case (it can neither be passed nor is it left behind quickly); the car waits above it until it has gone
+});
+
+/** A third car, scripted like the car ahead, placed `ahead` metres further up the road than the car ahead, in the lane of the car behind. */
+function thirdCar(setup, ahead, kmh) {
+  const third = setup.race.cars.find((c) => !c.isHuman);
+  placeCar(third, track, setup.b.s + ahead, setup.a.d);
+  third.state = CAR_STATE.RACING; third.ghostTimer = 0; third.speed = kmh / KMH; third.gear = setup.b.gear; third.isHuman = true;
+  return third;
+}
+
+test('the place where a hop comes down is free of every car: when a third car is there, the car does not take off', () => {
+  // (found by an independent review: with the landing only postponed, a hop ended by dropping onto a third car, both
+  // being shoved aside and the car underneath penalised)
+  // where the reference hop comes down, relative to the car it flies over
   const reference = wheelHop();
-  let spot = null, flightTime = 0, t0 = -1;
-  stepThrough(reference, 1.6, holding(reference), (i) => {
-    const { a, b } = reference;
-    if (a.state === CAR_STATE.AIRBORNE && t0 < 0) t0 = i;
-    if (t0 >= 0 && spot === null && a.state === CAR_STATE.RACING) { spot = relativeTo(a, b); flightTime = (i - t0) * SIM_DT; }
-  });
-  const crowded = wheelHop();
-  const third = crowded.race.cars.find((c) => !c.isHuman);
-  placeCar(third, track, crowded.b.s + spot.ahead + 1, crowded.b.d + spot.right);
-  third.state = CAR_STATE.RACING; third.ghostTimer = 0; third.speed = KMH_B / KMH; third.gear = crowded.b.gear; third.isHuman = true;
-  let up = -1, down = -1, worst = 0, lowestWhileWaiting = Infinity, px = 0, pz = 0;
-  stepThrough(crowded, 4, holding(crowded), (i) => {
-    const { a, b } = crowded;
-    third.inThrottle = holdSpeed(third, KMH_B)(); third.inSteer = 0;
-    if (a.state === CAR_STATE.AIRBORNE && up < 0) up = i;
-    // while it waits it is not moved either: only its own velocity carries it, and it keeps its height
-    if (a.state === CAR_STATE.AIRBORNE && up >= 0 && i > up) assert.ok(Math.hypot(a.x - px - a.velX * SIM_DT, a.z - pz - a.velZ * SIM_DT) < 1e-6, `step ${i} of the flight: moved by its own velocity only`);
-    if (a.state === CAR_STATE.AIRBORNE && a.airHold > 0 && a.airTime < a.airPlanned + T.flightOverCarMax && bodyOverlap(a, third) > 0) lowestWhileWaiting = Math.min(lowestWhileWaiting, a.airHeight);
-    px = a.x; pz = a.z;
-    if (up >= 0 && down < 0 && a.state !== CAR_STATE.AIRBORNE) { down = i; assert.equal(bodyOverlap(a, third), 0, 'not set down on the third car'); assert.equal(bodyOverlap(a, b), 0); }
+  let spot = null;
+  stepThrough(reference, 1.6, holding(reference), () => { if (spot === null && reference.a.landKind === LANDING.RECOVERABLE && reference.a.state === CAR_STATE.RACING) spot = relativeTo(reference.a, reference.b); });
+  assert.ok(spot && spot.ahead > 4.5);
+  for (const [kmhA, kmhB, ahead] of [[KMH_A, KMH_B, spot.ahead + 1], [KMH_A, KMH_B, 6], [262, 188, 8], [230, 150, 9], [245, 150, 12]]) {
+    const setup = wheelHop({ kmhA, kmhB });
+    const third = thirdCar(setup, ahead, kmhB), { a, b } = setup;
+    let flew = false, landed = false, px = a.x, pz = a.z, tx = third.x, tz = third.z, va = a.speed, vt = third.speed;
+    const events = stepThrough(setup, 3.5, { throttleA: holdSpeed(a, kmhA), throttleB: holdSpeed(b, kmhB) }, (i) => {
+      third.inThrottle = holdSpeed(third, kmhB)(); third.inSteer = 0;
+      // nobody is ever moved further in a step than its own speed takes it (the speed it had before or after the step),
+      // plus the push of an ordinary bump, half of what the cars went into each other in the step: under 12 cm here.
+      // (When it does not take off, or once it is down behind the third car, the car simply runs into it from behind.
+      // The defect that was found moved both cars by a metre.)
+      assert.ok(Math.hypot(a.x - px, a.z - pz) < Math.max(va, Math.abs(a.speed), Math.hypot(a.velX, a.velZ)) * SIM_DT + 0.15, `${kmhA} on ${kmhB}, third car ${ahead.toFixed(1)} m up, step ${i}: the car behind is not shoved`);
+      assert.ok(Math.hypot(third.x - tx, third.z - tz) < Math.max(vt, third.speed) * SIM_DT + 0.15, `${kmhA} on ${kmhB}, third car ${ahead.toFixed(1)} m up, step ${i}: the third car is not shoved`);
+      px = a.x; pz = a.z; tx = third.x; tz = third.z; va = Math.abs(a.speed); vt = third.speed;
+      if (a.state === CAR_STATE.AIRBORNE) flew = true;
+      if (flew && a.state !== CAR_STATE.AIRBORNE) {
+        if (!landed) { landed = true; assert.equal(bodyOverlap(a, third), 0, 'not set down on the third car'); assert.equal(bodyOverlap(a, b), 0, 'nor on the car it flew over'); }
+      }
+    });
+    // either it did not take off, or it came down in a free place after the flight that was planned; never a long wait in the air
+    if (flew) assert.ok(a.airTime <= T.hopFlightTimeMax + 2 * SIM_DT && a.airHold === 0, `${kmhA} on ${kmhB}, ${ahead.toFixed(1)} m: landed where planned (${a.airTime.toFixed(3)} s)`);
+    assert.ok(events.every((e) => e.car !== third.index || !['wheel', 'bump', 'crash'].includes(e.type)), 'the third car pays nothing for it');
+    assert.ok(Math.abs(third.speed - kmhB / KMH) < 1.5, `the third car keeps its speed (${(third.speed * KMH).toFixed(0)} km/h)`);
+    assert.equal(third.state, CAR_STATE.RACING);
+    if (ahead < 7) assert.ok(!flew, `third car ${ahead.toFixed(1)} m up: no room to come down between the two, no take-off`);
+  }
+});
+
+test('the landing waits when a car moves under the landing place during the flight, at the height it has, without a jolt', () => {
+  // a third car further up, clear of the landing place at the take-off, brakes hard as soon as the car is in the air
+  const setup = wheelHop();
+  const third = thirdCar(setup, 12.5, KMH_B), { a, b } = setup;
+  let up = -1, down = -1, held = 0, worst = 0, previous = 0, highestStep = 0, lowestWhileWaiting = Infinity, px = 0, pz = 0;
+  stepThrough(setup, 4, holding(setup), (i) => {
+    const flying = a.state === CAR_STATE.AIRBORNE;
+    third.inSteer = 0;
+    if (flying && up < 0) up = i;
+    third.inThrottle = up < 0 ? holdSpeed(third, KMH_B)() : 0; third.inBrake = up >= 0 && down < 0 ? 1 : 0;
+    if (flying && i > up) {
+      assert.ok(Math.hypot(a.x - px - a.velX * SIM_DT, a.z - pz - a.velZ * SIM_DT) < 1e-6, `step ${i} of the flight: moved by its own velocity only`);
+      // the height never jumps up once the car is on its way down (it rose by 38 cm in one step when a wait resumed)
+      if (a.airTime > a.airPlanned * 0.6) highestStep = Math.max(highestStep, a.airHeight - previous);
+      if (a.airWaiting) { held++; lowestWhileWaiting = Math.min(lowestWhileWaiting, a.airHeight); }
+    }
+    previous = a.airHeight; px = a.x; pz = a.z;
+    if (up >= 0 && down < 0 && !flying) { down = i; assert.equal(bodyOverlap(a, third), 0, 'not set down on the third car'); assert.equal(bodyOverlap(a, b), 0); }
     if (down >= 0) worst = Math.max(worst, bodyOverlap(a, third), bodyOverlap(a, b));
   });
-  assert.ok(up > 0 && down > up, 'the hop happened with a third car in the way');
-  assert.ok((down - up) * SIM_DT > flightTime + 0.02, `the landing waited: ${((down - up) * SIM_DT).toFixed(3)} s in the air instead of ${flightTime.toFixed(3)} s`);
-  assert.ok((down - up) * SIM_DT <= flightTime + T.flightOverCarMax + T.flightHoldTime + 2 * SIM_DT, 'within the longest wait allowed');
-  assert.ok(lowestWhileWaiting > 0.3 && lowestWhileWaiting < 1, `while it waits over the third car it keeps its height: ${lowestWhileWaiting.toFixed(2)} m at the lowest`);
+  assert.ok(up > 0 && down > up, 'the hop happened');
+  assert.ok(held > 5, `the landing waited (${held} steps)`);
+  assert.ok((down - up) * SIM_DT > a.airPlanned + 0.03, `${((down - up) * SIM_DT).toFixed(3)} s in the air instead of ${a.airPlanned.toFixed(3)} s`);
+  assert.ok(lowestWhileWaiting > 0.2, `while it waits it keeps its height (${lowestWhileWaiting.toFixed(2)} m at the lowest)`);
+  assert.ok(highestStep < 0.02, `no jump of height on the way down (largest rise in a step: ${(highestStep * 100).toFixed(1)} cm)`);
   assert.equal(worst, 0, 'no car driven through after the landing');
-  assert.equal(third.state, CAR_STATE.RACING);
+});
+
+test('a body contact is not followed by a hop: after a rub that pushes the cars apart the wheel does not climb the wheel', () => {
+  // (found by an independent review: nose corner on tail corner at a very high closing speed gave a wheel rub, and three
+  // steps later, the rub having opened the gap, the front wheel went into the rear wheel from behind: hop)
+  for (const [kmhA, kmhB, lateral] of [[300, 130, 1.8], [300, 130, 1.75], [280, 110, 1.84], [300, 130, -1.8]]) {
+    const setup = twoCars(track, { gap: 4, lateral, speedA: kmhA / KMH, speedB: kmhB / KMH, straight: 700 });
+    const events = stepThrough(setup, 1.2, { throttleA: holdSpeed(setup.a, kmhA), throttleB: holdSpeed(setup.b, kmhB) });
+    const body = events.find((e) => e.type === 'wheel' || e.type === 'bump');
+    assert.ok(body, `${kmhA} on ${kmhB} at ${lateral} m: the bodies touch`);
+    const hop = events.find((e) => e.type === 'hop');
+    assert.ok(!hop || (hop.tick - body.tick) * SIM_DT >= T.hopAfterContactTime, `${kmhA} on ${kmhB} at ${lateral} m: no hop in the ${T.hopAfterContactTime} s that follow${hop ? ` (hop ${hop.tick - body.tick} steps later)` : ''}`);
+  }
 });
 
 test('after a hop the driver has the car back: the steering swings once and settles, then answers as on any car', () => {

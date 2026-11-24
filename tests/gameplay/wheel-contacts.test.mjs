@@ -81,6 +81,43 @@ test('wheel strike: the front wheel must go in through the back of the rear whee
   assert.equal(wheelStrike(b, bare(-reach + 0.1, -1.95, 0, 58)), 0, 'the car ahead does not strike the car behind');
 });
 
+test('wheel strike at an angle: a tyre that passes the back of the other one beside it and then meets its flank is not a strike', () => {
+  // (found by an independent review) every arrival of a grid, at 6, 11 and 17 degrees of convergence: the step is cut
+  // in 300 and the first instant at which the two tyres touch is looked at. Just before that instant the two tyres are
+  // apart: if the front tyre already reaches into the width of the rear tyre, what separates them is the back face,
+  // and the touch is on it; if it is still entirely beside the rear tyre, the touch is on the flank.
+  const b = bare(0, 0, 0, 36);
+  const rl = W.rearTyre.radius, rw = W.rearTyre.width / 2, fl = W.frontTyre.radius, fw = W.frontTyre.width / 2;
+  let strikes = 0, flankTouches = 0, flankThePreviousTestAccepted = 0;
+  for (const angle of [0.1, 0.2, 0.3]) {
+    for (let x = -4.7; x <= -2.9; x += 0.03) {
+      for (let z = -3.2; z <= -1.5; z += 0.02) {
+        const a = bare(x, z, angle, 70);
+        if (polygonOverlap(tyreOf(a, W, 'front', 1), tyreOf(b, W, 'rear', -1)) <= 0) continue;
+        const at = (c, k) => ({ ...c, x: c.prevX + (c.x - c.prevX) * k, z: c.prevZ + (c.z - c.prevZ) * k });
+        if (polygonOverlap(tyreOf(at(a, 0), W, 'front', 1), tyreOf(at(b, 0), W, 'rear', -1)) > 0) continue;      // already touching one step earlier
+        let first = -1;
+        for (let k = 1; k <= 300 && first < 0; k++) if (polygonOverlap(tyreOf(at(a, k / 300), W, 'front', 1), tyreOf(at(b, k / 300), W, 'rear', -1)) > 0) first = k;
+        // just before the first touch: how far the front tyre (on the left of the other one) reaches into its width
+        const tyre = tyreOf(at(a, (first - 1) / 300), W, 'front', 1), leftEdge = at(b, (first - 1) / 300).z - W.rearTrack - rw;
+        const reachesIn = Math.max(...tyre.map((p) => p[1])) - leftEdge;
+        const throughTheBack = reachesIn > 0.004;
+        const strike = wheelStrike(a, b, T.hopTyreOverlapMin);
+        if (strike) { strikes++; assert.ok(throughTheBack, `angle ${angle}, car at (${x.toFixed(2)}, ${z.toFixed(2)}): counted as a strike although the first touch is on the flank`); }
+        if (!throughTheBack) {
+          flankTouches++;
+          // what the test accepted before this correction: tyres overlapping now, the front one behind the plane of the back face one step earlier
+          const along0 = (a.prevX + Math.cos(angle) * W.frontAxleX - Math.sin(angle) * W.frontTrack) - (b.prevX + W.rearAxleX);
+          if (along0 + fl * Math.cos(angle) + fw * Math.sin(angle) <= -rl) flankThePreviousTestAccepted++;
+        }
+      }
+    }
+  }
+  assert.ok(strikes > 300, `${strikes} strikes through the back face in the grid`);
+  assert.ok(flankTouches > 50, `${flankTouches} first touches on the flank, none counted as a strike`);
+  assert.ok(flankThePreviousTestAccepted > 0, `${flankThePreviousTestAccepted} of them were counted before the correction`);
+});
+
 /** What a contact gave to the car behind: 'hop', 'accident', 'bump', 'rub', 'contact' or 'none'. */
 function outcome(log, a) {
   const mine = log.events.filter((e) => e.car === a.index).map((e) => e.type);

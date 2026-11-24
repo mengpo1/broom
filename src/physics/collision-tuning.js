@@ -57,10 +57,10 @@ export const COLLISION_TUNING = {
   flightTimeCarMax: 1.1,         // s: longest flight of the hard accident (0.85 s measured, more only when needed to get past)
   flightHoldTime: 0.12,          // s before the planned landing from which the place where the car will come down is looked at
   flightHoldMax: 0.5,            // s: the landing waits at most this long when the car is not past the other one yet although
-                                 //    still gaining on it (that car sped up more than expected)
-  flightOverCarMax: 1.5,         // s: and at most this long when a car is under it (a third car; or the car it flew over, when it
-                                 //    could neither be passed nor left to one side). A car in the air loses 50 km/h every
-                                 //    second: any car that holds its speed is out from under it in about a second
+                                 //    still gaining on it (that car sped up more than expected). While a car is under it, or
+                                 //    where it would land, the landing waits for as long as it takes: the place where it comes
+                                 //    down is chosen free of every car at the take-off, so this only acts when a car changed
+                                 //    its speed or its line during the flight
 
   // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
   // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.
@@ -75,6 +75,8 @@ export const COLLISION_TUNING = {
   hopMinSpeed: 33,               // m/s (119 km/h): the car behind must be at least this fast
   hopAlignedCos: 0.94,           // angle: the two cars head within about 20 degrees of each other
   hopTyreOverlapMin: 0.04,       // m of tread in contact, seen from above: a tyre that only grazes the corner of another does not climb it
+  hopAfterContactTime: 0.5,      // s: a car whose body has just touched another car does not hop (a rub that pushes the two
+                                 // apart must not be followed, three steps later, by the wheel climbing the wheel)
   hopFlightTime: 0.45,           // s in the air at least (the hard accident: 0.85 s)
   hopFlightTimeMax: 0.85,        // s at most: a slower arrival needs a longer flight to get past; beyond, no hop
   hopAirDecel: 13.9,             // m/s^2 lost in the air during a hop: the same as in any flight (airDecel). The hop costs

@@ -196,14 +196,19 @@ Un saut récupérable part quand **toutes** ces conditions sont réunies au mêm
 simulation :
 
 1. les deux **carrosseries ne se touchent pas** (sinon c'est un tamponnage ou un frottement,
-   traités comme avant) ;
+   traités comme avant), et la carrosserie de la voiture de derrière **n'a touché aucune
+   voiture dans ce pas ni dans la demi-seconde précédente** (`hopAfterContactTime`). Les
+   contacts de carrosserie de tout le peloton sont traités d'abord, les roues ensuite : le
+   résultat ne dépend pas de l'ordre des voitures dans la liste ;
 2. vus de dessus, **un pneu avant de la voiture de derrière recouvre un pneu arrière de celle
    de devant**, sur au moins 4 cm de bande de roulement (`hopTyreOverlapMin` : un pneu qui
    effleure le coin d'un autre ne l'escalade pas) ;
 3. **un pas plus tôt ce pneu avant était encore entièrement derrière la face arrière de ce
-   pneu arrière** : il est entré par l'arrière. Deux pneus qui se rejoignent par le côté ne
-   comptent pas, quelle que soit la différence de vitesse : leur premier contact est sur les
-   flancs ;
+   pneu arrière, et à l'instant où son bord avant a passé le plan de cette face il était dans
+   la largeur du pneu arrière** : il est entré par l'arrière. Deux pneus qui se rejoignent par
+   le côté ne comptent pas, quelle que soit la différence de vitesse : leur premier contact est
+   sur les flancs — y compris un pneu qui arrive en biais, passe à côté de l'autre puis
+   rencontre son flanc ;
 4. vitesse relative le long de la voiture de devant ≥ 36 km/h (`hopClosingSpeed`), vitesse de
    la voiture de derrière ≥ 119 km/h (`hopMinSpeed`), caps à moins de 20° ;
 5. la voiture n'a pas atterri d'un saut depuis moins de 1,5 s ; la règle des accidents est
@@ -259,12 +264,17 @@ micromètre). Ce qui est décidé au décollage (`flightPlan`) :
   saut), **ou davantage quand il le faut pour retomber devant** : la queue de la voiture
   0,5 m devant le nez de l'autre (`flightClearance`), l'autre continuant comme elle roule à
   cet instant. Au plus 1,1 s pour l'accident, 0,85 s pour le saut ;
+- **un lieu d'atterrissage libre** : l'endroit où la voiture retombera est comparé à la place
+  qu'occupera alors **chaque voiture du peloton**, chacune poursuivant sa route à sa vitesse.
+  S'il est occupé, le vol est allongé pas à pas jusqu'à ce qu'il soit libre, dans la limite de
+  la durée maximale ;
 - **s'il y a décollage** : si, à la vitesse actuelle de l'autre voiture, la voiture ne peut
-  pas passer devant dans cette durée, **elle ne décolle pas** (le contact reste un tamponnage,
-  ou rien pour des pneus au bord) ;
-- **pour l'accident seulement, un écart latéral** : la voiture est jetée un peu plus du côté
-  où elle se trouve déjà, juste assez pour retomber à côté de la trajectoire de l'autre
-  (0,4 m entre les deux carrosseries, `flightSideClearance`). Sans cela l'épave, qui s'arrête
+  pas passer devant dans cette durée, ou si aucun lieu d'atterrissage libre n'est trouvé,
+  **elle ne décolle pas** (le contact reste un tamponnage, ou rien pour des pneus au bord) ;
+- **pour l'accident seulement, un écart latéral** : la voiture est jetée de côté, juste assez
+  pour retomber à côté de la trajectoire de l'autre (0,4 m entre les deux carrosseries,
+  `flightSideClearance`) : du côté où elle se trouve, ou de celui où sa route la mène quand
+  elle arrive en biais (le déplacement latéral de l'autre voiture est compté). Sans cela l'épave, qui s'arrête
   en moins d'une seconde, serait posée devant la voiture qu'elle vient de survoler, qui la
   traverserait (une épave ne peut pas être heurtée) : c'était le défaut E3x-1 relevé par le
   critique du premier lot. Le saut, lui, vole droit : ses roues touchaient au bord, il est
@@ -273,14 +283,14 @@ micromètre). Ce qui est décidé au décollage (`flightPlan`) :
 Hauteur : 1,3 m au sommet pour un vol de 0,85 s, proportionnelle au carré de la durée ; jamais
 moins de 0,55 m pour un saut.
 
-**L'atterrissage attend s'il le faut** (`holdLanding`) : dans les 0,12 dernières secondes on
-regarde où la voiture va se poser. Si elle n'est pas encore passée alors qu'elle gagne
-toujours du terrain (l'autre a accéléré plus que prévu), ou si une voiture est dessous (une
-troisième voiture ; ou la voiture survolée, quand elle n'a pu ni être dépassée ni laissée sur
-le côté, contre une barrière), elle reste en l'air à la hauteur qu'elle a, jusqu'à ce que la
-voie soit libre : 0,5 s au plus dans le premier cas, 1,5 s dans le second. Une voiture en vol
-perd 50 km/h par seconde : toute voiture qui tient sa vitesse est sortie de dessous en une
-seconde environ. Rien n'est déplacé : seul l'atterrissage attend.
+**L'atterrissage attend s'il le faut** (`holdLanding`) : le lieu d'atterrissage est choisi
+libre au décollage, mais une voiture peut changer de vitesse ou de ligne pendant le vol. Dans
+les 0,12 dernières secondes on regarde donc de nouveau où la voiture va se poser. Si elle
+n'est pas encore passée alors qu'elle gagne toujours du terrain (l'autre a accéléré plus que
+prévu), elle reste en l'air 0,5 s de plus au maximum ; si une voiture est sous elle ou à
+l'endroit où elle se poserait, elle reste en l'air tant que cette voiture y est. Elle garde
+pendant ce temps la hauteur qu'elle avait au début de l'attente, puis descend en 0,12 s. Rien
+n'est déplacé : seul l'atterrissage attend.
 
 **Barrières** : inchangé, une voiture en vol est retenue entre les barrières (elle y perd sa
 vitesse vers l'extérieur, sans effet visible). Test : l'accident E3 rejoué contre la barrière
@@ -389,28 +399,53 @@ tirages en règles arcade, trois courses en règles de compétition),
 | Sur les 21 courses | PR #4 | Maintenant |
 |---|---|---|
 | Somme des temps des vainqueurs | 4 268,55 s | 4 268,55 s (identique) |
-| Voitures à l'arrivée | 279 | 289 |
-| Tamponnages / frottements de roues | 184 / 1 090 | 212 / 1 103 |
+| Voitures à l'arrivée | 279 | 293 |
+| Tamponnages / frottements de roues | 184 / 1 090 | 219 / 1 110 |
 | **Sauts récupérables** | **42** | **0** |
 | Accidents violents | 10 | 5 |
 | Vols retombés devant la voiture survolée | 0 sur 52 | 3 sur 5 |
 | Vols posés en recouvrant la voiture survolée | 3 | 0 |
-| Remises en piste | 17 | 27 |
+| Remises en piste | 17 | 25 |
 
 À dire nettement : **dans ces 21 courses, aucun saut récupérable ne se produit plus.** Le
 contact géométrique lui-même (une roue avant qui entre par l'arrière dans une roue arrière)
-y arrive 105 fois, mais presque toujours à faible écart de vitesse : 7 fois au-dessus de
+y arrive 108 fois, mais presque toujours à faible écart de vitesse : 7 fois au-dessus de
 36 km/h, 3 fois au-dessus de 57 km/h, et ces trois-là ne décollent pas : la voiture arrive en
 biais (8°, 12° et 16°) et un coin de sa carrosserie touche l'autre au même pas (de 2 à 8 cm) —
 les carrosseries passent d'abord, c'est un frottement. Le saut est devenu un événement de
 pilotage, reproductible au banc d'essai, pas un incident de peloton. Les deux accidents qui ne
-retombent pas devant : l'un en plein virage (la voiture vole tout droit et se pose 9 m à
-l'extérieur de l'autre), l'autre sur une voiture qui accélérait (elle se pose à sa hauteur,
-2,25 m sur le côté). Aucun des cinq ne se pose sur une voiture ; trois le faisaient avec les
-règles de la PR #4.
+retombent pas devant sont sur le circuit urbain, à un écart de vitesse proche du seuil (59 et
+62 km/h), sur une voiture qui accélérait : le vol a duré 1,28 s, attente comprise, et la
+voiture s'est posée en retrait de l'autre (6,5 m derrière son nez et 2,8 m sur le côté pour
+l'une ; 10,5 m derrière son nez pour l'autre). Les trois autres retombent de 1,8 à 3,7 m
+devant. Aucun des cinq ne se pose sur une voiture ; trois le faisaient avec les règles de la
+PR #4.
 
 Coût de la simulation : 21 à 23 microsecondes par pas de 16 voitures avant comme après (trois
 courses complètes, médiane de cinq passes) : pas d'écart mesurable.
+
+### Relecture indépendante du code, et suites
+
+Le code de ce lot a été relu par un relecteur indépendant, qui n'avait que le diff et les
+règles attendues. Il a d'abord confirmé, sur 17 640 arrivées à deux voitures comparées pas à
+pas avec les sources de la PR #4, que **tout contact sans vol est identique** (position, cap,
+vitesse, dégâts, événements), puis il a trouvé et reproduit sept défauts. Tous sont corrigés,
+chacun avec un test.
+
+| N° | Défaut | Correction |
+|---|---|---|
+| 1 (grave) | Dans un peloton, un saut dont l'attente à l'atterrissage arrivait à son terme (1,5 s) se posait **dans** une troisième voiture : les deux étaient écartées d'un mètre en un pas et celle de dessous pénalisée (188 → 92 km/h) | Le lieu d'atterrissage est choisi libre de toute voiture dès le décollage (sinon pas de décollage) ; l'attente n'a plus de terme tant qu'une voiture est dessous. Test : cinq placements de troisième voiture, personne n'est déplacé ni pénalisé |
+| 2 | L'accident retombait dans la trajectoire de l'autre voiture dès que la voiture arrivait en biais de 0,6° : l'écart latéral supposait les deux voitures parallèles | Le déplacement latéral de l'autre voiture pendant le vol est compté. Test : de −1,7° à +2,9°, des deux côtés |
+| 3 | Deux contacts au même pas (une roue sur une roue, le nez sur une troisième voiture) donnaient un saut ou un accident selon l'ordre des voitures dans la liste ; une voiture qui venait de décoller pouvait encore être poussée par un autre contact du même pas (ce second point existait déjà dans la PR #4 pour l'accident) | Carrosseries d'abord pour tout le peloton, roues ensuite ; plus aucun contact pour une voiture qui vient de décoller. Test : onze positions de la troisième voiture, les six ordres donnent chaque fois le même résultat (avant correction, le résultat dépendait de l'ordre sur 14 cm de positions) |
+| 4 | Un frottement de carrosserie à très fort écart (coin contre coin) écartait les voitures, et trois pas plus tard la roue entrait dans la roue : saut | Pas de saut dans la demi-seconde qui suit un contact de carrosserie. Test |
+| 5 | Quand l'attente reprenait après avoir cessé, la voiture remontait de 38 cm en un pas | La hauteur tenue est celle du début de chaque attente. Test : pas de remontée de plus de 2 cm |
+| 6 | Un pneu arrivant en biais pouvait passer à côté de l'autre puis toucher son flanc, et être compté comme entré par l'arrière (13 cas sur 897 dans une grille d'essai) | La position latérale est vérifiée à l'instant où le pneu passe le plan de la face arrière. Test : 0 cas sur 827 |
+| 7 | Le cas 6 du banc (nez contre roue) roulait à 177 km/h, à 3 km/h du seuil de l'accident | Cas ramené à 165 km/h sur une voiture à 100 |
+
+Relevé par le relecteur hors de ce lot, **non corrigé** : une voiture de l'ordinateur retirée
+de la course après un abandon (elle n'est plus dessinée) reste un obstacle solide pour les
+contacts. C'était déjà le cas dans la PR #4 ; la correction tient en une ligne mais modifie
+les courses avec abandons : à décider.
 
 ### Limites et points à arbitrer
 
@@ -436,6 +471,17 @@ courses complètes, médiane de cinq passes) : pas d'écart mesurable.
   la voiture survolée est sûre de passer à côté.
 - **Contre une barrière**, l'écart latéral de l'accident peut être refusé par le rail ;
   l'atterrissage attend alors que la voiture survolée soit partie.
+- **Attente en l'air** : si une voiture freine ou se rabat sous le lieu d'atterrissage pendant
+  le vol, la voiture reste à sa hauteur (20 à 60 cm) tant qu'elle est dessous ; à l'image, une
+  voiture qui glisse au-dessus d'une autre. Mesuré en cherchant le pire : 854 vols (saut et
+  accident) avec une troisième voiture placée de 6 à 40 m devant et qui freine dès le
+  décollage, à sept intensités : 137 attentes, la plus longue de 0,77 s (un saut de 1,45 s au
+  lieu de 0,62 s), aucune voiture posée sur une autre. Il n'y a pas de plafond explicite ; la
+  seule borne est que l'attente cesse quand la voiture en vol n'a presque plus de vitesse
+  (moins de 4 km/h), ce qui demanderait qu'une voiture reste dessous pendant plus de quatre
+  secondes en freinant exactement comme elle : non observé.
+- **Dans un peloton serré, moins de décollages** : s'il n'y a pas de place libre où retomber,
+  la voiture ne décolle pas et le contact reste un tamponnage.
 - **En virage**, « devant » n'a plus de sens simple : le vol est rectiligne.
 - **Mise en scène** : les mouvements de la vue et l'assiette de la voiture en vol suivent la
   part du vol accomplie ; ils n'ont pas été réglés pour des vols plus longs que 0,85 s, ni

@@ -61,7 +61,7 @@ Délai avant restitution, pendant lequel les touches de direction n'ont aucun ef
 | 3 accident violent | 6,6 s | 0 km/h (redémarrage) |
 | 4 panneau | 3,5 s | 0 km/h (fin de la glissade) |
 | 5 tamponnages | 1,0 s | 59 km/h |
-| 6 nez contre roue (nouveau) | 1,2 s | 64 km/h |
+| 6 nez contre roue (nouveau) | 1,2 s | 54 km/h |
 
 Seule piste de ce côté pour une impression de « ne pas pouvoir tourner » au banc : appuyer
 avant le message. Pour l'accident violent cela dure 6,6 s, dont 4 s d'épave immobile.
@@ -75,7 +75,7 @@ Braquage après restitution, banc joué sans navigateur (touche tenue 1,3 s, ple
 | 3 accident | −71,5° en 1,31 s (0 → 70 km/h) | +75,4° en 1,31 s |
 | 4 panneau | −46,3° en 1,07 s (0 → 37 km/h) | +46,3° en 1,07 s |
 | 5 tamponnages | −55,8° en 1,32 s (59 → 104 km/h) | +53,7° en 1,27 s |
-| 6 nez contre roue | −53,3° en 1,28 s (64 → 104 km/h) | +54,5° en 1,31 s |
+| 6 nez contre roue | −56,7° en 1,27 s (54 → 98 km/h) | +58,0° en 1,30 s |
 
 (Les écarts gauche / droite de quelques degrés viennent de ce que la voiture n'est pas au même
 endroit de la route dans les deux essais — bord, mur des stands — et, pour le saut, de la

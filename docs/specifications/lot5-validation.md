@@ -34,7 +34,7 @@ message les touches de direction n'ont pas d'effet.
 | `2` | Saut récupérable, roue contre roue (215 km/h sur 150) | l'étoile est sur votre roue avant droite, contre la roue arrière gauche de l'autre ; la voiture décolle sans être ralentie, passe l'autre voiture et retombe **devant** elle (elle est dans le rétroviseur droit) vers 185 km/h ; le volant se dandine une fois ; vous conduisez |
 | `3` | Accident violent E3 (262 km/h sur 188) | la voiture passe au-dessus de l'autre, retombe devant elle et sur le côté ; explosion, arrêt ; l'autre voiture longe l'épave sans la toucher ; redémarrage |
 | `4` | Panneau E5 | inchangé : envol sur le panneau, retombée 35 m plus loin, glissade |
-| `6` | Nez contre roue arrière (175 km/h sur 110) | plus d'écart qu'il n'en faut pour un saut, mais les carrosseries se touchent : tamponnage, la voiture reste au sol |
+| `6` | Nez contre roue arrière (165 km/h sur 100) | plus d'écart qu'il n'en faut pour un saut, mais les carrosseries se touchent : tamponnage, la voiture reste au sol |
 | `1` | Roue contre roue côte à côte (E2) | inchangé : frottement, pas de décollage |
 | `5` | Tamponnages (E4) | inchangé |
 
@@ -109,8 +109,10 @@ contre roue, roues qui se rejoignent par le flanc : jamais de saut.
 libre : la voiture suit sa vitesse et perd 50 km/h par seconde, comme avant. Ce qui est choisi
 au décollage est la durée du vol, allongée quand il le faut pour retomber 0,5 m devant l'autre
 voiture ; si sa vitesse ne peut pas la faire passer, la voiture ne décolle pas. L'accident est
-de plus jeté de 0,4 m à côté de la trajectoire de l'autre voiture. L'atterrissage attend si une
-voiture est dessous. Rien n'est jamais déplacé à la main.
+de plus jeté de 0,4 m à côté de la trajectoire de l'autre voiture. Le lieu d'atterrissage est
+choisi libre de toute voiture du peloton (sinon la voiture ne décolle pas) ; si une voiture
+vient quand même dessous pendant le vol, l'atterrissage attend. Rien n'est jamais déplacé à la
+main.
 
 **Ce que cela coûte**, à savoir avant d'essayer :
 
@@ -136,7 +138,7 @@ dessin montre pourtant un braquage complet (11,8° dessinés pour 1,5° réels �
 
 ## 4. Rapport de non-régression
 
-Sur le build final (1 081 435 octets). « Identique » veut dire identique valeur pour valeur.
+Sur le build final (1 085 255 octets). « Identique » veut dire identique valeur pour valeur.
 
 | Ce qui devait être préservé | Contrôle | Résultat |
 |---|---|---|
@@ -152,14 +154,32 @@ Sur le build final (1 081 435 octets). « Identique » veut dire identique valeu
 | Modes de jeu | `flow-check.mjs` | 5 parcours réussis |
 | Graphismes, pages, audio | `smoke.browser.mjs`, `pages-check.mjs`, `audio-check.mjs` | 13 / 13, 14 / 14, 80 / 80 |
 | Déterminisme à 120 Hz | `npm test` | réussi |
-| Courses complètes de l'ordinateur | 21 courses de 16 voitures, avant / après | toutes terminées ; somme des temps des vainqueurs identique (4 268,55 s) ; tamponnages 184 → 212, frottements 1 090 → 1 103 (les anciens sauts redeviennent des contacts au sol), accidents 10 → 5, remises en piste 17 → 27, voitures à l'arrivée 279 → 289 |
+| Courses complètes de l'ordinateur | 21 courses de 16 voitures, avant / après | toutes terminées ; somme des temps des vainqueurs identique (4 268,55 s) ; tamponnages 184 → 219, frottements 1 090 → 1 110 (les anciens sauts redeviennent des contacts au sol), accidents 10 → 5, remises en piste 17 → 25, voitures à l'arrivée 279 → 293 |
 | Coût de la simulation | trois courses, médiane de cinq passes | 21 à 23 µs par pas avant comme après |
 
-Suite `npm test` : 103 / 103, dont 76 tests de la PR #4 inchangés, 15 réécrits ou adaptés aux
-règles demandées (devenus 14) et 13 nouveaux (`tests.md` § 1 ter).
+Suite `npm test` : 109 / 109, dont 76 tests de la PR #4 inchangés, 15 réécrits ou adaptés aux
+règles demandées (devenus 14) et 19 nouveaux, dont 6 écrits pour les défauts trouvés par la
+relecture indépendante du code (`tests.md` § 1 ter).
 
-Non couvert : aucun essai au volant ; aucun critique indépendant sur ce lot ; performances
-graphiques non remesurées (aucun changement de rendu hormis la hauteur des rétroviseurs).
+### Relecture indépendante du code
+
+Après la première livraison de cette branche, le code des collisions a été relu par un
+relecteur indépendant. Il a confirmé que tout contact sans vol est identique à la PR #4
+(17 640 arrivées comparées pas à pas) et a reproduit **sept défauts**, dont un grave : dans un
+peloton, un saut pouvait finir par se poser dans une troisième voiture. Les sept sont corrigés,
+six tests ont été ajoutés (chacun échoue sur le code d'avant correction), et les mesures, les
+courses et les dix séquences du banc ont été refaites ensuite : la télémétrie des séquences est
+identique octet pour octet à celle de la première livraison, sauf pour le cas 6, dont les
+vitesses ont changé (seule vidéo remplacée). Liste et corrections : `collisions.md` § 2 ter,
+« Relecture indépendante du code, et suites ».
+
+Relevé à cette occasion et **non corrigé** (antérieur à ce lot, hors de son objet) : une
+voiture de l'ordinateur retirée de la course après un abandon reste un obstacle solide alors
+qu'elle n'est plus dessinée.
+
+Non couvert : aucun essai au volant ; aucun critique indépendant de l'image sur ce lot (la
+relecture a porté sur le code) ; performances graphiques non remesurées (aucun changement de
+rendu hormis la hauteur des rétroviseurs).
 
 ## 5. À valider ou à arbitrer
 

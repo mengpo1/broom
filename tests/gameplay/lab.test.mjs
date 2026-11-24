@@ -72,7 +72,7 @@ test('bench, cases 1, 5 and 6: contacts that must not lift a car', () => {
   const hit = firstOf(body, 'bump');
   assert.ok(hit && !firstOf(body, 'launch') && !firstOf(body, 'hop'), `case 6: bump, no flight (${typesOf(body).join(' ')})`);
   const before = body.frames[hit.frame - 1];
-  assert.ok(before.me.speed - before.lead.speed > T.hopClosingSpeed + 5 && before.me.speed > T.hopMinSpeed + 5 && before.me.speed < T.launchMinSpeed, `at ${(before.me.speed * KMH).toFixed(0)} km/h on a car at ${(before.lead.speed * KMH).toFixed(0)} km/h: the energy of a hop, under the speed of the accident`);
+  assert.ok(before.me.speed - before.lead.speed > T.hopClosingSpeed + 5 && before.me.speed > T.hopMinSpeed + 5 && before.me.speed < T.launchMinSpeed - 2.5, `at ${(before.me.speed * KMH).toFixed(0)} km/h on a car at ${(before.lead.speed * KMH).toFixed(0)} km/h: the energy of a hop, well under the speed of the accident (${(T.launchMinSpeed * KMH).toFixed(0)} km/h)`);
   assert.ok(bodyOverlap(body.frames[hit.frame - 1].me, body.frames[hit.frame - 1].lead) > 0 || bodyOverlap(body.frames[hit.frame].me, body.frames[hit.frame].lead) >= 0, 'the bodies touched');
   assert.ok(Math.abs(body.frames[hit.frame].lead.speed - body.frames[hit.frame].me.speed - T.bumpSeparation) < 0.6, 'with the loss of any bump');
   assert.ok(body.frames.every((f) => f.me.airHeight === 0), 'the car never leaves the ground');

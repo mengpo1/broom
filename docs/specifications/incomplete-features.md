@@ -58,8 +58,14 @@ par le rasteriseur logiciel SwiftShader).
     longtemps près du seuil. **Sur ce point le jeu s'écarte de la vidéo de référence**, où
     les voitures heurtées sont devant après le vol ;
   - une épave reste traversable par les autres voitures ; seule la voiture survolée est sûre
-    de passer à côté. En virage ou contre une barrière la voiture peut ne pas retomber
-    « devant » (2 accidents sur 5 dans les courses d'essai), mais jamais sur une autre ;
+    de passer à côté. Quand l'autre voiture accélère, ou contre une barrière, la voiture peut
+    ne pas retomber « devant » (2 accidents sur 5 dans les courses d'essai), mais jamais sur
+    une autre ;
+  - le lieu d'atterrissage est choisi libre de toute voiture : dans un peloton serré il y a
+    donc moins de décollages (le contact reste un tamponnage). Si une voiture vient dessous
+    pendant le vol, la voiture attend en l'air tant qu'elle y est, sans plafond explicite
+    (0,77 s au plus sur 854 vols construits pour cela) : rare, mais visible (une voiture qui
+    glisse à 20–60 cm au-dessus d'une autre) ;
   - la mise en scène (vue, assiette de la voiture en vol) n'a pas été réglée pour les vols
     plus longs que 0,85 s ni pour l'attente en l'air ;
   - rétroviseurs : la variante B (+2,5 cm) est dans le jeu comme **proposition** ; A et C se
@@ -68,7 +74,12 @@ par le rasteriseur logiciel SwiftShader).
     vitesse élevée (la butée est limitée par l'adhérence) ; le dessin des roues et du volant
     montre un braquage complet quand l'angle réel est de 1,5°. Toute modification de la
     conduite attend un arbitrage ;
-  - aucun critique indépendant n'a revu ce lot ; rien n'a été essayé au volant.
+  - une relecture indépendante du code a trouvé sept défauts dans la première livraison de
+    ce lot, tous corrigés et testés (`collisions.md` § 2 ter) ; les corrections elles-mêmes
+    n'ont pas été relues à leur tour. Relevé à cette occasion, antérieur au lot et **non
+    corrigé** : une voiture de l'ordinateur retirée après un abandon (elle n'est plus
+    dessinée) reste un obstacle solide ;
+  - aucun critique indépendant n'a revu l'image de ce lot ; rien n'a été essayé au volant.
 - **Saut récupérable** *(état de la PR #4, pour mémoire)* : choix de gameplay original (rien de tel dans la vidéo de référence),
   ajouté à la demande du joueur. Ses seuils et son dosage sont des réglages de départ, jamais
   essayés au volant ; il se teste avec le banc d'essai (`collision-test-bench.md`). Les
