@@ -1,0 +1,17 @@
+{
+ "source": "HOPslow.json",
+ "imagesPerSecond": 30,
+ "takeOffImage": 44,
+ "landingImage": 116,
+ "tyreOverlapAtTakeOffCm": 12.5,
+ "tyreDepthAtTakeOffCm": 7.9,
+ "bodiesOverlapAtTakeOffM": 0.0,
+ "lateralGapBetweenBodiesCm": 9.0,
+ "aheadAtTakeOffM": -3.48,
+ "frontWheelOfTheCarBehind": "right",
+ "rearWheelOfTheCarAhead": "left",
+ "aheadAtLandingM": 4.74,
+ "tailAheadOfTheOtherNoseM": 0.54,
+ "sideAtLandingM": -1.95,
+ "flightSeconds": 0.6
+}
