@@ -539,14 +539,18 @@ function holdLanding(car, cars, dt, track, emit) {
     for (let i = 1; i < below; i++) if (paces[i] < paces[slowest]) slowest = i;
     if (car.airLetGo) {
       // it has let a car go in this flight: it does not hold its speed to pass a car any more, nor glide over one. Left
-      // to itself it may still be flying past every car below (one of them has stopped dead, as the reset key does): if
-      // it is past them all within flightPassTime, losing speed as in any flight, it flies on. Otherwise it lets them all
-      // go, the slowest included
-      let passing = next > 0;
+      // to itself it may still be flying past a car below (one that has stopped dead, as the reset key does): a car it
+      // is past within flightPassTime, losing speed as in any flight, needs nothing. If every car below is either that,
+      // or being let go already, it flies on. Otherwise it lets them all go, the slowest included
+      // (car by car: one it is already slower than by the margin is being let go, and needs nothing more)
       const tp = T.flightPassTime, reach = next * tp - 0.5 * decel * tp * tp;
-      for (let i = 0; i < below && passing; i++) if (reach - paces[i] * tp < gaps[i]) passing = false;
-      if (passing) car.airMode = 1;
-      else if (next > paces[slowest] - T.flightYieldSpeed) { car.airMode = -1; next = paces[slowest] - T.flightYieldSpeed; car.airCap = next; }
+      let free = true, passing = false;
+      for (let i = 0; i < below && free; i++) {
+        if (next <= paces[i] - T.flightYieldSpeed + 1e-9) continue;
+        if (next > 0 && reach - paces[i] * tp >= gaps[i]) passing = true; else free = false;
+      }
+      if (free) car.airMode = passing ? 1 : 0;
+      else { car.airMode = -1; next = paces[slowest] - T.flightYieldSpeed; car.airCap = next; }
     } else if (paced(next, below, T.flightYieldSpeed)) {
       const over = clearOf(next, below, T.flightYieldSpeed, 1), under = clearOf(next, below, T.flightYieldSpeed, -1);
       // (passing: from now on no faster than this, give or take what a driver holding his speed wavers by, so that a car
@@ -616,16 +620,19 @@ function standsClear(car, cars) {
  */
 function putBack(car, cars, track, emit) {
   if (track) {
-    const s0 = car.s, room = Math.max(0, track.halfWidth - car.params.halfWidth - 0.5);
-    const own = clamp(car.d, -room, room);
+    const pit = track.pit, s0 = car.s, d0 = car.d, room = Math.max(0, track.halfWidth - car.params.halfWidth - 0.5);
+    const own = clamp(d0, -room, room), lane = car.inPit;
     for (let k = 0; k < 160; k++) {
-      for (let lane = 0; lane < 4; lane++) {
-        placeCar(car, track, s0 - k * 1.5, lane === 0 ? own : lane === 1 ? 0 : lane === 2 ? room * 0.6 : -room * 0.6);
+      // a car of the pit lane stays in the pit lane for as long as the place is alongside the pit wall (its own line,
+      // then the line of the lane); otherwise, and for any other car, a place on the track
+      const rel = relativeS(track, s0 - k * 1.5), inLane = lane && rel >= pit.wallStartS && rel <= pit.wallEndS;
+      for (let i = 0; i < (inLane ? 2 : 4); i++) {
+        placeCar(car, track, s0 - k * 1.5, inLane ? (i === 0 ? d0 : pit.side * pit.laneD) : i === 0 ? own : i === 1 ? 0 : i === 2 ? room * 0.6 : -room * 0.6);
         // (it is further back than it was: its distance covered in the race goes back by as much)
-        if (standsClear(car, cars)) { putBackOnTrack(car, track, car.s, car.d, emit); car.progress -= k * 1.5; return true; }
+        if (standsClear(car, cars)) { putBackOnTrack(car, track, car.s, car.d, emit); car.inPit = inLane; car.progress -= k * 1.5; return true; }
       }
     }
-    putBackOnTrack(car, track, s0, 0, emit);          // (a road full of cars for 240 m: where any car is put back)
+    putBackOnTrack(car, track, s0, 0, emit); car.inPit = false;   // (a road full of cars for 240 m: where any car is put back)
     return true;
   }
   // (called without a track, which the game never does: straight back along its line, to the first free place)

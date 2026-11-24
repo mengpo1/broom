@@ -533,3 +533,42 @@ test('one car alone that stops dead under a car in flight still going fast: the 
   assert.ok(fl.waited > 1, `its landing did wait (${fl.waited.toFixed(2)} s)`);
   t.diagnostic(`one car that stops dead under a car in flight doing 130 km/h: ${told(fl)}`);
 });
+
+test('last resort for a car that came down over the pit lane: it is put back in the pit lane, on a free place, and stays there', (t) => {
+  // (fourth pass of the independent review. Since the cars of the pit lane count for a car in flight that has crossed
+  // into it, such a flight can wait to the limit there. The last resort then put the car on the track side of the wall
+  // while it was still marked as a car of the pit lane: at the next step the wall treated it as being on the wrong side
+  // and moved it 4 m sideways in one step, back into the pit lane, on a place nobody had looked at: in a car. It takes
+  // a pit lane full of cars four abreast, which no race has: 100 cars here)
+  const pit = track.pit, queue = 100;
+  const f = field(track, 2 + queue), [a, b] = f.cars, at = (rel) => track.length + rel - f.s0;
+  let flown = false;
+  f.put(b, at(-290), -7.2 + 0.93, 188, hold(188, -10.2 + 0.93));
+  f.put(a, at(-290) - LENGTH - 2.5, -7.2, 262, switching(hold(262, -10.2), () => flown, parked()));
+  for (let i = 0; i < queue; i++) {
+    const c = f.cars[2 + i], dC = -(10.7 + 2.0 * (i % 4));
+    let stopped = false;
+    f.put(c, at(-244) + Math.floor(i / 4) * 5.2, dC, 79, (car) => {     // (they roll at the pit speed and stop when the car takes off)
+      if (stopped || a.state === CAR_STATE.AIRBORNE) { stopped = true; car.inThrottle = 0; car.inBrake = car.speed > 0.5 ? 1 : 0; car.inSteer = 0; return; }
+      car.inThrottle = 0.3; car.inBrake = 0; car.inSteer = Math.max(-0.2, Math.min(0.2, (dC - car.d) * 0.08 - car.headingError * 1.5));
+    });
+    c.inPit = true;
+  }
+  let up = -1, down = -1, put = false, overlap = 0, sideways = 0, overlapAfter = 0;
+  for (let i = 0; i < 120 * 8; i++) {
+    const st = a.state, resets = a.resets, d0 = a.d;
+    f.tick();
+    if (a.state === CAR_STATE.AIRBORNE) { flown = true; if (up < 0) up = i; }
+    const around = () => { let most = 0; for (const o of f.cars) if (o !== a && !o.removed && o.state !== CAR_STATE.AIRBORNE) most = Math.max(most, bodyOverlap(a, o)); return most; };
+    if (st === CAR_STATE.AIRBORNE && a.state !== CAR_STATE.AIRBORNE && down < 0) { down = i; put = a.resets > resets; overlap = around(); }
+    else if (down >= 0 && i - down <= 120) { sideways = Math.max(sideways, Math.abs(a.d - d0)); overlapAfter = Math.max(overlapAfter, around()); }
+  }
+  assert.ok(up >= 0 && down >= 0, 'the car took off and its flight ended');
+  assert.ok(put, 'by the last resort: the pit lane is full under it for the whole of the longest wait');
+  assert.equal(overlap, 0, `put back ${overlap.toFixed(2)} m inside a car`);
+  assert.ok(sideways < 0.05, `then moved ${sideways.toFixed(2)} m sideways in one step`);
+  assert.equal(overlapAfter, 0, `and found ${overlapAfter.toFixed(2)} m inside a car in the second that follows`);
+  const rel = relativeS(track, a.s), alongside = rel >= pit.wallStartS && rel <= pit.wallEndS;
+  if (alongside) assert.equal(a.inPit, Math.abs(a.d) > pit.wallD, 'it is known to be on the side of the pit wall where it stands');
+  t.diagnostic(`a pit lane full of cars four abreast: the car is put back ${a.inPit ? 'in the pit lane' : 'on the track'} after ${((down - up) * SIM_DT).toFixed(2)} s, ${Math.abs(a.d).toFixed(1)} m from the centre line, in no car, and is not moved afterwards`);
+});
