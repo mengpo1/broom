@@ -3258,9 +3258,15 @@ const CONTACT = { SIMPLE: 'contact', REAR_BUMP: 'bump', WHEEL: 'wheel', LAUNCH: 
 
 const axes = new Float64Array(8);
 
+/**
+ * Can this car be hit by another? A racing or spinning car, and a retired car for as long as it is on the track
+ * (slowing down, then stopped where everybody sees it). Not a car taken off the track (`removed`: a retired computer
+ * car, a few seconds after it has stopped: it is no longer drawn, it must not be in the way either), nor a car in
+ * the pit lane, nor one protected for a moment after being put back or restarting.
+ */
 function collidable(car) {
   return (car.state === CAR_STATE.RACING || car.state === CAR_STATE.SPIN || car.state === CAR_STATE.RETIRED)
-    && car.ghostTimer <= 0 && !car.inPit;
+    && car.ghostTimer <= 0 && !car.inPit && !car.removed;
 }
 
 function worldVelocity(car, out) {
