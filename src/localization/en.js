@@ -77,7 +77,7 @@ export const EN = {
   'key.Enter': 'ENTER', 'key.Tab': 'TAB',
   // collision test bench (development tool, launch option #lab=...)
   'lab.title': 'TEST BENCH (DEVELOPMENT)', 'lab.auto': 'autopilot until the contact', 'lab.yours': 'YOUR TURN TO DRIVE', 'lab.stopped': 'stopped',
-  'lab.case.wheel': '1 · wheel to wheel, no flight', 'lab.case.hop': '2 · recoverable hop', 'lab.case.crash': '3 · hard accident (E3)',
-  'lab.case.board': '4 · roadside board (E5)', 'lab.case.bump': '5 · rear-end bumps',
-  'lab.keys': 'Keys 1 to 5: choose a case · Enter: replay · C: change camera',
+  'lab.case.wheel': '1 · wheel to wheel, no flight', 'lab.case.hop': '2 · recoverable hop (wheel on wheel)', 'lab.case.crash': '3 · hard accident (E3)',
+  'lab.case.board': '4 · roadside board (E5)', 'lab.case.bump': '5 · rear-end bumps', 'lab.case.body': '6 · nose against rear wheel: no hop', 'lab.case.under': '7 · hop, a third car stays under the car in flight',
+  'lab.keys': 'Keys 1 to 7: choose a case · Enter: replay · C: change camera',
 };

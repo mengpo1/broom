@@ -1,0 +1,101 @@
+{
+ "scene": "kestrel-fields, 150 km/h, one car behind on the right, one ahead on the left",
+ "width": 1280,
+ "height": 720,
+ "defaultOfTheGame": "b",
+ "variants": [
+  {
+   "id": "A",
+   "option": "#mirrors=a",
+   "label": "hauteur de la PR #4",
+   "z": 0.675,
+   "y": 0.395,
+   "width": 0.14,
+   "height": 0.075,
+   "arm": [
+    0.4,
+    0.25,
+    0.585
+   ],
+   "raisedByCm": 0,
+   "isDefaultOfTheGame": false,
+   "expectedRisePx": 0,
+   "measuredInTheCockpitView": {
+    "leftMirror": {
+     "up": 0,
+     "sideways": 0,
+     "residual": 0.0
+    },
+    "rightMirror": {
+     "up": 0,
+     "sideways": 0,
+     "residual": 0.0
+    },
+    "expectedUpPx": 0
+   },
+   "raisedOnThePicturePx": 0
+  },
+  {
+   "id": "B",
+   "option": "#mirrors=b",
+   "label": "l\u00e9g\u00e8rement remont\u00e9s",
+   "z": 0.7,
+   "y": 0.395,
+   "width": 0.14,
+   "height": 0.075,
+   "arm": [
+    0.4,
+    0.25,
+    0.585
+   ],
+   "raisedByCm": 2.5,
+   "isDefaultOfTheGame": true,
+   "expectedRisePx": 29.6,
+   "measuredInTheCockpitView": {
+    "leftMirror": {
+     "up": 30,
+     "sideways": 0,
+     "residual": 7.1
+    },
+    "rightMirror": {
+     "up": 30,
+     "sideways": 0,
+     "residual": 9.7
+    },
+    "expectedUpPx": 29.6
+   },
+   "raisedOnThePicturePx": 30
+  },
+  {
+   "id": "C",
+   "option": "#mirrors=c",
+   "label": "remont\u00e9s davantage",
+   "z": 0.725,
+   "y": 0.395,
+   "width": 0.14,
+   "height": 0.075,
+   "arm": [
+    0.4,
+    0.25,
+    0.585
+   ],
+   "raisedByCm": 5,
+   "isDefaultOfTheGame": false,
+   "expectedRisePx": 59.1,
+   "measuredInTheCockpitView": {
+    "leftMirror": {
+     "up": 59,
+     "sideways": 0,
+     "residual": 3.9
+    },
+    "rightMirror": {
+     "up": 59,
+     "sideways": 0,
+     "residual": 5.1
+    },
+    "expectedUpPx": 59.1
+   },
+   "raisedOnThePicturePx": 59
+  }
+ ]
+}

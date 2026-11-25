@@ -45,7 +45,56 @@ par le rasteriseur logiciel SwiftShader).
   Un critique indépendant a relevé 7 défauts moyens et 13 mineurs sur les séquences
   (`work/reviews/collision-review.md`) ; ce qui n'a pas été traité est listé dans
   `collisions.md` § 9, et les corrections n'ont pas été revues à leur tour.
-- **Saut récupérable** : choix de gameplay original (rien de tel dans la vidéo de référence),
+- **Lot 5 — saut par contact de roues, franchissement, rétroviseurs remontés, braquage**
+  (décisions du joueur après les essais de la PR #4 ; `collisions.md` § 2 ter,
+  `wheels-and-mirrors.md` § 2 ter, `steering-diagnosis.md`) :
+  - le saut récupérable ne vient plus que d'une roue avant qui entre par l'arrière dans une
+    roue arrière, carrosseries séparées : une bande de 17 cm de chaque côté, avec 58 km/h
+    d'écart. **Dans 21 courses de 16 voitures de l'ordinateur il ne s'en produit plus aucun**
+    (42 avec les règles de la PR #4). Il se teste au banc d'essai ; sa fréquence en course est
+    à arbitrer, avec les réglages possibles (`collisions.md`, « solutions chiffrées ») ;
+  - tout décollage sur une voiture la franchit et retombe devant elle ; pour cela il faut
+    58 km/h d'écart (54 auparavant pour l'accident, 36 pour le saut), et le vol dure plus
+    longtemps près du seuil. **Sur ce point le jeu s'écarte de la vidéo de référence**, où
+    les voitures heurtées sont devant après le vol ;
+  - une épave reste traversable par les autres voitures ; seule la voiture survolée est sûre
+    de passer à côté. Quand l'autre voiture accélère, ou contre une barrière, la voiture peut
+    ne pas retomber « devant » (2 accidents sur 5 dans les courses d'essai), mais jamais sur
+    une autre ;
+  - le lieu d'atterrissage est choisi libre de toute voiture : dans un peloton serré il y a
+    donc moins de décollages (le contact reste un tamponnage). Si une voiture vient dessous
+    pendant le vol, la voiture en vol **s'en dégage** (elle la dépasse ou la laisse partir, à
+    29 km/h d'écart au moins) : une à trois secondes, pendant lesquelles elle est dessinée
+    au-dessus de l'autre, sa vitesse fixée par la règle et non plus par le vol ; au-dessus d'une
+    voiture qui rampe elle peut reculer (elle est alors posée à l'arrêt). À juger à l'écran
+    (cas 7 du banc). Un vol ne dure jamais plus de 3,5 s au-delà de sa durée prévue ;
+    passé ce délai, si des voitures se sont relayées dessous, **la voiture est remise en piste
+    sur une place libre** : c'est la seule téléportation en vol, à arbitrer (`collisions.md`
+    § 2 quater, avec les autres issues possibles et leur coût) ;
+  - **la règle « retomber devant » n'est pas tenue en peloton** : 20 vols sur 34 dans 54
+    courses à 20 voitures ne retombent pas devant la voiture heurtée (en courbe, ou quand elle
+    accélère). Exception à arbitrer, non conforme à la règle générale ;
+  - la mise en scène (vue, assiette de la voiture en vol) n'a pas été réglée pour les vols
+    plus longs que 0,85 s ni pour l'attente en l'air ;
+  - rétroviseurs : la variante B (+2,5 cm) est dans le jeu comme **proposition** ; A et C se
+    choisissent par `#mirrors=a` et `#mirrors=c` ;
+  - braquage : **aucune correction**. Le diagnostic conclut à un comportement normal à
+    vitesse élevée (la butée est limitée par l'adhérence) ; le dessin des roues et du volant
+    montre un braquage complet quand l'angle réel est de 1,5°. Toute modification de la
+    conduite attend un arbitrage ;
+  - une relecture indépendante du code a trouvé sept défauts dans la première livraison de
+    ce lot, tous corrigés et testés (`collisions.md` § 2 ter). Relevé à cette occasion et
+    **corrigé depuis, à part** : une voiture de l'ordinateur retirée après un abandon (elle
+    n'est plus dessinée) n'est plus un obstacle. La sécurisation qui a suivi (attente en vol
+    bornée) a été relue à son tour, en quatre passes par deux relecteurs indépendants, chacune
+    portant sur les suites de la précédente : un défaut grave et deux moyens à la première,
+    trois moyens à la seconde, un grave (régression de la correction du muret des stands) et
+    deux moyens à la troisième, un grave (dans une voie des stands pleine sur quatre files) et
+    un moyen à la quatrième, tous traités et testés, sauf une limite étroite laissée en
+    l'état (`collisions.md` § 2 quater, constat 25). Les corrections de la quatrième passe
+    n'ont pas été relues ;
+  - aucun critique indépendant n'a revu l'image de ce lot ; rien n'a été essayé au volant.
+- **Saut récupérable** *(état de la PR #4, pour mémoire)* : choix de gameplay original (rien de tel dans la vidéo de référence),
   ajouté à la demande du joueur. Ses seuils et son dosage sont des réglages de départ, jamais
   essayés au volant ; il se teste avec le banc d'essai (`collision-test-bench.md`). Les
   voitures de l'ordinateur sautent aussi (1 à 5 fois par course de 16 voitures sur six courses

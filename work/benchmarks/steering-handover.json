@@ -1,0 +1,590 @@
+{
+ "note": "real game, real time, real key events; nothing is changed",
+ "cases": {
+  "hop": {
+   "beforeTheHandOver": {
+    "stepsWithTheLeftKeyHeld": 24,
+    "keyboardRequests": [
+     -1
+    ],
+    "stepsFedByTheBench": 24,
+    "requestSeenByTheCar": [
+     0,
+     0
+    ]
+   },
+   "handOver": {
+    "afterSeconds": 2.23,
+    "state": 1,
+    "speedKmh": 184
+   },
+   "handsOff": {
+    "steps": 12,
+    "stepsFedByTheBench": 0,
+    "requests": [
+     "0/0"
+    ],
+    "pitAuto": false,
+    "autoDrive": false
+   },
+   "leftKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     -1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     -1
+    ],
+    "steerAtTheEnd": -1,
+    "fullLockAfterSeconds": 0.3,
+    "yawDegPerSecondAtTheEnd": -30.6,
+    "headingTurnedDeg": -7.5,
+    "speedKmh": [
+     192,
+     208
+    ],
+    "states": [
+     1
+    ]
+   },
+   "rightKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     1
+    ],
+    "steerAtTheEnd": 1,
+    "fullLockAfterSeconds": 0.258,
+    "yawDegPerSecondAtTheEnd": 19.1,
+    "headingTurnedDeg": 4.1,
+    "speedKmh": [
+     212,
+     221
+    ],
+    "states": [
+     1
+    ]
+   },
+   "bothKeys": {
+    "steps": 24,
+    "requestSeenByTheCar": [
+     0
+    ]
+   }
+  },
+  "wheel": {
+   "beforeTheHandOver": {
+    "stepsWithTheLeftKeyHeld": 24,
+    "keyboardRequests": [
+     -1
+    ],
+    "stepsFedByTheBench": 24,
+    "requestSeenByTheCar": [
+     0,
+     0
+    ]
+   },
+   "handOver": {
+    "afterSeconds": 1.04,
+    "state": 1,
+    "speedKmh": 52
+   },
+   "handsOff": {
+    "steps": 12,
+    "stepsFedByTheBench": 0,
+    "requests": [
+     "0/0"
+    ],
+    "pitAuto": false,
+    "autoDrive": false
+   },
+   "leftKey": {
+    "steps": 60,
+    "seconds": 0.5,
+    "keyboardRequests": [
+     -1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     -1
+    ],
+    "steerAtTheEnd": -1,
+    "fullLockAfterSeconds": 0.225,
+    "yawDegPerSecondAtTheEnd": -52.6,
+    "headingTurnedDeg": -20.6,
+    "speedKmh": [
+     58,
+     84
+    ],
+    "states": [
+     1
+    ]
+   },
+   "rightKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     1
+    ],
+    "steerAtTheEnd": 1,
+    "fullLockAfterSeconds": 0.258,
+    "yawDegPerSecondAtTheEnd": 42.7,
+    "headingTurnedDeg": 8.1,
+    "speedKmh": [
+     90,
+     107
+    ],
+    "states": [
+     1
+    ]
+   },
+   "bothKeys": {
+    "steps": 12,
+    "requestSeenByTheCar": [
+     0
+    ]
+   }
+  },
+  "bump": {
+   "beforeTheHandOver": {
+    "stepsWithTheLeftKeyHeld": 24,
+    "keyboardRequests": [
+     -1
+    ],
+    "stepsFedByTheBench": 24,
+    "requestSeenByTheCar": [
+     0,
+     0
+    ]
+   },
+   "handOver": {
+    "afterSeconds": 1.04,
+    "state": 1,
+    "speedKmh": 59
+   },
+   "handsOff": {
+    "steps": 12,
+    "stepsFedByTheBench": 0,
+    "requests": [
+     "0/0"
+    ],
+    "pitAuto": false,
+    "autoDrive": false
+   },
+   "leftKey": {
+    "steps": 60,
+    "seconds": 0.5,
+    "keyboardRequests": [
+     -1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     -1
+    ],
+    "steerAtTheEnd": -1,
+    "fullLockAfterSeconds": 0.225,
+    "yawDegPerSecondAtTheEnd": -49.5,
+    "headingTurnedDeg": -19.2,
+    "speedKmh": [
+     64,
+     91
+    ],
+    "states": [
+     1
+    ]
+   },
+   "rightKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     1
+    ],
+    "steerAtTheEnd": 1,
+    "fullLockAfterSeconds": 0.258,
+    "yawDegPerSecondAtTheEnd": 40.9,
+    "headingTurnedDeg": 7.8,
+    "speedKmh": [
+     94,
+     114
+    ],
+    "states": [
+     1
+    ]
+   },
+   "bothKeys": {
+    "steps": 12,
+    "requestSeenByTheCar": [
+     0
+    ]
+   }
+  },
+  "body": {
+   "beforeTheHandOver": {
+    "stepsWithTheLeftKeyHeld": 24,
+    "keyboardRequests": [
+     -1
+    ],
+    "stepsFedByTheBench": 24,
+    "requestSeenByTheCar": [
+     0,
+     0
+    ]
+   },
+   "handOver": {
+    "afterSeconds": 1.22,
+    "state": 1,
+    "speedKmh": 54
+   },
+   "handsOff": {
+    "steps": 12,
+    "stepsFedByTheBench": 0,
+    "requests": [
+     "0/0"
+    ],
+    "pitAuto": false,
+    "autoDrive": false
+   },
+   "leftKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     -1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     -1
+    ],
+    "steerAtTheEnd": -1,
+    "fullLockAfterSeconds": 0.225,
+    "yawDegPerSecondAtTheEnd": -54.4,
+    "headingTurnedDeg": -15,
+    "speedKmh": [
+     59,
+     80
+    ],
+    "states": [
+     1
+    ]
+   },
+   "rightKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     1
+    ],
+    "steerAtTheEnd": 1,
+    "fullLockAfterSeconds": 0.258,
+    "yawDegPerSecondAtTheEnd": 44,
+    "headingTurnedDeg": 8.3,
+    "speedKmh": [
+     86,
+     103
+    ],
+    "states": [
+     1
+    ]
+   },
+   "bothKeys": {
+    "steps": 12,
+    "requestSeenByTheCar": [
+     0
+    ]
+   }
+  },
+  "under": {
+   "beforeTheHandOver": {
+    "stepsWithTheLeftKeyHeld": 24,
+    "keyboardRequests": [
+     -1
+    ],
+    "stepsFedByTheBench": 24,
+    "requestSeenByTheCar": [
+     0,
+     0
+    ]
+   },
+   "handOver": {
+    "afterSeconds": 2.84,
+    "state": 1,
+    "speedKmh": 93
+   },
+   "handsOff": {
+    "steps": 12,
+    "stepsFedByTheBench": 0,
+    "requests": [
+     "0/0"
+    ],
+    "pitAuto": false,
+    "autoDrive": false
+   },
+   "leftKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     -1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     -1
+    ],
+    "steerAtTheEnd": -1,
+    "fullLockAfterSeconds": 0.333,
+    "yawDegPerSecondAtTheEnd": -38.4,
+    "headingTurnedDeg": -10.5,
+    "speedKmh": [
+     103,
+     126
+    ],
+    "states": [
+     1
+    ]
+   },
+   "rightKey": {
+    "steps": 60,
+    "seconds": 0.5,
+    "keyboardRequests": [
+     1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     1
+    ],
+    "steerAtTheEnd": 1,
+    "fullLockAfterSeconds": 0.258,
+    "yawDegPerSecondAtTheEnd": 22.2,
+    "headingTurnedDeg": 8.2,
+    "speedKmh": [
+     133,
+     149
+    ],
+    "states": [
+     1
+    ]
+   },
+   "bothKeys": {
+    "steps": 12,
+    "requestSeenByTheCar": [
+     0
+    ]
+   }
+  },
+  "crash": {
+   "beforeTheHandOver": {
+    "stepsWithTheLeftKeyHeld": 24,
+    "keyboardRequests": [
+     -1
+    ],
+    "stepsFedByTheBench": 24,
+    "requestSeenByTheCar": [
+     0,
+     0
+    ]
+   },
+   "handOver": {
+    "afterSeconds": 6.6,
+    "state": 1,
+    "speedKmh": 0
+   },
+   "handsOff": {
+    "steps": 24,
+    "stepsFedByTheBench": 0,
+    "requests": [
+     "0/0"
+    ],
+    "pitAuto": false,
+    "autoDrive": false
+   },
+   "leftKey": {
+    "steps": 60,
+    "seconds": 0.5,
+    "keyboardRequests": [
+     -1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     -1
+    ],
+    "steerAtTheEnd": -1,
+    "fullLockAfterSeconds": 0.225,
+    "yawDegPerSecondAtTheEnd": -48.5,
+    "headingTurnedDeg": -18.8,
+    "speedKmh": [
+     66,
+     93
+    ],
+    "states": [
+     1
+    ]
+   },
+   "rightKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     1
+    ],
+    "steerAtTheEnd": 1,
+    "fullLockAfterSeconds": 0.258,
+    "yawDegPerSecondAtTheEnd": 26.8,
+    "headingTurnedDeg": 6.3,
+    "speedKmh": [
+     94,
+     111
+    ],
+    "states": [
+     1
+    ]
+   },
+   "bothKeys": {
+    "steps": 24,
+    "requestSeenByTheCar": [
+     0
+    ]
+   }
+  },
+  "board": {
+   "beforeTheHandOver": {
+    "stepsWithTheLeftKeyHeld": 24,
+    "keyboardRequests": [
+     -1
+    ],
+    "stepsFedByTheBench": 24,
+    "requestSeenByTheCar": [
+     -0.5,
+     -0.5
+    ]
+   },
+   "handOver": {
+    "afterSeconds": 3.54,
+    "state": 1,
+    "speedKmh": 0
+   },
+   "handsOff": {
+    "steps": 12,
+    "stepsFedByTheBench": 0,
+    "requests": [
+     "0/0"
+    ],
+    "pitAuto": false,
+    "autoDrive": false
+   },
+   "leftKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     -1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     -1
+    ],
+    "steerAtTheEnd": -1,
+    "fullLockAfterSeconds": 0.225,
+    "yawDegPerSecondAtTheEnd": -63.5,
+    "headingTurnedDeg": -15.3,
+    "speedKmh": [
+     30,
+     39
+    ],
+    "states": [
+     1
+    ]
+   },
+   "rightKey": {
+    "steps": 48,
+    "seconds": 0.4,
+    "keyboardRequests": [
+     1
+    ],
+    "benchRequests": 0,
+    "requestSeenByTheCar": [
+     1
+    ],
+    "steerAtTheEnd": 1,
+    "fullLockAfterSeconds": 0.258,
+    "yawDegPerSecondAtTheEnd": 72.9,
+    "headingTurnedDeg": 11.2,
+    "speedKmh": [
+     41,
+     53
+    ],
+    "states": [
+     1
+    ]
+   },
+   "bothKeys": {
+    "steps": 12,
+    "requestSeenByTheCar": [
+     0
+    ]
+   }
+  }
+ },
+ "normalRace": {
+  "leftKey": {
+   "steps": 48,
+   "seconds": 0.4,
+   "keyboardRequests": [
+    -1
+   ],
+   "benchRequests": 0,
+   "requestSeenByTheCar": [
+    -1
+   ],
+   "steerAtTheEnd": -1,
+   "fullLockAfterSeconds": 0.225,
+   "yawDegPerSecondAtTheEnd": -50,
+   "headingTurnedDeg": -13.7,
+   "speedKmh": [
+    67,
+    88
+   ],
+   "states": [
+    1
+   ]
+  },
+  "rightKey": {
+   "steps": 48,
+   "seconds": 0.4,
+   "keyboardRequests": [
+    1
+   ],
+   "benchRequests": 0,
+   "requestSeenByTheCar": [
+    1
+   ],
+   "steerAtTheEnd": 1,
+   "fullLockAfterSeconds": 0.258,
+   "yawDegPerSecondAtTheEnd": 41.4,
+   "headingTurnedDeg": 7.9,
+   "speedKmh": [
+    94,
+    111
+   ],
+   "states": [
+    1
+   ]
+  }
+ }
+}

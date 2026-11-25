@@ -1,7 +1,9 @@
 // Collision test bench — a DEVELOPMENT tool, never reachable from the menus of the game.
 // It is switched on by a launch option only (index.html#lab=hop, see main.js) and replays, on
 // demand, the situations that are rare in a normal race: a wheel contact, a recoverable hop, the
-// hard accident (E3), the launch on a roadside board (E5), repeated bumps (E4).
+// hard accident (E3), the launch on a roadside board (E5), repeated bumps (E4), a contact
+// between bodies that has the energy of a hop and must not give one, and a hop whose landing
+// place is taken by a third car that does what it can to stay there.
 //
 // Nothing here is a canned animation: the bench only PLACES two real cars and DRIVES them with
 // ordinary controls (steering, throttle) until they meet. The contact, the flight, the landing and
@@ -22,15 +24,26 @@ import { CAR_STATE, placeCar } from '../physics/car-physics.js';
  */
 export const LAB_SCENARIOS = {
   wheel: { key: 'Digit1', circuit: 'kestrel-fields', me: { speed: 146, back: 7, side: -3.2 }, other: { speed: 118 }, steerTo: -1.7, steerFrom: 0.45, hold: 146, release: 'wheel' },
-  // (the same staging as the accident below, with less speed; `back` makes the contact happen at the same instant, for comparison)
-  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 200, back: 23, side: -0.93 }, other: { speed: 150 }, steerTo: -0.93, steerFrom: 0, hold: 200, afterHold: 0.8, afterMove: 1.2, afterSide: -2.9, release: 'landing' },
+  // wheel on wheel: 1.95 m to the side of the car ahead, the right front wheel runs into the back of its left rear wheel
+  // (the bodies of the two cars 9 cm apart); it flies over that car and comes down ahead of it. `back` makes the contact
+  // happen at about the same instant as in the accident below, for comparison.
+  hop: { key: 'Digit2', circuit: 'kestrel-fields', me: { speed: 215, back: 28.4, side: -1.95 }, other: { speed: 150 }, steerTo: -1.95, steerFrom: 0, hold: 215, afterHold: 0.8, afterMove: 1.2, afterSide: -2.6, release: 'landing' },
   crash: { key: 'Digit3', circuit: 'kestrel-fields', me: { speed: 262, back: 34, side: -0.93 }, other: { speed: 188 }, steerTo: -0.93, steerFrom: 0, hold: 262, release: 'landing' },
   board: { key: 'Digit4', circuit: 'hazelbrook', board: true, me: { speed: 245, back: 70 }, release: 'landing' },
   // a first contact at about 40 km/h of closing speed, then the follower comes back gently on the car ahead (5 km/h faster)
   bump: { key: 'Digit5', circuit: 'kestrel-fields', me: { speed: 146, back: 12, side: 0 }, other: { speed: 105 }, steerTo: 0, steerFrom: 0, hold: 146, afterBump: 5, release: 'bump' },
+  // the nose on a rear wheel with more closing speed than the hop needs, under the speed of the accident: bodies touch,
+  // so it is a bump and nothing leaves the ground (it was a hop until the hop was tied to the wheels)
+  // (165 km/h: well under the speed of the accident, 180 km/h, whatever the scripted driver adds to its target)
+  body: { key: 'Digit6', circuit: 'kestrel-fields', me: { speed: 165, back: 22, side: -0.93 }, other: { speed: 100 }, steerTo: -0.93, steerFrom: 0, hold: 165, release: 'bump' },
+  // the hop of case 2 with a third car beside the player's car, at its speed, on the side away from the car that is hit.
+  // From the take-off that car steers onto the line of the car in flight and brakes as it slows down, to stay under it:
+  // the place where the car should land stays taken. (Extreme case: a driver doing this on purpose. The car in flight
+  // gets clear of it and comes down on free ground; before, it hung there until both had stopped.)
+  under: { key: 'Digit7', circuit: 'kestrel-fields', me: { speed: 215, back: 28.4, side: -1.95 }, other: { speed: 150 }, steerTo: -1.95, steerFrom: 0, hold: 215, afterHold: 0.8, afterMove: 1.2, afterSide: -2.6, release: 'landing', third: { side: -2.2, back: 0 } },
 };
 /** Other names accepted by the launch option (the names of the events in the analysis report, and French). */
-export const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump' };
+export const LAB_ALIASES = { e2: 'wheel', roue: 'wheel', saut: 'hop', e3: 'crash', accident: 'crash', e5: 'board', panneau: 'board', e4: 'bump', tamponnage: 'bump', nose: 'body', nez: 'body', carrosserie: 'body', dessous: 'under', attente: 'under', wait: 'under' };
 const WATCHED = ['bump', 'wheel', 'launch', 'hop', 'landing', 'obstacle', 'crash', 'restart', 'reset', 'contact'];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** Scripted driver after a recoverable landing: lateral error (m) to heading asked for (rad), times the speed (m/s). */
@@ -44,7 +57,7 @@ export class CollisionLab {
   constructor(app, quickRace) {
     this.app = app; this.quickRace = quickRace;
     this.name = null; this.scenario = null; this.race = null;
-    this.me = null; this.lead = null; this.board = null;
+    this.me = null; this.lead = null; this.board = null; this.third = null;
     this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
     this.handOver = true;                      // false: the bench keeps driving after the event (recordings)
     this.events = [];
@@ -78,7 +91,7 @@ export class CollisionLab {
     const kmh = (v) => v / 3.6;
     const gearFor = (car, v) => { const tops = car.params.spec.gearTopSpeeds; for (let g = 0; g < tops.length; g++) if (v < tops[g] * 0.93) return g + 1; return tops.length; };
     const put = (car, s, d, speed) => { placeCar(car, track, s, d); car.state = CAR_STATE.RACING; car.ghostTimer = 0; car.speed = kmh(speed); car.gear = gearFor(car, kmh(speed)); };
-    this.name = key; this.scenario = sc; this.race = race; this.me = me; this.lead = null; this.board = null;
+    this.name = key; this.scenario = sc; this.race = race; this.me = me; this.lead = null; this.board = null; this.third = null; this.thirdSeen = false;
     this.tick = 0; this.left = false; this.backTick = -1; this.bumped = false; this.triggered = false; this.released = false;
     this.handOver = handOver; this.events.length = 0;
     if (sc.board) {
@@ -103,6 +116,12 @@ export class CollisionLab {
       others.slice(1).forEach((c, k) => put(c, s0 + track.length / 2 + k * 40, 0, 150));
       // the car ahead is scripted (constant speed, straight): taken away from the computer driver
       this.lead = lead; lead.isHuman = true; this.leadSpeed = kmh(sc.other.speed); this.leadD = lead.d;
+      if (sc.third) {
+        // a third car, scripted too: beside the player's car until the take-off, then under it if it can
+        const third = others[1];
+        put(third, me.s - sc.third.back, me.d + sc.third.side, sc.me.speed);
+        this.third = third; third.isHuman = true; this.thirdD = third.d;
+      }
     }
     if (this.onChange) this.onChange(this);
     return true;
@@ -156,13 +175,35 @@ export class CollisionLab {
       lead.inThrottle = clamp(0.35 + dv * 0.4, 0, 1); lead.inBrake = dv < -2 ? 0.3 : 0;
       lead.inSteer = clamp((this.leadD - lead.d) * 0.3 - lead.headingError * 2.2, -0.3, 0.3);
     }
+    const third = this.third;
+    if (third && third.state === CAR_STATE.RACING) {
+      const me = this.me, L = this.race.track.length;
+      if (me.state === CAR_STATE.AIRBORNE) {
+        // under the car in flight if it can: it closes the distance as fast as it can still cancel the difference of
+        // speed on arrival, then keeps pace (it slows down as the car in flight does), and steers onto its line
+        this.thirdSeen = true;
+        const flown = Math.hypot(me.velX, me.velZ) * (me.airBack ? -1 : 1);
+        const gap = ((me.s - third.s + L * 1.5) % L) - L / 2, rate = flown - third.speed;
+        const want = (flown > 0.5 ? -13.9 : 0) + (rate + Math.sign(gap) * Math.sqrt(18 * Math.abs(gap))) * 8;
+        third.inThrottle = want >= 0 ? clamp(want / 6, 0, 1) : 0; third.inBrake = want < 0 && third.speed > 0.3 ? clamp(-want / 17, 0, 1) : 0;
+        // (onto its line without weaving: the heading asked for shrinks with the speed, as for the driver after a landing)
+        third.inSteer = clamp((clamp((me.d - third.d) * LAB_AFTER_GAIN / Math.max(20, third.speed), -0.08, 0.08) - third.headingError) * 6, -0.4, 0.4);
+        this.thirdD = me.d;
+      } else {
+        // before the take-off: beside the player's car, at its speed. Once the car in flight is down: it drives away on
+        // the line it has reached, flat out (it has shown what it had to show, and must not be in the way again)
+        const dv = (this.thirdSeen ? 330 : this.scenario.me.speed) / 3.6 - third.speed;
+        third.inThrottle = clamp(0.35 + dv * 0.4, 0, 1); third.inBrake = 0;
+        third.inSteer = clamp((clamp((this.thirdD - third.d) * LAB_AFTER_GAIN / Math.max(20, third.speed), -0.08, 0.08) - third.headingError) * 6, -0.4, 0.4);
+      }
+    }
     this.tick++;
   }
 }
 
 /**
  * Interactive use (index.html#lab=...): a line of help above the picture and a few keys, bound only
- * while this option is present. 1 to 5 choose a case, Enter replays the current one.
+ * while this option is present. 1 to 7 choose a case, Enter replays the current one.
  */
 export function attachLabControls(lab, t) {
   const panel = document.createElement('div');

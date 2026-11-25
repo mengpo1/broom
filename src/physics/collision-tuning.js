@@ -34,41 +34,77 @@ export const COLLISION_TUNING = {
   obstacleHalfDepth: 0.35,       // DESIGN m, thickness of a board along the track
 
   // ---- launches
-  launchClosingSpeed: 15,        // DESIGN m/s of closing speed needed to ride over the car ahead
+  launchClosingSpeed: 15,        // DESIGN m/s of closing speed needed to ride over the car ahead (and the flight must be able to
+                                 // carry the car past the other one: about 57 km/h with the values below, see flightPlan)
   launchMinSpeed: 50,            // DESIGN m/s, the follower must be at least this fast (E3: 73 m/s; E4, no launch: 29 to 41 m/s)
-  launchOverlapMin: 0.2,         // DESIGN share of the width overlapping: wheel over wheel, not nose to tail
+  launchOverlapMin: 0.2,         // DESIGN share of the width overlapping: the nose on a rear wheel, not nose to tail
   launchOverlapMax: 0.8,
   flightTimeCar: 0.85,           // MEASURED s (E3)
   flightTimeObstacle: 0.6,       // MEASURED s, by analogy (E5)
   airDecel: 13.9,                // MEASURED m/s^2 (50 km/h per second) while airborne
   airPeakHeight: 1.3,            // DESIGN m, height reached by the car in a 0.85 s flight (scaled with the square of the flight time)
-  flightGapBehind: 0,            // MEASURED (E3: after the flight the cars that were hit are just ahead) m kept between the nose
-                                 // of a car in flight and the tail of the car that launched it: it comes down behind it
   hardAfterCar: true,            // DESIGN a launch over a car ends in a hard landing (E3)
   hardAfterObstacle: false,      // DESIGN a launch over an obstacle ends in a light landing (E5)
 
+  // ---- flights over a car (lot 5, a decision of the player: a car thrown in the air clears what threw it and comes
+  // down ahead of it; before, it was held behind). All DESIGN. The flight is a free one: the car follows its
+  // velocity and slows down as in any flight (airDecel). What is chosen at the take-off is how long it stays up:
+  // the measured or designed time, or longer when that is what it takes to come down clear of the other car; and
+  // the take-off only happens when its speed allows it to get past (see flightPlan in collisions.js).
+  flightClearance: 0.5,          // m between the tail of the car that flew and the nose of the car it flew over, where it lands
+  flightSideClearance: 0.4,      // m between the two cars side by side at the landing: the car is thrown a little to the side
+                                 // it was already on, so that it does not come down in the path of the car it flew over
+  flightTimeCarMax: 1.1,         // s: longest flight of the hard accident (0.85 s measured, more only when needed to get past)
+  flightHoldTime: 0.12,          // s before the planned landing from which the place where the car will come down is looked at
+  flightHoldMax: 0.5,            // s: the landing waits at most this long when the car is not past the other one yet although
+                                 //    still gaining on it (that car sped up more than expected)
+  // While a car is under it, or where it would land, the landing waits too (the place where it comes down is chosen
+  // free of every car at the take-off, so this only acts when a car changed its speed or its line during the flight),
+  // but not for as long as that car likes: the car in flight gets clear of it, and all the waits of a flight are limited.
+  flightYieldSpeed: 8,           // m/s (29 km/h) kept between the speed of the car in flight and that of any car below it: it
+                                 //    passes it or lets it go, whichever is nearer its own speed. Two lengths of car at that
+                                 //    difference: a car below is left within about 1.2 s, whatever it does. Once it has let
+                                 //    a car go, it lets every car below go for the rest of that flight
+  flightYieldSlack: 5,           // m/s: once it is passing a car it goes no faster than that speed plus this: a car speeding up
+                                 //    below does not pull it along (it is then let go). Smaller, it lets cars go more often and
+                                 //    comes down behind them more often; larger, it follows them further (measured: stress script)
+  flightYieldRate: 120,          // m/s^2: how fast its speed moves to the value chosen (8 m/s in 0.07 s): six times the brakes of
+                                 //    a car, so the car below cannot outrun it, and no jump of tens of km/h in one step. A change
+                                 //    of speed that has begun is finished before the wait can end
+  flightPassTime: 0.4,           // s: after it has let a car go, the car in flight still flies on past the cars below when,
+                                 //    left to itself, it is past them all within this time (a car below that stops dead, as the
+                                 //    reset key does, is simply flown over: a car waiting to be put back stays put for 0.5 s)
+  flightWaitMax: 3.5,            // s: the longest a flight can go on beyond its planned time, whatever the reason (the wait
+                                 //    above included). One car alone has not been seen to use it up, whatever it does, the
+                                 //    reset key included, but not by much: passed nearly to the end (1.2 s), let go over its
+                                 //    whole length (1.2 s), then stopping dead under the car in flight (0.8 s), 3.2 s at the
+                                 //    worst found by searches made for that (docs/specifications/collisions.md). Two cars
+                                 //    taking turns under it can. Beyond, last resort: the car is put back on the track on a
+                                 //    free place, as a car that has left the road is. It is never set down where it is if a
+                                 //    car is there
+
   // ---- recoverable hop: an ORIGINAL gameplay choice. Nothing like it is shown by the reference footage,
   // which only has the hard accident (E3) and the launch on an obstacle (E5). All values are DESIGN.
-  // Interlocked wheels (the front wheel of the car behind against the rear wheel of the car ahead) lift
-  // the car behind when it arrives fast enough: a short flight, it comes down on its wheels and drives on.
-  // Ladder of the same contact by energy: below hopClosingSpeed nothing changes (bump or wheel contact);
-  // from hopClosingSpeed a hop; from launchClosingSpeed and launchMinSpeed, from behind, the hard accident.
-  hopClosingSpeed: 10,           // m/s (36 km/h): relative speed from which the wheels lift the car
+  // It comes from a contact between WHEELS and nothing else (lot 5): the front wheel of the car behind runs into
+  // the back of a rear wheel of the car ahead (wheel-contacts.js), the bodies of the two cars not touching. Fast
+  // enough, the wheel climbs the other one: the car flies over the car it touched, comes down ahead of it on its
+  // wheels and drives on. A contact between bodies (nose against tail, nose against wheel, side by side) never lifts
+  // a car into a hop: it stays a bump or a wheel rub, or becomes the hard accident under its own conditions.
+  hopClosingSpeed: 10,           // m/s (36 km/h): relative speed below which the wheels never lift the car. The flight must
+                                 // also be able to carry it past the other car: with the loss of speed of any flight
+                                 // (airDecel) and the longest hop (hopFlightTimeMax), that takes about 56 km/h
   hopMinSpeed: 33,               // m/s (119 km/h): the car behind must be at least this fast
   hopAlignedCos: 0.94,           // angle: the two cars head within about 20 degrees of each other
-  hopSideOverlapMax: 0.5,        // contact point, side by side: the cars overlap by at most this share of their length
-                                 // (front wheel beside rear wheel; fully alongside, wheels only rub: E2)
-  hopOverlapMin: 0,              // lateral overlap, from behind: from the slightest overlap (tyre against tyre at the edge of the
-                                 // cars) up to launchOverlapMax; beyond, nose in the gearbox, the cars bump. (The accident
-                                 // keeps its own, narrower window: launchOverlapMin..launchOverlapMax.)
-  hopFlightTime: 0.45,           // s in the air (the hard accident: 0.85 s)
-  hopPeakHeight: 0.55,           // m at the top of the hop (the hard accident: 1.3 m)
-  hopSeparation: 13.33,          // m/s: it comes down this much slower than the car it rode over was at the shock (as after a bump).
-                                 // The loss is taken where its cause is seen: most of it at the shock (the car is slowed to
-                                 // hopSeparation - airDecel * hopFlightTime below the other car, 25 km/h with these values),
-                                 // the rest steadily during the flight (airDecel, as in any flight); none at the landing.
+  hopTyreOverlapMin: 0.04,       // m of tread in contact, seen from above: a tyre that only grazes the corner of another does not climb it
+  hopAfterContactTime: 0.5,      // s: a car whose body has just touched another car does not hop (a rub that pushes the two
+                                 // apart must not be followed, three steps later, by the wheel climbing the wheel)
+  hopFlightTime: 0.45,           // s in the air at least (the hard accident: 0.85 s)
+  hopFlightTimeMax: 0.85,        // s at most: a slower arrival needs a longer flight to get past; beyond, no hop
+  hopAirDecel: 13.9,             // m/s^2 lost in the air during a hop: the same as in any flight (airDecel). The hop costs
+                                 // nothing at the shock and nothing at the landing: what it costs is the time spent in the air
+  hopPeakHeight: 0.55,           // m at the top of the shortest hop; longer hops rise as the flight of the accident does
+                                 // (airPeakHeight scaled with the square of the flight time), never lower than this
   hopLandingSpeedFactor: 1,      // share of its speed the car keeps as its wheels touch down (the hard accident: 0.15)
-  hopSideKick: 1.5,              // m/s sideways, away from the car it touched, when the hop starts side by side
   hopWobbleTime: 0.7,            // s during which the steering is disturbed after the landing
   hopWobbleSteer: 0.3,           // peak of the disturbance, share of the steering travel
   hopWobbleSwings: 1,            // whole swings in that time (one: away from the car it touched, then back): they cancel

@@ -1,0 +1,971 @@
+{
+ "source": "PR #4 (commit 97252a5)",
+ "summary": {
+  "races": 21,
+  "bumps": 184,
+  "rubs": 1090,
+  "contacts": 1140,
+  "boards": 9,
+  "hops": 42,
+  "accidents": 10,
+  "landedAhead": 0,
+  "overlappingAtTheLanding": 3,
+  "wheelStrikes": null,
+  "resets": 17,
+  "finishers": 279,
+  "wall": 208,
+  "totalWinnerTime": 4268.55
+ },
+ "results": [
+  {
+   "circuit": "hazelbrook",
+   "seed": 11,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 166.41,
+   "winnerTime": 155.27,
+   "bestLap": 50.58,
+   "finishers": 16,
+   "resets": 0,
+   "retired": 0,
+   "contact": 32,
+   "bump": 5,
+   "wheel": 29,
+   "obstacle": 0,
+   "launch": 5,
+   "hop": 5,
+   "crash": 0,
+   "wall": 7,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.74,
+     "sideM": -0.75,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.73,
+     "sideM": -3.27,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -12.56,
+     "sideM": -2.82,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.5,
+     "sideM": -1.56,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.93,
+     "sideM": 2.67,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "hazelbrook",
+   "seed": 12,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 168.48,
+   "winnerTime": 155.51,
+   "bestLap": 50.58,
+   "finishers": 16,
+   "resets": 3,
+   "retired": 0,
+   "contact": 44,
+   "bump": 6,
+   "wheel": 43,
+   "obstacle": 1,
+   "launch": 1,
+   "hop": 1,
+   "crash": 3,
+   "wall": 12,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -12.73,
+     "sideM": 2.92,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "hazelbrook",
+   "seed": 13,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 165.01,
+   "winnerTime": 155.24,
+   "bestLap": 50.58,
+   "finishers": 16,
+   "resets": 1,
+   "retired": 0,
+   "contact": 37,
+   "bump": 6,
+   "wheel": 32,
+   "obstacle": 1,
+   "launch": 2,
+   "hop": 2,
+   "crash": 1,
+   "wall": 5,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -11.67,
+     "sideM": 3.04,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.87,
+     "sideM": 2.99,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "kestrel-fields",
+   "seed": 11,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 237.48,
+   "winnerTime": 225.12,
+   "bestLap": 73.824,
+   "finishers": 12,
+   "resets": 2,
+   "retired": 0,
+   "contact": 59,
+   "bump": 11,
+   "wheel": 55,
+   "obstacle": 2,
+   "launch": 2,
+   "hop": 2,
+   "crash": 2,
+   "wall": 11,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -12.6,
+     "sideM": -2.14,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.05,
+     "sideM": -2.88,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "kestrel-fields",
+   "seed": 12,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 233.62,
+   "winnerTime": 225.25,
+   "bestLap": 73.721,
+   "finishers": 6,
+   "resets": 0,
+   "retired": 0,
+   "contact": 48,
+   "bump": 6,
+   "wheel": 47,
+   "obstacle": 1,
+   "launch": 6,
+   "hop": 4,
+   "crash": 2,
+   "wall": 12,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.12,
+     "sideM": -2.19,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.2,
+     "sideM": -2.04,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "accident",
+     "closingKmh": 123,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -8.31,
+     "sideM": 2.01,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -17,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -12.52,
+     "sideM": -0.08,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -11.54,
+     "sideM": 3.51,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "accident",
+     "closingKmh": 69,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -8.6,
+     "sideM": -2.67,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "kestrel-fields",
+   "seed": 13,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 240.65,
+   "winnerTime": 225.17,
+   "bestLap": 73.825,
+   "finishers": 14,
+   "resets": 1,
+   "retired": 0,
+   "contact": 82,
+   "bump": 12,
+   "wheel": 80,
+   "obstacle": 1,
+   "launch": 2,
+   "hop": 1,
+   "crash": 2,
+   "wall": 18,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -15.26,
+     "sideM": -2.97,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "accident",
+     "closingKmh": 78,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -8.79,
+     "sideM": -2.9,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "sablon",
+   "seed": 11,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 173.35,
+   "winnerTime": 163.61,
+   "bestLap": 53.089,
+   "finishers": 14,
+   "resets": 1,
+   "retired": 0,
+   "contact": 28,
+   "bump": 4,
+   "wheel": 26,
+   "obstacle": 0,
+   "launch": 1,
+   "hop": 1,
+   "crash": 1,
+   "wall": 5,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -12.88,
+     "sideM": 3.06,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "sablon",
+   "seed": 12,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 174.75,
+   "winnerTime": 163.69,
+   "bestLap": 53.244,
+   "finishers": 15,
+   "resets": 0,
+   "retired": 0,
+   "contact": 42,
+   "bump": 8,
+   "wheel": 33,
+   "obstacle": 0,
+   "launch": 4,
+   "hop": 3,
+   "crash": 1,
+   "wall": 2,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -9.8,
+     "sideM": 3.37,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -12.97,
+     "sideM": -2.47,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -11.43,
+     "sideM": 3.33,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "accident",
+     "closingKmh": 128,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -8.36,
+     "sideM": -3.26,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "sablon",
+   "seed": 13,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 174.14,
+   "winnerTime": 163.6,
+   "bestLap": 52.882,
+   "finishers": 16,
+   "resets": 1,
+   "retired": 0,
+   "contact": 39,
+   "bump": 6,
+   "wheel": 38,
+   "obstacle": 1,
+   "launch": 4,
+   "hop": 3,
+   "crash": 2,
+   "wall": 16,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -9.4,
+     "sideM": 1.77,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.78,
+     "sideM": 3.22,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "accident",
+     "closingKmh": 92,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -8.3,
+     "sideM": -0.63,
+     "overlapM": 0.25,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.54,
+     "sideM": -2.49,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "porto-sereno",
+   "seed": 11,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 185.88,
+   "winnerTime": 175.12,
+   "bestLap": 57.171,
+   "finishers": 13,
+   "resets": 0,
+   "retired": 0,
+   "contact": 61,
+   "bump": 12,
+   "wheel": 61,
+   "obstacle": 0,
+   "launch": 2,
+   "hop": 2,
+   "crash": 0,
+   "wall": 14,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.18,
+     "sideM": 0.02,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.26,
+     "sideM": 2.46,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "porto-sereno",
+   "seed": 12,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 188,
+   "winnerTime": 175.31,
+   "bestLap": 57.171,
+   "finishers": 15,
+   "resets": 0,
+   "retired": 0,
+   "contact": 58,
+   "bump": 9,
+   "wheel": 57,
+   "obstacle": 0,
+   "launch": 3,
+   "hop": 2,
+   "crash": 1,
+   "wall": 4,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -15.23,
+     "sideM": -3.11,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "accident",
+     "closingKmh": 119,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -8.37,
+     "sideM": -0.34,
+     "overlapM": 0.1,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -10.53,
+     "sideM": 2.91,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "porto-sereno",
+   "seed": 13,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 189.37,
+   "winnerTime": 175,
+   "bestLap": 56.951,
+   "finishers": 14,
+   "resets": 2,
+   "retired": 0,
+   "contact": 70,
+   "bump": 6,
+   "wheel": 67,
+   "obstacle": 0,
+   "launch": 4,
+   "hop": 2,
+   "crash": 4,
+   "wall": 11,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "accident",
+     "closingKmh": 78,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -9.23,
+     "sideM": 7.34,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -12.82,
+     "sideM": -2.36,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.54,
+     "sideM": 1.08,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "accident",
+     "closingKmh": 63,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -8.86,
+     "sideM": -0.19,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "meridian-docks",
+   "seed": 11,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 234.02,
+   "winnerTime": 221.93,
+   "bestLap": 72.753,
+   "finishers": 11,
+   "resets": 0,
+   "retired": 0,
+   "contact": 86,
+   "bump": 19,
+   "wheel": 84,
+   "obstacle": 0,
+   "launch": 3,
+   "hop": 3,
+   "crash": 0,
+   "wall": 8,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.86,
+     "sideM": -0.84,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -11.67,
+     "sideM": -1.39,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.54,
+     "sideM": 2.46,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "meridian-docks",
+   "seed": 12,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 229.05,
+   "winnerTime": 222.1,
+   "bestLap": 72.078,
+   "finishers": 6,
+   "resets": 0,
+   "retired": 0,
+   "contact": 65,
+   "bump": 12,
+   "wheel": 62,
+   "obstacle": 0,
+   "launch": 1,
+   "hop": 1,
+   "crash": 0,
+   "wall": 13,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.56,
+     "sideM": 2.94,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "meridian-docks",
+   "seed": 13,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 239.91,
+   "winnerTime": 221.88,
+   "bestLap": 72.753,
+   "finishers": 16,
+   "resets": 3,
+   "retired": 0,
+   "contact": 82,
+   "bump": 17,
+   "wheel": 77,
+   "obstacle": 0,
+   "launch": 0,
+   "hop": 0,
+   "crash": 3,
+   "wall": 24,
+   "wheelStrikes": null,
+   "flights": []
+  },
+  {
+   "circuit": "grand-zenith",
+   "seed": 11,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 303.98,
+   "winnerTime": 287.97,
+   "bestLap": 94.764,
+   "finishers": 16,
+   "resets": 1,
+   "retired": 0,
+   "contact": 47,
+   "bump": 6,
+   "wheel": 49,
+   "obstacle": 2,
+   "launch": 2,
+   "hop": 2,
+   "crash": 1,
+   "wall": 10,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.69,
+     "sideM": -1.26,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.48,
+     "sideM": 0.15,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "grand-zenith",
+   "seed": 12,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 303.42,
+   "winnerTime": 288.24,
+   "bestLap": 94.764,
+   "finishers": 14,
+   "resets": 2,
+   "retired": 0,
+   "contact": 54,
+   "bump": 7,
+   "wheel": 54,
+   "obstacle": 0,
+   "launch": 2,
+   "hop": 1,
+   "crash": 3,
+   "wall": 14,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "accident",
+     "closingKmh": 94,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -8.39,
+     "sideM": -1.35,
+     "overlapM": 0.02,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -12.9,
+     "sideM": -3.14,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "grand-zenith",
+   "seed": 13,
+   "rules": "arcade",
+   "finished": true,
+   "raceTime": 298.11,
+   "winnerTime": 287.85,
+   "bestLap": 94.73,
+   "finishers": 9,
+   "resets": 0,
+   "retired": 0,
+   "contact": 53,
+   "bump": 4,
+   "wheel": 51,
+   "obstacle": 0,
+   "launch": 4,
+   "hop": 4,
+   "crash": 0,
+   "wall": 6,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.01,
+     "sideM": 3.12,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -15.08,
+     "sideM": -1.01,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.21,
+     "sideM": -3.02,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -14.7,
+     "sideM": 0.38,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "hazelbrook",
+   "seed": 11,
+   "rules": "racing",
+   "finished": true,
+   "raceTime": 177.03,
+   "winnerTime": 161.77,
+   "bestLap": 52.69,
+   "finishers": 16,
+   "resets": 0,
+   "retired": 0,
+   "contact": 38,
+   "bump": 6,
+   "wheel": 38,
+   "obstacle": 0,
+   "launch": 2,
+   "hop": 1,
+   "crash": 1,
+   "wall": 5,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "accident",
+     "closingKmh": 56,
+     "seconds": 0.858,
+     "aheadOfItsNoseM": -9.09,
+     "sideM": -0.61,
+     "overlapM": 0,
+     "landedAhead": false
+    },
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -8.4,
+     "sideM": 2.94,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "meridian-docks",
+   "seed": 11,
+   "rules": "racing",
+   "finished": true,
+   "raceTime": 245.32,
+   "winnerTime": 230.27,
+   "bestLap": 75.459,
+   "finishers": 8,
+   "resets": 0,
+   "retired": 0,
+   "contact": 73,
+   "bump": 14,
+   "wheel": 70,
+   "obstacle": 0,
+   "launch": 1,
+   "hop": 1,
+   "crash": 0,
+   "wall": 8,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -13.06,
+     "sideM": -1.47,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  },
+  {
+   "circuit": "tannenring",
+   "seed": 11,
+   "rules": "racing",
+   "finished": true,
+   "raceTime": 204.72,
+   "winnerTime": 188.65,
+   "bestLap": 61.562,
+   "finishers": 16,
+   "resets": 0,
+   "retired": 0,
+   "contact": 42,
+   "bump": 8,
+   "wheel": 37,
+   "obstacle": 0,
+   "launch": 1,
+   "hop": 1,
+   "crash": 0,
+   "wall": 3,
+   "wheelStrikes": null,
+   "flights": [
+    {
+     "kind": "hop",
+     "closingKmh": -25,
+     "seconds": 0.45,
+     "aheadOfItsNoseM": -11.7,
+     "sideM": -0.33,
+     "overlapM": 0,
+     "landedAhead": false
+    }
+   ]
+  }
+ ]
+}

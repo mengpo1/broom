@@ -1,0 +1,4400 @@
+{
+ "note": "measurement of the game as it is; nothing is changed",
+ "simulationStepSeconds": 0.008333333333333333,
+ "track": "kestrel-fields widened to 900 m (asphalt everywhere)",
+ "leftRight": [
+  {
+   "profile": "arcade",
+   "startKmh": 60,
+   "lockOfTheSimulationDeg": 13.77,
+   "gripLimitMs2": 19.2,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -18.5,
+      "headingDeg": -0.81,
+      "sideMetres": -0.01,
+      "speedKmh": 65.6,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -45.9,
+      "headingDeg": -4.18,
+      "sideMetres": -0.09,
+      "speedKmh": 71.2,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -54.3,
+      "headingDeg": -9.37,
+      "sideMetres": -0.33,
+      "speedKmh": 76.4,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -51.2,
+      "headingDeg": -20.01,
+      "sideMetres": -1.49,
+      "speedKmh": 86.8,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -47.3,
+      "headingDeg": -29.79,
+      "sideMetres": -3.63,
+      "speedKmh": 93.2,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -43.3,
+      "headingDeg": -43.46,
+      "sideMetres": -8.59,
+      "speedKmh": 107.8,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -37.1,
+      "headingDeg": -63.38,
+      "sideMetres": -22.21,
+      "speedKmh": 135.5,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -34.1,
+      "headingDeg": -81.24,
+      "sideMetres": -41.34,
+      "speedKmh": 159,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 18.5,
+      "headingDeg": 0.81,
+      "sideMetres": 0.01,
+      "speedKmh": 65.6,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 45.9,
+      "headingDeg": 4.18,
+      "sideMetres": 0.09,
+      "speedKmh": 71.2,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 54.3,
+      "headingDeg": 9.37,
+      "sideMetres": 0.33,
+      "speedKmh": 76.4,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 51.2,
+      "headingDeg": 20.01,
+      "sideMetres": 1.49,
+      "speedKmh": 86.8,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 47.3,
+      "headingDeg": 29.79,
+      "sideMetres": 3.63,
+      "speedKmh": 93.2,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 43.3,
+      "headingDeg": 43.46,
+      "sideMetres": 8.59,
+      "speedKmh": 107.8,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 37.1,
+      "headingDeg": 63.38,
+      "sideMetres": 22.21,
+      "speedKmh": 135.5,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 34.1,
+      "headingDeg": 81.24,
+      "sideMetres": 41.34,
+      "speedKmh": 159,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 2.13e-15
+  },
+  {
+   "profile": "arcade",
+   "startKmh": 100,
+   "lockOfTheSimulationDeg": 5.51,
+   "gripLimitMs2": 21,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -12.6,
+      "headingDeg": -0.55,
+      "sideMetres": -0.01,
+      "speedKmh": 106,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -31.9,
+      "headingDeg": -2.88,
+      "sideMetres": -0.1,
+      "speedKmh": 112,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -38.6,
+      "headingDeg": -6.53,
+      "sideMetres": -0.36,
+      "speedKmh": 117.5,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -38.2,
+      "headingDeg": -14.3,
+      "sideMetres": -1.6,
+      "speedKmh": 128.9,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -36.7,
+      "headingDeg": -21.77,
+      "sideMetres": -3.89,
+      "speedKmh": 134.6,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -34.9,
+      "headingDeg": -32.55,
+      "sideMetres": -9.32,
+      "speedKmh": 151.8,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -32.5,
+      "headingDeg": -49.3,
+      "sideMetres": -24.42,
+      "speedKmh": 176.6,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.6,
+      "headingDeg": -65.32,
+      "sideMetres": -45.89,
+      "speedKmh": 194.2,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 12.6,
+      "headingDeg": 0.55,
+      "sideMetres": 0.01,
+      "speedKmh": 106,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 31.9,
+      "headingDeg": 2.88,
+      "sideMetres": 0.1,
+      "speedKmh": 112,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 38.6,
+      "headingDeg": 6.53,
+      "sideMetres": 0.36,
+      "speedKmh": 117.5,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 38.2,
+      "headingDeg": 14.3,
+      "sideMetres": 1.6,
+      "speedKmh": 128.9,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 36.7,
+      "headingDeg": 21.77,
+      "sideMetres": 3.89,
+      "speedKmh": 134.6,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 34.9,
+      "headingDeg": 32.55,
+      "sideMetres": 9.32,
+      "speedKmh": 151.8,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 32.5,
+      "headingDeg": 49.3,
+      "sideMetres": 24.42,
+      "speedKmh": 176.6,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.6,
+      "headingDeg": 65.32,
+      "sideMetres": 45.89,
+      "speedKmh": 194.2,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.07e-15
+  },
+  {
+   "profile": "arcade",
+   "startKmh": 150,
+   "lockOfTheSimulationDeg": 2.86,
+   "gripLimitMs2": 24.6,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -10,
+      "headingDeg": -0.43,
+      "sideMetres": -0.01,
+      "speedKmh": 156.5,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -25.7,
+      "headingDeg": -2.29,
+      "sideMetres": -0.11,
+      "speedKmh": 162.6,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.6,
+      "headingDeg": -5.27,
+      "sideMetres": -0.42,
+      "speedKmh": 168.1,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -32.4,
+      "headingDeg": -11.74,
+      "sideMetres": -1.84,
+      "speedKmh": 177.1,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -32.2,
+      "headingDeg": -18.21,
+      "sideMetres": -4.37,
+      "speedKmh": 181.3,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.6,
+      "headingDeg": -27.77,
+      "sideMetres": -10.46,
+      "speedKmh": 193.7,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.9,
+      "headingDeg": -43.36,
+      "sideMetres": -26.83,
+      "speedKmh": 212.2,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.6,
+      "headingDeg": -58.71,
+      "sideMetres": -50.38,
+      "speedKmh": 222.7,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 10,
+      "headingDeg": 0.43,
+      "sideMetres": 0.01,
+      "speedKmh": 156.5,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 25.7,
+      "headingDeg": 2.29,
+      "sideMetres": 0.11,
+      "speedKmh": 162.6,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.6,
+      "headingDeg": 5.27,
+      "sideMetres": 0.42,
+      "speedKmh": 168.1,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 32.4,
+      "headingDeg": 11.74,
+      "sideMetres": 1.84,
+      "speedKmh": 177.1,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 32.2,
+      "headingDeg": 18.21,
+      "sideMetres": 4.37,
+      "speedKmh": 181.3,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.6,
+      "headingDeg": 27.77,
+      "sideMetres": 10.46,
+      "speedKmh": 193.7,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.9,
+      "headingDeg": 43.36,
+      "sideMetres": 26.83,
+      "speedKmh": 212.2,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.6,
+      "headingDeg": 58.71,
+      "sideMetres": 50.38,
+      "speedKmh": 222.7,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.07e-15
+  },
+  {
+   "profile": "arcade",
+   "startKmh": 200,
+   "lockOfTheSimulationDeg": 1.93,
+   "gripLimitMs2": 29.5,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -9.1,
+      "headingDeg": -0.39,
+      "sideMetres": -0.01,
+      "speedKmh": 204.3,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -23.7,
+      "headingDeg": -2.1,
+      "sideMetres": -0.13,
+      "speedKmh": 208.4,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.4,
+      "headingDeg": -4.85,
+      "sideMetres": -0.49,
+      "speedKmh": 211.9,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.7,
+      "headingDeg": -10.93,
+      "sideMetres": -2.12,
+      "speedKmh": 218.4,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.6,
+      "headingDeg": -17.05,
+      "sideMetres": -5.06,
+      "speedKmh": 220.9,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.5,
+      "headingDeg": -26.23,
+      "sideMetres": -11.9,
+      "speedKmh": 227.7,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.4,
+      "headingDeg": -41.45,
+      "sideMetres": -29.9,
+      "speedKmh": 239.7,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.3,
+      "headingDeg": -56.62,
+      "sideMetres": -55.51,
+      "speedKmh": 250.3,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 9.1,
+      "headingDeg": 0.39,
+      "sideMetres": 0.01,
+      "speedKmh": 204.3,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 23.7,
+      "headingDeg": 2.1,
+      "sideMetres": 0.13,
+      "speedKmh": 208.4,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.4,
+      "headingDeg": 4.85,
+      "sideMetres": 0.49,
+      "speedKmh": 211.9,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.7,
+      "headingDeg": 10.93,
+      "sideMetres": 2.12,
+      "speedKmh": 218.4,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.6,
+      "headingDeg": 17.05,
+      "sideMetres": 5.06,
+      "speedKmh": 220.9,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.5,
+      "headingDeg": 26.23,
+      "sideMetres": 11.9,
+      "speedKmh": 227.7,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.4,
+      "headingDeg": 41.45,
+      "sideMetres": 29.9,
+      "speedKmh": 239.7,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.3,
+      "headingDeg": 56.62,
+      "sideMetres": 55.51,
+      "speedKmh": 250.3,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.07e-15
+  },
+  {
+   "profile": "arcade",
+   "startKmh": 250,
+   "lockOfTheSimulationDeg": 1.5,
+   "gripLimitMs2": 35.8,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -8.8,
+      "headingDeg": -0.38,
+      "sideMetres": -0.02,
+      "speedKmh": 252.5,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -23.2,
+      "headingDeg": -2.05,
+      "sideMetres": -0.16,
+      "speedKmh": 254.9,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -28.9,
+      "headingDeg": -4.75,
+      "sideMetres": -0.58,
+      "speedKmh": 256.8,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.3,
+      "headingDeg": -10.73,
+      "sideMetres": -2.5,
+      "speedKmh": 260.3,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.3,
+      "headingDeg": -16.79,
+      "sideMetres": -5.93,
+      "speedKmh": 263.5,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.3,
+      "headingDeg": -25.89,
+      "sideMetres": -13.94,
+      "speedKmh": 267.9,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.4,
+      "headingDeg": -41.07,
+      "sideMetres": -34.44,
+      "speedKmh": 270.2,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.4,
+      "headingDeg": -56.26,
+      "sideMetres": -62.77,
+      "speedKmh": 275.6,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 8.8,
+      "headingDeg": 0.38,
+      "sideMetres": 0.02,
+      "speedKmh": 252.5,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 23.2,
+      "headingDeg": 2.05,
+      "sideMetres": 0.16,
+      "speedKmh": 254.9,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 28.9,
+      "headingDeg": 4.75,
+      "sideMetres": 0.58,
+      "speedKmh": 256.8,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.3,
+      "headingDeg": 10.73,
+      "sideMetres": 2.5,
+      "speedKmh": 260.3,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.3,
+      "headingDeg": 16.79,
+      "sideMetres": 5.93,
+      "speedKmh": 263.5,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.3,
+      "headingDeg": 25.89,
+      "sideMetres": 13.94,
+      "speedKmh": 267.9,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.4,
+      "headingDeg": 41.07,
+      "sideMetres": 34.44,
+      "speedKmh": 270.2,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.4,
+      "headingDeg": 56.26,
+      "sideMetres": 62.77,
+      "speedKmh": 275.6,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.07e-15
+  },
+  {
+   "profile": "racing",
+   "startKmh": 60,
+   "lockOfTheSimulationDeg": 14.26,
+   "gripLimitMs2": 17.8,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -19.9,
+      "headingDeg": -0.86,
+      "sideMetres": -0.01,
+      "speedKmh": 65.2,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -46.8,
+      "headingDeg": -4.46,
+      "sideMetres": -0.09,
+      "speedKmh": 70.1,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -53.4,
+      "headingDeg": -9.61,
+      "sideMetres": -0.33,
+      "speedKmh": 74,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -51.1,
+      "headingDeg": -20.13,
+      "sideMetres": -1.41,
+      "speedKmh": 81.5,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -47.7,
+      "headingDeg": -29.99,
+      "sideMetres": -3.36,
+      "speedKmh": 88.5,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -45.2,
+      "headingDeg": -43.77,
+      "sideMetres": -7.83,
+      "speedKmh": 93,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -40.8,
+      "headingDeg": -65.26,
+      "sideMetres": -19.04,
+      "speedKmh": 107.9,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -37.8,
+      "headingDeg": -84.86,
+      "sideMetres": -34.23,
+      "speedKmh": 120.3,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 19.9,
+      "headingDeg": 0.86,
+      "sideMetres": 0.01,
+      "speedKmh": 65.2,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 46.8,
+      "headingDeg": 4.46,
+      "sideMetres": 0.09,
+      "speedKmh": 70.1,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 53.4,
+      "headingDeg": 9.61,
+      "sideMetres": 0.33,
+      "speedKmh": 74,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 51.1,
+      "headingDeg": 20.13,
+      "sideMetres": 1.41,
+      "speedKmh": 81.5,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 47.7,
+      "headingDeg": 29.99,
+      "sideMetres": 3.36,
+      "speedKmh": 88.5,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 45.2,
+      "headingDeg": 43.77,
+      "sideMetres": 7.83,
+      "speedKmh": 93,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 40.8,
+      "headingDeg": 65.26,
+      "sideMetres": 19.04,
+      "speedKmh": 107.9,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 37.8,
+      "headingDeg": 84.86,
+      "sideMetres": 34.23,
+      "speedKmh": 120.3,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 2.56e-15
+  },
+  {
+   "profile": "racing",
+   "startKmh": 100,
+   "lockOfTheSimulationDeg": 8.27,
+   "gripLimitMs2": 19.5,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -19.6,
+      "headingDeg": -0.84,
+      "sideMetres": -0.01,
+      "speedKmh": 105.5,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -35.8,
+      "headingDeg": -3.87,
+      "sideMetres": -0.13,
+      "speedKmh": 109.8,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -38.7,
+      "headingDeg": -7.66,
+      "sideMetres": -0.41,
+      "speedKmh": 112.4,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -38.4,
+      "headingDeg": -15.41,
+      "sideMetres": -1.57,
+      "speedKmh": 117.3,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -37.5,
+      "headingDeg": -23,
+      "sideMetres": -3.59,
+      "speedKmh": 121.9,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -36.3,
+      "headingDeg": -34.06,
+      "sideMetres": -8.29,
+      "speedKmh": 128.2,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -35.3,
+      "headingDeg": -51.84,
+      "sideMetres": -20.33,
+      "speedKmh": 132.4,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -34.1,
+      "headingDeg": -69.24,
+      "sideMetres": -36.63,
+      "speedKmh": 143,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 19.6,
+      "headingDeg": 0.84,
+      "sideMetres": 0.01,
+      "speedKmh": 105.5,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 35.8,
+      "headingDeg": 3.87,
+      "sideMetres": 0.13,
+      "speedKmh": 109.8,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 38.7,
+      "headingDeg": 7.66,
+      "sideMetres": 0.41,
+      "speedKmh": 112.4,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 38.4,
+      "headingDeg": 15.41,
+      "sideMetres": 1.57,
+      "speedKmh": 117.3,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 37.5,
+      "headingDeg": 23,
+      "sideMetres": 3.59,
+      "speedKmh": 121.9,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 36.3,
+      "headingDeg": 34.06,
+      "sideMetres": 8.29,
+      "speedKmh": 128.2,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 35.3,
+      "headingDeg": 51.84,
+      "sideMetres": 20.33,
+      "speedKmh": 132.4,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 34.1,
+      "headingDeg": 69.24,
+      "sideMetres": 36.63,
+      "speedKmh": 143,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.99e-15
+  },
+  {
+   "profile": "racing",
+   "startKmh": 150,
+   "lockOfTheSimulationDeg": 6.35,
+   "gripLimitMs2": 22.7,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -20.1,
+      "headingDeg": -0.94,
+      "sideMetres": -0.02,
+      "speedKmh": 155.9,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -29.9,
+      "headingDeg": -3.6,
+      "sideMetres": -0.18,
+      "speedKmh": 159.3,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.7,
+      "headingDeg": -6.71,
+      "sideMetres": -0.51,
+      "speedKmh": 161.7,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.8,
+      "headingDeg": -13.08,
+      "sideMetres": -1.88,
+      "speedKmh": 166.3,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.4,
+      "headingDeg": -19.39,
+      "sideMetres": -4.25,
+      "speedKmh": 170.5,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.1,
+      "headingDeg": -28.76,
+      "sideMetres": -9.76,
+      "speedKmh": 175.9,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31,
+      "headingDeg": -44.29,
+      "sideMetres": -23.59,
+      "speedKmh": 176.6,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.7,
+      "headingDeg": -59.7,
+      "sideMetres": -42.72,
+      "speedKmh": 182.1,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 20.1,
+      "headingDeg": 0.94,
+      "sideMetres": 0.02,
+      "speedKmh": 155.9,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 29.9,
+      "headingDeg": 3.6,
+      "sideMetres": 0.18,
+      "speedKmh": 159.3,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.7,
+      "headingDeg": 6.71,
+      "sideMetres": 0.51,
+      "speedKmh": 161.7,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.8,
+      "headingDeg": 13.08,
+      "sideMetres": 1.88,
+      "speedKmh": 166.3,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.4,
+      "headingDeg": 19.39,
+      "sideMetres": 4.25,
+      "speedKmh": 170.5,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.1,
+      "headingDeg": 28.76,
+      "sideMetres": 9.76,
+      "speedKmh": 175.9,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31,
+      "headingDeg": 44.29,
+      "sideMetres": 23.59,
+      "speedKmh": 176.6,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.7,
+      "headingDeg": 59.7,
+      "sideMetres": 42.72,
+      "speedKmh": 182.1,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.07e-15
+  },
+  {
+   "profile": "racing",
+   "startKmh": 200,
+   "lockOfTheSimulationDeg": 5.68,
+   "gripLimitMs2": 27.3,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -20.2,
+      "headingDeg": -1.02,
+      "sideMetres": -0.03,
+      "speedKmh": 203.7,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -27.8,
+      "headingDeg": -3.54,
+      "sideMetres": -0.22,
+      "speedKmh": 204.4,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.3,
+      "headingDeg": -6.42,
+      "sideMetres": -0.62,
+      "speedKmh": 204.8,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.6,
+      "headingDeg": -12.33,
+      "sideMetres": -2.23,
+      "speedKmh": 205.6,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.6,
+      "headingDeg": -18.26,
+      "sideMetres": -4.95,
+      "speedKmh": 206.4,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.6,
+      "headingDeg": -27.14,
+      "sideMetres": -11.15,
+      "speedKmh": 207.5,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.6,
+      "headingDeg": -41.93,
+      "sideMetres": -26.82,
+      "speedKmh": 209.1,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.5,
+      "headingDeg": -56.7,
+      "sideMetres": -48.31,
+      "speedKmh": 210.4,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 20.2,
+      "headingDeg": 1.02,
+      "sideMetres": 0.03,
+      "speedKmh": 203.7,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 27.8,
+      "headingDeg": 3.54,
+      "sideMetres": 0.22,
+      "speedKmh": 204.4,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.3,
+      "headingDeg": 6.42,
+      "sideMetres": 0.62,
+      "speedKmh": 204.8,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.6,
+      "headingDeg": 12.33,
+      "sideMetres": 2.23,
+      "speedKmh": 205.6,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.6,
+      "headingDeg": 18.26,
+      "sideMetres": 4.95,
+      "speedKmh": 206.4,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.6,
+      "headingDeg": 27.14,
+      "sideMetres": 11.15,
+      "speedKmh": 207.5,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.6,
+      "headingDeg": 41.93,
+      "sideMetres": 26.82,
+      "speedKmh": 209.1,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.5,
+      "headingDeg": 56.7,
+      "sideMetres": 48.31,
+      "speedKmh": 210.4,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.07e-15
+  },
+  {
+   "profile": "racing",
+   "startKmh": 250,
+   "lockOfTheSimulationDeg": 5.37,
+   "gripLimitMs2": 33.1,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -20.5,
+      "headingDeg": -1.09,
+      "sideMetres": -0.04,
+      "speedKmh": 251.6,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -27.3,
+      "headingDeg": -3.59,
+      "sideMetres": -0.27,
+      "speedKmh": 250.4,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -28.6,
+      "headingDeg": -6.41,
+      "sideMetres": -0.76,
+      "speedKmh": 249.1,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29,
+      "headingDeg": -12.19,
+      "sideMetres": -2.68,
+      "speedKmh": 246.8,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29,
+      "headingDeg": -17.99,
+      "sideMetres": -5.87,
+      "speedKmh": 244.5,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29,
+      "headingDeg": -26.7,
+      "sideMetres": -13.03,
+      "speedKmh": 241.3,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.1,
+      "headingDeg": -41.22,
+      "sideMetres": -30.71,
+      "speedKmh": 236.6,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.1,
+      "headingDeg": -55.75,
+      "sideMetres": -54.39,
+      "speedKmh": 232.4,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 20.5,
+      "headingDeg": 1.09,
+      "sideMetres": 0.04,
+      "speedKmh": 251.6,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 27.3,
+      "headingDeg": 3.59,
+      "sideMetres": 0.27,
+      "speedKmh": 250.4,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 28.6,
+      "headingDeg": 6.41,
+      "sideMetres": 0.76,
+      "speedKmh": 249.1,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29,
+      "headingDeg": 12.19,
+      "sideMetres": 2.68,
+      "speedKmh": 246.8,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29,
+      "headingDeg": 17.99,
+      "sideMetres": 5.87,
+      "speedKmh": 244.5,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29,
+      "headingDeg": 26.7,
+      "sideMetres": 13.03,
+      "speedKmh": 241.3,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.1,
+      "headingDeg": 41.22,
+      "sideMetres": 30.71,
+      "speedKmh": 236.6,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.1,
+      "headingDeg": 55.75,
+      "sideMetres": 54.39,
+      "speedKmh": 232.4,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 2.06e-15
+  },
+  {
+   "profile": "turbo",
+   "startKmh": 60,
+   "lockOfTheSimulationDeg": 13.9,
+   "gripLimitMs2": 18.5,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -19,
+      "headingDeg": -0.83,
+      "sideMetres": -0.01,
+      "speedKmh": 65.4,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -46.4,
+      "headingDeg": -4.3,
+      "sideMetres": -0.09,
+      "speedKmh": 70.7,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -53.8,
+      "headingDeg": -9.47,
+      "sideMetres": -0.33,
+      "speedKmh": 75.3,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -51.4,
+      "headingDeg": -20.08,
+      "sideMetres": -1.45,
+      "speedKmh": 84.3,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -47.8,
+      "headingDeg": -29.97,
+      "sideMetres": -3.51,
+      "speedKmh": 93.2,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -45,
+      "headingDeg": -43.92,
+      "sideMetres": -8.23,
+      "speedKmh": 100.8,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -39.3,
+      "headingDeg": -64.84,
+      "sideMetres": -20.73,
+      "speedKmh": 121.9,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -36.5,
+      "headingDeg": -83.58,
+      "sideMetres": -38.08,
+      "speedKmh": 135.9,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 19,
+      "headingDeg": 0.83,
+      "sideMetres": 0.01,
+      "speedKmh": 65.4,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 46.4,
+      "headingDeg": 4.3,
+      "sideMetres": 0.09,
+      "speedKmh": 70.7,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 53.8,
+      "headingDeg": 9.47,
+      "sideMetres": 0.33,
+      "speedKmh": 75.3,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 51.4,
+      "headingDeg": 20.08,
+      "sideMetres": 1.45,
+      "speedKmh": 84.3,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 47.8,
+      "headingDeg": 29.97,
+      "sideMetres": 3.51,
+      "speedKmh": 93.2,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 45,
+      "headingDeg": 43.92,
+      "sideMetres": 8.23,
+      "speedKmh": 100.8,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 39.3,
+      "headingDeg": 64.84,
+      "sideMetres": 20.73,
+      "speedKmh": 121.9,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 36.5,
+      "headingDeg": 83.58,
+      "sideMetres": 38.08,
+      "speedKmh": 135.9,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.14e-15
+  },
+  {
+   "profile": "turbo",
+   "startKmh": 100,
+   "lockOfTheSimulationDeg": 6.72,
+   "gripLimitMs2": 20.3,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -15.7,
+      "headingDeg": -0.68,
+      "sideMetres": -0.01,
+      "speedKmh": 105.7,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -34.9,
+      "headingDeg": -3.44,
+      "sideMetres": -0.12,
+      "speedKmh": 111.1,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -39.4,
+      "headingDeg": -7.24,
+      "sideMetres": -0.4,
+      "speedKmh": 115.3,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -38.9,
+      "headingDeg": -15.12,
+      "sideMetres": -1.63,
+      "speedKmh": 123.6,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -37.4,
+      "headingDeg": -22.73,
+      "sideMetres": -3.85,
+      "speedKmh": 131.8,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -36.3,
+      "headingDeg": -33.74,
+      "sideMetres": -8.99,
+      "speedKmh": 137.6,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -34,
+      "headingDeg": -51.28,
+      "sideMetres": -22.59,
+      "speedKmh": 157.3,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -32.4,
+      "headingDeg": -67.83,
+      "sideMetres": -42.33,
+      "speedKmh": 176.4,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 15.7,
+      "headingDeg": 0.68,
+      "sideMetres": 0.01,
+      "speedKmh": 105.7,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 34.9,
+      "headingDeg": 3.44,
+      "sideMetres": 0.12,
+      "speedKmh": 111.1,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 39.4,
+      "headingDeg": 7.24,
+      "sideMetres": 0.4,
+      "speedKmh": 115.3,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 38.9,
+      "headingDeg": 15.12,
+      "sideMetres": 1.63,
+      "speedKmh": 123.6,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 37.4,
+      "headingDeg": 22.73,
+      "sideMetres": 3.85,
+      "speedKmh": 131.8,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 36.3,
+      "headingDeg": 33.74,
+      "sideMetres": 8.99,
+      "speedKmh": 137.6,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 34,
+      "headingDeg": 51.28,
+      "sideMetres": 22.59,
+      "speedKmh": 157.3,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 32.4,
+      "headingDeg": 67.83,
+      "sideMetres": 42.33,
+      "speedKmh": 176.4,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.99e-15
+  },
+  {
+   "profile": "turbo",
+   "startKmh": 150,
+   "lockOfTheSimulationDeg": 4.43,
+   "gripLimitMs2": 23.6,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -15.7,
+      "headingDeg": -0.68,
+      "sideMetres": -0.02,
+      "speedKmh": 156.4,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -29.6,
+      "headingDeg": -3.16,
+      "sideMetres": -0.16,
+      "speedKmh": 161.7,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -32.4,
+      "headingDeg": -6.31,
+      "sideMetres": -0.5,
+      "speedKmh": 165.6,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -32.6,
+      "headingDeg": -12.84,
+      "sideMetres": -1.93,
+      "speedKmh": 173.2,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -32.3,
+      "headingDeg": -19.31,
+      "sideMetres": -4.44,
+      "speedKmh": 173.6,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.9,
+      "headingDeg": -28.96,
+      "sideMetres": -10.22,
+      "speedKmh": 183.2,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -31.2,
+      "headingDeg": -44.72,
+      "sideMetres": -25.53,
+      "speedKmh": 196.4,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.8,
+      "headingDeg": -60.23,
+      "sideMetres": -47.25,
+      "speedKmh": 206.5,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 15.7,
+      "headingDeg": 0.68,
+      "sideMetres": 0.02,
+      "speedKmh": 156.4,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 29.6,
+      "headingDeg": 3.16,
+      "sideMetres": 0.16,
+      "speedKmh": 161.7,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 32.4,
+      "headingDeg": 6.31,
+      "sideMetres": 0.5,
+      "speedKmh": 165.6,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 32.6,
+      "headingDeg": 12.84,
+      "sideMetres": 1.93,
+      "speedKmh": 173.2,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 32.3,
+      "headingDeg": 19.31,
+      "sideMetres": 4.44,
+      "speedKmh": 173.6,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.9,
+      "headingDeg": 28.96,
+      "sideMetres": 10.22,
+      "speedKmh": 183.2,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 31.2,
+      "headingDeg": 44.72,
+      "sideMetres": 25.53,
+      "speedKmh": 196.4,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.8,
+      "headingDeg": 60.23,
+      "sideMetres": 47.25,
+      "speedKmh": 206.5,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 2.06e-15
+  },
+  {
+   "profile": "turbo",
+   "startKmh": 200,
+   "lockOfTheSimulationDeg": 3.63,
+   "gripLimitMs2": 28.4,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -16.8,
+      "headingDeg": -0.73,
+      "sideMetres": -0.02,
+      "speedKmh": 205.5,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -27.9,
+      "headingDeg": -3.15,
+      "sideMetres": -0.2,
+      "speedKmh": 209,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.1,
+      "headingDeg": -6.09,
+      "sideMetres": -0.61,
+      "speedKmh": 210.6,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.6,
+      "headingDeg": -12.19,
+      "sideMetres": -2.25,
+      "speedKmh": 213.6,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.6,
+      "headingDeg": -18.31,
+      "sideMetres": -5.09,
+      "speedKmh": 216.1,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.5,
+      "headingDeg": -27.47,
+      "sideMetres": -11.67,
+      "speedKmh": 219.3,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.5,
+      "headingDeg": -42.7,
+      "sideMetres": -28.46,
+      "speedKmh": 217.7,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.5,
+      "headingDeg": -57.94,
+      "sideMetres": -51.25,
+      "speedKmh": 220.7,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 16.8,
+      "headingDeg": 0.73,
+      "sideMetres": 0.02,
+      "speedKmh": 205.5,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 27.9,
+      "headingDeg": 3.15,
+      "sideMetres": 0.2,
+      "speedKmh": 209,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.1,
+      "headingDeg": 6.09,
+      "sideMetres": 0.61,
+      "speedKmh": 210.6,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.6,
+      "headingDeg": 12.19,
+      "sideMetres": 2.25,
+      "speedKmh": 213.6,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.6,
+      "headingDeg": 18.31,
+      "sideMetres": 5.09,
+      "speedKmh": 216.1,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.5,
+      "headingDeg": 27.47,
+      "sideMetres": 11.67,
+      "speedKmh": 219.3,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.5,
+      "headingDeg": 42.7,
+      "sideMetres": 28.46,
+      "speedKmh": 217.7,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.5,
+      "headingDeg": 57.94,
+      "sideMetres": 51.25,
+      "speedKmh": 220.7,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 9.95e-16
+  },
+  {
+   "profile": "turbo",
+   "startKmh": 250,
+   "lockOfTheSimulationDeg": 3.25,
+   "gripLimitMs2": 34.5,
+   "left": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": -1,
+      "steer": -0.46,
+      "yawDegPerSecond": -17.8,
+      "headingDeg": -0.81,
+      "sideMetres": -0.03,
+      "speedKmh": 253.4,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": -1,
+      "steer": -0.92,
+      "yawDegPerSecond": -27.6,
+      "headingDeg": -3.24,
+      "sideMetres": -0.26,
+      "speedKmh": 254.4,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -29.6,
+      "headingDeg": -6.14,
+      "sideMetres": -0.75,
+      "speedKmh": 254.1,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.1,
+      "headingDeg": -12.14,
+      "sideMetres": -2.69,
+      "speedKmh": 253.4,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.1,
+      "headingDeg": -18.17,
+      "sideMetres": -6,
+      "speedKmh": 252.8,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.1,
+      "headingDeg": -27.21,
+      "sideMetres": -13.55,
+      "speedKmh": 251.9,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.1,
+      "headingDeg": -42.29,
+      "sideMetres": -32.52,
+      "speedKmh": 250.6,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": -1,
+      "steer": -1,
+      "yawDegPerSecond": -30.1,
+      "headingDeg": -57.36,
+      "sideMetres": -58.31,
+      "speedKmh": 249.5,
+      "state": 1
+     }
+    ]
+   },
+   "right": {
+    "fullLockAfterSeconds": 0.225,
+    "rows": [
+     {
+      "t": 0.1,
+      "inSteer": 1,
+      "steer": 0.46,
+      "yawDegPerSecond": 17.8,
+      "headingDeg": 0.81,
+      "sideMetres": 0.03,
+      "speedKmh": 253.4,
+      "state": 1
+     },
+     {
+      "t": 0.2,
+      "inSteer": 1,
+      "steer": 0.92,
+      "yawDegPerSecond": 27.6,
+      "headingDeg": 3.24,
+      "sideMetres": 0.26,
+      "speedKmh": 254.4,
+      "state": 1
+     },
+     {
+      "t": 0.3,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 29.6,
+      "headingDeg": 6.14,
+      "sideMetres": 0.75,
+      "speedKmh": 254.1,
+      "state": 1
+     },
+     {
+      "t": 0.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.1,
+      "headingDeg": 12.14,
+      "sideMetres": 2.69,
+      "speedKmh": 253.4,
+      "state": 1
+     },
+     {
+      "t": 0.7,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.1,
+      "headingDeg": 18.17,
+      "sideMetres": 6,
+      "speedKmh": 252.8,
+      "state": 1
+     },
+     {
+      "t": 1,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.1,
+      "headingDeg": 27.21,
+      "sideMetres": 13.55,
+      "speedKmh": 251.9,
+      "state": 1
+     },
+     {
+      "t": 1.5,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.1,
+      "headingDeg": 42.29,
+      "sideMetres": 32.52,
+      "speedKmh": 250.6,
+      "state": 1
+     },
+     {
+      "t": 2,
+      "inSteer": 1,
+      "steer": 1,
+      "yawDegPerSecond": 30.1,
+      "headingDeg": 57.36,
+      "sideMetres": 58.31,
+      "speedKmh": 249.5,
+      "state": 1
+     }
+    ]
+   },
+   "largestMirrorDifference": 1.07e-15
+  }
+ ],
+ "afterHop": [
+  {
+   "request": "full left",
+   "throttle": 1,
+   "hop": "front wheel on rear wheel, 215 km/h onto 150 km/h",
+   "landingSpeedKmh": 183.4,
+   "sideOfTheCarThatWasHit": "right",
+   "disturbanceSeconds": 0.7,
+   "disturbancePeakShareOfTravel": 0.3,
+   "afterTheHop": [
+    {
+     "t": 0.1,
+     "inSteer": -1,
+     "steer": -0.46,
+     "yawDegPerSecond": -9.3,
+     "headingDeg": -0.4,
+     "sideMetres": -0.01,
+     "speedKmh": 184.7,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": -1,
+     "steer": -0.92,
+     "yawDegPerSecond": -24.3,
+     "headingDeg": -2.15,
+     "sideMetres": -0.12,
+     "speedKmh": 189.4,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.1,
+     "headingDeg": -4.97,
+     "sideMetres": -0.45,
+     "speedKmh": 193.4,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": -1,
+     "steer": -0.771,
+     "yawDegPerSecond": -29.4,
+     "headingDeg": -11.07,
+     "sideMetres": -1.99,
+     "speedKmh": 201.8,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.7,
+     "headingDeg": -17.06,
+     "sideMetres": -4.78,
+     "speedKmh": 209.6,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.7,
+     "headingDeg": -26.29,
+     "sideMetres": -11.37,
+     "speedKmh": 219.4,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.5,
+     "headingDeg": -41.59,
+     "sideMetres": -28.59,
+     "speedKmh": 228.5,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.4,
+     "headingDeg": -56.8,
+     "sideMetres": -53.17,
+     "speedKmh": 240.5,
+     "state": 1
+    }
+   ],
+   "normalRaceAtTheSameSpeed": [
+    {
+     "t": 0.1,
+     "inSteer": -1,
+     "steer": -0.46,
+     "yawDegPerSecond": -9.3,
+     "headingDeg": -0.4,
+     "sideMetres": -0.01,
+     "speedKmh": 188.1,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": -1,
+     "steer": -0.92,
+     "yawDegPerSecond": -24.1,
+     "headingDeg": -2.14,
+     "sideMetres": -0.12,
+     "speedKmh": 192.7,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -29.9,
+     "headingDeg": -4.94,
+     "sideMetres": -0.46,
+     "speedKmh": 196.6,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -31.1,
+     "headingDeg": -11.12,
+     "sideMetres": -2.01,
+     "speedKmh": 204.2,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.9,
+     "headingDeg": -17.31,
+     "sideMetres": -4.82,
+     "speedKmh": 211.3,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.7,
+     "headingDeg": -26.55,
+     "sideMetres": -11.52,
+     "speedKmh": 220.9,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.5,
+     "headingDeg": -41.84,
+     "sideMetres": -28.93,
+     "speedKmh": 229.8,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.4,
+     "headingDeg": -57.05,
+     "sideMetres": -53.72,
+     "speedKmh": 241.6,
+     "state": 1
+    }
+   ],
+   "difference": [
+    {
+     "t": 0.2,
+     "steer": 0,
+     "yawDegPerSecond": -0.1,
+     "headingDeg": -0.01,
+     "sideMetres": 0,
+     "speedKmh": -3.3
+    },
+    {
+     "t": 0.35,
+     "steer": 0,
+     "yawDegPerSecond": -0.1,
+     "headingDeg": -0.03,
+     "sideMetres": 0.01,
+     "speedKmh": -3.2
+    },
+    {
+     "t": 0.5,
+     "steer": 0.229,
+     "yawDegPerSecond": 1.7,
+     "headingDeg": 0.05,
+     "sideMetres": 0.02,
+     "speedKmh": -2.4
+    },
+    {
+     "t": 0.7,
+     "steer": 0,
+     "yawDegPerSecond": 0.2,
+     "headingDeg": 0.25,
+     "sideMetres": 0.05,
+     "speedKmh": -1.7
+    },
+    {
+     "t": 1,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0.26,
+     "sideMetres": 0.15,
+     "speedKmh": -1.5
+    },
+    {
+     "t": 2,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0.24,
+     "sideMetres": 0.55,
+     "speedKmh": -1.1
+    }
+   ],
+   "steeringPositionIdenticalFromSeconds": 0.7
+  },
+  {
+   "request": "full left",
+   "throttle": 0,
+   "hop": "front wheel on rear wheel, 215 km/h onto 150 km/h",
+   "landingSpeedKmh": 183.4,
+   "sideOfTheCarThatWasHit": "right",
+   "disturbanceSeconds": 0.7,
+   "disturbancePeakShareOfTravel": 0.3,
+   "afterTheHop": [
+    {
+     "t": 0.1,
+     "inSteer": -1,
+     "steer": -0.46,
+     "yawDegPerSecond": -9.3,
+     "headingDeg": -0.4,
+     "sideMetres": -0.01,
+     "speedKmh": 181.5,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": -1,
+     "steer": -0.92,
+     "yawDegPerSecond": -24.6,
+     "headingDeg": -2.17,
+     "sideMetres": -0.12,
+     "speedKmh": 179.6,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.7,
+     "headingDeg": -5.03,
+     "sideMetres": -0.43,
+     "speedKmh": 177.2,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": -1,
+     "steer": -0.771,
+     "yawDegPerSecond": -30.6,
+     "headingDeg": -11.32,
+     "sideMetres": -1.81,
+     "speedKmh": 173.2,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -32.5,
+     "headingDeg": -17.61,
+     "sideMetres": -4.18,
+     "speedKmh": 169.3,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -33.3,
+     "headingDeg": -27.5,
+     "sideMetres": -9.44,
+     "speedKmh": 162.7,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -34.3,
+     "headingDeg": -44.39,
+     "sideMetres": -22.12,
+     "speedKmh": 151.9,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -35.5,
+     "headingDeg": -61.84,
+     "sideMetres": -38.27,
+     "speedKmh": 141.5,
+     "state": 1
+    }
+   ],
+   "normalRaceAtTheSameSpeed": [
+    {
+     "t": 0.1,
+     "inSteer": -1,
+     "steer": -0.46,
+     "yawDegPerSecond": -9.3,
+     "headingDeg": -0.4,
+     "sideMetres": -0.01,
+     "speedKmh": 181.5,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": -1,
+     "steer": -0.92,
+     "yawDegPerSecond": -24.6,
+     "headingDeg": -2.17,
+     "sideMetres": -0.12,
+     "speedKmh": 179.6,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -30.7,
+     "headingDeg": -5.03,
+     "sideMetres": -0.43,
+     "speedKmh": 177.2,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -32.5,
+     "headingDeg": -11.42,
+     "sideMetres": -1.8,
+     "speedKmh": 172.6,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -32.8,
+     "headingDeg": -17.96,
+     "sideMetres": -4.17,
+     "speedKmh": 168,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -33.4,
+     "headingDeg": -27.89,
+     "sideMetres": -9.47,
+     "speedKmh": 161.5,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -34.4,
+     "headingDeg": -44.83,
+     "sideMetres": -22.17,
+     "speedKmh": 150.7,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": -1,
+     "steer": -1,
+     "yawDegPerSecond": -35.7,
+     "headingDeg": -62.35,
+     "sideMetres": -38.29,
+     "speedKmh": 140.4,
+     "state": 1
+    }
+   ],
+   "difference": [
+    {
+     "t": 0.2,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 0
+    },
+    {
+     "t": 0.35,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 0
+    },
+    {
+     "t": 0.5,
+     "steer": 0.229,
+     "yawDegPerSecond": 1.9,
+     "headingDeg": 0.1,
+     "sideMetres": -0.01,
+     "speedKmh": 0.7
+    },
+    {
+     "t": 0.7,
+     "steer": 0,
+     "yawDegPerSecond": 0.4,
+     "headingDeg": 0.34,
+     "sideMetres": -0.01,
+     "speedKmh": 1.2
+    },
+    {
+     "t": 1,
+     "steer": 0,
+     "yawDegPerSecond": 0.1,
+     "headingDeg": 0.39,
+     "sideMetres": 0.02,
+     "speedKmh": 1.2
+    },
+    {
+     "t": 2,
+     "steer": 0,
+     "yawDegPerSecond": 0.1,
+     "headingDeg": 0.51,
+     "sideMetres": 0.03,
+     "speedKmh": 1.1
+    }
+   ],
+   "steeringPositionIdenticalFromSeconds": 0.7
+  },
+  {
+   "request": "full right",
+   "throttle": 1,
+   "hop": "front wheel on rear wheel, 215 km/h onto 150 km/h",
+   "landingSpeedKmh": 183.4,
+   "sideOfTheCarThatWasHit": "right",
+   "disturbanceSeconds": 0.7,
+   "disturbancePeakShareOfTravel": 0.3,
+   "afterTheHop": [
+    {
+     "t": 0.1,
+     "inSteer": 1,
+     "steer": 0.46,
+     "yawDegPerSecond": 9.3,
+     "headingDeg": 0.4,
+     "sideMetres": 0.01,
+     "speedKmh": 184.7,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": 1,
+     "steer": 0.771,
+     "yawDegPerSecond": 23.6,
+     "headingDeg": 2.14,
+     "sideMetres": 0.12,
+     "speedKmh": 189.4,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": 1,
+     "steer": 0.873,
+     "yawDegPerSecond": 28.9,
+     "headingDeg": 4.82,
+     "sideMetres": 0.45,
+     "speedKmh": 194,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 31.1,
+     "headingDeg": 10.93,
+     "sideMetres": 1.96,
+     "speedKmh": 201.7,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 31,
+     "headingDeg": 17.14,
+     "sideMetres": 4.72,
+     "speedKmh": 209,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 30.7,
+     "headingDeg": 26.39,
+     "sideMetres": 11.31,
+     "speedKmh": 218.9,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 30.5,
+     "headingDeg": 41.69,
+     "sideMetres": 28.55,
+     "speedKmh": 228.1,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 30.4,
+     "headingDeg": 56.91,
+     "sideMetres": 53.12,
+     "speedKmh": 240.1,
+     "state": 1
+    }
+   ],
+   "normalRaceAtTheSameSpeed": [
+    {
+     "t": 0.1,
+     "inSteer": 1,
+     "steer": 0.46,
+     "yawDegPerSecond": 9.3,
+     "headingDeg": 0.4,
+     "sideMetres": 0.01,
+     "speedKmh": 188.1,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": 1,
+     "steer": 0.92,
+     "yawDegPerSecond": 24.1,
+     "headingDeg": 2.14,
+     "sideMetres": 0.12,
+     "speedKmh": 192.7,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 29.9,
+     "headingDeg": 4.94,
+     "sideMetres": 0.46,
+     "speedKmh": 196.6,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 31.1,
+     "headingDeg": 11.12,
+     "sideMetres": 2.01,
+     "speedKmh": 204.2,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 30.9,
+     "headingDeg": 17.31,
+     "sideMetres": 4.82,
+     "speedKmh": 211.3,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 30.7,
+     "headingDeg": 26.55,
+     "sideMetres": 11.52,
+     "speedKmh": 220.9,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 30.5,
+     "headingDeg": 41.84,
+     "sideMetres": 28.93,
+     "speedKmh": 229.8,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 30.4,
+     "headingDeg": 57.05,
+     "sideMetres": 53.72,
+     "speedKmh": 241.6,
+     "state": 1
+    }
+   ],
+   "difference": [
+    {
+     "t": 0.2,
+     "steer": -0.149,
+     "yawDegPerSecond": -0.6,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": -3.3
+    },
+    {
+     "t": 0.35,
+     "steer": 0,
+     "yawDegPerSecond": -0.5,
+     "headingDeg": -0.17,
+     "sideMetres": -0.01,
+     "speedKmh": -2.5
+    },
+    {
+     "t": 0.5,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.19,
+     "sideMetres": -0.04,
+     "speedKmh": -2.4
+    },
+    {
+     "t": 0.7,
+     "steer": 0,
+     "yawDegPerSecond": 0.1,
+     "headingDeg": -0.17,
+     "sideMetres": -0.1,
+     "speedKmh": -2.3
+    },
+    {
+     "t": 1,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.16,
+     "sideMetres": -0.22,
+     "speedKmh": -2
+    },
+    {
+     "t": 2,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.14,
+     "sideMetres": -0.59,
+     "speedKmh": -1.5
+    }
+   ],
+   "steeringPositionIdenticalFromSeconds": 0.35
+  },
+  {
+   "request": "full right",
+   "throttle": 0,
+   "hop": "front wheel on rear wheel, 215 km/h onto 150 km/h",
+   "landingSpeedKmh": 183.4,
+   "sideOfTheCarThatWasHit": "right",
+   "disturbanceSeconds": 0.7,
+   "disturbancePeakShareOfTravel": 0.3,
+   "afterTheHop": [
+    {
+     "t": 0.1,
+     "inSteer": 1,
+     "steer": 0.46,
+     "yawDegPerSecond": 9.3,
+     "headingDeg": 0.4,
+     "sideMetres": 0.01,
+     "speedKmh": 181.5,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": 1,
+     "steer": 0.771,
+     "yawDegPerSecond": 23.8,
+     "headingDeg": 2.16,
+     "sideMetres": 0.12,
+     "speedKmh": 179.6,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": 1,
+     "steer": 0.873,
+     "yawDegPerSecond": 29.5,
+     "headingDeg": 4.88,
+     "sideMetres": 0.43,
+     "speedKmh": 177.8,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 32.4,
+     "headingDeg": 11.18,
+     "sideMetres": 1.78,
+     "speedKmh": 173.2,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 32.8,
+     "headingDeg": 17.7,
+     "sideMetres": 4.13,
+     "speedKmh": 168.7,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 33.3,
+     "headingDeg": 27.62,
+     "sideMetres": 9.39,
+     "speedKmh": 162.1,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 34.4,
+     "headingDeg": 44.54,
+     "sideMetres": 22.06,
+     "speedKmh": 151.3,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 35.6,
+     "headingDeg": 62.02,
+     "sideMetres": 38.17,
+     "speedKmh": 140.9,
+     "state": 1
+    }
+   ],
+   "normalRaceAtTheSameSpeed": [
+    {
+     "t": 0.1,
+     "inSteer": 1,
+     "steer": 0.46,
+     "yawDegPerSecond": 9.3,
+     "headingDeg": 0.4,
+     "sideMetres": 0.01,
+     "speedKmh": 181.5,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": 1,
+     "steer": 0.92,
+     "yawDegPerSecond": 24.6,
+     "headingDeg": 2.17,
+     "sideMetres": 0.12,
+     "speedKmh": 179.6,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 30.7,
+     "headingDeg": 5.03,
+     "sideMetres": 0.43,
+     "speedKmh": 177.2,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 32.5,
+     "headingDeg": 11.42,
+     "sideMetres": 1.8,
+     "speedKmh": 172.6,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 32.8,
+     "headingDeg": 17.96,
+     "sideMetres": 4.17,
+     "speedKmh": 168,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 33.4,
+     "headingDeg": 27.89,
+     "sideMetres": 9.47,
+     "speedKmh": 161.5,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 34.4,
+     "headingDeg": 44.83,
+     "sideMetres": 22.17,
+     "speedKmh": 150.7,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": 1,
+     "steer": 1,
+     "yawDegPerSecond": 35.7,
+     "headingDeg": 62.35,
+     "sideMetres": 38.29,
+     "speedKmh": 140.4,
+     "state": 1
+    }
+   ],
+   "difference": [
+    {
+     "t": 0.2,
+     "steer": -0.149,
+     "yawDegPerSecond": -0.7,
+     "headingDeg": -0.01,
+     "sideMetres": 0,
+     "speedKmh": 0
+    },
+    {
+     "t": 0.35,
+     "steer": 0,
+     "yawDegPerSecond": -0.7,
+     "headingDeg": -0.2,
+     "sideMetres": 0,
+     "speedKmh": 0.6
+    },
+    {
+     "t": 0.5,
+     "steer": 0,
+     "yawDegPerSecond": -0.1,
+     "headingDeg": -0.24,
+     "sideMetres": -0.02,
+     "speedKmh": 0.6
+    },
+    {
+     "t": 0.7,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.25,
+     "sideMetres": -0.04,
+     "speedKmh": 0.6
+    },
+    {
+     "t": 1,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.27,
+     "sideMetres": -0.08,
+     "speedKmh": 0.6
+    },
+    {
+     "t": 2,
+     "steer": 0,
+     "yawDegPerSecond": -0.1,
+     "headingDeg": -0.33,
+     "sideMetres": -0.12,
+     "speedKmh": 0.5
+    }
+   ],
+   "steeringPositionIdenticalFromSeconds": 0.35
+  },
+  {
+   "request": "hands off",
+   "throttle": 1,
+   "hop": "front wheel on rear wheel, 215 km/h onto 150 km/h",
+   "landingSpeedKmh": 183.4,
+   "sideOfTheCarThatWasHit": "right",
+   "disturbanceSeconds": 0.7,
+   "disturbancePeakShareOfTravel": 0.3,
+   "afterTheHop": [
+    {
+     "t": 0.1,
+     "inSteer": 0,
+     "steer": -0.102,
+     "yawDegPerSecond": -1.7,
+     "headingDeg": -0.06,
+     "sideMetres": 0,
+     "speedKmh": 184.7,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": 0,
+     "steer": -0.229,
+     "yawDegPerSecond": -6.3,
+     "headingDeg": -0.47,
+     "sideMetres": -0.02,
+     "speedKmh": 189.4,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": 0,
+     "steer": -0.127,
+     "yawDegPerSecond": -6.7,
+     "headingDeg": -1.19,
+     "sideMetres": -0.1,
+     "speedKmh": 194,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": 0,
+     "steer": 0.229,
+     "yawDegPerSecond": 6.3,
+     "headingDeg": -1.15,
+     "sideMetres": -0.37,
+     "speedKmh": 202.7,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 1.8,
+     "headingDeg": -0.13,
+     "sideMetres": -0.48,
+     "speedKmh": 211,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.03,
+     "sideMetres": -0.49,
+     "speedKmh": 222.2,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.03,
+     "sideMetres": -0.51,
+     "speedKmh": 233.5,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.03,
+     "sideMetres": -0.53,
+     "speedKmh": 247.5,
+     "state": 1
+    }
+   ],
+   "normalRaceAtTheSameSpeed": [
+    {
+     "t": 0.1,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 188.1,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 192.7,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 197.2,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 205.8,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 213.9,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 221.3,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 235.7,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 249.3,
+     "state": 1
+    }
+   ],
+   "difference": [
+    {
+     "t": 0.2,
+     "steer": -0.229,
+     "yawDegPerSecond": -6.3,
+     "headingDeg": -0.47,
+     "sideMetres": -0.02,
+     "speedKmh": -3.3
+    },
+    {
+     "t": 0.35,
+     "steer": 0,
+     "yawDegPerSecond": -3.9,
+     "headingDeg": -1.45,
+     "sideMetres": -0.17,
+     "speedKmh": -3.2
+    },
+    {
+     "t": 0.5,
+     "steer": 0.229,
+     "yawDegPerSecond": 6.3,
+     "headingDeg": -1.15,
+     "sideMetres": -0.37,
+     "speedKmh": -3
+    },
+    {
+     "t": 0.7,
+     "steer": 0,
+     "yawDegPerSecond": 1.8,
+     "headingDeg": -0.13,
+     "sideMetres": -0.48,
+     "speedKmh": -2.9
+    },
+    {
+     "t": 1,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.03,
+     "sideMetres": -0.49,
+     "speedKmh": 0.9
+    },
+    {
+     "t": 2,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": -0.03,
+     "sideMetres": -0.53,
+     "speedKmh": -1.9
+    }
+   ],
+   "steeringPositionIdenticalFromSeconds": 0.7
+  },
+  {
+   "request": "hands off",
+   "throttle": 0,
+   "hop": "front wheel on rear wheel, 215 km/h onto 150 km/h",
+   "landingSpeedKmh": 183.4,
+   "sideOfTheCarThatWasHit": "right",
+   "disturbanceSeconds": 0.7,
+   "disturbancePeakShareOfTravel": 0.3,
+   "afterTheHop": [
+    {
+     "t": 0.1,
+     "inSteer": 0,
+     "steer": -0.102,
+     "yawDegPerSecond": -1.7,
+     "headingDeg": -0.06,
+     "sideMetres": 0,
+     "speedKmh": 181.5,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": 0,
+     "steer": -0.229,
+     "yawDegPerSecond": -6.4,
+     "headingDeg": -0.48,
+     "sideMetres": -0.02,
+     "speedKmh": 179.6,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": 0,
+     "steer": -0.127,
+     "yawDegPerSecond": -6.8,
+     "headingDeg": -1.2,
+     "sideMetres": -0.1,
+     "speedKmh": 177.8,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": 0,
+     "steer": 0.229,
+     "yawDegPerSecond": 6.6,
+     "headingDeg": -1.16,
+     "sideMetres": -0.34,
+     "speedKmh": 174.2,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 1.9,
+     "headingDeg": -0.09,
+     "sideMetres": -0.42,
+     "speedKmh": 170.8,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0.02,
+     "sideMetres": -0.42,
+     "speedKmh": 165.7,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0.02,
+     "sideMetres": -0.42,
+     "speedKmh": 157.8,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0.02,
+     "sideMetres": -0.41,
+     "speedKmh": 149.7,
+     "state": 1
+    }
+   ],
+   "normalRaceAtTheSameSpeed": [
+    {
+     "t": 0.1,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 181.5,
+     "state": 1
+    },
+    {
+     "t": 0.2,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 179.6,
+     "state": 1
+    },
+    {
+     "t": 0.3,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 177.8,
+     "state": 1
+    },
+    {
+     "t": 0.5,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 174.2,
+     "state": 1
+    },
+    {
+     "t": 0.7,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 170.8,
+     "state": 1
+    },
+    {
+     "t": 1,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 165.7,
+     "state": 1
+    },
+    {
+     "t": 1.5,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 157.8,
+     "state": 1
+    },
+    {
+     "t": 2,
+     "inSteer": 0,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0,
+     "sideMetres": 0,
+     "speedKmh": 149.7,
+     "state": 1
+    }
+   ],
+   "difference": [
+    {
+     "t": 0.2,
+     "steer": -0.229,
+     "yawDegPerSecond": -6.4,
+     "headingDeg": -0.48,
+     "sideMetres": -0.02,
+     "speedKmh": 0
+    },
+    {
+     "t": 0.35,
+     "steer": 0,
+     "yawDegPerSecond": -4,
+     "headingDeg": -1.47,
+     "sideMetres": -0.16,
+     "speedKmh": 0
+    },
+    {
+     "t": 0.5,
+     "steer": 0.229,
+     "yawDegPerSecond": 6.6,
+     "headingDeg": -1.16,
+     "sideMetres": -0.34,
+     "speedKmh": 0
+    },
+    {
+     "t": 0.7,
+     "steer": 0,
+     "yawDegPerSecond": 1.9,
+     "headingDeg": -0.09,
+     "sideMetres": -0.42,
+     "speedKmh": 0
+    },
+    {
+     "t": 1,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0.02,
+     "sideMetres": -0.42,
+     "speedKmh": 0
+    },
+    {
+     "t": 2,
+     "steer": 0,
+     "yawDegPerSecond": 0,
+     "headingDeg": 0.02,
+     "sideMetres": -0.41,
+     "speedKmh": 0
+    }
+   ],
+   "steeringPositionIdenticalFromSeconds": 0.7
+  }
+ ],
+ "drawings": {
+  "frontWheelDrawings": 5,
+  "notchesEachSide": 2,
+  "largestAngleDrawnDeg": 14.9,
+  "steeringWheelRotationAtFullLockDeg": 54.4,
+  "bySpeed": [
+   {
+    "kmh": 30,
+    "angleOfTheSimulationAtFullLockDeg": 19.48,
+    "angleDrawnAtFullLockDeg": 14.9,
+    "notchAtFullLock": 2,
+    "changes": [
+     {
+      "notch": 1,
+      "afterSeconds": 0.05,
+      "atShareOfTravel": 0.23,
+      "simulatedAngleDeg": 4.48
+     },
+     {
+      "notch": 2,
+      "afterSeconds": 0.15,
+      "atShareOfTravel": 0.69,
+      "simulatedAngleDeg": 13.44
+     }
+    ]
+   },
+   {
+    "kmh": 60,
+    "angleOfTheSimulationAtFullLockDeg": 13.77,
+    "angleDrawnAtFullLockDeg": 14.9,
+    "notchAtFullLock": 2,
+    "changes": [
+     {
+      "notch": 1,
+      "afterSeconds": 0.058,
+      "atShareOfTravel": 0.27,
+      "simulatedAngleDeg": 3.69
+     },
+     {
+      "notch": 2,
+      "afterSeconds": 0.158,
+      "atShareOfTravel": 0.73,
+      "simulatedAngleDeg": 10.03
+     }
+    ]
+   },
+   {
+    "kmh": 100,
+    "angleOfTheSimulationAtFullLockDeg": 5.51,
+    "angleDrawnAtFullLockDeg": 14.1,
+    "notchAtFullLock": 2,
+    "changes": [
+     {
+      "notch": 1,
+      "afterSeconds": 0.058,
+      "atShareOfTravel": 0.27,
+      "simulatedAngleDeg": 1.48
+     },
+     {
+      "notch": 2,
+      "afterSeconds": 0.175,
+      "atShareOfTravel": 0.8,
+      "simulatedAngleDeg": 4.43
+     }
+    ]
+   },
+   {
+    "kmh": 150,
+    "angleOfTheSimulationAtFullLockDeg": 2.86,
+    "angleDrawnAtFullLockDeg": 13.1,
+    "notchAtFullLock": 2,
+    "changes": [
+     {
+      "notch": 1,
+      "afterSeconds": 0.067,
+      "atShareOfTravel": 0.31,
+      "simulatedAngleDeg": 0.88
+     },
+     {
+      "notch": 2,
+      "afterSeconds": 0.192,
+      "atShareOfTravel": 0.88,
+      "simulatedAngleDeg": 2.53
+     }
+    ]
+   },
+   {
+    "kmh": 200,
+    "angleOfTheSimulationAtFullLockDeg": 1.93,
+    "angleDrawnAtFullLockDeg": 12.4,
+    "notchAtFullLock": 2,
+    "changes": [
+     {
+      "notch": 1,
+      "afterSeconds": 0.067,
+      "atShareOfTravel": 0.31,
+      "simulatedAngleDeg": 0.59
+     },
+     {
+      "notch": 2,
+      "afterSeconds": 0.2,
+      "atShareOfTravel": 0.92,
+      "simulatedAngleDeg": 1.78
+     }
+    ]
+   },
+   {
+    "kmh": 250,
+    "angleOfTheSimulationAtFullLockDeg": 1.5,
+    "angleDrawnAtFullLockDeg": 11.8,
+    "notchAtFullLock": 2,
+    "changes": [
+     {
+      "notch": 1,
+      "afterSeconds": 0.075,
+      "atShareOfTravel": 0.34,
+      "simulatedAngleDeg": 0.52
+     },
+     {
+      "notch": 2,
+      "afterSeconds": 0.208,
+      "atShareOfTravel": 0.96,
+      "simulatedAngleDeg": 1.44
+     }
+    ]
+   },
+   {
+    "kmh": 300,
+    "angleOfTheSimulationAtFullLockDeg": 1.27,
+    "angleDrawnAtFullLockDeg": 11.5,
+    "notchAtFullLock": 2,
+    "changes": [
+     {
+      "notch": 1,
+      "afterSeconds": 0.075,
+      "atShareOfTravel": 0.34,
+      "simulatedAngleDeg": 0.44
+     },
+     {
+      "notch": 2,
+      "afterSeconds": 0.217,
+      "atShareOfTravel": 1,
+      "simulatedAngleDeg": 1.27
+     }
+    ]
+   }
+  ]
+ },
+ "turningCircle": [
+  {
+   "kmh": 60,
+   "radiusM": 14.1,
+   "yawDegPerSecond": 67.9,
+   "lateralG": 2.01,
+   "secondsForAQuarterTurn": 1.33
+  },
+  {
+   "kmh": 100,
+   "radiusM": 35.7,
+   "yawDegPerSecond": 44.5,
+   "lateralG": 2.2,
+   "secondsForAQuarterTurn": 2.02
+  },
+  {
+   "kmh": 150,
+   "radiusM": 68.9,
+   "yawDegPerSecond": 34.7,
+   "lateralG": 2.57,
+   "secondsForAQuarterTurn": 2.6
+  },
+  {
+   "kmh": 200,
+   "radiusM": 102,
+   "yawDegPerSecond": 31.2,
+   "lateralG": 3.08,
+   "secondsForAQuarterTurn": 2.88
+  },
+  {
+   "kmh": 250,
+   "radiusM": 131.2,
+   "yawDegPerSecond": 30.3,
+   "lateralG": 3.75,
+   "secondsForAQuarterTurn": 2.97
+  },
+  {
+   "kmh": 300,
+   "radiusM": 155.4,
+   "yawDegPerSecond": 30.7,
+   "lateralG": 4.55,
+   "secondsForAQuarterTurn": 2.93
+  }
+ ],
+ "circuits": [
+  {
+   "id": "hazelbrook",
+   "bends": 8,
+   "tightestRadiusM": 69.8,
+   "tightestOnTheRacingLineM": 91.2,
+   "highestSpeedThroughTheTightestKmh": 183.2,
+   "limitSpeedOfTheComputerThereKmh": 166.4,
+   "bendsTooTightAt150": 0,
+   "bendsTooTightAt200": 3,
+   "bendsTooTightAt250": 6
+  },
+  {
+   "id": "porto-sereno",
+   "bends": 9,
+   "tightestRadiusM": 44.8,
+   "tightestOnTheRacingLineM": 44.3,
+   "highestSpeedThroughTheTightestKmh": 113.5,
+   "limitSpeedOfTheComputerThereKmh": 105,
+   "bendsTooTightAt150": 5,
+   "bendsTooTightAt200": 8,
+   "bendsTooTightAt250": 9
+  },
+  {
+   "id": "montclair",
+   "bends": 10,
+   "tightestRadiusM": 49.8,
+   "tightestOnTheRacingLineM": 51,
+   "highestSpeedThroughTheTightestKmh": 123.5,
+   "limitSpeedOfTheComputerThereKmh": 114.1,
+   "bendsTooTightAt150": 5,
+   "bendsTooTightAt200": 8,
+   "bendsTooTightAt250": 10
+  },
+  {
+   "id": "sablon",
+   "bends": 8,
+   "tightestRadiusM": 89.9,
+   "tightestOnTheRacingLineM": 104.2,
+   "highestSpeedThroughTheTightestKmh": 203.4,
+   "limitSpeedOfTheComputerThereKmh": 183.4,
+   "bendsTooTightAt150": 0,
+   "bendsTooTightAt200": 0,
+   "bendsTooTightAt250": 4
+  },
+  {
+   "id": "kestrel-fields",
+   "bends": 10,
+   "tightestRadiusM": 37.7,
+   "tightestOnTheRacingLineM": 38.5,
+   "highestSpeedThroughTheTightestKmh": 104.5,
+   "limitSpeedOfTheComputerThereKmh": 96.8,
+   "bendsTooTightAt150": 8,
+   "bendsTooTightAt200": 10,
+   "bendsTooTightAt250": 10
+  },
+  {
+   "id": "aurelia-parc",
+   "bends": 11,
+   "tightestRadiusM": 34.7,
+   "tightestOnTheRacingLineM": 36.6,
+   "highestSpeedThroughTheTightestKmh": 101.4,
+   "limitSpeedOfTheComputerThereKmh": 94,
+   "bendsTooTightAt150": 8,
+   "bendsTooTightAt200": 10,
+   "bendsTooTightAt250": 11
+  },
+  {
+   "id": "lindqvist",
+   "bends": 9,
+   "tightestRadiusM": 59.8,
+   "tightestOnTheRacingLineM": 55.3,
+   "highestSpeedThroughTheTightestKmh": 130,
+   "limitSpeedOfTheComputerThereKmh": 119.8,
+   "bendsTooTightAt150": 2,
+   "bendsTooTightAt200": 5,
+   "bendsTooTightAt250": 8
+  },
+  {
+   "id": "baia-dourada",
+   "bends": 11,
+   "tightestRadiusM": 39.8,
+   "tightestOnTheRacingLineM": 45.6,
+   "highestSpeedThroughTheTightestKmh": 115.5,
+   "limitSpeedOfTheComputerThereKmh": 106.8,
+   "bendsTooTightAt150": 4,
+   "bendsTooTightAt200": 8,
+   "bendsTooTightAt250": 10
+  },
+  {
+   "id": "roca-alta",
+   "bends": 12,
+   "tightestRadiusM": 44.8,
+   "tightestOnTheRacingLineM": 48,
+   "highestSpeedThroughTheTightestKmh": 119.1,
+   "limitSpeedOfTheComputerThereKmh": 110.1,
+   "bendsTooTightAt150": 8,
+   "bendsTooTightAt200": 12,
+   "bendsTooTightAt250": 12
+  },
+  {
+   "id": "tannenring",
+   "bends": 10,
+   "tightestRadiusM": 59.8,
+   "tightestOnTheRacingLineM": 71.2,
+   "highestSpeedThroughTheTightestKmh": 153.3,
+   "limitSpeedOfTheComputerThereKmh": 140.5,
+   "bendsTooTightAt150": 0,
+   "bendsTooTightAt200": 3,
+   "bendsTooTightAt250": 10
+  },
+  {
+   "id": "meridian-docks",
+   "bends": 10,
+   "tightestRadiusM": 31.7,
+   "tightestOnTheRacingLineM": 31.9,
+   "highestSpeedThroughTheTightestKmh": 93.7,
+   "limitSpeedOfTheComputerThereKmh": 87,
+   "bendsTooTightAt150": 10,
+   "bendsTooTightAt200": 10,
+   "bendsTooTightAt250": 10
+  },
+  {
+   "id": "kagerou-hills",
+   "bends": 11,
+   "tightestRadiusM": 49.8,
+   "tightestOnTheRacingLineM": 50.4,
+   "highestSpeedThroughTheTightestKmh": 122.7,
+   "limitSpeedOfTheComputerThereKmh": 113.3,
+   "bendsTooTightAt150": 3,
+   "bendsTooTightAt200": 9,
+   "bendsTooTightAt250": 11
+  },
+  {
+   "id": "silverlake",
+   "bends": 11,
+   "tightestRadiusM": 49.8,
+   "tightestOnTheRacingLineM": 50.5,
+   "highestSpeedThroughTheTightestKmh": 122.9,
+   "limitSpeedOfTheComputerThereKmh": 113.5,
+   "bendsTooTightAt150": 3,
+   "bendsTooTightAt200": 4,
+   "bendsTooTightAt250": 7
+  },
+  {
+   "id": "costa-brisa",
+   "bends": 11,
+   "tightestRadiusM": 59.8,
+   "tightestOnTheRacingLineM": 58.4,
+   "highestSpeedThroughTheTightestKmh": 134.6,
+   "limitSpeedOfTheComputerThereKmh": 123.9,
+   "bendsTooTightAt150": 2,
+   "bendsTooTightAt200": 7,
+   "bendsTooTightAt250": 9
+  },
+  {
+   "id": "ouarzane",
+   "bends": 11,
+   "tightestRadiusM": 39.7,
+   "tightestOnTheRacingLineM": 42.9,
+   "highestSpeedThroughTheTightestKmh": 111.3,
+   "limitSpeedOfTheComputerThereKmh": 103,
+   "bendsTooTightAt150": 6,
+   "bendsTooTightAt200": 10,
+   "bendsTooTightAt250": 10
+  },
+  {
+   "id": "glenmoor",
+   "bends": 11,
+   "tightestRadiusM": 59.8,
+   "tightestOnTheRacingLineM": 61.8,
+   "highestSpeedThroughTheTightestKmh": 139.6,
+   "limitSpeedOfTheComputerThereKmh": 128.4,
+   "bendsTooTightAt150": 1,
+   "bendsTooTightAt200": 7,
+   "bendsTooTightAt250": 9
+  },
+  {
+   "id": "nova-belvedere",
+   "bends": 13,
+   "tightestRadiusM": 29.7,
+   "tightestOnTheRacingLineM": 34.5,
+   "highestSpeedThroughTheTightestKmh": 97.9,
+   "limitSpeedOfTheComputerThereKmh": 90.9,
+   "bendsTooTightAt150": 12,
+   "bendsTooTightAt200": 12,
+   "bendsTooTightAt250": 13
+  },
+  {
+   "id": "grand-zenith",
+   "bends": 15,
+   "tightestRadiusM": 49.8,
+   "tightestOnTheRacingLineM": 48.3,
+   "highestSpeedThroughTheTightestKmh": 119.5,
+   "limitSpeedOfTheComputerThereKmh": 110.4,
+   "bendsTooTightAt150": 2,
+   "bendsTooTightAt200": 6,
+   "bendsTooTightAt250": 10
+  }
+ ]
+}

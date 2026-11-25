@@ -24,10 +24,35 @@ export const CAR_DIMENSIONS = {
  * The right one is its reflection. Every view is drawn from this single definition: the car model seen
  * from outside, and the cockpit drawing, which projects it from the driver's eye.
  * (y: 2.5 cm closer to the centre line than at first, and the foot of the arm brought onto the rim of the
- * cockpit, which it used to miss by a few centimetres: a proposal after a player found the mirrors slightly
- * too far apart; see work/renders/comparison/mirror-variants.jpg.)
+ * cockpit: a proposal after a player found the mirrors slightly too far apart; see
+ * work/renders/comparison/mirror-variants.jpg. That distance is not touched here.)
+ *
+ * Height (lot 5: after the trials of PR #4 the player asked for the mirrors to be raised slightly). Three
+ * heights of the housing, everything else equal (distance to the centre line, size, foot of the arm on the rim
+ * of the cockpit: the arm simply rises to a housing that stands higher):
+ *   a: the height of PR #4;   b: 2.5 cm higher, the mount of the game (a proposal: the most discreet of the
+ *   two corrections, awaiting the player's validation);   c: 5 cm higher.
+ * They can be tried in the real game with the launch option #mirrors=a (or b, c) and are compared on
+ * work/renders/comparison/mirror-heights.jpg.
  */
-export const MIRROR_MOUNT = { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] };
+export const MIRROR_PRESETS = {
+  a: { x: 0.4, y: 0.395, z: 0.675, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] },
+  b: { x: 0.4, y: 0.395, z: 0.7, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] },
+  c: { x: 0.4, y: 0.395, z: 0.725, width: 0.14, height: 0.075, arm: [0.4, 0.25, 0.585] },
+};
+export const MIRROR_DEFAULT = 'b';
+export const MIRROR_MOUNT = { ...MIRROR_PRESETS[MIRROR_DEFAULT], arm: [...MIRROR_PRESETS[MIRROR_DEFAULT].arm] };
+
+/**
+ * Use another mirror mount (a key of MIRROR_PRESETS) for the drawings made from now on. To be called
+ * before the art is generated; returns false, and changes nothing, for an unknown name.
+ */
+export function selectMirrorPreset(name) {
+  const preset = MIRROR_PRESETS[String(name || '').toLowerCase()];
+  if (!preset) return false;
+  Object.assign(MIRROR_MOUNT, preset, { arm: [...preset.arm] });
+  return true;
+}
 
 function sgnPow(v, e) { return v < 0 ? -Math.pow(-v, e) : Math.pow(v, e); }
 

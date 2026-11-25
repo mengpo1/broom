@@ -1,0 +1,187 @@
+{
+ "note": "packs of 5 to 12 cars on a straight, drivers drawn at random (about a quarter of them doing what they can to stay under the car in flight), one car thrown in the air per pack; seeded, simulation only",
+ "limits": {
+  "flightWaitMax": 3.5,
+  "flightYieldSpeed": 8
+ },
+ "total": {
+  "packs": 1000,
+  "flights": 1573,
+  "hops": 703,
+  "accidents": 870,
+  "waited": 308,
+  "putBack": 1,
+  "setDownInACar": 0,
+  "drivenThroughAfter": 0,
+  "touchingAfter": 58,
+  "offVelocity": 0,
+  "notEnded": 0,
+  "stillUpAtTheEnd": 6,
+  "longestWait": 3.62,
+  "longestFlight": 4.35,
+  "wreckDrivenThrough": 352,
+  "twoInTheAir": 4,
+  "landedBehind": 38,
+  "fasterThanAtTakeOff": 0,
+  "notANumber": 0,
+  "waitedAndLostOver30KmhInAStep": 0,
+  "largestLossInAStepKmh": 4,
+  "waitedAndTookBackOver7Kmh": 48,
+  "mostSpeedTakenBackKmh": 29,
+  "flewBackwards": 29,
+  "furthestBackwardsM": 13.7,
+  "beganToWaitMoreThanTwice": 0,
+  "mostTimesALandingBeganToWait": 2
+ },
+ "waitSeconds": {
+  "median": 0.33,
+  "p90": 1.48,
+  "p99": 2.94,
+  "longest": 3.62
+ },
+ "toLookAt": [
+  {
+   "pack": 159,
+   "cars": 11,
+   "car": 0,
+   "kind": "hop",
+   "seconds": 2.8,
+   "waited": 2.28,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0.01
+  },
+  {
+   "pack": 228,
+   "cars": 10,
+   "car": 0,
+   "kind": "accident",
+   "seconds": 3.97,
+   "waited": 3.12,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  },
+  {
+   "pack": 284,
+   "cars": 11,
+   "car": 0,
+   "kind": "hop",
+   "seconds": 3.98,
+   "waited": 3.29,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0.02
+  },
+  {
+   "pack": 371,
+   "cars": 11,
+   "car": 0,
+   "kind": "accident",
+   "seconds": 2.95,
+   "waited": 2.08,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  },
+  {
+   "pack": 480,
+   "cars": 11,
+   "car": 0,
+   "kind": "accident",
+   "seconds": 3.38,
+   "waited": 2.53,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  },
+  {
+   "pack": 536,
+   "cars": 11,
+   "car": 0,
+   "kind": "hop",
+   "seconds": 3.48,
+   "waited": 2.94,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0.02
+  },
+  {
+   "pack": 706,
+   "cars": 8,
+   "car": 0,
+   "kind": "accident",
+   "seconds": 3.14,
+   "waited": 2.24,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  },
+  {
+   "pack": 849,
+   "cars": 9,
+   "car": 0,
+   "kind": "accident",
+   "seconds": 4.35,
+   "waited": 3.62,
+   "putBack": true,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  },
+  {
+   "pack": 879,
+   "cars": 6,
+   "car": 0,
+   "kind": "accident",
+   "seconds": 3.11,
+   "waited": 2.11,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  },
+  {
+   "pack": 926,
+   "cars": 8,
+   "car": 0,
+   "kind": "hop",
+   "seconds": 2.79,
+   "waited": 2.34,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0.03
+  },
+  {
+   "pack": 928,
+   "cars": 12,
+   "car": 0,
+   "kind": "hop",
+   "seconds": 2.64,
+   "waited": 2.05,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  },
+  {
+   "pack": 937,
+   "cars": 11,
+   "car": 0,
+   "kind": "hop",
+   "seconds": 2.69,
+   "waited": 2.06,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  },
+  {
+   "pack": 989,
+   "cars": 10,
+   "car": 0,
+   "kind": "accident",
+   "seconds": 3.48,
+   "waited": 2.63,
+   "putBack": false,
+   "setDownInACar": 0,
+   "overlappingAfter": 0
+  }
+ ]
+}

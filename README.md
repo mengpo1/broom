@@ -21,7 +21,7 @@ chromium --enable-features=Vulkan index.html      # Linux : Vulkan aide WebGPU s
 
 Pour essayer les collisions rares (saut récupérable, accident violent, panneau) sans attendre
 qu'elles arrivent en course, un banc d'essai de développement s'ouvre avec une option de
-lancement ; touches 1 à 5 pour choisir un cas, Entrée pour rejouer
+lancement ; touches 1 à 7 pour choisir un cas, Entrée pour rejouer
 (`docs/specifications/collision-test-bench.md`) :
 
 ```bash
@@ -46,7 +46,7 @@ en écran partagé (haut/bas ou gauche/droite). 18 circuits originaux, 16 advers
 ## Contenu du dépôt
 
 ```
-index.html            le jeu autonome (construit depuis src/), 1 068 261 octets
+index.html            le jeu autonome (construit depuis src/), 1 112 114 octets
 race-replay.mp4       démonstration, 60 s, 2560x1440, 60 i/s (enregistrée avant le travail sur les collisions)
 src/                  sources (voir docs/architecture/overview.md)
 tests/                tests automatisés (Node et navigateur)
@@ -59,8 +59,10 @@ work/
   scripts/            construction, captures, benchmark, vidéo, rapports
   renders/            captures de référence (final/ : les 20 captures 2560x1440 de la revue artistique, en JPEG)
     collisions/       scénarios de collision joués dans le jeu : vidéos 60 i/s, planches, télémétrie, images clés ;
-                      saut récupérable et accident violent côte à côte (hop-vs-accident.mp4)
-    comparison/       roues (avant / après, jusqu'à la vitesse maximale) et trois positions des rétroviseurs
+                      saut récupérable et accident violent côte à côte (hop-vs-accident.mp4) ; le contact de roues
+                      au ralenti avec son schéma vu de dessus (wheel-contact.mp4)
+    comparison/       roues (avant / après, jusqu'à la vitesse maximale), trois écartements et trois hauteurs
+                      des rétroviseurs (mirror-variants.jpg, mirror-heights.jpg)
   benchmarks/         résultats bruts (JSON)
   reviews/            comptes rendus des critiques (revue artistique, revue des séquences de collision)
 references/           volontairement vide : aucune image de référence n'est embarquée par le jeu
@@ -128,6 +130,8 @@ résultats à l'écran et dans `window.virageBenchmark`).
 | Collisions, décollages, accidents ; comparaison avec l'analyse vidéo ; non-régression de la conduite | `docs/specifications/collisions.md` |
 | Rotation des roues avant et rétroviseurs du cockpit (avant / après) | `docs/specifications/wheels-and-mirrors.md` |
 | Tester les décollages à la main (banc d'essai, option `#lab=…`) | `docs/specifications/collision-test-bench.md` |
+| Lot 5 : ce qui a changé après les essais de la PR #4, commandes d'essai, non-régression, points à arbitrer | `docs/specifications/lot5-validation.md` |
+| Diagnostic chiffré du braquage (commandes, simulation, dessin) | `docs/specifications/steering-diagnosis.md` |
 | Résultats des tests | `docs/specifications/tests.md` |
 | Rapport de performances | `docs/specifications/performance.md` |
 | Compatibilité Linux | `docs/specifications/linux-compatibility.md` |
